@@ -16,6 +16,13 @@ func main() {
 
 	r := gin.Default()
 
+	r.GET("/api/v1/addresses", addressesHandler)
+	r.GET("/api/v1/blocks", blocksHandler)
+	r.GET("/api/v1/contracts", contractsHandler)
+	r.GET("/api/v1/prices", pricesHandler)
+	r.GET("/api/v1/tokens", tokensHandler)
+	r.GET("/api/v1/transactions", transactionsHandler)
+
 	r.GET("/status", statusHandler)
 
 	if shouldServeTLS() {
@@ -62,4 +69,28 @@ func requireParams(requiredParams []string, c *gin.Context) error {
 
 func statusHandler(c *gin.Context) {
 	render(nil, 204, c)
+}
+
+func addressesHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func blocksHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func contractsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func pricesHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func tokensHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func transactionsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
 }
