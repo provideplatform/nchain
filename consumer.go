@@ -28,6 +28,11 @@ func RunConsumer() {
 	}
 }
 
-func priceTick(msg *GdaxMessage) {
-	Log.Infof("Price ticked; %s", msg)
+func priceTick(msg *GdaxMessage) error {
+	if msg.Type == "done" && msg.Reason == "filled" && msg.Price != "" {
+		Log.Infof("Price ticked; %s", msg)
+	} else {
+		Log.Debugf("Dropping GDAX message; %s", msg)
+	}
+	return nil
 }
