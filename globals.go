@@ -37,7 +37,7 @@ func bootstrap() {
 		if lvl == "" {
 			lvl = "INFO"
 		}
-		logger.NewLogger("goldmine", lvl, true)
+		Log = logger.NewLogger("goldmine", lvl, true)
 	})
 }
 
