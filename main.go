@@ -14,6 +14,8 @@ func main() {
 	bootstrap()
 	migrateSchema()
 
+	RunConsumer()
+
 	r := gin.Default()
 
 	r.GET("/api/v1/addresses", addressesHandler)

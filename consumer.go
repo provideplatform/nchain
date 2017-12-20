@@ -11,7 +11,7 @@ var (
 	waitGroup sync.WaitGroup
 )
 
-func Consume() {
+func RunConsumer() {
 	consumers := []*amqputil.Consumer{
 		GdaxMessageConsumerFactory(Log, priceTick, "BTC-USD"),
 		GdaxMessageConsumerFactory(Log, priceTick, "ETH-USD"),
