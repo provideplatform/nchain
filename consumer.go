@@ -22,12 +22,10 @@ func RunConsumer() {
 		waitGroup.Add(1)
 		go func() {
 			consumer.Run()
+			waitGroup.Done()
 			Log.Infof("Exiting ticker message consumer %s", consumer)
 		}()
 	}
-
-	waitGroup.Wait()
-	Log.Infof("Exiting consumer")
 }
 
 func priceTick(msg *GdaxMessage) {
