@@ -13,19 +13,24 @@ var (
 
 func RunConsumer() {
 	consumers := []*amqputil.Consumer{
-		GdaxMessageConsumerFactory(Log, priceTick, "BTC-USD"),
+		// GdaxMessageConsumerFactory(Log, priceTick, "BTC-USD"),
 		GdaxMessageConsumerFactory(Log, priceTick, "ETH-USD"),
-		GdaxMessageConsumerFactory(Log, priceTick, "LTC-USD"),
+		// GdaxMessageConsumerFactory(Log, priceTick, "LTC-USD"),
 	}
 
 	for _, consumer := range consumers {
 		waitGroup.Add(1)
 		go func() {
-			consumer.Run()
-			waitGroup.Done()
-			Log.Infof("Exiting ticker message consumer %s", consumer)
+			err := consumer.Run()
+			if err != nil {
+				Log.Warningf("Consumer exited unexpectedly; %s", err)
+			} else {
+				Log.Infof("Exiting consumer %s", consumer)
+			}
 		}()
 	}
+
+	waitGroup.Wait()
 }
 
 func priceTick(msg *GdaxMessage) error {
