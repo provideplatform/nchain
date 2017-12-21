@@ -4,38 +4,47 @@ import (
 	"sync"
 
 	. "github.com/kthomas/exchange-consumer"
-	amqputil "github.com/kthomas/go-amqputil"
 )
 
 var (
 	waitGroup sync.WaitGroup
+
+	currencyPairs = []string{
+		"BTC-USD",
+		"ETH-USD",
+		"LTC-USD",
+	}
 )
 
-func RunConsumer() {
-	consumers := []*amqputil.Consumer{
-		// GdaxMessageConsumerFactory(Log, priceTick, "BTC-USD"),
-		GdaxMessageConsumerFactory(Log, priceTick, "ETH-USD"),
-		// GdaxMessageConsumerFactory(Log, priceTick, "LTC-USD"),
-	}
+func RunConsumers() {
+	Log.Infof("Starting consumers...")
 
-	for _, consumer := range consumers {
+	go func() {
 		waitGroup.Add(1)
-		go func() {
-			err := consumer.Run()
-			if err != nil {
-				Log.Warningf("Consumer exited unexpectedly; %s", err)
-			} else {
-				Log.Infof("Exiting consumer %s", consumer)
-			}
-		}()
-	}
+		for _, currencyPair := range currencyPairs {
+			runConsumer(currencyPair)
+		}
+		waitGroup.Wait()
+	}()
+}
 
-	waitGroup.Wait()
+func runConsumer(currencyPair string) {
+	waitGroup.Add(1)
+	go func() {
+		consumer := GdaxMessageConsumerFactory(Log, priceTick, currencyPair)
+		err := consumer.Run()
+		if err != nil {
+			Log.Warningf("Consumer exited unexpectedly; %s", err)
+		} else {
+			Log.Infof("Exiting consumer %s", consumer)
+		}
+	}()
 }
 
 func priceTick(msg *GdaxMessage) error {
 	if msg.Type == "done" && msg.Reason == "filled" && msg.Price != "" {
 		Log.Infof("Price ticked; %s", msg)
+		// SetPrice(msg.ProductId)
 	} else {
 		Log.Debugf("Dropping GDAX message; %s", msg)
 	}
