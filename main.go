@@ -86,9 +86,13 @@ func contractsHandler(c *gin.Context) {
 }
 
 func pricesHandler(c *gin.Context) {
-	//currencyPair := c.Params.ByName("pair")
-	//price := CurrentPrice(currencyPair)
-	renderError("not implemented", 501, c)
+	currencyPair := c.Params.ByName("pair")
+	price, err := CurrentPrice(currencyPair)
+
+	if err != nil {
+		renderError(err.Error(), 400, c)
+	}
+	render(price, 200, c)
 }
 
 func tokensHandler(c *gin.Context) {

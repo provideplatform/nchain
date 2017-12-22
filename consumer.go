@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"sync"
 
 	. "github.com/kthomas/exchange-consumer"
@@ -42,8 +43,10 @@ func runConsumer(currencyPair string) {
 
 func priceTick(msg *GdaxMessage) error {
 	if msg.Type == "done" && msg.Reason == "filled" && msg.Price != "" {
-		Log.Infof("Price ticked; %s", msg)
-		// SetPrice(msg.ProductId)
+		price, err := strconv.ParseFloat(msg.Price, 64)
+		if err != nil {
+			SetPrice(msg.ProductId, price)
+		}
 	} else {
 		Log.Debugf("Dropping GDAX message; %s", msg)
 	}
