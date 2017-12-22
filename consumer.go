@@ -17,7 +17,6 @@ var (
 )
 
 func RunConsumers() {
-	Log.Infof("Starting consumers...")
 
 	go func() {
 		waitGroup.Add(1)
