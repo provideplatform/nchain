@@ -8,9 +8,9 @@ import (
 var prices = &Prices{}
 
 type Prices struct {
-	BtcUsdPrice float64
-	EthUsdPrice float64
-	LtcUsdPrice float64
+	BtcUsdPrice float64 `json:"btcusd"`
+	EthUsdPrice float64 `json:"ethusd"`
+	LtcUsdPrice float64 `json:"ltcusd"`
 }
 
 func CurrentPrice(currencyPair string) (*float64, error) {
