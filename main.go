@@ -86,13 +86,7 @@ func contractsHandler(c *gin.Context) {
 }
 
 func pricesHandler(c *gin.Context) {
-	currencyPair := c.Params.ByName("pair")
-	price, err := CurrentPrice(currencyPair)
-
-	if err != nil {
-		renderError(err.Error(), 400, c)
-	}
-	render(price, 200, c)
+	render(CurrenctPrices(), 200, c)
 }
 
 func tokensHandler(c *gin.Context) {

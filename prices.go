@@ -29,6 +29,10 @@ func CurrentPrice(currencyPair string) (*float64, error) {
 	}
 }
 
+func CurrenctPrices() *Prices {
+	return prices
+}
+
 func SetPrice(currencyPair string, price float64) error {
 
 	switch cp := currencyPair; cp != "" {
