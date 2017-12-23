@@ -14,6 +14,8 @@ var (
 		"BTC-USD",
 		"ETH-USD",
 		"LTC-USD",
+
+		"PRVD-USD", // FIXME-- pull from tokens database
 	}
 )
 
