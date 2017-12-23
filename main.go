@@ -86,7 +86,7 @@ func contractsHandler(c *gin.Context) {
 }
 
 func pricesHandler(c *gin.Context) {
-	render(CurrenctPrices(), 200, c)
+	render(CurrenctPrices, 200, c)
 }
 
 func tokensHandler(c *gin.Context) {
