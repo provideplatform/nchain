@@ -44,7 +44,7 @@ func runConsumer(currencyPair string) {
 func priceTick(msg *GdaxMessage) error {
 	if msg.Type == "done" && msg.Reason == "filled" && msg.Price != "" {
 		price, err := strconv.ParseFloat(msg.Price, 64)
-		if err != nil {
+		if err == nil {
 			SetPrice(msg.ProductId, price)
 		}
 	} else {
