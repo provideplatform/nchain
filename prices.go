@@ -5,10 +5,10 @@ import (
 	"fmt"
 )
 
-var CurrenctPrices = &Prices{}
+var CurrentPrices = &Prices{}
 
 func init() {
-	CurrenctPrices.PrvdUsdPrice = 0.22 // FIXME-- populate using token sale contract when it exists
+	CurrentPrices.PrvdUsdPrice = 0.22 // FIXME-- populate using token sale contract when it exists
 }
 
 type Prices struct {
@@ -23,13 +23,13 @@ func CurrentPrice(currencyPair string) (*float64, error) {
 
 	switch cp := currencyPair; cp != "" {
 	case cp == "BTC-USD":
-		return &CurrenctPrices.BtcUsdPrice, nil
+		return &CurrentPrices.BtcUsdPrice, nil
 	case cp == "ETH-USD":
-		return &CurrenctPrices.EthUsdPrice, nil
+		return &CurrentPrices.EthUsdPrice, nil
 	case cp == "LTC-USD":
-		return &CurrenctPrices.LtcUsdPrice, nil
+		return &CurrentPrices.LtcUsdPrice, nil
 	case cp == "PRVD-USD":
-		return &CurrenctPrices.PrvdUsdPrice, nil
+		return &CurrentPrices.PrvdUsdPrice, nil
 	default:
 		msg := fmt.Sprintf("Attempted lookup for unsupported or invalid currency pair: %s", cp)
 		Log.Warning(msg)
@@ -41,13 +41,13 @@ func SetPrice(currencyPair string, price float64) error {
 
 	switch cp := currencyPair; cp != "" {
 	case cp == "BTC-USD":
-		CurrenctPrices.BtcUsdPrice = price
+		CurrentPrices.BtcUsdPrice = price
 	case cp == "ETH-USD":
-		CurrenctPrices.EthUsdPrice = price
+		CurrentPrices.EthUsdPrice = price
 	case cp == "LTC-USD":
-		CurrenctPrices.LtcUsdPrice = price
+		CurrentPrices.LtcUsdPrice = price
 	case cp == "PRVD-USD":
-		CurrenctPrices.PrvdUsdPrice = price
+		CurrentPrices.PrvdUsdPrice = price
 	default:
 		msg := fmt.Sprintf("Attempted lookup for unsupported or invalid currency pair: %s", cp)
 		Log.Warning(msg)
