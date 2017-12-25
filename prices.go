@@ -13,13 +13,13 @@ func init() {
 
 type Prices struct {
 	BtcUsdPrice    float64 `json:"btcusd"`
-	BtcUsdPriceSeq uint64
+	BtcUsdPriceSeq uint64  `json:"-"`
 
 	EthUsdPrice    float64 `json:"ethusd"`
-	EthUsdPriceSeq uint64
+	EthUsdPriceSeq uint64  `json:"-"`
 
 	LtcUsdPrice    float64 `json:"ltcusd"`
-	LtcUsdPriceSeq uint64
+	LtcUsdPriceSeq uint64  `json:"-"`
 
 	PrvdUsdPrice float64 `json:"prvdusd"`
 }
