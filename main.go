@@ -18,12 +18,25 @@ func main() {
 
 	r := gin.Default()
 
-	r.GET("/api/v1/addresses", addressesHandler)
-	r.GET("/api/v1/blocks", blocksHandler)
-	r.GET("/api/v1/contracts", contractsHandler)
+	r.GET("/api/v1/networks", networksListHandler)
+	r.GET("/api/v1/networks/:id", networkDetailsHandler)
+	r.GET("/api/v1/networks/:id/addresses", networkAddressesHandler)
+	r.GET("/api/v1/networks/:id/blocks", networkBlocksHandler)
+	r.GET("/api/v1/networks/:id/contracts", networkContractsHandler)
+	r.GET("/api/v1/networks/:id/transactions", networkTransactionsHandler)
+
 	r.GET("/api/v1/prices", pricesHandler)
-	r.GET("/api/v1/tokens", tokensHandler)
-	r.GET("/api/v1/transactions", transactionsHandler)
+
+	r.GET("/api/v1/tokens", tokensListHandler)
+
+	r.GET("/api/v1/transactions", transactionsListHandler)
+	r.POST("/api/v1/transactions", createTransactionHandler)
+	r.GET("/api/v1/transactions/:id", transactionDetailsHandler)
+
+	r.GET("/api/v1/wallets", walletsListHandler)
+	r.POST("/api/v1/wallets", createWalletHandler)
+	r.GET("/api/v1/wallets/:id", walletDetailsHandler)
+	r.DELETE("/api/v1/wallets/:id", deleteWalletHandler)
 
 	r.GET("/status", statusHandler)
 
@@ -73,26 +86,97 @@ func statusHandler(c *gin.Context) {
 	render(nil, 204, c)
 }
 
-func addressesHandler(c *gin.Context) {
+// networks
+
+func networksListHandler(c *gin.Context) {
+	var networks []Network
+	DatabaseConnection().Find(&networks)
+	render(networks, 200, c)
+}
+
+func networkDetailsHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
-func blocksHandler(c *gin.Context) {
+func networkAddressesHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
-func contractsHandler(c *gin.Context) {
+func networkBlocksHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
+
+func networkContractsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func networkTransactionsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+// prices
 
 func pricesHandler(c *gin.Context) {
 	render(CurrentPrices, 200, c)
 }
 
-func tokensHandler(c *gin.Context) {
+// tokens
+
+func tokensListHandler(c *gin.Context) {
+	var tokens []Token
+	DatabaseConnection().Find(&tokens)
+	render(tokens, 200, c)
+}
+
+// transactions
+
+func transactionsListHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
-func transactionsHandler(c *gin.Context) {
+func createTransactionHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func transactionDetailsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+// wallets
+
+func walletsListHandler(c *gin.Context) {
+	var wallets []Wallet
+	DatabaseConnection().Find(&wallets)
+	render(wallets, 200, c)
+}
+
+func walletDetailsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func createWalletHandler(c *gin.Context) {
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	wallet := &Wallet{}
+	err = json.Unmarshal(buf, wallet)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	if wallet.Create() {
+		render(wallet, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = wallet.Errors
+		render(obj, 422, c)
+	}
+}
+
+func deleteWalletHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
