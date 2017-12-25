@@ -1,15 +1,20 @@
 package main
 
 import (
-	"crypto"
+	"context"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/jinzhu/gorm"
 	"github.com/satori/go.uuid"
 )
@@ -27,20 +32,40 @@ type Error struct {
 
 type Network struct {
 	Model
-	Name         string     `sql:"not null" json:"name"`
-	Description  *string    `json:"description"`
-	IsProduction *bool      `sql:"not null" json:"is_production"`
-	SidechainId  *uuid.UUID `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
+	Name         *string                `sql:"not null" json:"name"`
+	Description  *string                `json:"description"`
+	IsProduction *bool                  `sql:"not null" json:"is_production"`
+	SidechainId  *uuid.UUID             `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
+	Config       map[string]interface{} `sql:"type:json" json:"config"`
 }
 
 type Token struct {
 	Model
 	NetworkId   uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	Name        string    `sql:"not null" json:"name"`
-	Symbol      string    `sql:"not null" json:"symbol"`
-	Address     string    `sql:"not null" json:"address"` // network-specific token contract address
+	Name        *string   `sql:"not null" json:"name"`
+	Symbol      *string   `sql:"not null" json:"symbol"`
+	Address     *string   `sql:"not null" json:"address"` // network-specific token contract address
 	SaleAddress *string   `json:"sale_address"`           // non-null if token sale contract is specified
 }
+
+type Transaction struct {
+	Model
+	NetworkId uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
+	WalletId  uuid.UUID `sql:"not null;type:uuid" json:"wallet_id"`
+	To        *string   `sql:"not null" json:"to"`
+	Value     uint64    `sql:"not null;default:0" json:"value"`
+	Data      []byte    `json:"data"`
+	Signature []byte    `sql:"not null" json:"-"`
+}
+
+type Wallet struct {
+	Model
+	NetworkId  uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
+	Address    string    `sql:"not null" json:"address"`
+	PrivateKey *string   `sql:"not null;type:bytea" json:"-"`
+}
+
+// Token
 
 func (t *Token) Create() bool {
 	db := DatabaseConnection()
@@ -72,18 +97,111 @@ func (t *Token) Validate() bool {
 	return len(t.Errors) == 0
 }
 
-type Wallet struct {
-	Model
-	NetworkId  uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	Address    string    `sql:"not null" json:"address"`
-	PrivateKey *string   `sql:"not null;type:bytea" json:"-"`
+// Transaction
+
+func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *params.ChainConfig) (*types.Transaction, error) {
+	client := JsonRpcClient(network)
+	syncProgress, err := client.SyncProgress(context.TODO())
+	blockNumber := big.NewInt(int64(syncProgress.HighestBlock))
+	if err == nil {
+		addr := common.StringToAddress(*t.To)
+		nonce, _ := client.NonceAt(context.TODO(), addr, blockNumber)
+		gasPrice, _ := client.SuggestGasPrice(context.TODO())
+		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
+		gasLimit := big.NewInt(DefaultEthereumGasLimit)
+		tx := types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
+		signer := types.MakeSigner(cfg, blockNumber)
+		hashedTx := signer.Hash(tx)
+		hash := hashedTx.Bytes()
+		sig, err := wallet.SignTx(hash)
+		if err == nil {
+			tx, err = signer.WithSignature(tx, sig)
+			t.Signature = sig
+			Log.Debugf("Signed %v-byte %s tx: %s", len(hash), *network.Name, hashedTx.Hex())
+			return tx, nil
+		}
+		return nil, err
+	}
+	return nil, err
 }
+
+func (t *Transaction) Create() bool {
+	if !t.Validate() {
+		return false
+	}
+
+	db := DatabaseConnection()
+	var network = &Network{}
+	var wallet = &Wallet{}
+	if t.NetworkId != uuid.Nil {
+		db.Model(t).Related(&network)
+		db.Model(t).Related(&wallet)
+	}
+
+	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+		client, err := DialJsonRpc(network)
+		if err != nil {
+			Log.Warningf("Failed to dial %s JSON-RPC host @ %s", *network.Name, DefaultEthereumJsonRpcUrl)
+		} else {
+			cfg := params.MainnetChainConfig
+			tx, err := t.signEthereumTx(network, wallet, cfg)
+			if err == nil {
+				Log.Debugf("Transmitting signed %s tx to JSON-RPC host @ %s", *network.Name, DefaultEthereumJsonRpcUrl)
+				err := client.SendTransaction(context.TODO(), tx)
+				if err != nil {
+					Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host: %s; %s", *network.Name, DefaultEthereumJsonRpcUrl, err.Error())
+					Log.Debugf("Failed tx: %s", tx.String())
+				}
+			} else {
+				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())
+			}
+		}
+	} else {
+		Log.Warningf("Unable to generate tx to sign for unsupported network: %s", *network.Name)
+	}
+
+	if db.NewRecord(t) {
+		result := db.Create(&t)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				t.Errors = append(t.Errors, &Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(t) {
+			return rowsAffected > 0
+		}
+	}
+	return false
+}
+
+func (t *Transaction) Validate() bool {
+	db := DatabaseConnection()
+	var wallet = &Wallet{}
+	db.Model(t).Related(&wallet)
+	t.Errors = make([]*Error, 0)
+	if t.NetworkId == uuid.Nil {
+		t.Errors = append(t.Errors, &Error{
+			Message: stringOrNil("Unable to sign tx using unspecified network"),
+		})
+	} else if t.NetworkId != wallet.NetworkId {
+		t.Errors = append(t.Errors, &Error{
+			Message: stringOrNil("Transaction network did not match wallet network"),
+		})
+	}
+	return len(t.Errors) == 0
+}
+
+// Wallet
 
 func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
 
-	if strings.HasPrefix(strings.ToLower(network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		privateKey, err := ethcrypto.GenerateKey()
 		if err == nil {
 			w.Address = ethcrypto.PubkeyToAddress(privateKey.PublicKey).Hex()
@@ -92,7 +210,7 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 			Log.Debugf("Generated Ethereum address: %s", w.Address)
 		}
 	} else {
-		Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", network.Name)
+		Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", *network.Name)
 	}
 }
 
@@ -115,25 +233,31 @@ func (w *Wallet) ECDSAPrivateKey(gpgPrivateKey, gpgEncryptionKey string) (*ecdsa
 	return nil, errors.New("Failed to decode ecdsa private key from encrypted storage")
 }
 
-func (w *Wallet) SignTxn(msg []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (w *Wallet) SignTx(msg []byte) ([]byte, error) {
 	db := DatabaseConnection()
 
 	var network = &Network{}
 	db.Model(w).Related(&network)
 
-	privateKey, err := w.ECDSAPrivateKey(GpgPrivateKey, WalletEncryptionKey)
-	if err != nil {
-		Log.Warningf("Failed to sign txn using %s wallet: %s", network.Name, w.Id)
-		return nil, err
+	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+		privateKey, err := w.ECDSAPrivateKey(GpgPrivateKey, WalletEncryptionKey)
+		if err != nil {
+			Log.Warningf("Failed to sign tx using %s wallet: %s", *network.Name, w.Id)
+			return nil, err
+		}
+
+		Log.Debugf("Signing %v-byte tx using %s wallet: %s", len(msg), *network.Name, w.Id)
+		sig, err := ethcrypto.Sign(msg, privateKey)
+		if err != nil {
+			Log.Warningf("Failed to sign tx using %s wallet: %s; %s", *network.Name, w.Id, err.Error())
+			return nil, err
+		}
+		return sig, nil
 	}
 
-	Log.Debugf("Signing %v-byte txn using %s wallet: %s", len(msg), network.Name, w.Id)
-	asn1, err := privateKey.Sign(rand.Reader, msg, opts)
-	if err != nil {
-		Log.Warningf("Failed to sign txn using %s wallet: %s; %s", network.Name, w.Id, err.Error())
-		return nil, err
-	}
-	return asn1, nil
+	err := fmt.Errorf("Unable to sign tx using unsupported network: %s", *network.Name)
+	Log.Warningf(err.Error())
+	return nil, err
 }
 
 func (w *Wallet) Create() bool {

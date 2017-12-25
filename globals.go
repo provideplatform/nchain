@@ -19,6 +19,10 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
+	DefaultEthereumJsonRpcUrl string
+	DefaultEthereumGasLimit   int64
+	DefaultEthereumGasPrice   int64
+
 	bootstrapOnce sync.Once
 )
 
@@ -141,6 +145,10 @@ eZ0L
 		`
 
 		WalletEncryptionKey = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
+
+		DefaultEthereumJsonRpcUrl = "http://localhost:8545"
+		DefaultEthereumGasLimit = 21000
+		DefaultEthereumGasPrice = 4
 	})
 }
 

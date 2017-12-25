@@ -30,6 +30,10 @@ func migrateSchema() {
 		db.AutoMigrate(&Wallet{})
 		db.Model(&Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
+		db.AutoMigrate(&Transaction{})
+		db.Model(&Transaction{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+		db.Model(&Transaction{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
+
 		if initial {
 			populateInitialNetworks()
 		}

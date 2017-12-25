@@ -164,7 +164,26 @@ func transactionsListHandler(c *gin.Context) {
 }
 
 func createTransactionHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	tx := &Transaction{}
+	err = json.Unmarshal(buf, tx)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	if tx.Create() {
+		render(tx, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = tx.Errors
+		render(obj, 422, c)
+	}
 }
 
 func transactionDetailsHandler(c *gin.Context) {
