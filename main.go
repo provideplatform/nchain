@@ -164,7 +164,7 @@ func transactionsListHandler(c *gin.Context) {
 }
 
 func createTransactionHandler(c *gin.Context) {
-
+	renderError("not implemented", 501, c)
 }
 
 func transactionDetailsHandler(c *gin.Context) {
