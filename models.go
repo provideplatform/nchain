@@ -27,7 +27,7 @@ type Error struct {
 
 type Network struct {
 	Model
-	Name         *string    `sql:"not null" json:"name"`
+	Name         string     `sql:"not null" json:"name"`
 	Description  *string    `json:"description"`
 	IsProduction *bool      `sql:"not null" json:"is_production"`
 	SidechainId  *uuid.UUID `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
@@ -36,10 +36,40 @@ type Network struct {
 type Token struct {
 	Model
 	NetworkId   uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	Name        *string   `sql:"not null" json:"name"`
-	Symbol      *string   `sql:"not null" json:"symbol"`
-	Address     *string   `sql:"not null" json:"address"` // network-specific token contract address
+	Name        string    `sql:"not null" json:"name"`
+	Symbol      string    `sql:"not null" json:"symbol"`
+	Address     string    `sql:"not null" json:"address"` // network-specific token contract address
 	SaleAddress *string   `json:"sale_address"`           // non-null if token sale contract is specified
+}
+
+func (t *Token) Create() bool {
+	db := DatabaseConnection()
+
+	if !t.Validate() {
+		return false
+	}
+
+	if db.NewRecord(t) {
+		result := db.Create(&t)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				t.Errors = append(t.Errors, &Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(t) {
+			return rowsAffected > 0
+		}
+	}
+	return false
+}
+
+func (t *Token) Validate() bool {
+	t.Errors = make([]*Error, 0)
+	return len(t.Errors) == 0
 }
 
 type Wallet struct {
@@ -53,7 +83,7 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
 
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if strings.HasPrefix(strings.ToLower(network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		privateKey, err := ethcrypto.GenerateKey()
 		if err == nil {
 			w.Address = ethcrypto.PubkeyToAddress(privateKey.PublicKey).Hex()
@@ -62,7 +92,7 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 			Log.Debugf("Generated Ethereum address: %s", w.Address)
 		}
 	} else {
-		Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", *network.Name)
+		Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", network.Name)
 	}
 }
 
@@ -93,14 +123,14 @@ func (w *Wallet) SignTxn(msg []byte, opts crypto.SignerOpts) ([]byte, error) {
 
 	privateKey, err := w.ECDSAPrivateKey(GpgPrivateKey, WalletEncryptionKey)
 	if err != nil {
-		Log.Warningf("Failed to sign txn using %s wallet: %s", *network.Name, w.Id)
+		Log.Warningf("Failed to sign txn using %s wallet: %s", network.Name, w.Id)
 		return nil, err
 	}
 
-	Log.Debugf("Signing %v-byte txn using %s wallet: %s", len(msg), *network.Name, w.Id)
+	Log.Debugf("Signing %v-byte txn using %s wallet: %s", len(msg), network.Name, w.Id)
 	asn1, err := privateKey.Sign(rand.Reader, msg, opts)
 	if err != nil {
-		Log.Warningf("Failed to sign txn using %s wallet: %s; %s", *network.Name, w.Id, err.Error())
+		Log.Warningf("Failed to sign txn using %s wallet: %s; %s", network.Name, w.Id, err.Error())
 		return nil, err
 	}
 	return asn1, nil

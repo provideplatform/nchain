@@ -28,6 +28,8 @@ func main() {
 	r.GET("/api/v1/prices", pricesHandler)
 
 	r.GET("/api/v1/tokens", tokensListHandler)
+	r.POST("/api/v1/tokens", createTokenHandler)
+	r.DELETE("/api/v1/tokens/:id", deleteTokenHandler)
 
 	r.GET("/api/v1/transactions", transactionsListHandler)
 	r.POST("/api/v1/transactions", createTransactionHandler)
@@ -128,6 +130,33 @@ func tokensListHandler(c *gin.Context) {
 	render(tokens, 200, c)
 }
 
+func createTokenHandler(c *gin.Context) {
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	token := &Token{}
+	err = json.Unmarshal(buf, token)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	if token.Create() {
+		render(token, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = token.Errors
+		render(obj, 422, c)
+	}
+}
+
+func deleteTokenHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
 // transactions
 
 func transactionsListHandler(c *gin.Context) {
@@ -135,7 +164,7 @@ func transactionsListHandler(c *gin.Context) {
 }
 
 func createTransactionHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+
 }
 
 func transactionDetailsHandler(c *gin.Context) {
