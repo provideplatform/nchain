@@ -49,7 +49,7 @@ func populateInitialNetworks() {
 	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning', 'Lightning Network mainnet', true) RETURNING id").Scan(&ltcMainnet)
 
 	var ltcTestnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Litecoin Testnet', 'Litecoin Network testnet', false) RETURNING id").Scan(&ltcTestnet)
+	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning Testnet', 'Lightning Network testnet', false) RETURNING id").Scan(&ltcTestnet)
 
 	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", ltcMainnet.Id, btcMainnet.Id)
 	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", ltcTestnet.Id, btcTestnet.Id)
