@@ -74,12 +74,13 @@ func SetPrice(currencyPair string, seq uint64, price float64) error {
 	switch cp := currencyPair; cp != "" {
 	case cp == "BTC-USD":
 		CurrentPrices.BtcUsdPrice = price
+		CurrentPrices.BtcUsdPriceSeq = seq
 	case cp == "ETH-USD":
 		CurrentPrices.EthUsdPrice = price
+		CurrentPrices.EthUsdPriceSeq = seq
 	case cp == "LTC-USD":
 		CurrentPrices.LtcUsdPrice = price
-	case cp == "PRVD-USD":
-		CurrentPrices.PrvdUsdPrice = price
+		CurrentPrices.LtcUsdPriceSeq = seq
 	default:
 		msg := fmt.Sprintf("Attempted lookup for unsupported or invalid currency pair: %s", cp)
 		Log.Warning(msg)
