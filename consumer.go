@@ -47,7 +47,7 @@ func priceTick(msg *GdaxMessage) error {
 	if msg.Type == "done" && msg.Reason == "filled" && msg.Price != "" {
 		price, err := strconv.ParseFloat(msg.Price, 64)
 		if err == nil {
-			SetPrice(msg.ProductId, price)
+			SetPrice(msg.ProductId, msg.Sequence, price)
 		}
 	} else {
 		Log.Debugf("Dropping GDAX message; %s", msg)
