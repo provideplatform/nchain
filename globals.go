@@ -156,7 +156,11 @@ eZ0L
 			gasLimit, err := strconv.ParseInt(os.Getenv("DEFAULT_ETHEREUM_GAS_LIMTI"), 10, 64)
 			if err == nil {
 				DefaultEthereumGasLimit = gasLimit
+			} else {
+				DefaultEthereumGasLimit = 21000
 			}
+		} else {
+			DefaultEthereumGasLimit = 21000
 		}
 	})
 }
