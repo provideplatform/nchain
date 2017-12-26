@@ -102,30 +102,30 @@ func (t *Token) Validate() bool {
 func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *params.ChainConfig) (*types.Transaction, error) {
 	client := JsonRpcClient(network)
 	syncProgress, err := client.SyncProgress(context.TODO())
-	if err == nil && syncProgress != nil {
-		blockNumber := big.NewInt(int64(syncProgress.CurrentBlock))
+	if err == nil {
+		block, err := client.BlockByNumber(context.TODO(), nil)
+		if err != nil {
+			return nil, err
+		}
 		addr := common.HexToAddress(*t.To)
 		nonce, _ := client.PendingNonceAt(context.TODO(), addr)
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
 		//gasPrice := big.NewInt(DefaultEthereumGasPrice)
 		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
-		Log.Debugf("Calculated nonce %v @ %v; suggested gas price: %v", nonce, blockNumber, gasPrice)
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
 		tx := types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
-		signer := types.MakeSigner(cfg, blockNumber)
+		signer := types.MakeSigner(cfg, block.Number())
 		hash := signer.Hash(tx).Bytes()
 		sig, err := wallet.SignTx(hash)
 		if err == nil {
 			signedTx, _ := tx.WithSignature(signer, sig)
 			t.Signature = sig
-			Log.Debugf("Signed %v-byte %s tx: %s", len(hash), *network.Name, tx.Hash().Hex())
+			Log.Debugf("Signed %s tx for raw broadcast via JSON-RPC: %s", *network.Name, signedTx.String())
 			return signedTx, nil
 		}
 		return nil, err
 	} else if syncProgress == nil {
-		err := fmt.Errorf("%s JSON-RPC is not currently available to sign tx", *network.Name)
-		Log.Warningf(err.Error())
-		return nil, err
+		Log.Debugf("%s JSON-RPC is in sync with the network", *network.Name)
 	}
 	return nil, err
 }
@@ -155,7 +155,6 @@ func (t *Transaction) Create() bool {
 				err := client.SendTransaction(context.TODO(), tx)
 				if err != nil {
 					Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host: %s; %s", *network.Name, DefaultEthereumJsonRpcUrl, err.Error())
-					Log.Debugf("Failed tx: %s", tx.String())
 				}
 			} else {
 				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())
@@ -251,7 +250,7 @@ func (w *Wallet) SignTx(msg []byte) ([]byte, error) {
 			return nil, err
 		}
 
-		Log.Debugf("Signing %v-byte tx using %s wallet: %s", len(msg), *network.Name, w.Id)
+		Log.Debugf("Signing tx using %s wallet: %s", *network.Name, w.Id)
 		sig, err := ethcrypto.Sign(msg, privateKey)
 		if err != nil {
 			Log.Warningf("Failed to sign tx using %s wallet: %s; %s", *network.Name, w.Id, err.Error())
