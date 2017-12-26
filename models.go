@@ -110,7 +110,6 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 		addr := common.HexToAddress(*t.To)
 		nonce, _ := client.PendingNonceAt(context.TODO(), addr)
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
-		//gasPrice := big.NewInt(DefaultEthereumGasPrice)
 		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
 		tx := types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
