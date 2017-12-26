@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/kthomas/go-logger"
@@ -19,9 +20,8 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
-	DefaultEthereumJsonRpcUrl string
 	DefaultEthereumGasLimit   int64
-	DefaultEthereumGasPrice   int64
+	DefaultEthereumJsonRpcUrl string
 
 	bootstrapOnce sync.Once
 )
@@ -146,9 +146,18 @@ eZ0L
 
 		WalletEncryptionKey = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 
-		DefaultEthereumJsonRpcUrl = "http://localhost:8545"
-		DefaultEthereumGasLimit = 21000
-		DefaultEthereumGasPrice = 20000000000
+		if os.Getenv("DEFAULT_ETHEREUM_JSON_RPC_URL") != "" {
+			DefaultEthereumJsonRpcUrl = os.Getenv("DEFAULT_ETHEREUM_JSON_RPC_URL")
+		} else {
+			DefaultEthereumJsonRpcUrl = "http://localhost:8545"
+		}
+
+		if os.Getenv("DEFAULT_ETHEREUM_GAS_LIMIT") != "" {
+			gasLimit, err := strconv.ParseInt(os.Getenv("DEFAULT_ETHEREUM_GAS_LIMTI"), 10, 64)
+			if err == nil {
+				DefaultEthereumGasLimit = gasLimit
+			}
+		}
 	})
 }
 
