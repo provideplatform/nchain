@@ -55,7 +55,7 @@ type Transaction struct {
 	To        *string   `sql:"not null" json:"to"`
 	Value     uint64    `sql:"not null;default:0" json:"value"`
 	Data      []byte    `json:"data"`
-	Signature []byte    `sql:"not null" json:"-"`
+	Hash      *string   `sql:"not null" json:"hash"`
 }
 
 type Wallet struct {
@@ -118,7 +118,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 		sig, err := wallet.SignTx(hash)
 		if err == nil {
 			signedTx, _ := tx.WithSignature(signer, sig)
-			t.Signature = sig
+			t.Hash = stringOrNil(fmt.Sprintf("%x", signedTx.Hash()))
 			Log.Debugf("Signed %s tx for raw broadcast via JSON-RPC: %s", *network.Name, signedTx.String())
 			return signedTx, nil
 		}
