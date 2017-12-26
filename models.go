@@ -102,24 +102,29 @@ func (t *Token) Validate() bool {
 func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *params.ChainConfig) (*types.Transaction, error) {
 	client := JsonRpcClient(network)
 	syncProgress, err := client.SyncProgress(context.TODO())
-	blockNumber := big.NewInt(int64(syncProgress.HighestBlock))
-	if err == nil {
-		addr := common.StringToAddress(*t.To)
-		nonce, _ := client.NonceAt(context.TODO(), addr, blockNumber)
+	if err == nil && syncProgress != nil {
+		blockNumber := big.NewInt(int64(syncProgress.CurrentBlock))
+		addr := common.HexToAddress(*t.To)
+		nonce, _ := client.PendingNonceAt(context.TODO(), addr)
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
+		//gasPrice := big.NewInt(DefaultEthereumGasPrice)
 		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
+		Log.Debugf("Calculated nonce %v @ %v; suggested gas price: %v", nonce, blockNumber, gasPrice)
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
 		tx := types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
 		signer := types.MakeSigner(cfg, blockNumber)
-		hashedTx := signer.Hash(tx)
-		hash := hashedTx.Bytes()
+		hash := signer.Hash(tx).Bytes()
 		sig, err := wallet.SignTx(hash)
 		if err == nil {
-			tx, err = signer.WithSignature(tx, sig)
+			signedTx, _ := tx.WithSignature(signer, sig)
 			t.Signature = sig
-			Log.Debugf("Signed %v-byte %s tx: %s", len(hash), *network.Name, hashedTx.Hex())
-			return tx, nil
+			Log.Debugf("Signed %v-byte %s tx: %s", len(hash), *network.Name, tx.Hash().Hex())
+			return signedTx, nil
 		}
+		return nil, err
+	} else if syncProgress == nil {
+		err := fmt.Errorf("%s JSON-RPC is not currently available to sign tx", *network.Name)
+		Log.Warningf(err.Error())
 		return nil, err
 	}
 	return nil, err

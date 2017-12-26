@@ -32,8 +32,13 @@ func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 		client = EthereumClients[network.Id.String()][0]
 	}
 
-	progress, _ := client.SyncProgress(context.TODO())
-	Log.Debugf("Latest synced block for %s JSON-RPC host @ %s: %v [of %v]", *network.Name, url, progress.CurrentBlock, progress.HighestBlock)
+	progress, err := client.SyncProgress(context.TODO())
+	if err != nil {
+		Log.Warningf("Failed to read sync progress for %s JSON-RPC host: %s; %s", *network.Name, url, err.Error())
+		return nil, err
+	} else if progress != nil {
+		Log.Debugf("Latest synced block for %s JSON-RPC host @ %s: %v [of %v]", *network.Name, url, progress.CurrentBlock, progress.HighestBlock)
+	}
 
 	return client, nil
 }

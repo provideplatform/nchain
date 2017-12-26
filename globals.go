@@ -148,7 +148,7 @@ eZ0L
 
 		DefaultEthereumJsonRpcUrl = "http://localhost:8545"
 		DefaultEthereumGasLimit = 21000
-		DefaultEthereumGasPrice = 4
+		DefaultEthereumGasPrice = 20000000000
 	})
 }
 
