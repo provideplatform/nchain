@@ -103,7 +103,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 	client := JsonRpcClient(network)
 	syncProgress, err := client.SyncProgress(context.TODO())
 	if err == nil {
-		block, err := client.BlockByNumber(context.TODO(), nil)
+		hdr, err := client.HeaderByNumber(context.TODO(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
 		tx := types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
-		signer := types.MakeSigner(cfg, block.Number())
+		signer := types.MakeSigner(cfg, hdr.Number)
 		hash := signer.Hash(tx).Bytes()
 		sig, err := wallet.SignTx(hash)
 		if err == nil {
