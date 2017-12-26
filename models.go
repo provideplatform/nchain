@@ -108,7 +108,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 			return nil, err
 		}
 		addr := common.HexToAddress(*t.To)
-		nonce, _ := client.PendingNonceAt(context.TODO(), addr)
+		nonce := *wallet.TxCount() + 1
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
 		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
@@ -154,13 +154,23 @@ func (t *Transaction) Create() bool {
 				err := client.SendTransaction(context.TODO(), tx)
 				if err != nil {
 					Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host: %s; %s", *network.Name, DefaultEthereumJsonRpcUrl, err.Error())
+					t.Errors = append(t.Errors, &Error{
+						Message: stringOrNil(err.Error()),
+					})
 				}
 			} else {
 				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())
+				t.Errors = append(t.Errors, &Error{
+					Message: stringOrNil(err.Error()),
+				})
 			}
 		}
 	} else {
 		Log.Warningf("Unable to generate tx to sign for unsupported network: %s", *network.Name)
+	}
+
+	if len(t.Errors) > 0 {
+		return false
 	}
 
 	if db.NewRecord(t) {
@@ -299,4 +309,10 @@ func (w *Wallet) Validate() bool {
 		})
 	}
 	return len(w.Errors) == 0
+}
+
+func (w *Wallet) TxCount() (count *uint64) {
+	db := DatabaseConnection()
+	db.Model(&Transaction{}).Where("wallet_id = ?", w.Id).Count(&count)
+	return count
 }
