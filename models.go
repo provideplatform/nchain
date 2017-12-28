@@ -134,7 +134,10 @@ func (c *Contract) Create() bool {
 
 			Log.Warningf("Contract address will remain nil until contract tx receipt is retreived after mining...")
 		} else {
-			Log.Warningf("Failed to create %s contract; errors: %s", *network.Name, tx.Errors)
+			Log.Warningf("Failed to create %s contract due to tx signing or broadcast failure", *network.Name)
+			for _, err := range tx.Errors {
+				Log.Warningf("Failed %s contract creation tx failed; %s", *network.Name, err.Message)
+			}
 			return false
 		}
 	} else {
