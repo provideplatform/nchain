@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -32,11 +33,11 @@ type Error struct {
 
 type Network struct {
 	Model
-	Name         *string                `sql:"not null" json:"name"`
-	Description  *string                `json:"description"`
-	IsProduction *bool                  `sql:"not null" json:"is_production"`
-	SidechainId  *uuid.UUID             `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
-	Config       map[string]interface{} `sql:"type:json" json:"config"`
+	Name         *string          `sql:"not null" json:"name"`
+	Description  *string          `json:"description"`
+	IsProduction *bool            `sql:"not null" json:"is_production"`
+	SidechainId  *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
+	Config       *json.RawMessage `sql:"type:json" json:"config"`
 }
 
 type Token struct {
@@ -65,6 +66,17 @@ type Wallet struct {
 	PrivateKey *string   `sql:"not null;type:bytea" json:"-"`
 }
 
+// Network
+
+func (n *Network) ParseConfig() map[string]interface{} {
+	config := map[string]interface{}{}
+	err := json.Unmarshal(*n.Config, &config)
+	if err != nil {
+		Log.Warningf("Failed to unmarshal network config; %s", err.Error())
+		return nil
+	}
+	return config
+}
 // Token
 
 func (t *Token) Create() bool {
@@ -145,15 +157,18 @@ func (t *Transaction) Create() bool {
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		client, err := DialJsonRpc(network)
 		if err != nil {
-			Log.Warningf("Failed to dial %s JSON-RPC host @ %s", *network.Name, DefaultEthereumJsonRpcUrl)
+			Log.Warningf("Failed to dial %s JSON-RPC host; %s", *network.Name, err.Error())
+			t.Errors = append(t.Errors, &Error{
+				Message: stringOrNil(err.Error()),
+			})
 		} else {
 			cfg := params.MainnetChainConfig
 			tx, err := t.signEthereumTx(network, wallet, cfg)
 			if err == nil {
-				Log.Debugf("Transmitting signed %s tx to JSON-RPC host @ %s", *network.Name, DefaultEthereumJsonRpcUrl)
+				Log.Debugf("Transmitting signed %s tx to JSON-RPC host", *network.Name)
 				err := client.SendTransaction(context.TODO(), tx)
 				if err != nil {
-					Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host: %s; %s", *network.Name, DefaultEthereumJsonRpcUrl, err.Error())
+					Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host; %s", *network.Name, err.Error())
 					t.Errors = append(t.Errors, &Error{
 						Message: stringOrNil(err.Error()),
 					})

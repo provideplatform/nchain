@@ -20,8 +20,9 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
-	DefaultEthereumGasLimit   int64
-	DefaultEthereumJsonRpcUrl string
+	DefaultEthereumGasLimit                 int64
+	DefaultEthereumMainnetJsonRpcUrl        string
+	DefaultEthereumRopstenTestnetJsonRpcUrl string
 
 	bootstrapOnce sync.Once
 )
@@ -147,9 +148,15 @@ eZ0L
 		WalletEncryptionKey = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 
 		if os.Getenv("ETHEREUM_MAINNET_JSON_RPC_URL") != "" {
-			DefaultEthereumJsonRpcUrl = os.Getenv("ETHEREUM_MAINNET_JSON_RPC_URL")
+			DefaultEthereumMainnetJsonRpcUrl = os.Getenv("ETHEREUM_MAINNET_JSON_RPC_URL")
 		} else {
-			DefaultEthereumJsonRpcUrl = "http://localhost:8545"
+			DefaultEthereumMainnetJsonRpcUrl = "http://localhost:8545"
+		}
+
+		if os.Getenv("ETHEREUM_ROPSTEN_TESTNET_JSON_RPC_URL") != "" {
+			DefaultEthereumMainnetJsonRpcUrl = os.Getenv("ETHEREUM_ROPSTEN_TESTNET_JSON_RPC_URL")
+		} else {
+			DefaultEthereumMainnetJsonRpcUrl = "http://localhost:8546"
 		}
 
 		if os.Getenv("ETHEREUM_DEFAULT_GAS_LIMIT") != "" {

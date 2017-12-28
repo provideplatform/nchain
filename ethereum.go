@@ -10,11 +10,12 @@ var EthereumClients = map[string][]*ethclient.Client{}
 
 func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 	var url string
-	if jsonRpcUrl, ok := network.Config["json_rpc_url"].(string); ok {
+	config := network.ParseConfig()
+	if jsonRpcUrl, ok := config["json_rpc_url"].(string); ok {
 		url = jsonRpcUrl
 	} else {
 		Log.Warningf("No JSON-RPC url was configured for network: %s (%s)", *network.Name, network.Id)
-		url = DefaultEthereumJsonRpcUrl
+		url = DefaultEthereumMainnetJsonRpcUrl
 	}
 
 	var client *ethclient.Client
