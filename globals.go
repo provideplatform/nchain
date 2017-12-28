@@ -146,14 +146,14 @@ eZ0L
 
 		WalletEncryptionKey = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 
-		if os.Getenv("DEFAULT_ETHEREUM_JSON_RPC_URL") != "" {
-			DefaultEthereumJsonRpcUrl = os.Getenv("DEFAULT_ETHEREUM_JSON_RPC_URL")
+		if os.Getenv("ETHEREUM_MAINNET_JSON_RPC_URL") != "" {
+			DefaultEthereumJsonRpcUrl = os.Getenv("ETHEREUM_MAINNET_JSON_RPC_URL")
 		} else {
 			DefaultEthereumJsonRpcUrl = "http://localhost:8545"
 		}
 
-		if os.Getenv("DEFAULT_ETHEREUM_GAS_LIMIT") != "" {
-			gasLimit, err := strconv.ParseInt(os.Getenv("DEFAULT_ETHEREUM_GAS_LIMTI"), 10, 64)
+		if os.Getenv("ETHEREUM_DEFAULT_GAS_LIMIT") != "" {
+			gasLimit, err := strconv.ParseInt(os.Getenv("ETHEREUM_DEFAULT_GAS_LIMIT"), 10, 64)
 			if err == nil {
 				DefaultEthereumGasLimit = gasLimit
 			} else {
