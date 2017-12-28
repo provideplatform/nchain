@@ -1,6 +1,6 @@
 ## goldmine
 
-Blockchain API, written in golang
+API for building best-of-breed applications which leverage a public blockchain.
 
 ### Authentication
 
@@ -8,9 +8,9 @@ Consumers of this API will present a `bearer` authentication header (i.e., using
 
 ### Authorization
 
-The `bearer` authorization header will be scoped to an application. The `bearer` authorization header may contain a `sub` (see [RFC-7519 §§ 4.1.2](https://tools.ietf.org/html/rfc7519#section-4.1.2)) to further limit its authorized scope to a specific network or networks, token, wallet or other platform-managed entity.
+The `bearer` authorization header will be scoped to an authorized application. The `bearer` authorization header may contain a `sub` (see [RFC-7519 §§ 4.1.2](https://tools.ietf.org/html/rfc7519#section-4.1.2)) to further limit its authorized scope to a specific token or smart contract, wallet or other entity.
 
-Certain APIs will be metered similarly to how AWS meters some of its webservices. The consumer will need a sufficient PRVD token balance to consume metered APIs. The token model and economics are being finalized and the documentation will be updated accordingly.
+Certain APIs will be metered similarly to how AWS meters some of its webservices. Production applications will need a sufficient PRVD token balance to consume metered APIs (based on market conditions at the time of consumption, some quantity of PRVD tokens will be burned as a result of such metered API usage. *The PRVD token model and economics are in the process of being peer-reviewed and finalized; the documentation will be updated accordingly with specifics.*
 
 ---
 The following APIs are exposed:
@@ -59,7 +59,7 @@ Enumerate available blockchain networks and related configuration details.
         "id": "6eafb694-95a9-407f-a6d2-f541659c49b9",
         "created_at": "2017-12-25T11:54:57.615578Z",
         "name": "Bitcoin",
-        "description": "Bitcoin Mainnet",
+        "description": "Bitcoin mainnet",
         "is_production": true,
         "sidechain_id": "07c85f35-aa6d-4ec2-8a92-2240a85e91e9",
         "config": null
@@ -68,7 +68,7 @@ Enumerate available blockchain networks and related configuration details.
         "id": "b018af93-7c7f-4b76-a0d3-2f4282250e82",
         "created_at": "2017-12-25T11:54:57.61854Z",
         "name": "Bitcoin Testnet",
-        "description": "Bitcoin Testnet",
+        "description": "Bitcoin testnet",
         "is_production": false,
         "sidechain_id": "017428e4-41ac-41ab-bd08-8fc234e8169f",
         "config": null
@@ -85,7 +85,7 @@ Enumerate available blockchain networks and related configuration details.
     {
         "id": "ba02ff92-f5bb-4d44-9187-7e1cc214b9fc",
         "created_at": "2017-12-25T11:54:57.63379Z",
-        "name": "Ethereum Testnet",
+        "name": "Ethereum testnet",
         "description": "ROPSTEN (Revival) TESTNET",
         "is_production": false,
         "sidechain_id": null,
