@@ -70,13 +70,16 @@ type Wallet struct {
 
 func (n *Network) ParseConfig() map[string]interface{} {
 	config := map[string]interface{}{}
-	err := json.Unmarshal(*n.Config, &config)
-	if err != nil {
-		Log.Warningf("Failed to unmarshal network config; %s", err.Error())
-		return nil
+	if n.Config != nil {
+		err := json.Unmarshal(*n.Config, &config)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal network config; %s", err.Error())
+			return nil
+		}
 	}
 	return config
 }
+
 // Token
 
 func (t *Token) Create() bool {
