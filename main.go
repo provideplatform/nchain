@@ -160,7 +160,9 @@ func deleteTokenHandler(c *gin.Context) {
 // transactions
 
 func transactionsListHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+	var txs []Transaction
+	DatabaseConnection().Find(&txs)
+	render(txs, 200, c)
 }
 
 func createTransactionHandler(c *gin.Context) {
