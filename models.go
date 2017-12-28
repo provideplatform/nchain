@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
@@ -110,19 +111,22 @@ func (c *Contract) Create() bool {
 
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		value := uint64(0)
-		data := make([]byte, 0)
+		data := make([][]byte, 0)
 		if val, ok := params["value"].(uint64); ok {
 			value = val
 		}
-		if dataStr, ok := params["data"].(string); ok {
-			data = []byte(dataStr)
+		if bytecode, ok := params["bytecode"].(string); ok {
+			data = append(data, []byte(bytecode))
+		}
+		if abi, ok := params["abi"].(string); ok {
+			data = append(data, []byte(abi))
 		}
 		tx := &Transaction{
 			NetworkId: network.Id,
 			WalletId:  wallet.Id,
 			To:        nil, // recipient is nil to indicate contract creation
 			Value:     value,
-			Data:      data,
+			Data:      bytes.Join(data, []byte("")),
 		}
 		if tx.Create() {
 			Log.Debugf("Created %s contract in tx %s", *network.Name, tx.Hash)
