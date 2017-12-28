@@ -165,7 +165,7 @@ func (t *Transaction) Create() bool {
 				Message: stringOrNil(err.Error()),
 			})
 		} else {
-			cfg := params.MainnetChainConfig
+			cfg := GetChainConfig(network)
 			tx, err := t.signEthereumTx(network, wallet, cfg)
 			if err == nil {
 				Log.Debugf("Transmitting signed %s tx to JSON-RPC host", *network.Name)

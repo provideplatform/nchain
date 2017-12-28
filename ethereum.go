@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"strings"
+
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -42,6 +45,18 @@ func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 	}
 
 	return client, nil
+}
+
+func GetChainConfig(network *Network) *params.ChainConfig {
+	config := network.ParseConfig()
+	if testnet, ok := config["testnet"].(string); ok {
+		if strings.ToLower(testnet) == "ropsten" {
+			return params.TestnetChainConfig
+		} else if strings.ToLower(testnet) == "rinkeby" {
+			return params.RinkebyChainConfig
+		}
+	}
+	return params.MainnetChainConfig
 }
 
 func JsonRpcClient(network *Network) *ethclient.Client {
