@@ -40,13 +40,22 @@ type Network struct {
 	Config       *json.RawMessage `sql:"type:json" json:"config"`
 }
 
+type Contract struct {
+	Model
+	NetworkId uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
+	Name      *string   `sql:"not null" json:"name"`
+	Address   *string   `sql:"not null" json:"address"` // network-specific token contract address
+}
+
 type Token struct {
 	Model
-	NetworkId   uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	Name        *string   `sql:"not null" json:"name"`
-	Symbol      *string   `sql:"not null" json:"symbol"`
-	Address     *string   `sql:"not null" json:"address"` // network-specific token contract address
-	SaleAddress *string   `json:"sale_address"`           // non-null if token sale contract is specified
+	NetworkId      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+	ContractId     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
+	SaleContractId *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
+	Name           *string    `sql:"not null" json:"name"`
+	Symbol         *string    `sql:"not null" json:"symbol"`
+	Address        *string    `sql:"not null" json:"address"` // network-specific token contract address
+	SaleAddress    *string    `json:"sale_address"`           // non-null if token sale contract is specified
 }
 
 type Transaction struct {
@@ -78,6 +87,38 @@ func (n *Network) ParseConfig() map[string]interface{} {
 		}
 	}
 	return config
+}
+
+// Contract
+
+func (c *Contract) Create() bool {
+	db := DatabaseConnection()
+
+	if !c.Validate() {
+		return false
+	}
+
+	if db.NewRecord(c) {
+		result := db.Create(&c)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				c.Errors = append(c.Errors, &Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(c) {
+			return rowsAffected > 0
+		}
+	}
+	return false
+}
+
+func (c *Contract) Validate() bool {
+	c.Errors = make([]*Error, 0)
+	return len(c.Errors) == 0
 }
 
 // Token
@@ -175,6 +216,8 @@ func (t *Transaction) Create() bool {
 					t.Errors = append(t.Errors, &Error{
 						Message: stringOrNil(err.Error()),
 					})
+				} else {
+					// queue job to check on tx receipt
 				}
 			} else {
 				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())
