@@ -42,9 +42,12 @@ type Network struct {
 
 type Contract struct {
 	Model
-	NetworkId uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	Name      *string   `sql:"not null" json:"name"`
-	Address   *string   `sql:"not null" json:"address"` // network-specific token contract address
+	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	WalletId      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
+	TransactionId *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
+	Name          *string          `sql:"not null" json:"name"`
+	Address       *string          `sql:"not null" json:"address"` // network-specific token contract address
+	Params        *json.RawMessage `sql:"type:json" json:"params"`
 }
 
 type Token struct {
@@ -92,9 +95,49 @@ func (n *Network) ParseConfig() map[string]interface{} {
 // Contract
 
 func (c *Contract) Create() bool {
-	db := DatabaseConnection()
-
 	if !c.Validate() {
+		return false
+	}
+
+	db := DatabaseConnection()
+	var network = &Network{}
+	var wallet = &Wallet{}
+	if c.NetworkId != uuid.Nil {
+		db.Model(c).Related(&network)
+		db.Model(c).Related(&wallet)
+	}
+	params := c.ParseParams()
+
+	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+		value := uint64(0)
+		data := make([]byte, 0)
+		if val, ok := params["value"].(uint64); ok {
+			value = val
+		}
+		if dataStr, ok := params["data"].(string); ok {
+			data = []byte(dataStr)
+		}
+		tx := &Transaction{
+			NetworkId: network.Id,
+			WalletId:  wallet.Id,
+			To:        nil, // recipient is nil to indicate contract creation
+			Value:     value,
+			Data:      data,
+		}
+		if tx.Create() {
+			Log.Debugf("Created %s contract in tx %s", *network.Name, tx.Hash)
+			c.TransactionId = &tx.Id
+
+			Log.Warningf("Contract address will remain nil until contract tx receipt is retreived after mining...")
+		} else {
+			Log.Warningf("Failed to create %s contract; errors: %s", *network.Name, tx.Errors)
+			return false
+		}
+	} else {
+		Log.Warningf("Unable to generate contract deployment tx for unsupported network: %s", *network.Name)
+	}
+
+	if len(c.Errors) > 0 {
 		return false
 	}
 
@@ -117,8 +160,37 @@ func (c *Contract) Create() bool {
 }
 
 func (c *Contract) Validate() bool {
+	db := DatabaseConnection()
+	var wallet = &Wallet{}
+	db.Model(c).Related(&wallet)
 	c.Errors = make([]*Error, 0)
+	if c.Params == nil {
+		c.Errors = append(c.Errors, &Error{
+			Message: stringOrNil("Unable to create contract without network-specific params"),
+		})
+	}
+	if c.NetworkId == uuid.Nil {
+		c.Errors = append(c.Errors, &Error{
+			Message: stringOrNil("Unable to create contract using unspecified network"),
+		})
+	} else if c.NetworkId != wallet.NetworkId {
+		c.Errors = append(c.Errors, &Error{
+			Message: stringOrNil("Contract network did not match wallet network"),
+		})
+	}
 	return len(c.Errors) == 0
+}
+
+func (c *Contract) ParseParams() map[string]interface{} {
+	params := map[string]interface{}{}
+	if c.Params != nil {
+		err := json.Unmarshal(*c.Params, &params)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal contract params; %s", err.Error())
+			return nil
+		}
+	}
+	return params
 }
 
 // Token
@@ -149,7 +221,45 @@ func (t *Token) Create() bool {
 }
 
 func (t *Token) Validate() bool {
+	db := DatabaseConnection()
+	var contract = &Contract{}
+	var saleContract = &Contract{}
+	if t.NetworkId != uuid.Nil {
+		db.Model(t).Related(&contract)
+		db.Model(t).Related(&saleContract)
+	}
 	t.Errors = make([]*Error, 0)
+	if t.NetworkId == uuid.Nil {
+		t.Errors = append(t.Errors, &Error{
+			Message: stringOrNil("Unable to deploy token contract using unspecified network"),
+		})
+	} else if contract != nil {
+		if t.NetworkId != contract.NetworkId {
+			t.Errors = append(t.Errors, &Error{
+				Message: stringOrNil("Token network did not match token contract network"),
+			})
+		}
+		if t.Address == nil {
+			t.Address = contract.Address
+		} else if t.Address != nil && t.Address != contract.Address {
+			t.Errors = append(t.Errors, &Error{
+				Message: stringOrNil("Token sale address did not match referenced token contract address"),
+			})
+		}
+	} else if saleContract != nil {
+		if t.NetworkId != saleContract.NetworkId {
+			t.Errors = append(t.Errors, &Error{
+				Message: stringOrNil("Token network did not match token sale contract network"),
+			})
+		}
+		if t.SaleAddress == nil {
+			t.SaleAddress = saleContract.Address
+		} else if t.SaleAddress != nil && t.SaleAddress != saleContract.Address {
+			t.Errors = append(t.Errors, &Error{
+				Message: stringOrNil("Token sale address did not match referenced token sale contract address"),
+			})
+		}
+	}
 	return len(t.Errors) == 0
 }
 
