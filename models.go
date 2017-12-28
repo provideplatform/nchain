@@ -273,7 +273,12 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 		if err != nil {
 			return nil, err
 		}
-		addr := common.HexToAddress(*t.To)
+		var addr common.Address
+		if t.To != nil {
+			addr = common.HexToAddress(*t.To)
+		} else {
+			addr = common.HexToAddress("0x")
+		}
 		nonce := *wallet.TxCount()
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
 		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
