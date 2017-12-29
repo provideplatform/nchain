@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	ethparams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/jinzhu/gorm"
 	"github.com/satori/go.uuid"
@@ -117,11 +118,6 @@ func (c *Contract) Create() bool {
 		if _data, ok := params["data"].(string); ok {
 			data = []byte(_data)
 		}
-
-		// if args, ok := params["abi"].(string); ok {
-		// 	data = append(data, []byte(abi))
-		// }
-
 		tx := &Transaction{
 			NetworkId: network.Id,
 			WalletId:  wallet.Id,
@@ -273,7 +269,25 @@ func (t *Token) Validate() bool {
 
 // Transaction
 
-func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *params.ChainConfig) (*types.Transaction, error) {
+func (t *Transaction) asEthereumCallMsg(gasPrice *big.Int) *ethereum.CallMsg {
+	db := DatabaseConnection()
+	var wallet = &Wallet{}
+	db.Model(t).Related(&wallet)
+	var to *common.Address
+	if t.To != nil {
+		addr := common.HexToAddress(*t.To)
+		to = &addr
+	}
+	return &ethereum.CallMsg{
+		From:     common.HexToAddress(wallet.Address),
+		To:       to,
+		GasPrice: gasPrice,
+		Value:    big.NewInt(int64(t.Value)),
+		Data:     t.Data,
+	}
+}
+
+func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethparams.ChainConfig) (*types.Transaction, error) {
 	client := JsonRpcClient(network)
 	syncProgress, err := client.SyncProgress(context.TODO())
 	if err == nil {
@@ -281,17 +295,21 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 		if err != nil {
 			return nil, err
 		}
-		var addr common.Address
-		if t.To != nil {
-			addr = common.HexToAddress(*t.To)
-		} else {
-			addr = common.HexToAddress("0x")
-		}
 		nonce := *wallet.TxCount()
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
-		// FIXME-- gasLimit, _ := client.EstimateGas(context.TODO(), tx)
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
-		tx := types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
+		callMsg := t.asEthereumCallMsg(gasPrice)
+		if callMsg != nil {
+			gasLimit, err = client.EstimateGas(context.TODO(), *callMsg)
+			Log.Warningf("Failed to estimate gas for %s contract invocation; %s", *network.Name, err.Error())
+		}
+		var tx *types.Transaction
+		if t.To != nil {
+			addr := common.HexToAddress(*t.To)
+			tx = types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
+		} else {
+			tx = types.NewContractCreation(nonce, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
+		}
 		signer := types.MakeSigner(cfg, hdr.Number)
 		hash := signer.Hash(tx).Bytes()
 		sig, err := wallet.SignTx(hash)
