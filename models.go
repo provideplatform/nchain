@@ -43,12 +43,10 @@ type Network struct {
 
 type Contract struct {
 	Model
-	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	WalletId      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
-	TransactionId *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
-	Name          *string          `sql:"not null" json:"name"`
-	Address       *string          `sql:"not null" json:"address"` // network-specific token contract address
-	Params        *json.RawMessage `sql:"type:json" json:"params"`
+	NetworkId     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+	TransactionId *uuid.UUID `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
+	Name          *string    `sql:"not null" json:"name"`
+	Address       *string    `sql:"not null" json:"address"` // network-specific token contract address
 }
 
 type Token struct {
@@ -96,53 +94,9 @@ func (n *Network) ParseConfig() map[string]interface{} {
 // Contract
 
 func (c *Contract) Create() bool {
-	if !c.Validate() {
-		return false
-	}
-
 	db := DatabaseConnection()
-	var network = &Network{}
-	var wallet = &Wallet{}
-	if c.NetworkId != uuid.Nil {
-		db.Model(c).Related(&network)
-		db.Model(c).Related(&wallet)
-	}
-	params := c.ParseParams()
 
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
-		value := uint64(0)
-		data := make([]byte, 0)
-		if val, ok := params["value"].(uint64); ok {
-			value = val
-		}
-		if _data, ok := params["data"].(string); ok {
-			data = []byte(_data)
-		}
-		tx := &Transaction{
-			NetworkId: network.Id,
-			WalletId:  wallet.Id,
-			To:        nil, // recipient is nil to indicate contract creation
-			Value:     value,
-			Data:      data,
-		}
-		if tx.Create() {
-			Log.Debugf("Created %s contract in tx %s", *network.Name, tx.Hash)
-			c.TransactionId = &tx.Id
-
-			Log.Warningf("Contract address will remain nil until contract tx receipt is retreived after mining...")
-		} else {
-			Log.Warningf("Failed to create %s contract due to tx signing or broadcast failure", *network.Name)
-			for _, err := range tx.Errors {
-				Log.Warningf("Failed %s contract creation tx error: %s", *network.Name, *err.Message)
-				c.Errors = append(c.Errors, err)
-			}
-			return false
-		}
-	} else {
-		Log.Warningf("Unable to generate contract deployment tx for unsupported network: %s", *network.Name)
-	}
-
-	if len(c.Errors) > 0 {
+	if !c.Validate() {
 		return false
 	}
 
@@ -166,36 +120,19 @@ func (c *Contract) Create() bool {
 
 func (c *Contract) Validate() bool {
 	db := DatabaseConnection()
-	var wallet = &Wallet{}
-	db.Model(c).Related(&wallet)
+	var transaction = &Transaction{}
+	db.Model(c).Related(&transaction)
 	c.Errors = make([]*Error, 0)
-	if c.Params == nil {
-		c.Errors = append(c.Errors, &Error{
-			Message: stringOrNil("Unable to create contract without network-specific params"),
-		})
-	}
 	if c.NetworkId == uuid.Nil {
 		c.Errors = append(c.Errors, &Error{
-			Message: stringOrNil("Unable to create contract using unspecified network"),
+			Message: stringOrNil("Unable to associate contract with unspecified network"),
 		})
-	} else if c.NetworkId != wallet.NetworkId {
+	} else if c.NetworkId != transaction.NetworkId {
 		c.Errors = append(c.Errors, &Error{
-			Message: stringOrNil("Contract network did not match wallet network"),
+			Message: stringOrNil("Contract network did not match transaction network"),
 		})
 	}
 	return len(c.Errors) == 0
-}
-
-func (c *Contract) ParseParams() map[string]interface{} {
-	params := map[string]interface{}{}
-	if c.Params != nil {
-		err := json.Unmarshal(*c.Params, &params)
-		if err != nil {
-			Log.Warningf("Failed to unmarshal contract params; %s", err.Error())
-			return nil
-		}
-	}
-	return params
 }
 
 // Token
@@ -321,7 +258,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		if err == nil {
 			signedTx, _ := tx.WithSignature(signer, sig)
 			t.Hash = stringOrNil(fmt.Sprintf("%x", signedTx.Hash()))
-			Log.Debugf("Signed %s tx for raw broadcast via JSON-RPC: %s", *network.Name, signedTx.String())
+			Log.Debugf("Signed %s tx for broadcast via JSON-RPC: %s", *network.Name, signedTx.String())
 			return signedTx, nil
 		}
 		return nil, err
@@ -363,7 +300,9 @@ func (t *Transaction) Create() bool {
 						Message: stringOrNil(err.Error()),
 					})
 				} else {
-					// queue job to check on tx receipt
+					if t.To == nil {
+						Log.Warningf("%s contract created by broadcast tx; address must be retrieved from tx receipt", *network.Name)
+					}
 				}
 			} else {
 				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())

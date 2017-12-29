@@ -28,7 +28,6 @@ func main() {
 	r.GET("/api/v1/prices", pricesHandler)
 
 	r.GET("/api/v1/contracts", contractsListHandler)
-	r.POST("/api/v1/contracts", createContractHandler)
 
 	r.GET("/api/v1/tokens", tokensListHandler)
 	r.POST("/api/v1/tokens", createTokenHandler)
@@ -129,29 +128,6 @@ func contractsListHandler(c *gin.Context) {
 	var contracts []Contract
 	DatabaseConnection().Find(&contracts)
 	render(contracts, 200, c)
-}
-
-func createContractHandler(c *gin.Context) {
-	buf, err := c.GetRawData()
-	if err != nil {
-		renderError(err.Error(), 400, c)
-		return
-	}
-
-	contract := &Contract{}
-	err = json.Unmarshal(buf, contract)
-	if err != nil {
-		renderError(err.Error(), 422, c)
-		return
-	}
-
-	if contract.Create() {
-		render(contract, 201, c)
-	} else {
-		obj := map[string]interface{}{}
-		obj["errors"] = contract.Errors
-		render(obj, 422, c)
-	}
 }
 
 // tokens
