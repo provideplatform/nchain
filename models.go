@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
@@ -66,7 +65,7 @@ type Transaction struct {
 	Model
 	NetworkId uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
 	WalletId  uuid.UUID `sql:"not null;type:uuid" json:"wallet_id"`
-	To        *string   `sql:"not null" json:"to"`
+	To        *string   `json:"to"`
 	Value     uint64    `sql:"not null;default:0" json:"value"`
 	Data      []byte    `json:"data"`
 	Hash      *string   `sql:"not null" json:"hash"`
@@ -111,22 +110,24 @@ func (c *Contract) Create() bool {
 
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		value := uint64(0)
-		data := make([][]byte, 0)
+		data := make([]byte, 0)
 		if val, ok := params["value"].(uint64); ok {
 			value = val
 		}
-		if bytecode, ok := params["bytecode"].(string); ok {
-			data = append(data, []byte(bytecode))
+		if _data, ok := params["data"].(string); ok {
+			data = []byte(_data)
 		}
-		if abi, ok := params["abi"].(string); ok {
-			data = append(data, []byte(abi))
-		}
+
+		// if args, ok := params["abi"].(string); ok {
+		// 	data = append(data, []byte(abi))
+		// }
+
 		tx := &Transaction{
 			NetworkId: network.Id,
 			WalletId:  wallet.Id,
 			To:        nil, // recipient is nil to indicate contract creation
 			Value:     value,
-			Data:      bytes.Join(data, []byte("")),
+			Data:      data,
 		}
 		if tx.Create() {
 			Log.Debugf("Created %s contract in tx %s", *network.Name, tx.Hash)
