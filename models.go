@@ -269,7 +269,7 @@ func (t *Token) Validate() bool {
 
 // Transaction
 
-func (t *Transaction) asEthereumCallMsg(gasPrice *big.Int) *ethereum.CallMsg {
+func (t *Transaction) asEthereumCallMsg(gasPrice *big.Int) ethereum.CallMsg {
 	db := DatabaseConnection()
 	var wallet = &Wallet{}
 	db.Model(t).Related(&wallet)
@@ -278,7 +278,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice *big.Int) *ethereum.CallMsg {
 		addr := common.HexToAddress(*t.To)
 		to = &addr
 	}
-	return &ethereum.CallMsg{
+	return ethereum.CallMsg{
 		From:     common.HexToAddress(wallet.Address),
 		To:       to,
 		GasPrice: gasPrice,
@@ -299,9 +299,10 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
 		gasLimit := big.NewInt(DefaultEthereumGasLimit)
 		callMsg := t.asEthereumCallMsg(gasPrice)
-		if callMsg != nil {
-			gasLimit, err = client.EstimateGas(context.TODO(), *callMsg)
+		gasLimit, err = client.EstimateGas(context.TODO(), callMsg)
+		if err != nil {
 			Log.Warningf("Failed to estimate gas for %s contract invocation; %s", *network.Name, err.Error())
+			return nil, err
 		}
 		var tx *types.Transaction
 		if t.To != nil {
