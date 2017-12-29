@@ -136,7 +136,7 @@ func (c *Contract) Create() bool {
 		} else {
 			Log.Warningf("Failed to create %s contract due to tx signing or broadcast failure", *network.Name)
 			for _, err := range tx.Errors {
-				Log.Warningf("Failed %s contract creation tx failed; %s", *network.Name, err.Message)
+				Log.Warningf("Failed %s contract creation tx error: %s", *network.Name, *err.Message)
 			}
 			return false
 		}
