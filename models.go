@@ -222,7 +222,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.Ca
 		Gas:      gasLimit,
 		GasPrice: gasPrice,
 		Value:    big.NewInt(int64(t.Value)),
-		Data:     t.Data,
+		Data:     common.Hex2Bytes(string(t.Data)),
 	}
 }
 
@@ -250,7 +250,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 				return nil, err
 			}
 			Log.Debugf("Estimated %d total gas required for %s contract deployment tx", gasLimit, *network.Name)
-			tx = types.NewContractCreation(nonce, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
+			tx = types.NewContractCreation(nonce, big.NewInt(int64(t.Value)), gasLimit, gasPrice, common.Hex2Bytes(string(t.Data)))
 		}
 		signer := types.MakeSigner(cfg, hdr.Number)
 		hash := signer.Hash(tx).Bytes()
