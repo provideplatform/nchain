@@ -309,7 +309,21 @@ func (t *Transaction) Create() bool {
 					})
 				} else {
 					if t.To == nil {
-						Log.Warningf("%s contract created by broadcast tx; address must be retrieved from tx receipt", *network.Name)
+						Log.Warningf("%s contract created by broadcast tx: %s", *network.Name, tx.Hash())
+						receipt, err := client.TransactionReceipt(context.TODO(), tx.Hash())
+						if err != nil && err == ethereum.NotFound {
+							Log.Warningf("%s contract created by broadcast tx; address must be retrieved from tx receipt", *network.Name)
+						} else {
+							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, tx.Hash(), receipt.ContractAddress)
+							contract := &Contract{
+								Address: stringOrNil(receipt.ContractAddress.Hex()),
+							}
+							if contract.Create() {
+								Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, tx.Hash())
+							} else {
+								Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, tx.Hash())
+							}
+						}
 					}
 				}
 			} else {
