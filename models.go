@@ -66,7 +66,7 @@ type Transaction struct {
 	WalletId  uuid.UUID `sql:"not null;type:uuid" json:"wallet_id"`
 	To        *string   `json:"to"`
 	Value     uint64    `sql:"not null;default:0" json:"value"`
-	Data      []byte    `json:"data"`
+	Data      *string   `json:"data"`
 	Hash      *string   `sql:"not null" json:"hash"`
 }
 
@@ -212,9 +212,13 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.Ca
 	var wallet = &Wallet{}
 	db.Model(t).Related(&wallet)
 	var to *common.Address
+	var data []byte
 	if t.To != nil {
 		addr := common.HexToAddress(*t.To)
 		to = &addr
+	}
+	if t.Data != nil {
+		data = common.Hex2Bytes(*t.Data)
 	}
 	return ethereum.CallMsg{
 		From:     common.HexToAddress(wallet.Address),
@@ -222,7 +226,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.Ca
 		Gas:      gasLimit,
 		GasPrice: gasPrice,
 		Value:    big.NewInt(int64(t.Value)),
-		Data:     common.Hex2Bytes(string(t.Data)),
+		Data:     data,
 	}
 }
 
@@ -236,11 +240,15 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		}
 		nonce := *wallet.TxCount()
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
+		var data []byte
+		if t.Data != nil {
+			data = common.Hex2Bytes(*t.Data)
+		}
 		var tx *types.Transaction
 		if t.To != nil {
 			addr := common.HexToAddress(*t.To)
 			gasLimit := big.NewInt(DefaultEthereumGasLimit)
-			tx = types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
+			tx = types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, data)
 		} else {
 			Log.Debugf("Attempting to deploy %s contract via tx; estimating total gas requirements", *network.Name)
 			callMsg := t.asEthereumCallMsg(gasPrice, nil)
@@ -249,8 +257,8 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 				Log.Warningf("Failed to estimate gas for %s contract deployment tx; %s", *network.Name, err.Error())
 				return nil, err
 			}
-			Log.Debugf("Estimated %d total gas required for %s contract deployment tx", gasLimit, *network.Name)
-			tx = types.NewContractCreation(nonce, big.NewInt(int64(t.Value)), gasLimit, gasPrice, common.Hex2Bytes(string(t.Data)))
+			Log.Debugf("Estimated %d total gas required for %s contract deployment tx with %d-byte data payload", gasLimit, *network.Name, len(data))
+			tx = types.NewContractCreation(nonce, big.NewInt(int64(t.Value)), gasLimit, gasPrice, data)
 		}
 		signer := types.MakeSigner(cfg, hdr.Number)
 		hash := signer.Hash(tx).Bytes()
