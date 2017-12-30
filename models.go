@@ -218,7 +218,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.Ca
 		to = &addr
 	}
 	if t.Data != nil {
-		data = common.Hex2Bytes(*t.Data)
+		data = common.FromHex(*t.Data)
 	}
 	return ethereum.CallMsg{
 		From:     common.HexToAddress(wallet.Address),
@@ -242,7 +242,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
 		var data []byte
 		if t.Data != nil {
-			data = common.Hex2Bytes(*t.Data)
+			data = common.FromHex(*t.Data)
 		}
 		var tx *types.Transaction
 		if t.To != nil {
