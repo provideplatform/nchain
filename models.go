@@ -236,15 +236,15 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		}
 		nonce := *wallet.TxCount()
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
-		gasLimit := big.NewInt(DefaultEthereumGasLimit)
 		var tx *types.Transaction
 		if t.To != nil {
 			addr := common.HexToAddress(*t.To)
+			gasLimit := big.NewInt(DefaultEthereumGasLimit)
 			tx = types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, t.Data)
 		} else {
 			Log.Debugf("Attempting to deploy %s contract via tx; estimating total gas requirements", *network.Name)
 			callMsg := t.asEthereumCallMsg(gasPrice, nil)
-			gasLimit, err = client.EstimateGas(context.TODO(), callMsg)
+			gasLimit, err := client.EstimateGas(context.TODO(), callMsg)
 			if err != nil {
 				Log.Warningf("Failed to estimate gas for %s contract deployment tx; %s", *network.Name, err.Error())
 				return nil, err
