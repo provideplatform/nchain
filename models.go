@@ -309,19 +309,26 @@ func (t *Transaction) Create() bool {
 					})
 				} else {
 					if t.To == nil {
-						Log.Warningf("%s contract created by broadcast tx: %s", *network.Name, tx.Hash())
-						receipt, err := client.TransactionReceipt(context.TODO(), tx.Hash())
-						if err != nil && err == ethereum.NotFound {
-							Log.Warningf("%s contract created by broadcast tx; address must be retrieved from tx receipt", *network.Name)
-						} else {
-							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, tx.Hash(), receipt.ContractAddress)
-							contract := &Contract{
-								Address: stringOrNil(receipt.ContractAddress.Hex()),
-							}
-							if contract.Create() {
-								Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, tx.Hash())
+						Log.Debugf("%s contract created by broadcast tx: %s", *network.Name, tx.Hash().Hex())
+						err = ethereum.NotFound
+						for err == ethereum.NotFound {
+							Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, tx.Hash().Hex())
+							receipt, err := client.TransactionReceipt(context.TODO(), tx.Hash())
+							if err != nil && err == ethereum.NotFound {
+								Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, tx.Hash().Hex())
 							} else {
-								Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, tx.Hash())
+								Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, tx.Hash().Hex(), receipt.ContractAddress)
+								contract := &Contract{
+									NetworkId:     t.NetworkId,
+									TransactionId: &t.Id,
+									Name:          stringOrNil(receipt.ContractAddress.Hex()), // FIXME-- should be provided 'name' param
+									Address:       stringOrNil(receipt.ContractAddress.Hex()),
+								}
+								if contract.Create() {
+									Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, tx.Hash().Hex())
+								} else {
+									Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, tx.Hash().Hex())
+								}
 							}
 						}
 					}
