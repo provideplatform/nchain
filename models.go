@@ -307,31 +307,6 @@ func (t *Transaction) Create() bool {
 					t.Errors = append(t.Errors, &Error{
 						Message: stringOrNil(err.Error()),
 					})
-				} else {
-					if t.To == nil {
-						Log.Debugf("%s contract created by broadcast tx: %s", *network.Name, tx.Hash().Hex())
-						err = ethereum.NotFound
-						for err == ethereum.NotFound {
-							Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, tx.Hash().Hex())
-							receipt, err := client.TransactionReceipt(context.TODO(), tx.Hash())
-							if err != nil && err == ethereum.NotFound {
-								Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, tx.Hash().Hex())
-							} else {
-								Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, tx.Hash().Hex(), receipt.ContractAddress)
-								contract := &Contract{
-									NetworkId:     t.NetworkId,
-									TransactionId: &t.Id,
-									Name:          stringOrNil(receipt.ContractAddress.Hex()), // FIXME-- should be provided 'name' param
-									Address:       stringOrNil(receipt.ContractAddress.Hex()),
-								}
-								if contract.Create() {
-									Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, tx.Hash().Hex())
-								} else {
-									Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, tx.Hash().Hex())
-								}
-							}
-						}
-					}
 				}
 			} else {
 				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())
@@ -360,6 +335,34 @@ func (t *Transaction) Create() bool {
 			}
 		}
 		if !db.NewRecord(t) {
+			if t.To == nil && rowsAffected > 0 {
+				if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+					client, err := DialJsonRpc(network)
+					txHash := fmt.Sprintf("0x%s", *t.Hash)
+					Log.Debugf("%s contract created by broadcast tx: %s", *network.Name, txHash)
+					err = ethereum.NotFound
+					for err == ethereum.NotFound {
+						Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, txHash)
+						receipt, err := client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
+						if err != nil && err == ethereum.NotFound {
+							Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, txHash)
+						} else {
+							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress)
+							contract := &Contract{
+								NetworkId:     t.NetworkId,
+								TransactionId: &t.Id,
+								Name:          stringOrNil(receipt.ContractAddress.Hex()), // FIXME-- should be provided 'name' param
+								Address:       stringOrNil(receipt.ContractAddress.Hex()),
+							}
+							if contract.Create() {
+								Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, txHash)
+							} else {
+								Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, txHash)
+							}
+						}
+					}
+				}
+			}
 			return rowsAffected > 0
 		}
 	}
