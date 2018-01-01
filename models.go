@@ -337,17 +337,19 @@ func (t *Transaction) Create() bool {
 		if !db.NewRecord(t) {
 			if t.To == nil && rowsAffected > 0 {
 				if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+					var err error
+					var receipt *types.Receipt
 					client, err := DialJsonRpc(network)
 					txHash := fmt.Sprintf("0x%s", *t.Hash)
 					Log.Debugf("%s contract created by broadcast tx: %s", *network.Name, txHash)
 					err = ethereum.NotFound
-					for err == ethereum.NotFound {
+					for receipt == nil && err == ethereum.NotFound {
 						Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, txHash)
-						receipt, err := client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
+						receipt, err = client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
 						if err != nil && err == ethereum.NotFound {
 							Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, txHash)
 						} else {
-							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress)
+							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress.Hex())
 							contract := &Contract{
 								NetworkId:     t.NetworkId,
 								TransactionId: &t.Id,
@@ -357,7 +359,7 @@ func (t *Transaction) Create() bool {
 							if contract.Create() {
 								Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, txHash)
 							} else {
-								Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, txHash)
+								Log.Warningf("Failed to create contract for %s contract creation tx %s; errors: %s", *network.Name, txHash, *contract.Errors[0].Message)
 							}
 						}
 					}
