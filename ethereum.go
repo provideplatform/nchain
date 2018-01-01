@@ -4,9 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/params"
-
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 var EthereumClients = map[string][]*ethclient.Client{}
