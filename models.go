@@ -43,10 +43,11 @@ type Network struct {
 
 type Contract struct {
 	Model
-	NetworkId     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
-	TransactionId *uuid.UUID `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
-	Name          *string    `sql:"not null" json:"name"`
-	Address       *string    `sql:"not null" json:"address"` // network-specific token contract address
+	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	TransactionId *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
+	Name          *string          `sql:"not null" json:"name"`
+	Address       *string          `sql:"not null" json:"address"` // network-specific token contract address
+	Params        *json.RawMessage `sql:"type:json" json:"params"`
 }
 
 type Token struct {
@@ -62,12 +63,13 @@ type Token struct {
 
 type Transaction struct {
 	Model
-	NetworkId uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	WalletId  uuid.UUID `sql:"not null;type:uuid" json:"wallet_id"`
-	To        *string   `json:"to"`
-	Value     uint64    `sql:"not null;default:0" json:"value"`
-	Data      *string   `json:"data"`
-	Hash      *string   `sql:"not null" json:"hash"`
+	NetworkId uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	WalletId  uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
+	To        *string          `json:"to"`
+	Value     uint64           `sql:"not null;default:0" json:"value"`
+	Data      *string          `json:"data"`
+	Hash      *string          `sql:"not null" json:"hash"`
+	Params    *json.RawMessage `sql:"-" json:"params"`
 }
 
 type Wallet struct {
@@ -92,6 +94,18 @@ func (n *Network) ParseConfig() map[string]interface{} {
 }
 
 // Contract
+
+func (c *Contract) ParseParams() map[string]interface{} {
+	params := map[string]interface{}{}
+	if c.Params != nil {
+		err := json.Unmarshal(*c.Params, &params)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal contract params; %s", err.Error())
+			return nil
+		}
+	}
+	return params
+}
 
 func (c *Contract) Create() bool {
 	db := DatabaseConnection()
@@ -206,6 +220,18 @@ func (t *Token) Validate() bool {
 }
 
 // Transaction
+
+func (t *Transaction) ParseParams() map[string]interface{} {
+	params := map[string]interface{}{}
+	if t.Params != nil {
+		err := json.Unmarshal(*t.Params, &params)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal transaction params; %s", err.Error())
+			return nil
+		}
+	}
+	return params
+}
 
 func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.CallMsg {
 	db := DatabaseConnection()
@@ -350,11 +376,17 @@ func (t *Transaction) Create() bool {
 							Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, txHash)
 						} else {
 							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress.Hex())
+							params := t.ParseParams()
+							contractName := fmt.Sprintf("Contract %s", *stringOrNil(receipt.ContractAddress.Hex()))
+							if name, ok := params["name"].(string); ok {
+								contractName = name
+							}
 							contract := &Contract{
 								NetworkId:     t.NetworkId,
 								TransactionId: &t.Id,
-								Name:          stringOrNil(receipt.ContractAddress.Hex()), // FIXME-- should be provided 'name' param
+								Name:          stringOrNil(contractName),
 								Address:       stringOrNil(receipt.ContractAddress.Hex()),
+								Params:        t.Params,
 							}
 							if contract.Create() {
 								Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, txHash)
