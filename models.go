@@ -12,6 +12,7 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -57,6 +58,7 @@ type Token struct {
 	SaleContractId *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
 	Name           *string    `sql:"not null" json:"name"`
 	Symbol         *string    `sql:"not null" json:"symbol"`
+	Decimals       uint64     `sql:"not null" json:"decimals"`
 	Address        *string    `sql:"not null" json:"address"` // network-specific token contract address
 	SaleAddress    *string    `json:"sale_address"`           // non-null if token sale contract is specified
 }
@@ -179,42 +181,43 @@ func (t *Token) Create() bool {
 func (t *Token) Validate() bool {
 	db := DatabaseConnection()
 	var contract = &Contract{}
-	var saleContract = &Contract{}
 	if t.NetworkId != uuid.Nil {
 		db.Model(t).Related(&contract)
-		db.Model(t).Related(&saleContract)
 	}
 	t.Errors = make([]*Error, 0)
 	if t.NetworkId == uuid.Nil {
 		t.Errors = append(t.Errors, &Error{
 			Message: stringOrNil("Unable to deploy token contract using unspecified network"),
 		})
-	} else if contract != nil {
-		if t.NetworkId != contract.NetworkId {
-			t.Errors = append(t.Errors, &Error{
-				Message: stringOrNil("Token network did not match token contract network"),
-			})
+	} else {
+		if contract != nil {
+			if t.NetworkId != contract.NetworkId {
+				t.Errors = append(t.Errors, &Error{
+					Message: stringOrNil("Token network did not match token contract network"),
+				})
+			}
+			if t.Address == nil {
+				t.Address = contract.Address
+			} else if t.Address != nil && *t.Address != *contract.Address {
+				t.Errors = append(t.Errors, &Error{
+					Message: stringOrNil("Token contract address did not match referenced contract address"),
+				})
+			}
 		}
-		if t.Address == nil {
-			t.Address = contract.Address
-		} else if t.Address != nil && t.Address != contract.Address {
-			t.Errors = append(t.Errors, &Error{
-				Message: stringOrNil("Token sale address did not match referenced token contract address"),
-			})
-		}
-	} else if saleContract != nil {
-		if t.NetworkId != saleContract.NetworkId {
-			t.Errors = append(t.Errors, &Error{
-				Message: stringOrNil("Token network did not match token sale contract network"),
-			})
-		}
-		if t.SaleAddress == nil {
-			t.SaleAddress = saleContract.Address
-		} else if t.SaleAddress != nil && t.SaleAddress != saleContract.Address {
-			t.Errors = append(t.Errors, &Error{
-				Message: stringOrNil("Token sale address did not match referenced token sale contract address"),
-			})
-		}
+		// if t.SaleContractId != nil {
+		// 	if t.NetworkId != saleContract.NetworkId {
+		// 		t.Errors = append(t.Errors, &Error{
+		// 			Message: stringOrNil("Token network did not match token sale contract network"),
+		// 		})
+		// 	}
+		// 	if t.SaleAddress == nil {
+		// 		t.SaleAddress = saleContract.Address
+		// 	} else if t.SaleAddress != nil && *t.SaleAddress != *saleContract.Address {
+		// 		t.Errors = append(t.Errors, &Error{
+		// 			Message: stringOrNil("Token sale address did not match referenced token sale contract address"),
+		// 		})
+		// 	}
+		// }
 	}
 	return len(t.Errors) == 0
 }
@@ -366,6 +369,7 @@ func (t *Transaction) Create() bool {
 					var err error
 					var receipt *types.Receipt
 					client, err := DialJsonRpc(network)
+					gasPrice, _ := client.SuggestGasPrice(context.TODO())
 					txHash := fmt.Sprintf("0x%s", *t.Hash)
 					Log.Debugf("%s contract created by broadcast tx: %s", *network.Name, txHash)
 					err = ethereum.NotFound
@@ -389,9 +393,75 @@ func (t *Transaction) Create() bool {
 								Params:        t.Params,
 							}
 							if contract.Create() {
-								Log.Debugf("Created contract %s for %s contract creation tx", contract.Id, *network.Name, txHash)
+								Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.Id, *network.Name, txHash)
+
+								if contractAbi, ok := params["abi"]; ok {
+									abistr, err := json.Marshal(contractAbi)
+									if err != nil {
+										Log.Warningf("failed to marshal abi to json...  %s", err.Error())
+									}
+									abi, err := ethabi.JSON(strings.NewReader(string(abistr)))
+									if err == nil {
+										msg := ethereum.CallMsg{
+											From:     common.HexToAddress(wallet.Address),
+											To:       &receipt.ContractAddress,
+											Gas:      nil,
+											GasPrice: gasPrice,
+											Value:    nil,
+											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("name()"))),
+										}
+
+										result, _ := client.CallContract(context.TODO(), msg, nil)
+										var name string
+										err = abi.Methods["name"].Outputs.Unpack(&name, result)
+										if err != nil {
+											Log.Warningf("Failed to unpack token name; %s", err.Error())
+										}
+
+										msg = ethereum.CallMsg{
+											From:     common.HexToAddress(wallet.Address),
+											To:       &receipt.ContractAddress,
+											Gas:      nil,
+											GasPrice: gasPrice,
+											Value:    nil,
+											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("decimals()"))),
+										}
+										result, _ = client.CallContract(context.TODO(), msg, nil)
+										var decimals *big.Int
+										abi.Methods["decimals"].Outputs.Unpack(&decimals, result)
+
+										msg = ethereum.CallMsg{
+											From:     common.HexToAddress(wallet.Address),
+											To:       &receipt.ContractAddress,
+											Gas:      nil,
+											GasPrice: gasPrice,
+											Value:    nil,
+											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("symbol()"))),
+										}
+										result, _ = client.CallContract(context.TODO(), msg, nil)
+										var symbol string
+										abi.Methods["symbol"].Outputs.Unpack(&symbol, result)
+
+										Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+										token := &Token{
+											NetworkId:  contract.NetworkId,
+											ContractId: &contract.Id,
+											Name:       stringOrNil(name),
+											Symbol:     stringOrNil(symbol),
+											Decimals:   decimals.Uint64(),
+											Address:    stringOrNil(receipt.ContractAddress.Hex()),
+										}
+										if token.Create() {
+											Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.Id, *network.Name, txHash)
+										} else {
+											Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, txHash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
+										}
+									} else {
+										Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
+									}
+								}
 							} else {
-								Log.Warningf("Failed to create contract for %s contract creation tx %s; errors: %s", *network.Name, txHash, *contract.Errors[0].Message)
+								Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, txHash)
 							}
 						}
 					}

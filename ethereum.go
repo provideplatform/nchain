@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -65,4 +66,8 @@ func JsonRpcClient(network *Network) *ethclient.Client {
 		}
 	}
 	return nil
+}
+
+func EncodeFunctionSignature(funcsig string) []byte {
+	return ethcrypto.Keccak256([]byte(funcsig))[0:4]
 }
