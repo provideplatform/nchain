@@ -236,7 +236,7 @@ func (t *Transaction) ParseParams() map[string]interface{} {
 	return params
 }
 
-func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.CallMsg {
+func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.CallMsg {
 	db := DatabaseConnection()
 	var wallet = &Wallet{}
 	db.Model(t).Related(&wallet)
@@ -253,7 +253,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit *big.Int) ethereum.Ca
 		From:     common.HexToAddress(wallet.Address),
 		To:       to,
 		Gas:      gasLimit,
-		GasPrice: gasPrice,
+		GasPrice: big.NewInt(int64(gasPrice)),
 		Value:    big.NewInt(int64(t.Value)),
 		Data:     data,
 	}
@@ -276,11 +276,11 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		var tx *types.Transaction
 		if t.To != nil {
 			addr := common.HexToAddress(*t.To)
-			gasLimit := big.NewInt(DefaultEthereumGasLimit)
+			gasLimit := big.NewInt(DefaultEthereumGasLimit).Uint64()
 			tx = types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, data)
 		} else {
 			Log.Debugf("Attempting to deploy %s contract via tx; estimating total gas requirements", *network.Name)
-			callMsg := t.asEthereumCallMsg(gasPrice, nil)
+			callMsg := t.asEthereumCallMsg(gasPrice.Uint64(), 0)
 			gasLimit, err := client.EstimateGas(context.TODO(), callMsg)
 			if err != nil {
 				Log.Warningf("Failed to estimate gas for %s contract deployment tx; %s", *network.Name, err.Error())
@@ -405,7 +405,7 @@ func (t *Transaction) Create() bool {
 										msg := ethereum.CallMsg{
 											From:     common.HexToAddress(wallet.Address),
 											To:       &receipt.ContractAddress,
-											Gas:      nil,
+											Gas:      0,
 											GasPrice: gasPrice,
 											Value:    nil,
 											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("name()"))),
@@ -421,7 +421,7 @@ func (t *Transaction) Create() bool {
 										msg = ethereum.CallMsg{
 											From:     common.HexToAddress(wallet.Address),
 											To:       &receipt.ContractAddress,
-											Gas:      nil,
+											Gas:      0,
 											GasPrice: gasPrice,
 											Value:    nil,
 											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("decimals()"))),
@@ -433,7 +433,7 @@ func (t *Transaction) Create() bool {
 										msg = ethereum.CallMsg{
 											From:     common.HexToAddress(wallet.Address),
 											To:       &receipt.ContractAddress,
-											Gas:      nil,
+											Gas:      0,
 											GasPrice: gasPrice,
 											Value:    nil,
 											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("symbol()"))),
