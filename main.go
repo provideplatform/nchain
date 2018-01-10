@@ -40,7 +40,7 @@ func main() {
 	r.GET("/api/v1/wallets", walletsListHandler)
 	r.POST("/api/v1/wallets", createWalletHandler)
 	r.GET("/api/v1/wallets/:id", walletDetailsHandler)
-	r.GET("/api/v1/wallets/:id/balances", walletBalancesHandler)
+	r.GET("/api/v1/wallets/:id/balances/:tokenId", walletBalanceHandler)
 
 	r.GET("/status", statusHandler)
 
@@ -214,8 +214,22 @@ func walletDetailsHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
-func walletBalancesHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+func walletBalanceHandler(c *gin.Context) {
+	var wallet = &Wallet{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
+	if wallet == nil {
+		renderError("wallet not found", 404, c)
+		return
+	}
+	balance, err := wallet.TokenBalance(c.Param("tokenId"))
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+	response := map[string]uint64{
+		c.Param("tokenId"): balance,
+	}
+	render(response, 200, c)
 }
 
 func createWalletHandler(c *gin.Context) {

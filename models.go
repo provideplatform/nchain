@@ -234,7 +234,7 @@ func (t *Token) Validate() bool {
 
 func (t *Token) GetContract() (*Contract, error) {
 	db := DatabaseConnection()
-	var contract *Contract
+	var contract = &Contract{}
 	db.Model(t).Related(&contract)
 	if contract == nil {
 		return nil, fmt.Errorf("Failed to retrieve token contract for token: %s", t.Id)
@@ -648,7 +648,7 @@ func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
 	balance := uint64(0)
 	db := DatabaseConnection()
 	var network = &Network{}
-	var token *Token
+	var token = &Token{}
 	db.Model(w).Related(&network)
 	db.Where("id = ?", tokenId).Find(&token)
 	if token == nil {
