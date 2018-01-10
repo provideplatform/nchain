@@ -134,6 +134,16 @@ func (c *Contract) Create() bool {
 	return false
 }
 
+func (c *Contract) GetTransaction() (*Transaction, error) {
+	var tx = &Transaction{}
+	db := DatabaseConnection()
+	db.Model(c).Related(&tx)
+	if tx == nil {
+		return nil, fmt.Errorf("Failed to retrieve tx for contract: %s", c.Id)
+	}
+	return tx, nil
+}
+
 func (c *Contract) Validate() bool {
 	db := DatabaseConnection()
 	var transaction = &Transaction{}
@@ -222,6 +232,28 @@ func (t *Token) Validate() bool {
 	return len(t.Errors) == 0
 }
 
+func (t *Token) GetContract() (*Contract, error) {
+	db := DatabaseConnection()
+	var contract *Contract
+	db.Model(t).Related(&contract)
+	if contract == nil {
+		return nil, fmt.Errorf("Failed to retrieve token contract for token: %s", t.Id)
+	}
+	return contract, nil
+}
+
+func (t *Token) readEthereumContractAbi() (*ethabi.ABI, error) {
+	contract, err := t.GetContract()
+	if err != nil {
+		return nil, err
+	}
+	tx, err := contract.GetTransaction()
+	if err != nil {
+		return nil, err
+	}
+	return tx.readEthereumContractAbi()
+}
+
 // Transaction
 
 func (t *Transaction) ParseParams() map[string]interface{} {
@@ -257,6 +289,25 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 		Value:    big.NewInt(int64(t.Value)),
 		Data:     data,
 	}
+}
+
+func (t *Transaction) readEthereumContractAbi() (*ethabi.ABI, error) {
+	var abi *ethabi.ABI
+	params := t.ParseParams()
+	if contractAbi, ok := params["abi"]; ok {
+		abistr, err := json.Marshal(contractAbi)
+		if err != nil {
+			Log.Warningf("Failed to marshal abi to json...  %s", err.Error())
+		}
+		abival, err := ethabi.JSON(strings.NewReader(string(abistr)))
+		if err != nil {
+			return nil, err
+		}
+		abi = &abival
+	} else {
+		return nil, fmt.Errorf("Failed to read abi from params for tx: %s", t.Id)
+	}
+	return abi, nil
 }
 
 func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethparams.ChainConfig) (*types.Transaction, error) {
@@ -591,6 +642,45 @@ func (w *Wallet) Validate() bool {
 		})
 	}
 	return len(w.Errors) == 0
+}
+
+func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
+	balance := uint64(0)
+	db := DatabaseConnection()
+	var network = &Network{}
+	var token *Token
+	db.Model(w).Related(&network)
+	db.Where("id = ?", tokenId).Find(&token)
+	if token == nil {
+		return 0, fmt.Errorf("Unable to read token balance for invalid token: %s", tokenId)
+	}
+	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+		abi, err := token.readEthereumContractAbi()
+		if err != nil {
+			return 0, err
+		}
+		client, err := DialJsonRpc(network)
+		gasPrice, _ := client.SuggestGasPrice(context.TODO())
+		to := common.HexToAddress(*token.Address)
+		msg := ethereum.CallMsg{
+			From:     common.HexToAddress(w.Address),
+			To:       &to,
+			Gas:      0,
+			GasPrice: gasPrice,
+			Value:    nil,
+			Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("balanceOf(address)"))),
+		}
+		result, _ := client.CallContract(context.TODO(), msg, nil)
+		var out *big.Int
+		abi.Methods["balanceOf"].Outputs.Unpack(&out, result)
+		if out != nil {
+			balance = out.Uint64()
+			Log.Debugf("Read %s %s token balance (%v) from token contract address: %s", *network.Name, token.Symbol, balance, token.Address)
+		}
+	} else {
+		Log.Warningf("Unable to read token balance for unsupported network: %s", *network.Name)
+	}
+	return balance, nil
 }
 
 func (w *Wallet) TxCount() (count *uint64) {

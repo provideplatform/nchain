@@ -30,6 +30,7 @@ func main() {
 	r.GET("/api/v1/contracts", contractsListHandler)
 
 	r.GET("/api/v1/tokens", tokensListHandler)
+	r.GET("/api/v1/tokens/:id", tokenDetailsHandler)
 	r.POST("/api/v1/tokens", createTokenHandler)
 
 	r.GET("/api/v1/transactions", transactionsListHandler)
@@ -39,6 +40,7 @@ func main() {
 	r.GET("/api/v1/wallets", walletsListHandler)
 	r.POST("/api/v1/wallets", createWalletHandler)
 	r.GET("/api/v1/wallets/:id", walletDetailsHandler)
+	r.GET("/api/v1/wallets/:id/balances", walletBalancesHandler)
 
 	r.GET("/status", statusHandler)
 
@@ -138,6 +140,10 @@ func tokensListHandler(c *gin.Context) {
 	render(tokens, 200, c)
 }
 
+func tokenDetailsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
 func createTokenHandler(c *gin.Context) {
 	buf, err := c.GetRawData()
 	if err != nil {
@@ -205,6 +211,10 @@ func walletsListHandler(c *gin.Context) {
 }
 
 func walletDetailsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func walletBalancesHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
