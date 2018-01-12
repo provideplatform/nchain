@@ -318,7 +318,10 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		if err != nil {
 			return nil, err
 		}
-		nonce := *wallet.TxCount()
+		nonce, err := client.PendingNonceAt(context.TODO(), common.HexToAddress(wallet.Address))
+		if err != nil {
+			return nil, err
+		}
 		gasPrice, _ := client.SuggestGasPrice(context.TODO())
 		var data []byte
 		if t.Data != nil {
