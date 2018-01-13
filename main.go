@@ -7,7 +7,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/satori/go.uuid"
+
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	gocore "github.com/provideapp/go-core"
 )
 
 func main() {
@@ -49,6 +53,31 @@ func main() {
 	} else {
 		r.Run(ListenAddr)
 	}
+}
+
+func authorizedApplicationId(c *gin.Context) *uuid.UUID {
+	var id string
+	keyfn := func(jwtToken *jwt.Token) (interface{}, error) {
+		if claims, ok := jwtToken.Claims.(jwt.MapClaims); ok {
+			if sub, subok := claims["sub"].(string); subok {
+				subprts := strings.Split(sub, ":")
+				if len(subprts) != 2 {
+					return nil, fmt.Errorf("JWT subject malformed; %s", sub)
+				}
+				if subprts[0] != "application" {
+					return nil, fmt.Errorf("JWT claims specified non-application subject: %s", subprts[0])
+				}
+				id = subprts[1]
+			}
+		}
+		return nil, nil
+	}
+	gocore.ParseBearerAuthorizationHeader(c, &keyfn)
+	uuidV4, err := uuid.FromString(id)
+	if err != nil {
+		return nil
+	}
+	return &uuidV4
 }
 
 func render(obj interface{}, status int, c *gin.Context) {
@@ -127,6 +156,12 @@ func pricesHandler(c *gin.Context) {
 // contracts
 
 func contractsListHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	var contracts []Contract
 	DatabaseConnection().Find(&contracts)
 	render(contracts, 200, c)
@@ -135,6 +170,12 @@ func contractsListHandler(c *gin.Context) {
 // tokens
 
 func tokensListHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	var tokens []Token
 	DatabaseConnection().Find(&tokens)
 	render(tokens, 200, c)
@@ -145,6 +186,12 @@ func tokenDetailsHandler(c *gin.Context) {
 }
 
 func createTokenHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	buf, err := c.GetRawData()
 	if err != nil {
 		renderError(err.Error(), 400, c)
@@ -157,6 +204,7 @@ func createTokenHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
+	token.ApplicationId = appId
 
 	if token.Create() {
 		render(token, 201, c)
@@ -170,12 +218,24 @@ func createTokenHandler(c *gin.Context) {
 // transactions
 
 func transactionsListHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	var txs []Transaction
 	DatabaseConnection().Find(&txs)
 	render(txs, 200, c)
 }
 
 func createTransactionHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	buf, err := c.GetRawData()
 	if err != nil {
 		renderError(err.Error(), 400, c)
@@ -188,6 +248,7 @@ func createTransactionHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
+	tx.ApplicationId = appId
 
 	if tx.Create() {
 		render(tx, 201, c)
@@ -205,6 +266,12 @@ func transactionDetailsHandler(c *gin.Context) {
 // wallets
 
 func walletsListHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	var wallets []Wallet
 	DatabaseConnection().Find(&wallets)
 	render(wallets, 200, c)
@@ -215,6 +282,12 @@ func walletDetailsHandler(c *gin.Context) {
 }
 
 func walletBalanceHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	var wallet = &Wallet{}
 	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
 	if wallet == nil {
@@ -233,6 +306,12 @@ func walletBalanceHandler(c *gin.Context) {
 }
 
 func createWalletHandler(c *gin.Context) {
+	appId := authorizedApplicationId(c)
+	if appId == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
 	buf, err := c.GetRawData()
 	if err != nil {
 		renderError(err.Error(), 400, c)
@@ -245,6 +324,7 @@ func createWalletHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
+	wallet.ApplicationId = appId
 
 	if wallet.Create() {
 		render(wallet, 201, c)
