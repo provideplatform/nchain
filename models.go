@@ -32,6 +32,7 @@ type Network struct {
 	Config       *json.RawMessage `sql:"type:json" json:"config"`
 }
 
+// Contract instances must be associated with an application identifier.
 type Contract struct {
 	gocore.Model
 	ApplicationId *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
@@ -42,6 +43,7 @@ type Contract struct {
 	Params        *json.RawMessage `sql:"type:json" json:"params"`
 }
 
+// Token instances must be associated with an application identifier.
 type Token struct {
 	gocore.Model
 	ApplicationId  *uuid.UUID `sql:"not null;type:uuid" json:"-"`
@@ -55,9 +57,11 @@ type Token struct {
 	SaleAddress    *string    `json:"sale_address"`           // non-null if token sale contract is specified
 }
 
+// Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
 	gocore.Model
-	ApplicationId *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
+	ApplicationId *uuid.UUID       `sql:"type:uuid" json:"-"`
+	UserId        *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	WalletId      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
 	To            *string          `json:"to"`
@@ -67,9 +71,11 @@ type Transaction struct {
 	Params        *json.RawMessage `sql:"-" json:"params"`
 }
 
+// Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
 type Wallet struct {
 	gocore.Model
-	ApplicationId *uuid.UUID `sql:"not null;type:uuid" json:"-"`
+	ApplicationId *uuid.UUID `sql:"type:uuid" json:"-"`
+	UserId        *uuid.UUID `sql:"type:uuid" json:"-"`
 	NetworkId     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
@@ -434,7 +440,6 @@ func (t *Transaction) Create() bool {
 								contractName = name
 							}
 							contract := &Contract{
-								ApplicationId: t.ApplicationId,
 								NetworkId:     t.NetworkId,
 								TransactionId: &t.Id,
 								Name:          stringOrNil(contractName),
@@ -528,6 +533,23 @@ func (t *Transaction) Validate() bool {
 	var wallet = &Wallet{}
 	db.Model(t).Related(&wallet)
 	t.Errors = make([]*gocore.Error, 0)
+	if t.ApplicationId == nil && t.UserId == nil {
+		t.Errors = append(t.Errors, &gocore.Error{
+			Message: stringOrNil("no application or user identifier provided"),
+		})
+	} else if t.ApplicationId != nil && t.UserId != nil {
+		t.Errors = append(t.Errors, &gocore.Error{
+			Message: stringOrNil("only an application OR user identifier should be provided"),
+		})
+	} else if t.ApplicationId != nil && wallet.ApplicationId != nil && &t.ApplicationId != &wallet.ApplicationId {
+		t.Errors = append(t.Errors, &gocore.Error{
+			Message: stringOrNil("Unable to sign tx due to mismatched signing application"),
+		})
+	} else if t.UserId != nil && wallet.UserId != nil && &t.UserId != &wallet.UserId {
+		t.Errors = append(t.Errors, &gocore.Error{
+			Message: stringOrNil("Unable to sign tx due to mismatched signing user"),
+		})
+	}
 	if t.NetworkId == uuid.Nil {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx using unspecified network"),
@@ -633,6 +655,15 @@ func (w *Wallet) Create() bool {
 
 func (w *Wallet) Validate() bool {
 	w.Errors = make([]*gocore.Error, 0)
+	if w.ApplicationId == nil && w.UserId == nil {
+		w.Errors = append(w.Errors, &gocore.Error{
+			Message: stringOrNil("no application or user identifier provided"),
+		})
+	} else if w.ApplicationId != nil && w.UserId != nil {
+		w.Errors = append(w.Errors, &gocore.Error{
+			Message: stringOrNil("only an application OR user identifier should be provided"),
+		})
+	}
 	_, err := w.ECDSAPrivateKey(GpgPrivateKey, WalletEncryptionKey)
 	if err != nil {
 		msg := err.Error()

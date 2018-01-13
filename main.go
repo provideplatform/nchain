@@ -55,7 +55,7 @@ func main() {
 	}
 }
 
-func authorizedApplicationId(c *gin.Context) *uuid.UUID {
+func authorizedSubjectId(c *gin.Context, subject string) *uuid.UUID {
 	var id string
 	keyfn := func(jwtToken *jwt.Token) (interface{}, error) {
 		if claims, ok := jwtToken.Claims.(jwt.MapClaims); ok {
@@ -64,7 +64,7 @@ func authorizedApplicationId(c *gin.Context) *uuid.UUID {
 				if len(subprts) != 2 {
 					return nil, fmt.Errorf("JWT subject malformed; %s", sub)
 				}
-				if subprts[0] != "application" {
+				if subprts[0] != subject {
 					return nil, fmt.Errorf("JWT claims specified non-application subject: %s", subprts[0])
 				}
 				id = subprts[1]
@@ -156,7 +156,7 @@ func pricesHandler(c *gin.Context) {
 // contracts
 
 func contractsListHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
+	appId := authorizedSubjectId(c, "application")
 	if appId == nil {
 		renderError("unauthorized", 401, c)
 		return
@@ -170,7 +170,7 @@ func contractsListHandler(c *gin.Context) {
 // tokens
 
 func tokensListHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
+	appId := authorizedSubjectId(c, "application")
 	if appId == nil {
 		renderError("unauthorized", 401, c)
 		return
@@ -186,7 +186,7 @@ func tokenDetailsHandler(c *gin.Context) {
 }
 
 func createTokenHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
+	appId := authorizedSubjectId(c, "application")
 	if appId == nil {
 		renderError("unauthorized", 401, c)
 		return
@@ -218,20 +218,26 @@ func createTokenHandler(c *gin.Context) {
 // transactions
 
 func transactionsListHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
-	if appId == nil {
+	appId := authorizedSubjectId(c, "application")
+	userId := authorizedSubjectId(c, "user")
+	if appId == nil && userId == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
 
 	var txs []Transaction
-	DatabaseConnection().Where("application_id = ?", appId).Find(&txs)
+	if appId != nil {
+		DatabaseConnection().Where("application_id = ?", appId).Find(&txs)
+	} else if userId != nil {
+		DatabaseConnection().Where("user_id = ?", userId).Find(&txs)
+	}
 	render(txs, 200, c)
 }
 
 func createTransactionHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
-	if appId == nil {
+	appId := authorizedSubjectId(c, "application")
+	userId := authorizedSubjectId(c, "user")
+	if appId == nil && userId == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
@@ -248,7 +254,14 @@ func createTransactionHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
-	tx.ApplicationId = appId
+
+	if appId != nil {
+		tx.ApplicationId = appId
+	}
+
+	if userId != nil {
+		tx.UserId = userId
+	}
 
 	if tx.Create() {
 		render(tx, 201, c)
@@ -266,14 +279,19 @@ func transactionDetailsHandler(c *gin.Context) {
 // wallets
 
 func walletsListHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
-	if appId == nil {
+	appId := authorizedSubjectId(c, "application")
+	userId := authorizedSubjectId(c, "user")
+	if appId == nil && userId == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
 
 	var wallets []Wallet
-	DatabaseConnection().Where("application_id = ?", appId).Find(&wallets)
+	if appId != nil {
+		DatabaseConnection().Where("application_id = ?", appId).Find(&wallets)
+	} else if userId != nil {
+		DatabaseConnection().Where("user_id = ?", userId).Find(&wallets)
+	}
 	render(wallets, 200, c)
 }
 
@@ -282,8 +300,9 @@ func walletDetailsHandler(c *gin.Context) {
 }
 
 func walletBalanceHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
-	if appId == nil {
+	appId := authorizedSubjectId(c, "application")
+	userId := authorizedSubjectId(c, "user")
+	if appId == nil && userId == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
@@ -293,7 +312,10 @@ func walletBalanceHandler(c *gin.Context) {
 	if wallet == nil {
 		renderError("wallet not found", 404, c)
 		return
-	} else if &wallet.ApplicationId != &appId {
+	} else if appId != nil && &wallet.ApplicationId != &appId {
+		renderError("forbidden", 403, c)
+		return
+	} else if userId != nil && &wallet.UserId != &userId {
 		renderError("forbidden", 403, c)
 		return
 	}
@@ -309,8 +331,9 @@ func walletBalanceHandler(c *gin.Context) {
 }
 
 func createWalletHandler(c *gin.Context) {
-	appId := authorizedApplicationId(c)
-	if appId == nil {
+	appId := authorizedSubjectId(c, "application")
+	userId := authorizedSubjectId(c, "user")
+	if appId == nil && userId == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
@@ -327,7 +350,14 @@ func createWalletHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
-	wallet.ApplicationId = appId
+
+	if appId != nil {
+		wallet.ApplicationId = appId
+	}
+
+	if userId != nil {
+		wallet.UserId = userId
+	}
 
 	if wallet.Create() {
 		render(wallet, 201, c)
