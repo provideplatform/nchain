@@ -44,6 +44,7 @@ type Network struct {
 
 type Contract struct {
 	Model
+	ApplicationId uuid.UUID        `sql:"not null;type:uuid" json:"-"`
 	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	TransactionId *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
@@ -53,6 +54,7 @@ type Contract struct {
 
 type Token struct {
 	Model
+	ApplicationId  uuid.UUID  `sql:"not null;type:uuid" json:"-"`
 	NetworkId      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	ContractId     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
 	SaleContractId *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
@@ -65,20 +67,22 @@ type Token struct {
 
 type Transaction struct {
 	Model
-	NetworkId uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	WalletId  uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
-	To        *string          `json:"to"`
-	Value     uint64           `sql:"not null;default:0" json:"value"`
-	Data      *string          `json:"data"`
-	Hash      *string          `sql:"not null" json:"hash"`
-	Params    *json.RawMessage `sql:"-" json:"params"`
+	ApplicationId uuid.UUID        `sql:"not null;type:uuid" json:"-"`
+	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	WalletId      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
+	To            *string          `json:"to"`
+	Value         uint64           `sql:"not null;default:0" json:"value"`
+	Data          *string          `json:"data"`
+	Hash          *string          `sql:"not null" json:"hash"`
+	Params        *json.RawMessage `sql:"-" json:"params"`
 }
 
 type Wallet struct {
 	Model
-	NetworkId  uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
-	Address    string    `sql:"not null" json:"address"`
-	PrivateKey *string   `sql:"not null;type:bytea" json:"-"`
+	ApplicationId uuid.UUID `sql:"not null;type:uuid" json:"-"`
+	NetworkId     uuid.UUID `sql:"not null;type:uuid" json:"network_id"`
+	Address       string    `sql:"not null" json:"address"`
+	PrivateKey    *string   `sql:"not null;type:bytea" json:"-"`
 }
 
 // Network
