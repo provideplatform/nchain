@@ -54,22 +54,22 @@ func populateInitialNetworks() {
 	db := dbconf.DatabaseConnection()
 
 	var btcMainnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Bitcoin', 'Bitcoin mainnet', true) RETURNING id").Scan(&btcMainnet)
+	db.Raw("INSERT INTO networks (created_at, name, description, is_production) values (NOW(), 'Bitcoin', 'Bitcoin mainnet', true) RETURNING id").Scan(&btcMainnet)
 
 	var btcTestnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Bitcoin testnet', 'Bitcoin testnet', false) RETURNING id").Scan(&btcTestnet)
+	db.Raw("INSERT INTO networks (created_at, name, description, is_production) values (NOW(), 'Bitcoin testnet', 'Bitcoin testnet', false) RETURNING id").Scan(&btcTestnet)
 
 	var lightningMainnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning Network', 'Lightning Network mainnet', true) RETURNING id").Scan(&lightningMainnet)
+	db.Raw("INSERT INTO networks (created_at, name, description, is_production) values (NOW(), 'Lightning Network', 'Lightning Network mainnet', true) RETURNING id").Scan(&lightningMainnet)
 
 	var lightningTestnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning Network testnet', 'Lightning Network testnet', false) RETURNING id").Scan(&lightningTestnet)
+	db.Raw("INSERT INTO networks (created_at, name, description, is_production) values (NOW(), 'Lightning Network testnet', 'Lightning Network testnet', false) RETURNING id").Scan(&lightningTestnet)
 
 	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningMainnet.Id, btcMainnet.Id)
 	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningTestnet.Id, btcTestnet.Id)
 
-	db.Exec("INSERT INTO networks (name, description, is_production, config) values ('Ethereum', 'Ethereum mainnet', true, '{\"json_rpc_url\": \"http://ethereum-mainnet-json-rpc.provide.services\"}')")
-	db.Exec("INSERT INTO networks (name, description, is_production, config) values ('Ethereum testnet', 'Ropsten (Revival) testnet', false, '{\"json_rpc_url\": \"http://ethereum-ropsten-testnet-json-rpc.provide.services\", \"testnet\": \"ropsten\"}')")
+	db.Exec("INSERT INTO networks (created_at, name, description, is_production, config) values (NOW(), 'Ethereum', 'Ethereum mainnet', true, '{\"json_rpc_url\": \"http://ethereum-mainnet-json-rpc.provide.services\"}')")
+	db.Exec("INSERT INTO networks (created_at, name, description, is_production, config) values (NOW(), 'Ethereum testnet', 'Ropsten (Revival) testnet', false, '{\"json_rpc_url\": \"http://ethereum-ropsten-testnet-json-rpc.provide.services\", \"testnet\": \"ropsten\"}')")
 }
 
 func DatabaseConnection() *gorm.DB {
