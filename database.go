@@ -25,17 +25,21 @@ func migrateSchema() {
 		db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Wallet{})
+		db.Model(&Wallet{}).AddIndex("idx_wallets_application_id", "application_id")
 		db.Model(&Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Transaction{})
+		db.Model(&Transaction{}).AddIndex("idx_transactions_application_id", "application_id")
 		db.Model(&Transaction{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Transaction{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Contract{})
+		db.Model(&Contract{}).AddIndex("idx_contracts_application_id", "application_id")
 		db.Model(&Contract{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Contract{}).AddForeignKey("transaction_id", "transactions(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Token{})
+		db.Model(&Token{}).AddIndex("idx_tokens_application_id", "application_id")
 		db.Model(&Token{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Token{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
 		db.Model(&Token{}).AddForeignKey("sale_contract_id", "contracts(id)", "SET NULL", "CASCADE")
@@ -50,22 +54,22 @@ func populateInitialNetworks() {
 	db := dbconf.DatabaseConnection()
 
 	var btcMainnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Bitcoin', 'Bitcoin Mainnet', true) RETURNING id").Scan(&btcMainnet)
+	db.Raw("INSERT INTO networks (name, description, is_production) values ('Bitcoin', 'Bitcoin mainnet', true) RETURNING id").Scan(&btcMainnet)
 
 	var btcTestnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Bitcoin Testnet', 'Bitcoin Testnet', false) RETURNING id").Scan(&btcTestnet)
+	db.Raw("INSERT INTO networks (name, description, is_production) values ('Bitcoin testnet', 'Bitcoin testnet', false) RETURNING id").Scan(&btcTestnet)
 
-	var ltcMainnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning', 'Lightning Network mainnet', true) RETURNING id").Scan(&ltcMainnet)
+	var lightningMainnet = &Network{}
+	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning Network', 'Lightning Network mainnet', true) RETURNING id").Scan(&lightningMainnet)
 
-	var ltcTestnet = &Network{}
-	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning Testnet', 'Lightning Network testnet', false) RETURNING id").Scan(&ltcTestnet)
+	var lightningTestnet = &Network{}
+	db.Raw("INSERT INTO networks (name, description, is_production) values ('Lightning Network testnet', 'Lightning Network testnet', false) RETURNING id").Scan(&lightningTestnet)
 
-	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", ltcMainnet.Id, btcMainnet.Id)
-	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", ltcTestnet.Id, btcTestnet.Id)
+	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningMainnet.Id, btcMainnet.Id)
+	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningTestnet.Id, btcTestnet.Id)
 
-	db.Exec("INSERT INTO networks (name, description, is_production) values ('Ethereum', 'Ethereum mainnet', true)")
-	db.Exec("INSERT INTO networks (name, description, is_production) values ('Ethereum Testnet', 'ROPSTEN (Revival) TESTNET', false)")
+	db.Exec("INSERT INTO networks (name, description, is_production, config) values ('Ethereum', 'Ethereum mainnet', true, '{\"json_rpc_url\": \"http://ethereum-mainnet-json-rpc.provide.services\"}')")
+	db.Exec("INSERT INTO networks (name, description, is_production, config) values ('Ethereum testnet', 'Ropsten (Revival) testnet', false, '{\"json_rpc_url\": \"http://ethereum-ropsten-testnet-json-rpc.provide.services\", \"testnet\": \"ropsten\"}')")
 }
 
 func DatabaseConnection() *gorm.DB {
