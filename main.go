@@ -163,7 +163,7 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	DatabaseConnection().Find(&contracts)
+	DatabaseConnection().Where("application_id = ?", appId).Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -177,7 +177,7 @@ func tokensListHandler(c *gin.Context) {
 	}
 
 	var tokens []Token
-	DatabaseConnection().Find(&tokens)
+	DatabaseConnection().Where("application_id = ?", appId).Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -225,7 +225,7 @@ func transactionsListHandler(c *gin.Context) {
 	}
 
 	var txs []Transaction
-	DatabaseConnection().Find(&txs)
+	DatabaseConnection().Where("application_id = ?", appId).Find(&txs)
 	render(txs, 200, c)
 }
 
@@ -273,7 +273,7 @@ func walletsListHandler(c *gin.Context) {
 	}
 
 	var wallets []Wallet
-	DatabaseConnection().Find(&wallets)
+	DatabaseConnection().Where("application_id = ?", appId).Find(&wallets)
 	render(wallets, 200, c)
 }
 
@@ -292,6 +292,9 @@ func walletBalanceHandler(c *gin.Context) {
 	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
 	if wallet == nil {
 		renderError("wallet not found", 404, c)
+		return
+	} else if &wallet.ApplicationId != &appId {
+		renderError("forbidden", 403, c)
 		return
 	}
 	balance, err := wallet.TokenBalance(c.Param("tokenId"))
