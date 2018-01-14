@@ -81,8 +81,7 @@ type Wallet struct {
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 }
 
-// Network
-
+// ParseConfig - parse the persistent network configuration JSON
 func (n *Network) ParseConfig() map[string]interface{} {
 	config := map[string]interface{}{}
 	if n.Config != nil {
@@ -95,8 +94,7 @@ func (n *Network) ParseConfig() map[string]interface{} {
 	return config
 }
 
-// Contract
-
+// ParseParams - parse the original JSON params used for contract creation
 func (c *Contract) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}
 	if c.Params != nil {
@@ -109,6 +107,7 @@ func (c *Contract) ParseParams() map[string]interface{} {
 	return params
 }
 
+// Create and persist a new contract
 func (c *Contract) Create() bool {
 	db := DatabaseConnection()
 
@@ -134,6 +133,7 @@ func (c *Contract) Create() bool {
 	return false
 }
 
+// GetTransaction - retrieve the associated contract creation transaction
 func (c *Contract) GetTransaction() (*Transaction, error) {
 	var tx = &Transaction{}
 	db := DatabaseConnection()
@@ -144,6 +144,7 @@ func (c *Contract) GetTransaction() (*Transaction, error) {
 	return tx, nil
 }
 
+// Validate a contract for persistence
 func (c *Contract) Validate() bool {
 	db := DatabaseConnection()
 	var transaction = &Transaction{}
@@ -161,8 +162,7 @@ func (c *Contract) Validate() bool {
 	return len(c.Errors) == 0
 }
 
-// Token
-
+// Create and persist a token
 func (t *Token) Create() bool {
 	db := DatabaseConnection()
 
@@ -188,6 +188,7 @@ func (t *Token) Create() bool {
 	return false
 }
 
+// Validate a token for persistence
 func (t *Token) Validate() bool {
 	db := DatabaseConnection()
 	var contract = &Contract{}
@@ -232,6 +233,7 @@ func (t *Token) Validate() bool {
 	return len(t.Errors) == 0
 }
 
+// GetContract - retreieve the associated token contract
 func (t *Token) GetContract() (*Contract, error) {
 	db := DatabaseConnection()
 	var contract = &Contract{}
@@ -254,8 +256,7 @@ func (t *Token) readEthereumContractAbi() (*ethabi.ABI, error) {
 	return tx.readEthereumContractAbi()
 }
 
-// Transaction
-
+// ParseParams - parse the original JSON params used when the tx was broadcast
 func (t *Transaction) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}
 	if t.Params != nil {
@@ -359,6 +360,8 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 	return nil, err
 }
 
+// Create and persist a new transaction. Side effects include persistence of contract and/or token instances
+// when the tx represents a contract and/or token creation.
 func (t *Transaction) Create() bool {
 	if !t.Validate() {
 		return false
@@ -528,6 +531,7 @@ func (t *Transaction) Create() bool {
 	return false
 }
 
+// Validate a transaction for persistence
 func (t *Transaction) Validate() bool {
 	db := DatabaseConnection()
 	var wallet = &Wallet{}
@@ -562,8 +566,6 @@ func (t *Transaction) Validate() bool {
 	return len(t.Errors) == 0
 }
 
-// Wallet
-
 func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
@@ -581,6 +583,7 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	}
 }
 
+// ECDSAPrivateKey - read the wallet-specific ECDSA private key; required for signing transactions on behalf of the wallet
 func (w *Wallet) ECDSAPrivateKey(gpgPrivateKey, gpgEncryptionKey string) (*ecdsa.PrivateKey, error) {
 	results := make([]byte, 1)
 	db := DatabaseConnection()
@@ -600,6 +603,7 @@ func (w *Wallet) ECDSAPrivateKey(gpgPrivateKey, gpgEncryptionKey string) (*ecdsa
 	return nil, errors.New("Failed to decode ecdsa private key from encrypted storage")
 }
 
+// SignTx - sign a raw transaction
 func (w *Wallet) SignTx(msg []byte) ([]byte, error) {
 	db := DatabaseConnection()
 
@@ -627,6 +631,7 @@ func (w *Wallet) SignTx(msg []byte) ([]byte, error) {
 	return nil, err
 }
 
+// Create and persist a network-specific wallet used for storing crpyotcurrency or digital tokens native to a specific network
 func (w *Wallet) Create() bool {
 	db := DatabaseConnection()
 
@@ -653,6 +658,7 @@ func (w *Wallet) Create() bool {
 	return false
 }
 
+// Validate a wallet for persistence
 func (w *Wallet) Validate() bool {
 	w.Errors = make([]*gocore.Error, 0)
 	if w.ApplicationId == nil && w.UserId == nil {
@@ -674,6 +680,8 @@ func (w *Wallet) Validate() bool {
 	return len(w.Errors) == 0
 }
 
+// TokenBalance
+// Retrieve a wallet's token balance for a given token id
 func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
 	balance := uint64(0)
 	db := DatabaseConnection()
@@ -713,6 +721,8 @@ func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
 	return balance, nil
 }
 
+// TxCount
+// Retrieve a count of transactions signed by the wallet
 func (w *Wallet) TxCount() (count *uint64) {
 	db := DatabaseConnection()
 	db.Model(&Transaction{}).Where("wallet_id = ?", w.Id).Count(&count)
