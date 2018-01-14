@@ -67,8 +67,8 @@ func populateInitialNetworks() {
 	var lightningTestnet = &Network{}
 	db.Raw("INSERT INTO networks (created_at, name, description, is_production) values (NOW(), 'Lightning Network testnet', 'Lightning Network testnet', false) RETURNING id").Scan(&lightningTestnet)
 
-	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningMainnet.Id, btcMainnet.Id)
-	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningTestnet.Id, btcTestnet.Id)
+	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningMainnet.ID, btcMainnet.ID)
+	db.Exec("UPDATE networks SET sidechain_id = ? WHERE id = ?", lightningTestnet.ID, btcTestnet.ID)
 
 	db.Exec("INSERT INTO networks (created_at, name, description, is_production, config) values (NOW(), 'Ethereum', 'Ethereum mainnet', true, '{\"json_rpc_url\": \"http://ethereum-mainnet-json-rpc.provide.services\"}')")
 	db.Exec("INSERT INTO networks (created_at, name, description, is_production, config) values (NOW(), 'Ethereum testnet', 'Ropsten (Revival) testnet', false, '{\"json_rpc_url\": \"http://ethereum-ropsten-testnet-json-rpc.provide.services\", \"testnet\": \"ropsten\"}')")

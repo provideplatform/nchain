@@ -17,23 +17,23 @@ func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 	if jsonRpcUrl, ok := config["json_rpc_url"].(string); ok {
 		url = jsonRpcUrl
 	} else {
-		Log.Warningf("No JSON-RPC url was configured for network: %s (%s)", *network.Name, network.Id)
+		Log.Warningf("No JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
 		url = DefaultEthereumMainnetJsonRpcUrl
 	}
 
 	var client *ethclient.Client
 
-	if networkClients, _ := EthereumClients[network.Id.String()]; len(networkClients) == 0 {
+	if networkClients, _ := EthereumClients[network.ID.String()]; len(networkClients) == 0 {
 		ec, err := ethclient.Dial(url)
 		if err != nil {
 			Log.Warningf("Failed to dial %s JSON-RPC host: %s", *network.Name, url)
 			return nil, err
 		}
 		client = ec
-		EthereumClients[network.Id.String()] = append(networkClients, client)
+		EthereumClients[network.ID.String()] = append(networkClients, client)
 		Log.Debugf("Dialed %s JSON-RPC host @ %s", *network.Name, url)
 	} else {
-		client = EthereumClients[network.Id.String()][0]
+		client = EthereumClients[network.ID.String()][0]
 	}
 
 	progress, err := client.SyncProgress(context.TODO())
@@ -60,7 +60,7 @@ func GetChainConfig(network *Network) *params.ChainConfig {
 }
 
 func JsonRpcClient(network *Network) *ethclient.Client {
-	if networkClients, ok := EthereumClients[network.Id.String()]; ok {
+	if networkClients, ok := EthereumClients[network.ID.String()]; ok {
 		if len(networkClients) > 0 {
 			return networkClients[0] // FIXME
 		}

@@ -20,7 +20,7 @@ import (
 	ethparams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/jinzhu/gorm"
-	"github.com/satori/go.uuid"
+	"github.com/kthomas/go.uuid"
 )
 
 type Network struct {
@@ -28,16 +28,16 @@ type Network struct {
 	Name         *string          `sql:"not null" json:"name"`
 	Description  *string          `json:"description"`
 	IsProduction *bool            `sql:"not null" json:"is_production"`
-	SidechainId  *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
+	SidechainID  *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
 	Config       *json.RawMessage `sql:"type:json" json:"config"`
 }
 
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	gocore.Model
-	ApplicationId *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
-	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	TransactionId *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
+	ApplicationID *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
+	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
 	Address       *string          `sql:"not null" json:"address"` // network-specific token contract address
 	Params        *json.RawMessage `sql:"type:json" json:"params"`
@@ -46,10 +46,10 @@ type Contract struct {
 // Token instances must be associated with an application identifier.
 type Token struct {
 	gocore.Model
-	ApplicationId  *uuid.UUID `sql:"not null;type:uuid" json:"-"`
-	NetworkId      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
-	ContractId     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
-	SaleContractId *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
+	ApplicationID  *uuid.UUID `sql:"not null;type:uuid" json:"-"`
+	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+	ContractID     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
+	SaleContractID *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
 	Name           *string    `sql:"not null" json:"name"`
 	Symbol         *string    `sql:"not null" json:"symbol"`
 	Decimals       uint64     `sql:"not null" json:"decimals"`
@@ -60,10 +60,10 @@ type Token struct {
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
 	gocore.Model
-	ApplicationId *uuid.UUID       `sql:"type:uuid" json:"-"`
-	UserId        *uuid.UUID       `sql:"type:uuid" json:"-"`
-	NetworkId     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	WalletId      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
+	UserID        *uuid.UUID       `sql:"type:uuid" json:"-"`
+	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	WalletID      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
 	To            *string          `json:"to"`
 	Value         uint64           `sql:"not null;default:0" json:"value"`
 	Data          *string          `json:"data"`
@@ -74,9 +74,9 @@ type Transaction struct {
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
 type Wallet struct {
 	gocore.Model
-	ApplicationId *uuid.UUID `sql:"type:uuid" json:"-"`
-	UserId        *uuid.UUID `sql:"type:uuid" json:"-"`
-	NetworkId     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"-"`
+	UserID        *uuid.UUID `sql:"type:uuid" json:"-"`
+	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 }
@@ -139,7 +139,7 @@ func (c *Contract) GetTransaction() (*Transaction, error) {
 	db := DatabaseConnection()
 	db.Model(c).Related(&tx)
 	if tx == nil {
-		return nil, fmt.Errorf("Failed to retrieve tx for contract: %s", c.Id)
+		return nil, fmt.Errorf("Failed to retrieve tx for contract: %s", c.ID)
 	}
 	return tx, nil
 }
@@ -150,11 +150,11 @@ func (c *Contract) Validate() bool {
 	var transaction = &Transaction{}
 	db.Model(c).Related(&transaction)
 	c.Errors = make([]*gocore.Error, 0)
-	if c.NetworkId == uuid.Nil {
+	if c.NetworkID == uuid.Nil {
 		c.Errors = append(c.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to associate contract with unspecified network"),
 		})
-	} else if c.NetworkId != transaction.NetworkId {
+	} else if c.NetworkID != transaction.NetworkID {
 		c.Errors = append(c.Errors, &gocore.Error{
 			Message: stringOrNil("Contract network did not match transaction network"),
 		})
@@ -192,17 +192,17 @@ func (t *Token) Create() bool {
 func (t *Token) Validate() bool {
 	db := DatabaseConnection()
 	var contract = &Contract{}
-	if t.NetworkId != uuid.Nil {
+	if t.NetworkID != uuid.Nil {
 		db.Model(t).Related(&contract)
 	}
 	t.Errors = make([]*gocore.Error, 0)
-	if t.NetworkId == uuid.Nil {
+	if t.NetworkID == uuid.Nil {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to deploy token contract using unspecified network"),
 		})
 	} else {
 		if contract != nil {
-			if t.NetworkId != contract.NetworkId {
+			if t.NetworkID != contract.NetworkID {
 				t.Errors = append(t.Errors, &gocore.Error{
 					Message: stringOrNil("Token network did not match token contract network"),
 				})
@@ -215,8 +215,8 @@ func (t *Token) Validate() bool {
 				})
 			}
 		}
-		// if t.SaleContractId != nil {
-		// 	if t.NetworkId != saleContract.NetworkId {
+		// if t.SaleContractID != nil {
+		// 	if t.NetworkID != saleContract.NetworkID {
 		// 		t.Errors = append(t.Errors, &gocore.Error{
 		// 			Message: stringOrNil("Token network did not match token sale contract network"),
 		// 		})
@@ -239,7 +239,7 @@ func (t *Token) GetContract() (*Contract, error) {
 	var contract = &Contract{}
 	db.Model(t).Related(&contract)
 	if contract == nil {
-		return nil, fmt.Errorf("Failed to retrieve token contract for token: %s", t.Id)
+		return nil, fmt.Errorf("Failed to retrieve token contract for token: %s", t.ID)
 	}
 	return contract, nil
 }
@@ -306,7 +306,7 @@ func (t *Transaction) readEthereumContractAbi() (*ethabi.ABI, error) {
 		}
 		abi = &abival
 	} else {
-		return nil, fmt.Errorf("Failed to read abi from params for tx: %s", t.Id)
+		return nil, fmt.Errorf("Failed to read abi from params for tx: %s", t.ID)
 	}
 	return abi, nil
 }
@@ -370,7 +370,7 @@ func (t *Transaction) Create() bool {
 	db := DatabaseConnection()
 	var network = &Network{}
 	var wallet = &Wallet{}
-	if t.NetworkId != uuid.Nil {
+	if t.NetworkID != uuid.Nil {
 		db.Model(t).Related(&network)
 		db.Model(t).Related(&wallet)
 	}
@@ -395,7 +395,7 @@ func (t *Transaction) Create() bool {
 					})
 				}
 			} else {
-				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.Id, err.Error())
+				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
 				t.Errors = append(t.Errors, &gocore.Error{
 					Message: stringOrNil(err.Error()),
 				})
@@ -443,14 +443,14 @@ func (t *Transaction) Create() bool {
 								contractName = name
 							}
 							contract := &Contract{
-								NetworkId:     t.NetworkId,
-								TransactionId: &t.Id,
+								NetworkID:     t.NetworkID,
+								TransactionID: &t.ID,
 								Name:          stringOrNil(contractName),
 								Address:       stringOrNil(receipt.ContractAddress.Hex()),
 								Params:        t.Params,
 							}
 							if contract.Create() {
-								Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.Id, *network.Name, txHash)
+								Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, txHash)
 
 								if contractAbi, ok := params["abi"]; ok {
 									abistr, err := json.Marshal(contractAbi)
@@ -501,16 +501,16 @@ func (t *Transaction) Create() bool {
 
 										Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 										token := &Token{
-											ApplicationId: contract.ApplicationId,
-											NetworkId:     contract.NetworkId,
-											ContractId:    &contract.Id,
+											ApplicationID: contract.ApplicationID,
+											NetworkID:     contract.NetworkID,
+											ContractID:    &contract.ID,
 											Name:          stringOrNil(name),
 											Symbol:        stringOrNil(symbol),
 											Decimals:      decimals.Uint64(),
 											Address:       stringOrNil(receipt.ContractAddress.Hex()),
 										}
 										if token.Create() {
-											Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.Id, *network.Name, txHash)
+											Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.ID, *network.Name, txHash)
 										} else {
 											Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, txHash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
 										}
@@ -537,28 +537,28 @@ func (t *Transaction) Validate() bool {
 	var wallet = &Wallet{}
 	db.Model(t).Related(&wallet)
 	t.Errors = make([]*gocore.Error, 0)
-	if t.ApplicationId == nil && t.UserId == nil {
+	if t.ApplicationID == nil && t.UserID == nil {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("no application or user identifier provided"),
 		})
-	} else if t.ApplicationId != nil && t.UserId != nil {
+	} else if t.ApplicationID != nil && t.UserID != nil {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
-	} else if t.ApplicationId != nil && wallet.ApplicationId != nil && &t.ApplicationId != &wallet.ApplicationId {
+	} else if t.ApplicationID != nil && wallet.ApplicationID != nil && &t.ApplicationID != &wallet.ApplicationID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing application"),
 		})
-	} else if t.UserId != nil && wallet.UserId != nil && &t.UserId != &wallet.UserId {
+	} else if t.UserID != nil && wallet.UserID != nil && &t.UserID != &wallet.UserID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing user"),
 		})
 	}
-	if t.NetworkId == uuid.Nil {
+	if t.NetworkID == uuid.Nil {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx using unspecified network"),
 		})
-	} else if t.NetworkId != wallet.NetworkId {
+	} else if t.NetworkID != wallet.NetworkID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Transaction network did not match wallet network"),
 		})
@@ -570,7 +570,7 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
 
-	if network == nil || network.Id == uuid.Nil {
+	if network == nil || network.ID == uuid.Nil {
 		Log.Warningf("Unable to generate private key for wallet without an associated network")
 		return
 	}
@@ -618,14 +618,14 @@ func (w *Wallet) SignTx(msg []byte) ([]byte, error) {
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		privateKey, err := w.ECDSAPrivateKey(GpgPrivateKey, WalletEncryptionKey)
 		if err != nil {
-			Log.Warningf("Failed to sign tx using %s wallet: %s", *network.Name, w.Id)
+			Log.Warningf("Failed to sign tx using %s wallet: %s", *network.Name, w.ID)
 			return nil, err
 		}
 
-		Log.Debugf("Signing tx using %s wallet: %s", *network.Name, w.Id)
+		Log.Debugf("Signing tx using %s wallet: %s", *network.Name, w.ID)
 		sig, err := ethcrypto.Sign(msg, privateKey)
 		if err != nil {
-			Log.Warningf("Failed to sign tx using %s wallet: %s; %s", *network.Name, w.Id, err.Error())
+			Log.Warningf("Failed to sign tx using %s wallet: %s; %s", *network.Name, w.ID, err.Error())
 			return nil, err
 		}
 		return sig, nil
@@ -668,16 +668,16 @@ func (w *Wallet) Validate() bool {
 	w.Errors = make([]*gocore.Error, 0)
 	var network = &Network{}
 	DatabaseConnection().Model(w).Related(&network)
-	if network == nil || network.Id == uuid.Nil {
+	if network == nil || network.ID == uuid.Nil {
 		w.Errors = append(w.Errors, &gocore.Error{
-			Message: stringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", w.NetworkId.String())),
+			Message: stringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", w.NetworkID.String())),
 		})
 	}
-	if w.ApplicationId == nil && w.UserId == nil {
+	if w.ApplicationID == nil && w.UserID == nil {
 		w.Errors = append(w.Errors, &gocore.Error{
 			Message: stringOrNil("no application or user identifier provided"),
 		})
-	} else if w.ApplicationId != nil && w.UserId != nil {
+	} else if w.ApplicationID != nil && w.UserID != nil {
 		w.Errors = append(w.Errors, &gocore.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
@@ -737,6 +737,6 @@ func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
 // Retrieve a count of transactions signed by the wallet
 func (w *Wallet) TxCount() (count *uint64) {
 	db := DatabaseConnection()
-	db.Model(&Transaction{}).Where("wallet_id = ?", w.Id).Count(&count)
+	db.Model(&Transaction{}).Where("wallet_id = ?", w.ID).Count(&count)
 	return count
 }
