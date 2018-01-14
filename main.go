@@ -362,6 +362,7 @@ func createWalletHandler(c *gin.Context) {
 	if wallet.Create() {
 		render(wallet, 201, c)
 	} else {
+		Log.Warningf("Failed to create wallet; %s", *wallet.Errors[0].Message)
 		obj := map[string]interface{}{}
 		obj["errors"] = wallet.Errors
 		render(obj, 422, c)

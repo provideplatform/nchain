@@ -570,6 +570,11 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
 
+	if network == nil || network.Id == uuid.Nil {
+		Log.Warningf("Unable to generate private key for wallet without an associated network")
+		return
+	}
+
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
 		privateKey, err := ethcrypto.GenerateKey()
 		if err == nil {
@@ -661,6 +666,13 @@ func (w *Wallet) Create() bool {
 // Validate a wallet for persistence
 func (w *Wallet) Validate() bool {
 	w.Errors = make([]*gocore.Error, 0)
+	var network = &Network{}
+	DatabaseConnection().Model(w).Related(&network)
+	if network == nil || network.Id == uuid.Nil {
+		w.Errors = append(w.Errors, &gocore.Error{
+			Message: stringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", w.NetworkId.String())),
+		})
+	}
 	if w.ApplicationId == nil && w.UserId == nil {
 		w.Errors = append(w.Errors, &gocore.Error{
 			Message: stringOrNil("no application or user identifier provided"),
