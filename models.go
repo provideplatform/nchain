@@ -117,22 +117,23 @@ func (n *Network) Status() (*NetworkStatus, error) {
 				return nil, err
 			}
 			var state string
-			var block uint64  // current block; will be less than height while syncing in progress
-			var height uint64 // total number of blocks
+			var block *uint64  // current block; will be less than height while syncing in progress
+			var height *uint64 // total number of blocks
 			if syncProgress == nil {
 				hdr, err := client.HeaderByNumber(context.TODO(), nil)
 				if err != nil {
 					Log.Warningf("Failed to read latest block header for %s using JSON-RPC host; %s", *n.Name, err.Error())
 					return nil, err
 				}
-				block = hdr.Number.Uint64()
+				hdrUint64 := hdr.Number.Uint64()
+				block = &hdrUint64
 			} else {
-				block = syncProgress.CurrentBlock
-				height = syncProgress.HighestBlock
+				block = &syncProgress.CurrentBlock
+				height = &syncProgress.HighestBlock
 			}
 			status = &NetworkStatus{
-				Block:   &block,
-				Height:  &height,
+				Block:   block,
+				Height:  height,
 				State:   stringOrNil(state),
 				Syncing: syncProgress == nil,
 				Meta:    map[string]interface{}{},
