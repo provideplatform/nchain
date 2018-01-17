@@ -27,6 +27,7 @@ func main() {
 	r.GET("/api/v1/networks/:id/addresses", networkAddressesHandler)
 	r.GET("/api/v1/networks/:id/blocks", networkBlocksHandler)
 	r.GET("/api/v1/networks/:id/contracts", networkContractsHandler)
+	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
 	r.GET("/api/v1/networks/:id/transactions", networkTransactionsHandler)
 
 	r.GET("/api/v1/prices", pricesHandler)
@@ -141,6 +142,22 @@ func networkBlocksHandler(c *gin.Context) {
 
 func networkContractsHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
+}
+
+func networkStatusHandler(c *gin.Context) {
+	var network = &Network{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
+	if network == nil || network.ID == uuid.Nil {
+		renderError("network not found", 404, c)
+		return
+	}
+	status, err := network.Status()
+	if err != nil {
+		msg := fmt.Sprintf("failed to retrieve network status; %s", err.Error())
+		renderError(msg, 500, c)
+		return
+	}
+	render(status, 200, c)
 }
 
 func networkTransactionsHandler(c *gin.Context) {
@@ -309,7 +326,7 @@ func walletBalanceHandler(c *gin.Context) {
 
 	var wallet = &Wallet{}
 	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
-	if wallet == nil {
+	if wallet == nil || wallet.ID == uuid.Nil {
 		renderError("wallet not found", 404, c)
 		return
 	} else if appID != nil && &wallet.ApplicationID != &appID {

@@ -32,6 +32,15 @@ type Network struct {
 	Config       *json.RawMessage `sql:"type:json" json:"config"`
 }
 
+// NetworkStatus provides network-agnostic status
+type NetworkStatus struct {
+	Block   *uint64                `json:"block"`   // current block
+	Height  *uint64                `json:"height"`  // total height of the blockchain; null after syncing completed
+	State   *string                `json:"state"`   // i.e., syncing, synced, etc
+	Syncing bool                   `json:"syncing"` // when true, the network is in the process of syncing the ledger; available functionaltiy will be network-specific
+	Meta    map[string]interface{} `json:"meta"`    // network-specific metadata
+}
+
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	gocore.Model
@@ -92,6 +101,47 @@ func (n *Network) ParseConfig() map[string]interface{} {
 		}
 	}
 	return config
+}
+
+func (n *Network) Status() (*NetworkStatus, error) {
+	var status *NetworkStatus
+	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+		client, err := DialJsonRpc(n)
+		if err != nil {
+			Log.Warningf("Failed to dial %s JSON-RPC host; %s", *n.Name, err.Error())
+			return nil, err
+		} else {
+			syncProgress, err := client.SyncProgress(context.TODO())
+			if err != nil {
+				Log.Warningf("Failed to read %s sync progress using JSON-RPC host; %s", *n.Name, err.Error())
+				return nil, err
+			}
+			var state string
+			var block uint64  // current block; will be less than height while syncing in progress
+			var height uint64 // total number of blocks
+			if syncProgress == nil {
+				hdr, err := client.HeaderByNumber(context.TODO(), nil)
+				if err != nil {
+					Log.Warningf("Failed to read latest block header for %s using JSON-RPC host; %s", *n.Name, err.Error())
+					return nil, err
+				}
+				block = hdr.Number.Uint64()
+			} else {
+				block = syncProgress.CurrentBlock
+				height = syncProgress.HighestBlock
+			}
+			status = &NetworkStatus{
+				Block:   &block,
+				Height:  &height,
+				State:   stringOrNil(state),
+				Syncing: syncProgress == nil,
+				Meta:    map[string]interface{}{},
+			}
+		}
+	} else {
+		Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
+	}
+	return status, nil
 }
 
 // ParseParams - parse the original JSON params used for contract creation
