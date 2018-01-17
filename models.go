@@ -103,6 +103,7 @@ func (n *Network) ParseConfig() map[string]interface{} {
 	return config
 }
 
+// Status retrieves metadata and metrics specific to the given network
 func (n *Network) Status() (*NetworkStatus, error) {
 	var status *NetworkStatus
 	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
@@ -110,34 +111,34 @@ func (n *Network) Status() (*NetworkStatus, error) {
 		if err != nil {
 			Log.Warningf("Failed to dial %s JSON-RPC host; %s", *n.Name, err.Error())
 			return nil, err
-		} else {
-			syncProgress, err := client.SyncProgress(context.TODO())
+		}
+
+		syncProgress, err := client.SyncProgress(context.TODO())
+		if err != nil {
+			Log.Warningf("Failed to read %s sync progress using JSON-RPC host; %s", *n.Name, err.Error())
+			return nil, err
+		}
+		var state string
+		var block *uint64  // current block; will be less than height while syncing in progress
+		var height *uint64 // total number of blocks
+		if syncProgress == nil {
+			hdr, err := client.HeaderByNumber(context.TODO(), nil)
 			if err != nil {
-				Log.Warningf("Failed to read %s sync progress using JSON-RPC host; %s", *n.Name, err.Error())
+				Log.Warningf("Failed to read latest block header for %s using JSON-RPC host; %s", *n.Name, err.Error())
 				return nil, err
 			}
-			var state string
-			var block *uint64  // current block; will be less than height while syncing in progress
-			var height *uint64 // total number of blocks
-			if syncProgress == nil {
-				hdr, err := client.HeaderByNumber(context.TODO(), nil)
-				if err != nil {
-					Log.Warningf("Failed to read latest block header for %s using JSON-RPC host; %s", *n.Name, err.Error())
-					return nil, err
-				}
-				hdrUint64 := hdr.Number.Uint64()
-				block = &hdrUint64
-			} else {
-				block = &syncProgress.CurrentBlock
-				height = &syncProgress.HighestBlock
-			}
-			status = &NetworkStatus{
-				Block:   block,
-				Height:  height,
-				State:   stringOrNil(state),
-				Syncing: syncProgress == nil,
-				Meta:    map[string]interface{}{},
-			}
+			hdrUint64 := hdr.Number.Uint64()
+			block = &hdrUint64
+		} else {
+			block = &syncProgress.CurrentBlock
+			height = &syncProgress.HighestBlock
+		}
+		status = &NetworkStatus{
+			Block:   block,
+			Height:  height,
+			State:   stringOrNil(state),
+			Syncing: syncProgress != nil,
+			Meta:    map[string]interface{}{},
 		}
 	} else {
 		Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
