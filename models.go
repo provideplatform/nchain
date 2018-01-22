@@ -121,6 +121,7 @@ func (n *Network) Status() (*NetworkStatus, error) {
 		var state string
 		var block *uint64  // current block; will be less than height while syncing in progress
 		var height *uint64 // total number of blocks
+		var syncing = false
 		if syncProgress == nil {
 			hdr, err := client.HeaderByNumber(context.TODO(), nil)
 			if err != nil {
@@ -132,12 +133,13 @@ func (n *Network) Status() (*NetworkStatus, error) {
 		} else {
 			block = &syncProgress.CurrentBlock
 			height = &syncProgress.HighestBlock
+			syncing = true
 		}
 		status = &NetworkStatus{
 			Block:   block,
 			Height:  height,
 			State:   stringOrNil(state),
-			Syncing: syncProgress != nil,
+			Syncing: syncing,
 			Meta:    map[string]interface{}{},
 		}
 	} else {
