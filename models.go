@@ -525,9 +525,11 @@ func (t *Transaction) Create() bool {
 
 										result, _ := client.CallContract(context.TODO(), msg, nil)
 										var name string
-										err = abi.Methods["name"].Outputs.Unpack(&name, result)
-										if err != nil {
-											Log.Warningf("Failed to unpack token name; %s", err.Error())
+										if method, ok := abi.Methods["name"]; ok {
+											err = method.Outputs.Unpack(&name, result)
+											if err != nil {
+												Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
+											}
 										}
 
 										msg = ethereum.CallMsg{
@@ -540,7 +542,12 @@ func (t *Transaction) Create() bool {
 										}
 										result, _ = client.CallContract(context.TODO(), msg, nil)
 										var decimals *big.Int
-										abi.Methods["decimals"].Outputs.Unpack(&decimals, result)
+										if method, ok := abi.Methods["decimals"]; ok {
+											err = method.Outputs.Unpack(&decimals, result)
+											if err != nil {
+												Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
+											}
+										}
 
 										msg = ethereum.CallMsg{
 											From:     common.HexToAddress(wallet.Address),
@@ -552,7 +559,12 @@ func (t *Transaction) Create() bool {
 										}
 										result, _ = client.CallContract(context.TODO(), msg, nil)
 										var symbol string
-										abi.Methods["symbol"].Outputs.Unpack(&symbol, result)
+										if method, ok := abi.Methods["symbol"]; ok {
+											err = method.Outputs.Unpack(&name, result)
+											if err != nil {
+												Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
+											}
+										}
 
 										Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 										token := &Token{
@@ -777,10 +789,14 @@ func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
 		}
 		result, _ := client.CallContract(context.TODO(), msg, nil)
 		var out *big.Int
-		abi.Methods["balanceOf"].Outputs.Unpack(&out, result)
-		if out != nil {
-			balance = out.Uint64()
-			Log.Debugf("Read %s %s token balance (%v) from token contract address: %s", *network.Name, token.Symbol, balance, token.Address)
+		if method, ok := abi.Methods["balanceOf"]; ok {
+			method.Outputs.Unpack(&out, result)
+			if out != nil {
+				balance = out.Uint64()
+				Log.Debugf("Read %s %s token balance (%v) from token contract address: %s", *network.Name, token.Symbol, balance, token.Address)
+			}
+		} else {
+			Log.Warningf("Unable to read balance of unsupported %s token contract address: %s", *network.Name, token.Address)
 		}
 	} else {
 		Log.Warningf("Unable to read token balance for unsupported network: %s", *network.Name)
