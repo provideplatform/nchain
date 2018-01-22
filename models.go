@@ -560,26 +560,28 @@ func (t *Transaction) Create() bool {
 										result, _ = client.CallContract(context.TODO(), msg, nil)
 										var symbol string
 										if method, ok := abi.Methods["symbol"]; ok {
-											err = method.Outputs.Unpack(&name, result)
+											err = method.Outputs.Unpack(&symbol, result)
 											if err != nil {
 												Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
 											}
 										}
 
-										Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
-										token := &Token{
-											ApplicationID: contract.ApplicationID,
-											NetworkID:     contract.NetworkID,
-											ContractID:    &contract.ID,
-											Name:          stringOrNil(name),
-											Symbol:        stringOrNil(symbol),
-											Decimals:      decimals.Uint64(),
-											Address:       stringOrNil(receipt.ContractAddress.Hex()),
-										}
-										if token.Create() {
-											Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.ID, *network.Name, txHash)
-										} else {
-											Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, txHash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
+										if name != "" && decimals != nil && symbol != "" { // isERC20Token
+											Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+											token := &Token{
+												ApplicationID: contract.ApplicationID,
+												NetworkID:     contract.NetworkID,
+												ContractID:    &contract.ID,
+												Name:          stringOrNil(name),
+												Symbol:        stringOrNil(symbol),
+												Decimals:      decimals.Uint64(),
+												Address:       stringOrNil(receipt.ContractAddress.Hex()),
+											}
+											if token.Create() {
+												Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.ID, *network.Name, txHash)
+											} else {
+												Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, txHash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
+											}
 										}
 									} else {
 										Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
