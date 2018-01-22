@@ -497,6 +497,7 @@ func (t *Transaction) Create() bool {
 								contractName = name
 							}
 							contract := &Contract{
+								ApplicationID: t.ApplicationID,
 								NetworkID:     t.NetworkID,
 								TransactionID: &t.ID,
 								Name:          stringOrNil(contractName),
