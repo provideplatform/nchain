@@ -600,11 +600,11 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
-	} else if t.ApplicationID != nil && wallet.ApplicationID != nil && &t.ApplicationID != &wallet.ApplicationID {
+	} else if t.ApplicationID != nil && wallet.ApplicationID != nil && *t.ApplicationID != *wallet.ApplicationID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing application"),
 		})
-	} else if t.UserID != nil && wallet.UserID != nil && &t.UserID != &wallet.UserID {
+	} else if t.UserID != nil && wallet.UserID != nil && *t.UserID != *wallet.UserID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing user"),
 		})
