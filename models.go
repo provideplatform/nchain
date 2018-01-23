@@ -231,7 +231,7 @@ func (c *Contract) GetTransaction() (*Transaction, error) {
 	var tx = &Transaction{}
 	db := DatabaseConnection()
 	db.Model(c).Related(&tx)
-	if tx == nil {
+	if tx == nil || tx.ID == uuid.Nil {
 		return nil, fmt.Errorf("Failed to retrieve tx for contract: %s", c.ID)
 	}
 	return tx, nil
@@ -256,33 +256,33 @@ func (c *Contract) Validate() bool {
 }
 
 func (c *Contract) executeEthereumContract(tx *Transaction, method string, params ...interface{}) error { // given tx has been built but broadcast has not yet been attempted
+	var err error
 	abi, err := c.readEthereumContractAbi()
-	if err == nil {
-		if _, ok := abi.Methods[method]; ok {
-			Log.Debugf("Attempting to encode %d parameters prior to attempting execution of contract method %s on contract: %s", len(params), method, c.ID)
-			invocationSig, err := abi.Pack(method, params)
-			if err != nil {
-				Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
-				return err
-			}
-
-			data := common.Bytes2Hex(invocationSig)
-			tx.Data = &data
-
-			if tx.Create() {
-				Log.Debugf("Executed contract method %s on contract: %s", method, c.ID)
-			} else {
-				Log.Warningf("Failed to execute contract method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, tx.Data, c.ID)
-			}
-		} else {
-			err := fmt.Errorf("Failed to execute contract method %s on contract: %s; method not found in ABI", method, c.ID)
-			return err
-		}
-	} else {
+	if err != nil {
 		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
 		return err
 	}
-	return nil
+	if _, ok := abi.Methods[method]; ok {
+		Log.Debugf("Attempting to encode %d parameters prior to attempting execution of contract method %s on contract: %s", len(params), method, c.ID)
+		invocationSig, err := abi.Pack(method, params)
+		if err != nil {
+			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
+			return err
+		}
+
+		data := common.Bytes2Hex(invocationSig)
+		tx.Data = &data
+
+		if tx.Create() {
+			Log.Debugf("Executed contract method %s on contract: %s", method, c.ID)
+		} else {
+			err = fmt.Errorf("Failed to execute contract method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, *tx.Data, c.ID)
+			Log.Warning(err.Error())
+		}
+	} else {
+		err = fmt.Errorf("Failed to execute contract method %s on contract: %s; method not found in ABI", method, c.ID)
+	}
+	return err
 }
 
 func (c *Contract) readEthereumContractAbi() (*ethabi.ABI, error) {
@@ -425,15 +425,19 @@ func (t *Transaction) readEthereumContractAbi() (*ethabi.ABI, error) {
 	if contractAbi, ok := params["abi"]; ok {
 		abistr, err := json.Marshal(contractAbi)
 		if err != nil {
-			Log.Warningf("Failed to marshal abi to json...  %s", err.Error())
-		}
-		abival, err := ethabi.JSON(strings.NewReader(string(abistr)))
-		if err != nil {
+			Log.Warningf("Failed to marshal ABI from tx params to json; %s", err.Error())
 			return nil, err
 		}
+
+		abival, err := ethabi.JSON(strings.NewReader(string(abistr)))
+		if err != nil {
+			Log.Warningf("Failed to initialize ABI from tx params to json; %s", err.Error())
+			return nil, err
+		}
+
 		abi = &abival
 	} else {
-		return nil, fmt.Errorf("Failed to read abi from params for tx: %s", t.ID)
+		return nil, fmt.Errorf("Failed to read ABI from params for tx: %s", t.ID)
 	}
 	return abi, nil
 }
