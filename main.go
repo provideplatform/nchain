@@ -179,7 +179,7 @@ func contractsListHandler(c *gin.Context) {
 		return
 	}
 
-	query := DatabaseConnection().Where("application_id = ?", appID)
+	query := DatabaseConnection().Where("contracts.application_id = ?", appID)
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
 	if filterTokens {
