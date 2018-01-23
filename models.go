@@ -278,6 +278,9 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 			err := fmt.Errorf("Failed to execute contract method %s on contract: %s; method not found in ABI", method, c.ID)
 			return err
 		}
+	} else {
+		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
+		return err
 	}
 	return nil
 }
