@@ -286,11 +286,26 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 }
 
 func (c *Contract) readEthereumContractAbi() (*ethabi.ABI, error) {
-	tx, err := c.GetTransaction()
-	if err != nil {
-		return nil, err
+	var abi *ethabi.ABI
+	params := c.ParseParams()
+	if contractAbi, ok := params["abi"]; ok {
+		abistr, err := json.Marshal(contractAbi)
+		if err != nil {
+			Log.Warningf("Failed to marshal ABI from contract params to json; %s", err.Error())
+			return nil, err
+		}
+
+		abival, err := ethabi.JSON(strings.NewReader(string(abistr)))
+		if err != nil {
+			Log.Warningf("Failed to initialize ABI from contract  params to json; %s", err.Error())
+			return nil, err
+		}
+
+		abi = &abival
+	} else {
+		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
 	}
-	return tx.readEthereumContractAbi()
+	return abi, nil
 }
 
 // Create and persist a token
@@ -417,29 +432,6 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 		Value:    big.NewInt(int64(t.Value)),
 		Data:     data,
 	}
-}
-
-func (t *Transaction) readEthereumContractAbi() (*ethabi.ABI, error) {
-	var abi *ethabi.ABI
-	params := t.ParseParams()
-	if contractAbi, ok := params["abi"]; ok {
-		abistr, err := json.Marshal(contractAbi)
-		if err != nil {
-			Log.Warningf("Failed to marshal ABI from tx params to json; %s", err.Error())
-			return nil, err
-		}
-
-		abival, err := ethabi.JSON(strings.NewReader(string(abistr)))
-		if err != nil {
-			Log.Warningf("Failed to initialize ABI from tx params to json; %s", err.Error())
-			return nil, err
-		}
-
-		abi = &abival
-	} else {
-		return nil, fmt.Errorf("Failed to read ABI from params for tx: %s", t.ID)
-	}
-	return abi, nil
 }
 
 func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethparams.ChainConfig) (*types.Transaction, error) {
