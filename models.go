@@ -255,23 +255,14 @@ func (c *Contract) Validate() bool {
 	return len(c.Errors) == 0
 }
 
-func (c *Contract) executeEthereumContract(tx *Transaction, method string, params []interface{}) error { // given tx has been built but broadcast has not yet been attempted
-	contractParams := c.ParseParams()
-	if _, ok := contractParams["abi"]; !ok {
-		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI found for validation", method, c.ID)
-		return err
-	}
-	abistr, err := json.Marshal(contractParams["abi"])
-	if err != nil {
-		Log.Warningf("Failed to marshal abi to json...  %s", err.Error())
-		return err
-	}
-	abi, err := ethabi.JSON(strings.NewReader(string(abistr)))
+func (c *Contract) executeEthereumContract(tx *Transaction, method string, params ...interface{}) error { // given tx has been built but broadcast has not yet been attempted
+	abi, err := c.readEthereumContractAbi()
 	if err == nil {
 		if _, ok := abi.Methods[method]; ok {
+			Log.Debugf("Attempting to encode %d parameters prior to attempting execution of contract method %s on contract: %s", len(params), method, c.ID)
 			invocationSig, err := abi.Pack(method, params)
 			if err != nil {
-				Log.Warningf("Failed to encode parameters prior to attempting execution of contract method %s on contract: %s; %s", method, c.ID, err.Error())
+				Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
 				return err
 			}
 
@@ -283,24 +274,6 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 			} else {
 				Log.Warningf("Failed to execute contract method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, tx.Data, c.ID)
 			}
-
-			// msg := ethereum.CallMsg{
-			// 	From:     common.HexToAddress(wallet.Address),
-			// 	To:       &receipt.ContractAddress,
-			// 	Gas:      0,
-			// 	GasPrice: gasPrice,
-			// 	Value:    nil,
-			// 	Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("name()"))),
-			// }
-
-			// result, _ := client.CallContract(context.TODO(), msg, nil)
-			// var name string
-			// if method, ok := abi.Methods["name"]; ok {
-			// 	err = method.Outputs.Unpack(&name, result)
-			// 	if err != nil {
-			// 		Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-			// 	}
-			// }
 		} else {
 			err := fmt.Errorf("Failed to execute contract method %s on contract: %s; method not found in ABI", method, c.ID)
 			return err
