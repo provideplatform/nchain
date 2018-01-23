@@ -137,7 +137,7 @@ Fetch real-time pricing data for major currency pairs and supported tokens.
 
 ##### `GET /api/v1/contracts`
 
-Enumerate managed smart contracts. Each `Contract` contains a `params` object which includes `Network`-specific descriptors.
+Enumerate managed smart contracts. Each `Contract` contains a `params` object which includes `Network`-specific descriptors. `Token` contracts can be filtered from the response by passing a query string with the `filter_tokens` parameter set to `true`.
 
 ```
 [prvd@vpc ~]# curl -v https://goldmine.provide.services/api/v1/contracts
@@ -935,17 +935,18 @@ Enumerate managed smart contracts. Each `Contract` contains a `params` object wh
 ```
 
 
+##### `POST /api/v1/contracts/:id/execute`
+
+Execute specific functionality encapsulated within a given `Contract`.
+
+*This API and documentation is still being developed.*
+
+
 ### Tokens API
 
 ##### `GET /api/v1/tokens`
 
 Enumerate managed token contracts.
-
-*This API and documentation is still being developed.*
-
-##### `POST /api/v1/tokens`
-
-Create a new token smart contract in accordance with the given parameters and deploy it to the specified `Network`.
 
 *This API and documentation is still being developed.*
 

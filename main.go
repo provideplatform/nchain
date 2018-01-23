@@ -33,6 +33,7 @@ func main() {
 	r.GET("/api/v1/prices", pricesHandler)
 
 	r.GET("/api/v1/contracts", contractsListHandler)
+	r.POST("/api/v1/contracts/:id/execute", contractExecutionHandler)
 
 	r.GET("/api/v1/tokens", tokensListHandler)
 	r.GET("/api/v1/tokens/:id", tokenDetailsHandler)
@@ -189,6 +190,46 @@ func contractsListHandler(c *gin.Context) {
 	var contracts []Contract
 	query.Find(&contracts)
 	render(contracts, 200, c)
+}
+
+func contractExecutionHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	var contract = &Contract{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&contract)
+
+	if contract == nil || contract.ID == uuid.Nil {
+		renderError("contract not found", 404, c)
+		return
+	} else if appID != nil && &contract.ApplicationID != &appID {
+		renderError("forbidden", 403, c)
+		return
+	}
+
+	execution := &ContractExecution{}
+	err = json.Unmarshal(buf, execution)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	tx, err := contract.Execute(execution.WalletID, execution.Value, *execution.Method, execution.Params)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	render(tx, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 }
 
 // tokens
