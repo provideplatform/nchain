@@ -179,8 +179,15 @@ func contractsListHandler(c *gin.Context) {
 		return
 	}
 
+	query := DatabaseConnection().Where("application_id = ?", appID)
+
+	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
+	if filterTokens {
+		query = query.Joins("LEFT OUTER JOIN tokens ON tokens.contract_id = contracts.id").Where("symbol IS NULL")
+	}
+
 	var contracts []Contract
-	DatabaseConnection().Where("application_id = ?", appID).Find(&contracts)
+	query.Find(&contracts)
 	render(contracts, 200, c)
 }
 
