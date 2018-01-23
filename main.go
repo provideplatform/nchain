@@ -211,7 +211,7 @@ func contractExecutionHandler(c *gin.Context) {
 	if contract == nil || contract.ID == uuid.Nil {
 		renderError("contract not found", 404, c)
 		return
-	} else if appID != nil && &contract.ApplicationID != &appID {
+	} else if appID != nil && *contract.ApplicationID != *appID {
 		renderError("forbidden", 403, c)
 		return
 	}
