@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -290,12 +291,20 @@ func transactionsListHandler(c *gin.Context) {
 		return
 	}
 
-	var txs []Transaction
+	var query *gorm.DB
 	if appID != nil {
-		DatabaseConnection().Where("application_id = ?", appID).Find(&txs)
+		query = DatabaseConnection().Where("transactions.application_id = ?", appID)
 	} else if userID != nil {
-		DatabaseConnection().Where("user_id = ?", userID).Find(&txs)
+		query = DatabaseConnection().Where("transactions.user_id = ?", userID)
 	}
+
+	filterContractCreationTx := strings.ToLower(c.Query("filter_contract_creations")) == "true"
+	if filterContractCreationTx {
+		query = query.Where("transactions.to IS NULL")
+	}
+
+	var txs []Transaction
+	query.Find(&txs)
 	render(txs, 200, c)
 }
 
