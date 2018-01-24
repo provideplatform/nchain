@@ -223,7 +223,7 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	tx, err := contract.Execute(execution.WalletID, execution.Value, *execution.Method, execution.Params)
+	tx, err := contract.Execute(execution.WalletID, execution.Value, *execution.Method, execution.ParseParams())
 	if err != nil {
 		renderError(err.Error(), 422, c)
 		return

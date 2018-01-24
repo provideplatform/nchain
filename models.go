@@ -54,10 +54,10 @@ type Contract struct {
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
-	WalletID *uuid.UUID     `json:"wallet_id"`
-	Method   *string        `json:"method"`
-	Params   []*interface{} `json:"params"`
-	Value    uint64         `json:"value"`
+	WalletID *uuid.UUID       `json:"wallet_id"`
+	Method   *string          `json:"method"`
+	Params   *json.RawMessage `json:"params"`
+	Value    uint64           `json:"value"`
 }
 
 // Token instances must be associated with an application identifier.
@@ -307,6 +307,19 @@ func (c *Contract) readEthereumContractAbi() (*ethabi.ABI, error) {
 		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
 	}
 	return abi, nil
+}
+
+// ParseParams - parse the given parameters JSON
+func (execution *ContractExecution) ParseParams() []interface{} {
+	params := []interface{}{}
+	if execution.Params != nil {
+		err := json.Unmarshal(*execution.Params, &params)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal contract execution parameters; %s", err.Error())
+			return nil
+		}
+	}
+	return params
 }
 
 // Create and persist a token
