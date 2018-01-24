@@ -263,7 +263,7 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 		return err
 	}
 	if _, ok := abi.Methods[method]; ok {
-		Log.Debugf("Attempting to encode %d parameters prior to attempting execution of contract method %s on contract: %s", len(params), method, c.ID)
+		Log.Debugf("Attempting to encode %d parameters prior to executing contract method %s on contract: %s", len(params), method, c.ID)
 		invocationSig, err := abi.Pack(method, params...)
 		if err != nil {
 			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
@@ -454,7 +454,6 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 		var tx *types.Transaction
 		if t.To != nil {
 			addr := common.HexToAddress(*t.To)
-			//gasLimit := big.NewInt(DefaultEthereumGasLimit).Uint64()
 			callMsg := t.asEthereumCallMsg(gasPrice.Uint64(), 0)
 			gasLimit, err := client.EstimateGas(context.TODO(), callMsg)
 			if err != nil {
