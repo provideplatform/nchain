@@ -54,10 +54,10 @@ type Contract struct {
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
-	WalletID *uuid.UUID               `json:"wallet_id"`
-	Method   *string                  `json:"method"`
-	Params   []map[string]interface{} `json:"params"`
-	Value    uint64                   `json:"value"`
+	WalletID *uuid.UUID    `json:"wallet_id"`
+	Method   *string       `json:"method"`
+	Params   []interface{} `json:"params"`
+	Value    uint64        `json:"value"`
 }
 
 // Token instances must be associated with an application identifier.
@@ -170,7 +170,7 @@ func (c *Contract) ParseParams() map[string]interface{} {
 }
 
 // Execute - execute functionality encapsulated in the contract by invoking a specific method using given parameters
-func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, params ...interface{}) (*Transaction, error) {
+func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, params []interface{}) (*Transaction, error) {
 	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
@@ -255,7 +255,7 @@ func (c *Contract) Validate() bool {
 	return len(c.Errors) == 0
 }
 
-func (c *Contract) executeEthereumContract(tx *Transaction, method string, params ...interface{}) error { // given tx has been built but broadcast has not yet been attempted
+func (c *Contract) executeEthereumContract(tx *Transaction, method string, params []interface{}) error { // given tx has been built but broadcast has not yet been attempted
 	var err error
 	abi, err := c.readEthereumContractAbi()
 	if err != nil {
@@ -264,8 +264,7 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 	}
 	if _, ok := abi.Methods[method]; ok {
 		Log.Debugf("Attempting to encode %d parameters prior to attempting execution of contract method %s on contract: %s", len(params), method, c.ID)
-		Log.Debugf("Attempting to encode parameters: %s", params)
-		invocationSig, err := abi.Pack(method, params)
+		invocationSig, err := abi.Pack(method, params...)
 		if err != nil {
 			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
 			return err
