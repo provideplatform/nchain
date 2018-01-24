@@ -54,10 +54,10 @@ type Contract struct {
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
-	WalletID *uuid.UUID    `json:"wallet_id"`
-	Method   *string       `json:"method"`
-	Params   []interface{} `json:"params,omitempty"`
-	Value    uint64        `json:"value"`
+	WalletID *uuid.UUID     `json:"wallet_id"`
+	Method   *string        `json:"method"`
+	Params   []*interface{} `json:"params"`
+	Value    uint64         `json:"value"`
 }
 
 // Token instances must be associated with an application identifier.
