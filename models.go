@@ -56,7 +56,7 @@ type Contract struct {
 type ContractExecution struct {
 	WalletID *uuid.UUID    `json:"wallet_id"`
 	Method   *string       `json:"method"`
-	Params   []interface{} `json:"params"`
+	Params   []interface{} `json:"params,omitempty"`
 	Value    uint64        `json:"value"`
 }
 
