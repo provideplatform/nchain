@@ -276,7 +276,7 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 		if tx.Create() {
 			Log.Debugf("Executed contract method %s on contract: %s", method, c.ID)
 		} else {
-			err = fmt.Errorf("Failed to execute contract method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, *tx.Data, c.ID)
+			err = fmt.Errorf("Failed to execute contract method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, c.ID, *tx.Data)
 			Log.Warning(err.Error())
 		}
 	} else {
