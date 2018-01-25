@@ -55,7 +55,7 @@ type Contract struct {
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
 	WalletID *uuid.UUID    `json:"wallet_id"`
-	Method   *string       `json:"method"`
+	Method   string        `json:"method"`
 	Params   []interface{} `json:"params"`
 	Value    uint64        `json:"value"`
 }

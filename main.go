@@ -224,13 +224,13 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	tx, err := contract.Execute(execution.WalletID, execution.Value, *execution.Method, execution.Params)
+	executionResponse, err := contract.Execute(execution.WalletID, execution.Value, execution.Method, execution.Params)
 	if err != nil {
 		renderError(err.Error(), 422, c)
 		return
 	}
 
-	render(tx, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+	render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 }
 
 // tokens
