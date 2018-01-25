@@ -292,14 +292,14 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 			gasPrice, _ := client.SuggestGasPrice(context.TODO())
 			msg := tx.asEthereumCallMsg(gasPrice.Uint64(), 0)
 			result, _ := client.CallContract(context.TODO(), msg, nil)
-			var out *interface{}
+			var out interface{}
 			err = abiMethod.Outputs.Unpack(&out, result)
 			if err != nil {
 				err = fmt.Errorf("Failed to execute constant method %s on contract: %s (signature with encoded parameters: %s)", method, c.ID, *tx.Data)
 				Log.Warning(err.Error())
 				return nil, err
 			}
-			return out, nil
+			return &out, nil
 		}
 		if tx.Create() {
 			Log.Debugf("Executed contract method %s on contract: %s", method, c.ID)
