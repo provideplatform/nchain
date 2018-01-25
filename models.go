@@ -60,6 +60,12 @@ type ContractExecution struct {
 	Value    uint64        `json:"value"`
 }
 
+// ContractExecutionResponse is returned upon successful contract execution
+type ContractExecutionResponse struct {
+	Result      *interface{} `json:"result"`
+	Transaction *Transaction `json:"transaction"`
+}
+
 // Token instances must be associated with an application identifier.
 type Token struct {
 	gocore.Model
@@ -170,7 +176,7 @@ func (c *Contract) ParseParams() map[string]interface{} {
 }
 
 // Execute - execute functionality encapsulated in the contract by invoking a specific method using given parameters
-func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, params []interface{}) (*Transaction, error) {
+func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, params []interface{}) (*ContractExecutionResponse, error) {
 	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
@@ -185,8 +191,10 @@ func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, par
 		Value:         value,
 	}
 
+	var result *interface{}
+
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
-		err = c.executeEthereumContract(tx, method, params)
+		result, err = c.executeEthereumContract(tx, method, params)
 		if err != nil {
 			err = fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 		}
@@ -197,7 +205,11 @@ func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, par
 		Log.Warningf(err.Error())
 		return nil, err
 	}
-	return tx, nil
+
+	return &ContractExecutionResponse{
+		Result:      result,
+		Transaction: tx,
+	}, nil
 }
 
 // Create and persist a new contract
@@ -255,24 +267,40 @@ func (c *Contract) Validate() bool {
 	return len(c.Errors) == 0
 }
 
-func (c *Contract) executeEthereumContract(tx *Transaction, method string, params []interface{}) error { // given tx has been built but broadcast has not yet been attempted
+func (c *Contract) executeEthereumContract(tx *Transaction, method string, params []interface{}) (*interface{}, error) { // given tx has been built but broadcast has not yet been attempted
 	var err error
 	abi, err := c.readEthereumContractAbi()
 	if err != nil {
 		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
-		return err
+		return nil, err
 	}
-	if _, ok := abi.Methods[method]; ok {
+	if abiMethod, ok := abi.Methods[method]; ok {
 		Log.Debugf("Attempting to encode %d parameters prior to executing contract method %s on contract: %s", len(params), method, c.ID)
 		invocationSig, err := abi.Pack(method, params...)
 		if err != nil {
 			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
-			return err
+			return nil, err
 		}
 
 		data := common.Bytes2Hex(invocationSig)
 		tx.Data = &data
 
+		if abiMethod.Const {
+			Log.Debugf("Attempting to execute constant method %s on contract: %s", method, c.ID)
+			network, _ := tx.GetNetwork()
+			client, err := DialJsonRpc(network)
+			gasPrice, _ := client.SuggestGasPrice(context.TODO())
+			msg := tx.asEthereumCallMsg(gasPrice.Uint64(), 0)
+			result, _ := client.CallContract(context.TODO(), msg, nil)
+			var out *interface{}
+			err = abiMethod.Outputs.Unpack(&out, result)
+			if err != nil {
+				err = fmt.Errorf("Failed to execute constant method %s on contract: %s (signature with encoded parameters: %s)", method, c.ID, *tx.Data)
+				Log.Warning(err.Error())
+				return nil, err
+			}
+			return out, nil
+		}
 		if tx.Create() {
 			Log.Debugf("Executed contract method %s on contract: %s", method, c.ID)
 		} else {
@@ -282,7 +310,7 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 	} else {
 		err = fmt.Errorf("Failed to execute contract method %s on contract: %s; method not found in ABI", method, c.ID)
 	}
-	return err
+	return nil, err
 }
 
 func (c *Contract) readEthereumContractAbi() (*ethabi.ABI, error) {
@@ -396,6 +424,17 @@ func (t *Token) readEthereumContractAbi() (*ethabi.ABI, error) {
 		return nil, err
 	}
 	return contract.readEthereumContractAbi()
+}
+
+// GetNetwork - retrieve the associated transaction network
+func (t *Transaction) GetNetwork() (*Network, error) {
+	db := DatabaseConnection()
+	var network = &Network{}
+	db.Model(t).Related(&network)
+	if network == nil {
+		return nil, fmt.Errorf("Failed to retrieve transaction network for tx: %s", t.ID)
+	}
+	return network, nil
 }
 
 // ParseParams - parse the original JSON params used when the tx was broadcast
