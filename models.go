@@ -274,11 +274,19 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
 		return nil, err
 	}
-	if abiMethod, ok := abi.Methods[method]; ok {
-		Log.Debugf("Attempting to encode %d parameters prior to executing contract method %s on contract: %s", len(params), method, c.ID)
+	var methodDescriptor = fmt.Sprintf("method %s", method)
+	var abiMethod *ethabi.Method
+	if mthd, ok := abi.Methods[method]; ok {
+		abiMethod = &mthd
+	} else if method == "" {
+		abiMethod = &abi.Constructor
+		methodDescriptor = "constructor"
+	}
+	if abiMethod != nil {
+		Log.Debugf("Attempting to encode %d parameters prior to executing contract %s on contract: %s", len(params), methodDescriptor, c.ID)
 		invocationSig, err := abi.Pack(method, params...)
 		if err != nil {
-			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract method %s on contract: %s; %s", len(params), method, c.ID, err.Error())
+			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 			return nil, err
 		}
 
@@ -295,20 +303,20 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 			var out interface{}
 			err = abiMethod.Outputs.Unpack(&out, result)
 			if err != nil {
-				err = fmt.Errorf("Failed to execute constant method %s on contract: %s (signature with encoded parameters: %s)", method, c.ID, *tx.Data)
+				err = fmt.Errorf("Failed to execute constant %s on contract: %s (signature with encoded parameters: %s)", methodDescriptor, c.ID, *tx.Data)
 				Log.Warning(err.Error())
 				return nil, err
 			}
 			return &out, nil
 		}
 		if tx.Create() {
-			Log.Debugf("Executed contract method %s on contract: %s", method, c.ID)
+			Log.Debugf("Executed contract %s on contract: %s", methodDescriptor, c.ID)
 		} else {
-			err = fmt.Errorf("Failed to execute contract method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, c.ID, *tx.Data)
+			err = fmt.Errorf("Failed to execute contract %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
 			Log.Warning(err.Error())
 		}
 	} else {
-		err = fmt.Errorf("Failed to execute contract method %s on contract: %s; method not found in ABI", method, c.ID)
+		err = fmt.Errorf("Failed to execute contract %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)
 	}
 	return nil, err
 }
