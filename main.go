@@ -189,7 +189,7 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	query.Find(&contracts)
+	query.Order("created_at ASC").Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -243,7 +243,7 @@ func tokensListHandler(c *gin.Context) {
 	}
 
 	var tokens []Token
-	DatabaseConnection().Where("application_id = ?", appID).Find(&tokens)
+	DatabaseConnection().Where("application_id = ?", appID).Order("created_at ASC").Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -304,7 +304,7 @@ func transactionsListHandler(c *gin.Context) {
 	}
 
 	var txs []Transaction
-	query.Find(&txs)
+	query.Order("created_at DESC").Find(&txs)
 	render(txs, 200, c)
 }
 
