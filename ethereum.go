@@ -78,12 +78,6 @@ func EncodeFunctionSignature(funcsig string) []byte {
 	return ethcrypto.Keccak256([]byte(funcsig))[0:4]
 }
 
-func EncodeABI3(contractAbi *abi.ABI, method string, params ...interface{}) ([]byte, error) {
-	var methodDescriptor = fmt.Sprintf("method %s", method)
-	Log.Debugf("Attempting to encode %d parameters prior to executing contract %s", len(params), methodDescriptor)
-	return contractAbi.Pack(method, params...)
-}
-
 func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 	var methodDescriptor = fmt.Sprintf("method %s", method.Name)
 	Log.Debugf("Attempting to encode %d parameters prior to executing contract %s", len(params), methodDescriptor)
