@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
@@ -70,4 +72,11 @@ func JsonRpcClient(network *Network) *ethclient.Client {
 
 func EncodeFunctionSignature(funcsig string) []byte {
 	return ethcrypto.Keccak256([]byte(funcsig))[0:4]
+}
+
+func EncodeABI(abi *ethabi.ABI, method string, params ...interface{}) ([]byte, error) {
+	var methodDescriptor = fmt.Sprintf("method %s", method)
+	Log.Debugf("Attempting to encode %d parameters prior to executing contract %s", len(params), methodDescriptor)
+	invocationSig, err := abi.Pack(method, params...)
+	return invocationSig, err
 }

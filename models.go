@@ -284,7 +284,7 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 	}
 	if abiMethod != nil {
 		Log.Debugf("Attempting to encode %d parameters prior to executing contract %s on contract: %s", len(params), methodDescriptor, c.ID)
-		invocationSig, err := abi.Pack(method, params...)
+		invocationSig, err := EncodeABI(abi, method, params...)
 		if err != nil {
 			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 			return nil, err
