@@ -13,7 +13,7 @@ import (
 	"github.com/provideapp/go-core"
 
 	ethereum "github.com/ethereum/go-ethereum"
-	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -269,22 +269,22 @@ func (c *Contract) Validate() bool {
 
 func (c *Contract) executeEthereumContract(tx *Transaction, method string, params []interface{}) (*interface{}, error) { // given tx has been built but broadcast has not yet been attempted
 	var err error
-	abi, err := c.readEthereumContractAbi()
+	_abi, err := c.readEthereumContractAbi()
 	if err != nil {
 		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
 		return nil, err
 	}
 	var methodDescriptor = fmt.Sprintf("method %s", method)
-	var abiMethod *ethabi.Method
-	if mthd, ok := abi.Methods[method]; ok {
+	var abiMethod *abi.Method
+	if mthd, ok := _abi.Methods[method]; ok {
 		abiMethod = &mthd
 	} else if method == "" {
-		abiMethod = &abi.Constructor
+		abiMethod = &_abi.Constructor
 		methodDescriptor = "constructor"
 	}
 	if abiMethod != nil {
 		Log.Debugf("Attempting to encode %d parameters prior to executing contract %s on contract: %s", len(params), methodDescriptor, c.ID)
-		invocationSig, err := EncodeABI(abi, method, params...)
+		invocationSig, err := EncodeABI(abiMethod, params...)
 		if err != nil {
 			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 			return nil, err
@@ -321,8 +321,8 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 	return nil, err
 }
 
-func (c *Contract) readEthereumContractAbi() (*ethabi.ABI, error) {
-	var abi *ethabi.ABI
+func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
+	var _abi *abi.ABI
 	params := c.ParseParams()
 	if contractAbi, ok := params["abi"]; ok {
 		abistr, err := json.Marshal(contractAbi)
@@ -331,17 +331,17 @@ func (c *Contract) readEthereumContractAbi() (*ethabi.ABI, error) {
 			return nil, err
 		}
 
-		abival, err := ethabi.JSON(strings.NewReader(string(abistr)))
+		abival, err := abi.JSON(strings.NewReader(string(abistr)))
 		if err != nil {
 			Log.Warningf("Failed to initialize ABI from contract  params to json; %s", err.Error())
 			return nil, err
 		}
 
-		abi = &abival
+		_abi = &abival
 	} else {
 		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
 	}
-	return abi, nil
+	return _abi, nil
 }
 
 // Create and persist a token
@@ -426,7 +426,7 @@ func (t *Token) GetContract() (*Contract, error) {
 	return contract, nil
 }
 
-func (t *Token) readEthereumContractAbi() (*ethabi.ABI, error) {
+func (t *Token) readEthereumContractAbi() (*abi.ABI, error) {
 	contract, err := t.GetContract()
 	if err != nil {
 		return nil, err
@@ -634,7 +634,7 @@ func (t *Transaction) Create() bool {
 									if err != nil {
 										Log.Warningf("failed to marshal abi to json...  %s", err.Error())
 									}
-									abi, err := ethabi.JSON(strings.NewReader(string(abistr)))
+									_abi, err := abi.JSON(strings.NewReader(string(abistr)))
 									if err == nil {
 										msg := ethereum.CallMsg{
 											From:     common.HexToAddress(wallet.Address),
@@ -647,7 +647,7 @@ func (t *Transaction) Create() bool {
 
 										result, _ := client.CallContract(context.TODO(), msg, nil)
 										var name string
-										if method, ok := abi.Methods["name"]; ok {
+										if method, ok := _abi.Methods["name"]; ok {
 											err = method.Outputs.Unpack(&name, result)
 											if err != nil {
 												Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
@@ -664,7 +664,7 @@ func (t *Transaction) Create() bool {
 										}
 										result, _ = client.CallContract(context.TODO(), msg, nil)
 										var decimals *big.Int
-										if method, ok := abi.Methods["decimals"]; ok {
+										if method, ok := _abi.Methods["decimals"]; ok {
 											err = method.Outputs.Unpack(&decimals, result)
 											if err != nil {
 												Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
@@ -681,7 +681,7 @@ func (t *Transaction) Create() bool {
 										}
 										result, _ = client.CallContract(context.TODO(), msg, nil)
 										var symbol string
-										if method, ok := abi.Methods["symbol"]; ok {
+										if method, ok := _abi.Methods["symbol"]; ok {
 											err = method.Outputs.Unpack(&symbol, result)
 											if err != nil {
 												Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, contract.ID, err.Error())

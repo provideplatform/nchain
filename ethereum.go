@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"reflect"
 	"strings"
 
-	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
@@ -74,9 +78,68 @@ func EncodeFunctionSignature(funcsig string) []byte {
 	return ethcrypto.Keccak256([]byte(funcsig))[0:4]
 }
 
-func EncodeABI(abi *ethabi.ABI, method string, params ...interface{}) ([]byte, error) {
+func EncodeABI3(contractAbi *abi.ABI, method string, params ...interface{}) ([]byte, error) {
 	var methodDescriptor = fmt.Sprintf("method %s", method)
 	Log.Debugf("Attempting to encode %d parameters prior to executing contract %s", len(params), methodDescriptor)
-	invocationSig, err := abi.Pack(method, params...)
-	return invocationSig, err
+	return contractAbi.Pack(method, params...)
+}
+
+func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
+	var methodDescriptor = fmt.Sprintf("method %s", method.Name)
+	Log.Debugf("Attempting to encode %d parameters prior to executing contract %s", len(params), methodDescriptor)
+	var args []interface{}
+
+	for i := range params {
+		input := method.Inputs[i]
+		param, err := coerceAbiParameter(input.Type, params[i])
+		if err != nil {
+			Log.Warningf("Failed to encode ABI parameter %s in accordance with contract %s; %s", input.Name, methodDescriptor, err.Error())
+		} else {
+			args = append(args, param)
+		}
+	}
+	encodedArgs, err := method.Inputs.Pack(args...)
+	if err != nil {
+		Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract; %s", len(params), methodDescriptor, err.Error())
+		return nil, err
+	}
+	Log.Debugf("Encoded abi params: %s", encodedArgs)
+	return append(method.Id(), encodedArgs...), nil
+}
+
+func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
+	switch t.T {
+	case abi.IntTy, abi.UintTy:
+		switch kind := t.Kind; kind {
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return big.NewInt(int64(v.(int64))), nil
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return big.NewInt(int64(v.(int64))), nil
+		case reflect.Float64:
+			return big.NewInt(int64(v.(float64))), nil
+		case reflect.Ptr:
+			switch v.(type) {
+			case float64:
+				return big.NewInt(int64(v.(float64))), nil
+			}
+		default:
+			return nil, fmt.Errorf("Failed to coerce %s (%s) parameter for ABI encoding", t.String(), kind.String())
+		}
+	case abi.StringTy:
+		return v.(string), nil
+	case abi.AddressTy:
+		// FIXME... ensure handling of arrays
+		return common.HexToAddress(v.(string)), nil
+	case abi.BoolTy:
+		return v.(bool), nil
+	case abi.BytesTy:
+		// FIXME... ensure handling of arrays
+		return v.([]byte), nil
+	case abi.FixedBytesTy, abi.FunctionTy:
+		// FIXME... ensure handling of arrays
+		return v.([]byte), nil
+	default:
+		return nil, fmt.Errorf("Failed to coerce %s parameter for ABI encoding", t.String())
+	}
+	return nil, fmt.Errorf("Failed to coerce %s parameter for ABI encoding", t.String())
 }
