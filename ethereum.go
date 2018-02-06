@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -16,8 +17,9 @@ import (
 )
 
 var EthereumClients = map[string][]*ethclient.Client{}
+var EthereumRpcClients = map[string][]*ethrpc.Client{}
 
-func DialJsonRpc(network *Network) (*ethclient.Client, error) {
+func GetJsonRpcUrl(network *Network) *string {
 	var url string
 	config := network.ParseConfig()
 	if jsonRpcUrl, ok := config["json_rpc_url"].(string); ok {
@@ -26,16 +28,19 @@ func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 		Log.Warningf("No JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
 		url = DefaultEthereumMainnetJsonRpcUrl
 	}
-
+	return stringOrNil(url)
+}
+func DialJsonRpc(network *Network) (*ethclient.Client, error) {
+	url := GetJsonRpcUrl(network)
 	var client *ethclient.Client
 
 	if networkClients, _ := EthereumClients[network.ID.String()]; len(networkClients) == 0 {
-		ec, err := ethclient.Dial(url)
+		rpcClient, err := ResolveJsonRpcClient(network)
 		if err != nil {
 			Log.Warningf("Failed to dial %s JSON-RPC host: %s", *network.Name, url)
 			return nil, err
 		}
-		client = ec
+		client = ethclient.NewClient(rpcClient)
 		EthereumClients[network.ID.String()] = append(networkClients, client)
 		Log.Debugf("Dialed %s JSON-RPC host @ %s", *network.Name, url)
 	} else {
@@ -50,6 +55,25 @@ func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 		Log.Debugf("Latest synced block for %s JSON-RPC host @ %s: %v [of %v]", *network.Name, url, progress.CurrentBlock, progress.HighestBlock)
 	}
 
+	return client, nil
+}
+
+func ResolveJsonRpcClient(network *Network) (*ethrpc.Client, error) {
+	url := GetJsonRpcUrl(network)
+	var client *ethrpc.Client
+
+	if rpcClients, _ := EthereumRpcClients[network.ID.String()]; len(rpcClients) == 0 {
+		erpc, err := ethrpc.Dial(*url)
+		if err != nil {
+			Log.Warningf("Failed to resolve cached RPC client for %s JSON-RPC host: %s", *network.Name, url)
+			return nil, err
+		}
+		client = erpc
+		EthereumRpcClients[network.ID.String()] = append(rpcClients, client)
+		Log.Debugf("Dialed %s JSON-RPC host @ %s", *network.Name, url)
+	} else {
+		client = EthereumRpcClients[network.ID.String()][0]
+	}
 	return client, nil
 }
 
@@ -99,6 +123,11 @@ func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 	}
 	Log.Debugf("Encoded abi params: %s", encodedArgs)
 	return append(method.Id(), encodedArgs...), nil
+}
+
+func TraceTx(network *Network, hash *string) (interface{}, error) {
+	Log.Warningf("TraceTx not implemented; unable to trace %s tx: %s", *network.Name, hash)
+	return nil, nil
 }
 
 func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {

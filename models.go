@@ -17,7 +17,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	ethparams "github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
@@ -62,7 +64,7 @@ type ContractExecution struct {
 
 // ContractExecutionResponse is returned upon successful contract execution
 type ContractExecutionResponse struct {
-	Result      *interface{} `json:"result"`
+	Result      interface{}  `json:"result"`
 	Transaction *Transaction `json:"transaction"`
 }
 
@@ -83,15 +85,16 @@ type Token struct {
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
 	gocore.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
-	UserID        *uuid.UUID       `sql:"type:uuid" json:"-"`
-	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	WalletID      uuid.UUID        `sql:"not null;type:uuid" json:"wallet_id"`
-	To            *string          `json:"to"`
-	Value         uint64           `sql:"not null;default:0" json:"value"`
-	Data          *string          `json:"data"`
-	Hash          *string          `sql:"not null" json:"hash"`
-	Params        *json.RawMessage `sql:"-" json:"params"`
+	ApplicationID *uuid.UUID                 `sql:"type:uuid" json:"-"`
+	UserID        *uuid.UUID                 `sql:"type:uuid" json:"-"`
+	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
+	WalletID      uuid.UUID                  `sql:"not null;type:uuid" json:"wallet_id"`
+	To            *string                    `json:"to"`
+	Value         uint64                     `sql:"not null;default:0" json:"value"`
+	Data          *string                    `json:"data"`
+	Hash          *string                    `sql:"not null" json:"hash"`
+	Params        *json.RawMessage           `sql:"-" json:"params"`
+	Response      *ContractExecutionResponse `sql:"-" json:"-"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
@@ -194,7 +197,7 @@ func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, par
 	var result *interface{}
 
 	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
-		result, err = c.executeEthereumContract(tx, method, params)
+		result, err = c.executeEthereumContract(network, tx, method, params)
 		if err != nil {
 			err = fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 		}
@@ -206,10 +209,16 @@ func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, par
 		return nil, err
 	}
 
-	return &ContractExecutionResponse{
-		Result:      result,
-		Transaction: tx,
-	}, nil
+	if tx.Response == nil {
+		tx.Response = &ContractExecutionResponse{
+			Result:      result,
+			Transaction: tx,
+		}
+	} else if tx.Response.Transaction == nil {
+		tx.Response.Transaction = tx
+	}
+
+	return tx.Response, nil
 }
 
 // Create and persist a new contract
@@ -267,7 +276,7 @@ func (c *Contract) Validate() bool {
 	return len(c.Errors) == 0
 }
 
-func (c *Contract) executeEthereumContract(tx *Transaction, method string, params []interface{}) (*interface{}, error) { // given tx has been built but broadcast has not yet been attempted
+func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, method string, params []interface{}) (*interface{}, error) { // given tx has been built but broadcast has not yet been attempted
 	var err error
 	_abi, err := c.readEthereumContractAbi()
 	if err != nil {
@@ -311,6 +320,30 @@ func (c *Contract) executeEthereumContract(tx *Transaction, method string, param
 		}
 		if tx.Create() {
 			Log.Debugf("Executed contract %s on contract: %s", methodDescriptor, c.ID)
+
+			if tx.Response != nil {
+				Log.Debugf("Received response to tx broadcast attempt calling contract %s on contract: %s", methodDescriptor, c.ID)
+
+				var out interface{}
+				switch (tx.Response.Result).(type) {
+				case []byte:
+					out = (tx.Response.Result).([]byte)
+					Log.Debugf("Received response: %s", out)
+				case types.Receipt:
+					client, _ := DialJsonRpc(network)
+					receipt := tx.Response.Result.(*types.Receipt)
+					txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
+					if err != nil {
+						err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
+						Log.Warning(err.Error())
+						return nil, err
+					}
+					out = txdeets
+				default:
+					// no-op
+				}
+				return &out, nil
+			}
 		} else {
 			err = fmt.Errorf("Failed to execute contract %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
 			Log.Warning(err.Error())
@@ -536,6 +569,24 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *ethp
 	return nil, err
 }
 
+// sendEthereumTx injects a signed transaction into the pending pool for execution.
+//
+// If the transaction was a contract creation use the TransactionReceipt method to get the
+// contract address after the transaction has been mined.
+func (t *Transaction) sendEthereumTx(ctx context.Context, network *Network, tx *types.Transaction, client *ethclient.Client, result interface{}) error {
+	rpcClient, err := ResolveJsonRpcClient(network)
+	if err != nil {
+		return err
+	}
+
+	data, err := rlp.EncodeToBytes(tx)
+	if err != nil {
+		return err
+	}
+
+	return rpcClient.CallContext(ctx, result, "eth_sendRawTransaction", common.ToHex(data))
+}
+
 // Create and persist a new transaction. Side effects include persistence of contract and/or token instances
 // when the tx represents a contract and/or token creation.
 func (t *Transaction) Create() bool {
@@ -563,12 +614,40 @@ func (t *Transaction) Create() bool {
 			tx, err := t.signEthereumTx(network, wallet, cfg)
 			if err == nil {
 				Log.Debugf("Transmitting signed %s tx to JSON-RPC host", *network.Name)
-				err := client.SendTransaction(context.TODO(), tx)
+				var out interface{}
+				err := t.sendEthereumTx(context.TODO(), network, tx, client, &out)
 				if err != nil {
 					Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host; %s", *network.Name, err.Error())
 					t.Errors = append(t.Errors, &gocore.Error{
 						Message: stringOrNil(err.Error()),
 					})
+				} else if out == nil { // FIXME-- out pointer not yet handled by sendEthereumTx
+					receipt, err := t.fetchEthereumTxReceipt(network, wallet)
+					if err != nil {
+						Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
+						t.Errors = append(t.Errors, &gocore.Error{
+							Message: stringOrNil(err.Error()),
+						})
+					} else {
+						Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", *t.Hash, receipt)
+						t.Response = &ContractExecutionResponse{
+							Result:      receipt,
+							Transaction: t,
+						}
+					}
+				} else {
+					trace, err := TraceTx(network, stringOrNil(out.(string)))
+					if err == nil && trace != nil {
+						t.Response = &ContractExecutionResponse{
+							Result:      trace,
+							Transaction: t,
+						}
+					} else if trace == nil {
+						t.Response = &ContractExecutionResponse{
+							Result:      out,
+							Transaction: t,
+						}
+					}
 				}
 			} else {
 				Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
@@ -599,120 +678,15 @@ func (t *Transaction) Create() bool {
 		if !db.NewRecord(t) {
 			if t.To == nil && rowsAffected > 0 {
 				if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
-					var err error
-					var receipt *types.Receipt
-					client, err := DialJsonRpc(network)
-					gasPrice, _ := client.SuggestGasPrice(context.TODO())
-					txHash := fmt.Sprintf("0x%s", *t.Hash)
-					Log.Debugf("%s contract created by broadcast tx: %s", *network.Name, txHash)
-					err = ethereum.NotFound
-					for receipt == nil && err == ethereum.NotFound {
-						Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, txHash)
-						receipt, err = client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
-						if err != nil && err == ethereum.NotFound {
-							Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, txHash)
-						} else {
-							Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress.Hex())
-							params := t.ParseParams()
-							contractName := fmt.Sprintf("Contract %s", *stringOrNil(receipt.ContractAddress.Hex()))
-							if name, ok := params["name"].(string); ok {
-								contractName = name
-							}
-							contract := &Contract{
-								ApplicationID: t.ApplicationID,
-								NetworkID:     t.NetworkID,
-								TransactionID: &t.ID,
-								Name:          stringOrNil(contractName),
-								Address:       stringOrNil(receipt.ContractAddress.Hex()),
-								Params:        t.Params,
-							}
-							if contract.Create() {
-								Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, txHash)
+					receipt, err := t.fetchEthereumTxReceipt(network, wallet)
+					if err != nil {
+						Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", t.Hash, err.Error())
+						t.Errors = append(t.Errors, &gocore.Error{
+							Message: stringOrNil(err.Error()),
+						})
+					} else {
+						Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", t.Hash, receipt)
 
-								if contractAbi, ok := params["abi"]; ok {
-									abistr, err := json.Marshal(contractAbi)
-									if err != nil {
-										Log.Warningf("failed to marshal abi to json...  %s", err.Error())
-									}
-									_abi, err := abi.JSON(strings.NewReader(string(abistr)))
-									if err == nil {
-										msg := ethereum.CallMsg{
-											From:     common.HexToAddress(wallet.Address),
-											To:       &receipt.ContractAddress,
-											Gas:      0,
-											GasPrice: gasPrice,
-											Value:    nil,
-											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("name()"))),
-										}
-
-										result, _ := client.CallContract(context.TODO(), msg, nil)
-										var name string
-										if method, ok := _abi.Methods["name"]; ok {
-											err = method.Outputs.Unpack(&name, result)
-											if err != nil {
-												Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-											}
-										}
-
-										msg = ethereum.CallMsg{
-											From:     common.HexToAddress(wallet.Address),
-											To:       &receipt.ContractAddress,
-											Gas:      0,
-											GasPrice: gasPrice,
-											Value:    nil,
-											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("decimals()"))),
-										}
-										result, _ = client.CallContract(context.TODO(), msg, nil)
-										var decimals *big.Int
-										if method, ok := _abi.Methods["decimals"]; ok {
-											err = method.Outputs.Unpack(&decimals, result)
-											if err != nil {
-												Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-											}
-										}
-
-										msg = ethereum.CallMsg{
-											From:     common.HexToAddress(wallet.Address),
-											To:       &receipt.ContractAddress,
-											Gas:      0,
-											GasPrice: gasPrice,
-											Value:    nil,
-											Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("symbol()"))),
-										}
-										result, _ = client.CallContract(context.TODO(), msg, nil)
-										var symbol string
-										if method, ok := _abi.Methods["symbol"]; ok {
-											err = method.Outputs.Unpack(&symbol, result)
-											if err != nil {
-												Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-											}
-										}
-
-										if name != "" && decimals != nil && symbol != "" { // isERC20Token
-											Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
-											token := &Token{
-												ApplicationID: contract.ApplicationID,
-												NetworkID:     contract.NetworkID,
-												ContractID:    &contract.ID,
-												Name:          stringOrNil(name),
-												Symbol:        stringOrNil(symbol),
-												Decimals:      decimals.Uint64(),
-												Address:       stringOrNil(receipt.ContractAddress.Hex()),
-											}
-											if token.Create() {
-												Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.ID, *network.Name, txHash)
-											} else {
-												Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, txHash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
-											}
-										}
-									} else {
-										Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
-									}
-								}
-							} else {
-								Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, txHash)
-							}
-						}
 					}
 				}
 			}
@@ -720,6 +694,125 @@ func (t *Transaction) Create() bool {
 		}
 	}
 	return false
+}
+
+func (t *Transaction) fetchEthereumTxReceipt(network *Network, wallet *Wallet) (*types.Receipt, error) {
+	var err error
+	var receipt *types.Receipt
+	client, err := DialJsonRpc(network)
+	gasPrice, _ := client.SuggestGasPrice(context.TODO())
+	txHash := fmt.Sprintf("0x%s", *t.Hash)
+	Log.Debugf("Attempting to retrieve %s tx receipt for broadcast tx: %s", *network.Name, txHash)
+	err = ethereum.NotFound
+	for receipt == nil && err == ethereum.NotFound {
+		Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, txHash)
+		receipt, err = client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
+		if err != nil && err == ethereum.NotFound {
+			Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, txHash)
+		} else {
+			Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress.Hex())
+			params := t.ParseParams()
+			contractName := fmt.Sprintf("Contract %s", *stringOrNil(receipt.ContractAddress.Hex()))
+			if name, ok := params["name"].(string); ok {
+				contractName = name
+			}
+			contract := &Contract{
+				ApplicationID: t.ApplicationID,
+				NetworkID:     t.NetworkID,
+				TransactionID: &t.ID,
+				Name:          stringOrNil(contractName),
+				Address:       stringOrNil(receipt.ContractAddress.Hex()),
+				Params:        t.Params,
+			}
+			if contract.Create() {
+				Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, txHash)
+
+				if contractAbi, ok := params["abi"]; ok {
+					abistr, err := json.Marshal(contractAbi)
+					if err != nil {
+						Log.Warningf("failed to marshal abi to json...  %s", err.Error())
+					}
+					_abi, err := abi.JSON(strings.NewReader(string(abistr)))
+					if err == nil {
+						msg := ethereum.CallMsg{
+							From:     common.HexToAddress(wallet.Address),
+							To:       &receipt.ContractAddress,
+							Gas:      0,
+							GasPrice: gasPrice,
+							Value:    nil,
+							Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("name()"))),
+						}
+
+						result, _ := client.CallContract(context.TODO(), msg, nil)
+						var name string
+						if method, ok := _abi.Methods["name"]; ok {
+							err = method.Outputs.Unpack(&name, result)
+							if err != nil {
+								Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
+							}
+						}
+
+						msg = ethereum.CallMsg{
+							From:     common.HexToAddress(wallet.Address),
+							To:       &receipt.ContractAddress,
+							Gas:      0,
+							GasPrice: gasPrice,
+							Value:    nil,
+							Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("decimals()"))),
+						}
+						result, _ = client.CallContract(context.TODO(), msg, nil)
+						var decimals *big.Int
+						if method, ok := _abi.Methods["decimals"]; ok {
+							err = method.Outputs.Unpack(&decimals, result)
+							if err != nil {
+								Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
+							}
+						}
+
+						msg = ethereum.CallMsg{
+							From:     common.HexToAddress(wallet.Address),
+							To:       &receipt.ContractAddress,
+							Gas:      0,
+							GasPrice: gasPrice,
+							Value:    nil,
+							Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("symbol()"))),
+						}
+						result, _ = client.CallContract(context.TODO(), msg, nil)
+						var symbol string
+						if method, ok := _abi.Methods["symbol"]; ok {
+							err = method.Outputs.Unpack(&symbol, result)
+							if err != nil {
+								Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
+							}
+						}
+
+						if name != "" && decimals != nil && symbol != "" { // isERC20Token
+							Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+							token := &Token{
+								ApplicationID: contract.ApplicationID,
+								NetworkID:     contract.NetworkID,
+								ContractID:    &contract.ID,
+								Name:          stringOrNil(name),
+								Symbol:        stringOrNil(symbol),
+								Decimals:      decimals.Uint64(),
+								Address:       stringOrNil(receipt.ContractAddress.Hex()),
+							}
+							if token.Create() {
+								Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.ID, *network.Name, txHash)
+							} else {
+								Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, txHash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
+							}
+						}
+					} else {
+						Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
+					}
+				}
+			} else {
+				Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, txHash)
+			}
+		}
+	}
+	return receipt, err
 }
 
 // Validate a transaction for persistence
