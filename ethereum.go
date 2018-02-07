@@ -126,8 +126,14 @@ func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 }
 
 func TraceTx(network *Network, hash *string) (interface{}, error) {
-	Log.Warningf("TraceTx not implemented; unable to trace %s tx: %s", *network.Name, hash)
-	return nil, nil
+	var result interface{}
+	rpcClient, _ := ResolveJsonRpcClient(network)
+	err := rpcClient.CallContext(context.TODO(), &result, "debug_traceTransaction", hash) //trace_rawTransaction
+	if err != nil {
+		Log.Warningf("Failed to invoke debug_traceTransaction method via JSON-RPC; %s", err.Error())
+		return nil, err
+	}
+	return result, nil
 }
 
 func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
