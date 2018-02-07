@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/url"
 	"strings"
 
 	"github.com/provideapp/go-core"
@@ -66,6 +67,18 @@ type ContractExecution struct {
 type ContractExecutionResponse struct {
 	Result      interface{}  `json:"result"`
 	Transaction *Transaction `json:"transaction"`
+}
+
+// Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
+type Oracle struct {
+	gocore.Model
+	ApplicationID *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
+	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	ContractID    uuid.UUID        `sql:"not null;type:uuid" json:"contract_id"`
+	Name          *string          `sql:"not null" json:"name"`
+	FeedURL       *url.URL         `sql:"not null" json:"feed_url"`
+	Params        *json.RawMessage `sql:"type:json" json:"params"`
+	AttachmentIds []*uuid.UUID     `sql:"type:uuid[]" json:"attachment_ids"`
 }
 
 // Token instances must be associated with an application identifier.
@@ -375,6 +388,56 @@ func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
 		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
 	}
 	return _abi, nil
+}
+
+// ParseParams - parse the original JSON params used for oracle creation
+func (o *Oracle) ParseParams() map[string]interface{} {
+	params := map[string]interface{}{}
+	if o.Params != nil {
+		err := json.Unmarshal(*o.Params, &params)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal oracle params; %s", err.Error())
+			return nil
+		}
+	}
+	return params
+}
+
+// Create and persist a new oracle
+func (o *Oracle) Create() bool {
+	db := DatabaseConnection()
+
+	if !o.Validate() {
+		return false
+	}
+
+	if db.NewRecord(o) {
+		result := db.Create(&o)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				o.Errors = append(o.Errors, &gocore.Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(o) {
+			return rowsAffected > 0
+		}
+	}
+	return false
+}
+
+// Validate an oracle for persistence
+func (o *Oracle) Validate() bool {
+	o.Errors = make([]*gocore.Error, 0)
+	if o.NetworkID == uuid.Nil {
+		o.Errors = append(o.Errors, &gocore.Error{
+			Message: stringOrNil("Unable to deploy oracle using unspecified network"),
+		})
+	}
+	return len(o.Errors) == 0
 }
 
 // Create and persist a token

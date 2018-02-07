@@ -40,6 +40,11 @@ func migrateSchema() {
 		db.Model(&Contract{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Contract{}).AddForeignKey("transaction_id", "transactions(id)", "SET NULL", "CASCADE")
 
+		db.AutoMigrate(&Oracle{})
+		db.Model(&Oracle{}).AddIndex("idx_oracles_application_id", "application_id")
+		db.Model(&Oracle{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+		db.Model(&Oracle{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
+
 		db.AutoMigrate(&Token{})
 		db.Model(&Token{}).AddIndex("idx_tokens_application_id", "application_id")
 		db.Model(&Token{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")

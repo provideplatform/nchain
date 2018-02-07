@@ -942,6 +942,29 @@ Execute specific functionality encapsulated within a given `Contract`.
 *This API and documentation is still being developed.*
 
 
+### Oracles API
+
+##### `GET /api/v1/oracles`
+
+Enumerate managed oracle contracts.
+
+*This API and documentation is still being developed.*
+
+
+##### `POST /api/v1/oracles`
+
+Create a managed `Oracle` smart contract and deploy it to a given `Network`. Upon successful deployment of the `Oracle` contract, the configured data feed will be consumed on the configured schedule and written onto the ledger associated with the given `Network`.
+
+*This API and documentation is still being developed.*
+
+
+##### `GET /api/v1/oracles/:id`
+
+This method is not yet implemented; it will details for the requested `Oracle`.
+
+*This API and documentation is still being developed.*
+
+
 ### Tokens API
 
 ##### `GET /api/v1/tokens`

@@ -36,6 +36,10 @@ func main() {
 	r.GET("/api/v1/contracts", contractsListHandler)
 	r.POST("/api/v1/contracts/:id/execute", contractExecutionHandler)
 
+	r.GET("/api/v1/oracles", oraclesListHandler)
+	r.POST("/api/v1/oracles", createOracleHandler)
+	r.GET("/api/v1/oracles/:id", oracleDetailsHandler)
+
 	r.GET("/api/v1/tokens", tokensListHandler)
 	r.GET("/api/v1/tokens/:id", tokenDetailsHandler)
 	r.POST("/api/v1/tokens", createTokenHandler)
@@ -231,6 +235,56 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+}
+
+// oracles
+
+func oraclesListHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	query := DatabaseConnection().Where("oracles.application_id = ?", appID)
+
+	var oracles []Oracle
+	query.Order("created_at ASC").Find(&oracles)
+	render(oracles, 200, c)
+}
+
+func oracleDetailsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func createOracleHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	oracle := &Oracle{}
+	err = json.Unmarshal(buf, oracle)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	oracle.ApplicationID = appID
+
+	if oracle.Create() {
+		render(oracle, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = oracle.Errors
+		render(obj, 422, c)
+	}
 }
 
 // tokens
