@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -16,8 +20,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-var EthereumClients = map[string][]*ethclient.Client{}
-var EthereumRpcClients = map[string][]*ethrpc.Client{}
+var EthereumGethClients = map[string][]*ethclient.Client{}
+var EthereumGethRpcClients = map[string][]*ethrpc.Client{}
 
 func GetJsonRpcUrl(network *Network) *string {
 	var url string
@@ -30,21 +34,63 @@ func GetJsonRpcUrl(network *Network) *string {
 	}
 	return stringOrNil(url)
 }
+
+func GetParityJsonRpcUrl(network *Network) *string {
+	var url string
+	config := network.ParseConfig()
+	if jsonRpcUrl, ok := config["parity_json_rpc_url"].(string); ok {
+		url = jsonRpcUrl
+	} else {
+		Log.Warningf("No parity JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
+		url = DefaultEthereumMainnetJsonRpcUrl
+	}
+	return stringOrNil(url)
+}
+
+func InvokeParityJsonRpcClient(network *Network, method string, params ...interface{}) error {
+	url := GetJsonRpcUrl(network)
+	if url == nil {
+		return fmt.Errorf("No parity JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{}, // FIXME-- support self-signed certs here
+		Timeout:   time.Second * 10,
+	}
+	payload := map[string]interface{}{
+		"method":  method,
+		"params":  append(params, []string{"vmTrace"}),
+		"id":      1,
+		"jsonrpc": "2.0",
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		Log.Warningf("Failed to marshal JSON payload for %s parity JSON-RPC invocation; network: %s; %s", method, *network.Name, err.Error())
+		return err
+	}
+	resp, err := client.Post(*url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		Log.Warningf("Failed to invoke %s parity via JSON-RPC; network: %s; %s", method, *network.Name, err.Error())
+		return err
+	}
+	Log.Debugf("Parity %s JSON-RPC invocation succeeded; network: %s; response: %s", method, *network.Name, resp)
+	return nil
+}
+
 func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 	url := GetJsonRpcUrl(network)
 	var client *ethclient.Client
 
-	if networkClients, _ := EthereumClients[network.ID.String()]; len(networkClients) == 0 {
+	if networkClients, _ := EthereumGethClients[network.ID.String()]; len(networkClients) == 0 {
 		rpcClient, err := ResolveJsonRpcClient(network)
 		if err != nil {
 			Log.Warningf("Failed to dial %s JSON-RPC host: %s", *network.Name, url)
 			return nil, err
 		}
 		client = ethclient.NewClient(rpcClient)
-		EthereumClients[network.ID.String()] = append(networkClients, client)
+		EthereumGethClients[network.ID.String()] = append(networkClients, client)
 		Log.Debugf("Dialed %s JSON-RPC host @ %s", *network.Name, url)
 	} else {
-		client = EthereumClients[network.ID.String()][0]
+		client = EthereumGethClients[network.ID.String()][0]
 	}
 
 	progress, err := client.SyncProgress(context.TODO())
@@ -62,17 +108,17 @@ func ResolveJsonRpcClient(network *Network) (*ethrpc.Client, error) {
 	url := GetJsonRpcUrl(network)
 	var client *ethrpc.Client
 
-	if rpcClients, _ := EthereumRpcClients[network.ID.String()]; len(rpcClients) == 0 {
+	if rpcClients, _ := EthereumGethRpcClients[network.ID.String()]; len(rpcClients) == 0 {
 		erpc, err := ethrpc.Dial(*url)
 		if err != nil {
 			Log.Warningf("Failed to resolve cached RPC client for %s JSON-RPC host: %s", *network.Name, url)
 			return nil, err
 		}
 		client = erpc
-		EthereumRpcClients[network.ID.String()] = append(rpcClients, client)
+		EthereumGethRpcClients[network.ID.String()] = append(rpcClients, client)
 		Log.Debugf("Dialed %s JSON-RPC host @ %s", *network.Name, url)
 	} else {
-		client = EthereumRpcClients[network.ID.String()][0]
+		client = EthereumGethRpcClients[network.ID.String()][0]
 	}
 	return client, nil
 }
@@ -90,7 +136,7 @@ func GetChainConfig(network *Network) *params.ChainConfig {
 }
 
 func JsonRpcClient(network *Network) *ethclient.Client {
-	if networkClients, ok := EthereumClients[network.ID.String()]; ok {
+	if networkClients, ok := EthereumGethClients[network.ID.String()]; ok {
 		if len(networkClients) > 0 {
 			return networkClients[0] // FIXME
 		}
@@ -126,13 +172,13 @@ func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 }
 
 func TraceTx(network *Network, hash *string) (interface{}, error) {
-	var result interface{}
-	rpcClient, _ := ResolveJsonRpcClient(network)
-	err := rpcClient.CallContext(context.TODO(), &result, "debug_traceTransaction", hash) //trace_rawTransaction
+	params := []string{*hash}
+	err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", params)
 	if err != nil {
-		Log.Warningf("Failed to invoke debug_traceTransaction method via JSON-RPC; %s", err.Error())
+		Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
 		return nil, err
 	}
+	var result interface{}
 	return result, nil
 }
 
