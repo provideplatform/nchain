@@ -156,10 +156,30 @@ func (n *Network) ParseConfig() map[string]interface{} {
 	return config
 }
 
+// isEthereumNetwork returns true if the network is a public or private blockchain network based on the Ethereum protocol
+func (n *Network) isEthereumNetwork() bool {
+	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
+		return true
+	}
+
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isEthereumNetwork, ok := cfg["is_ethereum_network"]; ok {
+			if _ok := isEthereumNetwork.(bool); _ok {
+				return isEthereumNetwork.(bool)
+			}
+		}
+		if _, ok := cfg["parity_json_rpc_url"]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // Status retrieves metadata and metrics specific to the given network
 func (n *Network) Status() (*NetworkStatus, error) {
 	var status *NetworkStatus
-	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if n.isEthereumNetwork() {
 		client, err := DialJsonRpc(n)
 		if err != nil {
 			Log.Warningf("Failed to dial %s JSON-RPC host; %s", *n.Name, err.Error())
@@ -232,7 +252,7 @@ func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, par
 
 	var result *interface{}
 
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if network.isEthereumNetwork() {
 		result, err = c.executeEthereumContract(network, tx, method, params)
 		if err != nil {
 			err = fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
@@ -688,7 +708,7 @@ func (t *Transaction) Create() bool {
 		db.Model(t).Related(&wallet)
 	}
 
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if network.isEthereumNetwork() {
 		client, err := DialJsonRpc(network)
 		if err != nil {
 			Log.Warningf("Failed to dial %s JSON-RPC host; %s", *network.Name, err.Error())
@@ -763,7 +783,7 @@ func (t *Transaction) Create() bool {
 		}
 		if !db.NewRecord(t) {
 			if t.To == nil && rowsAffected > 0 {
-				if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+				if network.isEthereumNetwork() {
 					receipt, err := t.fetchEthereumTxReceipt(network, wallet)
 					if err != nil {
 						Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", t.Hash, err.Error())
@@ -945,7 +965,7 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 		return
 	}
 
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if network.isEthereumNetwork() {
 		privateKey, err := ethcrypto.GenerateKey()
 		if err == nil {
 			w.Address = ethcrypto.PubkeyToAddress(privateKey.PublicKey).Hex()
@@ -985,7 +1005,7 @@ func (w *Wallet) SignTx(msg []byte) ([]byte, error) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
 
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if network.isEthereumNetwork() {
 		privateKey, err := w.ECDSAPrivateKey(GpgPrivateKey, WalletEncryptionKey)
 		if err != nil {
 			Log.Warningf("Failed to sign tx using %s wallet: %s", *network.Name, w.ID)
@@ -1074,7 +1094,7 @@ func (w *Wallet) TokenBalance(tokenId string) (uint64, error) {
 	if token == nil {
 		return 0, fmt.Errorf("Unable to read token balance for invalid token: %s", tokenId)
 	}
-	if strings.HasPrefix(strings.ToLower(*network.Name), "eth") { // HACK-- this should be simpler; implement protocol switch
+	if network.isEthereumNetwork() {
 		abi, err := token.readEthereumContractAbi()
 		if err != nil {
 			return 0, err
