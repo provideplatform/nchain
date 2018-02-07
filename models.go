@@ -69,6 +69,29 @@ type ContractExecutionResponse struct {
 	Transaction *Transaction `json:"transaction"`
 }
 
+// TxTraceResponse is returned upon successful contract execution
+type TxTraceResponse []struct {
+	Action struct {
+		CallType string `json:"callType"`
+		From     string `json:"from"`
+		Gas      string `json:"gas"`
+		Input    string `json:"input"`
+		To       string `json:"to"`
+		Value    string `json:"value"`
+	} `json:"action"`
+	BlockHash   string `json:"blockHash"`
+	BlockNumber int    `json:"blockNumber"`
+	Result      struct {
+		GasUsed string `json:"gasUsed"`
+		Output  string `json:"output"`
+	} `json:"result"`
+	Subtraces           int           `json:"subtraces"`
+	TraceAddress        []interface{} `json:"traceAddress"`
+	TransactionHash     string        `json:"transactionHash"`
+	TransactionPosition int           `json:"transactionPosition"`
+	Type                string        `json:"type"`
+}
+
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
 type Oracle struct {
 	gocore.Model

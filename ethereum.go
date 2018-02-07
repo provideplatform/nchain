@@ -47,8 +47,8 @@ func GetParityJsonRpcUrl(network *Network) *string {
 	return stringOrNil(url)
 }
 
-func InvokeParityJsonRpcClient(network *Network, method string, params ...interface{}) error {
-	url := GetJsonRpcUrl(network)
+func InvokeParityJsonRpcClient(network *Network, method string, params []interface{}, traceResponse interface{}) error {
+	url := GetParityJsonRpcUrl(network)
 	if url == nil {
 		return fmt.Errorf("No parity JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
 	}
@@ -72,7 +72,14 @@ func InvokeParityJsonRpcClient(network *Network, method string, params ...interf
 		Log.Warningf("Failed to invoke %s parity via JSON-RPC; network: %s; %s", method, *network.Name, err.Error())
 		return err
 	}
-	Log.Debugf("Parity %s JSON-RPC invocation succeeded; network: %s; response: %s", method, *network.Name, resp)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	err = json.Unmarshal(buf.Bytes(), traceResponse)
+	if err != nil {
+		Log.Warningf("Failed to unmarshal %s parity JSON-RPC response; network: %s; %s", method, *network.Name, err.Error())
+		return err
+	}
+	Log.Debugf("Parity %s JSON-RPC invocation succeeded; network: %s; response: %s", method, *network.Name, traceResponse)
 	return nil
 }
 
@@ -172,13 +179,14 @@ func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 }
 
 func TraceTx(network *Network, hash *string) (interface{}, error) {
-	params := []string{*hash}
-	err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", params)
+	params := make([]interface{}, 0)
+	params = append(params, hash)
+	var result = &TxTraceResponse{}
+	err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", params, &result)
 	if err != nil {
 		Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
 		return nil, err
 	}
-	var result interface{}
 	return result, nil
 }
 
