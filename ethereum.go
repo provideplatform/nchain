@@ -138,6 +138,10 @@ func GetChainConfig(network *Network) *params.ChainConfig {
 		} else if strings.ToLower(testnet) == "rinkeby" {
 			return params.RinkebyChainConfig
 		}
+	} else if networkID, ok := config["network_id"].(int64); ok {
+		return &params.ChainConfig{
+			ChainId: big.NewInt(networkID),
+		}
 	}
 	return params.MainnetChainConfig
 }
