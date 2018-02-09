@@ -33,65 +33,103 @@ Enumerate available blockchain networks and related configuration details.
 < HTTP/1.1 200 OK
 < Date: Thu, 28 Dec 2017 16:54:12 GMT
 < Content-Type: application/json; charset=UTF-8
-< Content-Length: 1899
+< Transfer-Encoding: chunked
 < Connection: keep-alive
 <
 [
     {
-        "id": "07c85f35-aa6d-4ec2-8a92-2240a85e91e9",
-        "created_at": "2017-12-25T11:54:57.62033Z",
-        "name": "Lightning",
+        "id": "b696c1f0-8c5b-4c0e-8400-da9d2046be15",
+        "created_at": "2018-01-13T22:00:47.871841Z",
+        "application_id": null,
+        "name": "Bitcoin",
+        "description": "Bitcoin mainnet",
+        "is_production": true,
+        "sidechain_id": "2d86e27b-36ae-4d19-b647-0301f275846a",
+        "config": null
+    },
+    {
+        "id": "598688e5-8995-486a-9b82-6f8b07df6f57",
+        "created_at": "2018-01-13T22:00:47.889276Z",
+        "application_id": null,
+        "name": "Bitcoin testnet",
+        "description": "Bitcoin testnet",
+        "is_production": false,
+        "sidechain_id": "6f97ea01-1339-4945-a89d-1f74e419ce08",
+        "config": null
+    },
+    {
+        "id": "2d86e27b-36ae-4d19-b647-0301f275846a",
+        "created_at": "2018-01-13T22:00:47.89848Z",
+        "application_id": null,
+        "name": "Lightning Network",
         "description": "Lightning Network mainnet",
         "is_production": true,
         "sidechain_id": null,
         "config": null
     },
     {
-        "id": "017428e4-41ac-41ab-bd08-8fc234e8169f",
-        "created_at": "2017-12-25T11:54:57.622145Z",
-        "name": "Lightning Testnet",
+        "id": "6f97ea01-1339-4945-a89d-1f74e419ce08",
+        "created_at": "2018-01-13T22:00:47.900525Z",
+        "application_id": null,
+        "name": "Lightning Network testnet",
         "description": "Lightning Network testnet",
         "is_production": false,
         "sidechain_id": null,
         "config": null
     },
     {
-        "id": "6eafb694-95a9-407f-a6d2-f541659c49b9",
-        "created_at": "2017-12-25T11:54:57.615578Z",
-        "name": "Bitcoin",
-        "description": "Bitcoin mainnet",
-        "is_production": true,
-        "sidechain_id": "07c85f35-aa6d-4ec2-8a92-2240a85e91e9",
-        "config": null
-    },
-    {
-        "id": "b018af93-7c7f-4b76-a0d3-2f4282250e82",
-        "created_at": "2017-12-25T11:54:57.61854Z",
-        "name": "Bitcoin Testnet",
-        "description": "Bitcoin testnet",
-        "is_production": false,
-        "sidechain_id": "017428e4-41ac-41ab-bd08-8fc234e8169f",
-        "config": null
-    },
-    {
-        "id": "5bc7d17f-653f-4599-a6dd-618ae3a1ecb2",
-        "created_at": "2017-12-25T11:54:57.629505Z",
+        "id": "deca2436-21ba-4ff5-b225-ad1b0b2f5c59",
+        "created_at": "2018-01-13T22:00:47.947907Z",
+        "application_id": null,
         "name": "Ethereum",
         "description": "Ethereum mainnet",
         "is_production": true,
         "sidechain_id": null,
-        "config": null
+        "config": {
+            "json_rpc_url": "https://geth-ethereum-json-rpc.provide.services",
+            "parity_json_rpc_url": "https://parity-ethereum-json-rpc.provide.services"
+        }
     },
     {
-        "id": "ba02ff92-f5bb-4d44-9187-7e1cc214b9fc",
-        "created_at": "2017-12-25T11:54:57.63379Z",
-        "name": "Ethereum testnet",
-        "description": "ROPSTEN (Revival) TESTNET",
+        "id": "66d44f30-9092-4182-a3c4-bc02736d6ae5",
+        "created_at": "2018-01-13T22:00:47.967657Z",
+        "application_id": null,
+        "name": "Ethereum Ropsten testnet",
+        "description": "Ropsten (Revival) testnet",
         "is_production": false,
         "sidechain_id": null,
         "config": {
-            "json_rpc_url": "https://ethereum-ropsten-testnet-json-rpc.provide.services",
+            "json_rpc_url": "https://geth-ropsten-testnet-json-rpc.provide.services",
+            "parity_json_rpc_url": "https://parity-ropsten-testnet-json-rpc.provide.services",
             "testnet": "ropsten"
+        }
+    },
+    {
+        "id": "57aa77fe-ee82-440d-88f6-fe4a14f06b22",
+        "created_at": "2018-02-07T22:41:10.525667Z",
+        "application_id": null,
+        "name": "POA Network Core",
+        "description": "Oracles Proof-of-Authority Core (mainnet)",
+        "is_production": true,
+        "sidechain_id": null,
+        "config": {
+            "json_rpc_url": "https://core.poa.network",
+            "parity_json_rpc_url": "https://core.poa.network",
+            "network_id": 99
+        }
+    },
+    {
+        "id": "9f7a08cb-4d8d-469d-a53a-f39fde5ece41",
+        "created_at": "2018-02-07T22:42:13.897144Z",
+        "application_id": null,
+        "name": "POA Network Sokol",
+        "description": "Oracles Proof-of-Authority Sokol (testnet)",
+        "is_production": false,
+        "sidechain_id": null,
+        "config": {
+            "json_rpc_url": "https://sokol.poa.network",
+            "parity_json_rpc_url": "https://sokol.poa.network",
+            "network_id": 77
         }
     }
 ]
