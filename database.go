@@ -22,6 +22,7 @@ func migrateSchema() {
 		initial := !db.HasTable(&Network{})
 
 		db.AutoMigrate(&Network{})
+		db.Model(&Network{}).AddIndex("idx_networks_application_id", "application_id")
 		db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Wallet{})

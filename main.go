@@ -25,6 +25,7 @@ func main() {
 
 	r.GET("/api/v1/networks", networksListHandler)
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)
+	r.POST("/api/v1/networks", createNetworkHandler)
 	r.GET("/api/v1/networks/:id/addresses", networkAddressesHandler)
 	r.GET("/api/v1/networks/:id/blocks", networkBlocksHandler)
 	r.GET("/api/v1/networks/:id/contracts", networkContractsHandler)
@@ -128,9 +129,46 @@ func statusHandler(c *gin.Context) {
 
 // networks
 
+func createNetworkHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	network := &Network{}
+	err = json.Unmarshal(buf, network)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	network.ApplicationID = appID
+
+	if network.Create() {
+		render(network, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = network.Errors
+		render(obj, 422, c)
+	}
+}
+
 func networksListHandler(c *gin.Context) {
 	var networks []Network
-	DatabaseConnection().Find(&networks)
+	query := DatabaseConnection().Where("networks.application_id IS NULL").Order("created_at ASC")
+
+	appID := authorizedSubjectId(c, "application")
+	if appID != nil {
+		query = query.Or("networks.application_id = ?", appID)
+	}
+
+	query.Order("created_at ASC").Find(&networks)
 	render(networks, 200, c)
 }
 

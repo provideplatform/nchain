@@ -13,11 +13,12 @@ import (
 
 type Network struct {
 	gocore.Model
-	Name         *string          `sql:"not null" json:"name"`
-	Description  *string          `json:"description"`
-	IsProduction *bool            `sql:"not null" json:"is_production"`
-	SidechainID  *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
-	Config       *json.RawMessage `sql:"type:json" json:"config"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	Name          *string          `sql:"not null" json:"name"`
+	Description   *string          `json:"description"`
+	IsProduction  *bool            `sql:"not null" json:"is_production"`
+	SidechainID   *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
+	Config        *json.RawMessage `sql:"type:json" json:"config"`
 }
 
 // NetworkStatus provides network-agnostic status
@@ -103,6 +104,38 @@ type Wallet struct {
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
+}
+
+// Create and persist a new network
+func (n *Network) Create() bool {
+	db := DatabaseConnection()
+
+	if !n.Validate() {
+		return false
+	}
+
+	if db.NewRecord(n) {
+		result := db.Create(&n)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				n.Errors = append(n.Errors, &gocore.Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(n) {
+			return rowsAffected > 0
+		}
+	}
+	return false
+}
+
+// Validate a network for persistence
+func (n *Network) Validate() bool {
+	n.Errors = make([]*gocore.Error, 0)
+	return len(n.Errors) == 0
 }
 
 // ParseConfig - parse the persistent network configuration JSON
