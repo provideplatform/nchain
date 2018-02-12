@@ -439,7 +439,27 @@ func createTransactionHandler(c *gin.Context) {
 }
 
 func transactionDetailsHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	var tx = &Transaction{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&tx)
+	if tx == nil || tx.ID == uuid.Nil {
+		renderError("transaction not found", 404, c)
+		return
+	} else if appID != nil && &tx.ApplicationID != &appID {
+		renderError("forbidden", 403, c)
+		return
+	}
+	err := tx.RefreshDetails()
+	if err != nil {
+		renderError("internal server error", 500, c)
+		return
+	}
+	render(tx, 200, c)
 }
 
 // wallets

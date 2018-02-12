@@ -94,6 +94,7 @@ type Transaction struct {
 	Hash          *string                    `sql:"not null" json:"hash"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
+	Traces        []interface{}              `sql:"-" json:"traces"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
@@ -528,6 +529,17 @@ func (t *Transaction) Validate() bool {
 		})
 	}
 	return len(t.Errors) == 0
+}
+
+// RefreshDetails populates transaction details which were not necessarily available upon broadcast, including network-specific metadata and VM execution tracing if applicable
+func (t *Transaction) RefreshDetails() error {
+	network, _ := t.GetNetwork()
+	traces, err := TraceTx(network, t.Hash)
+	if err != nil {
+		return err
+	}
+	t.Traces = traces.([]interface{})
+	return nil
 }
 
 func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
