@@ -230,10 +230,10 @@ func TraceTx(network *Network, hash *string) (interface{}, error) {
 	params := make([]interface{}, 0)
 	params = append(params, addr)
 	var result = &EthereumTxTraceResponse{}
-	Log.Debugf("Attempting to trace %s tx via trace_replayTransaction method via JSON-RPC; tx hash: %s", *network.Name, addr)
-	err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", append(params, []string{"vmTrace"}), &result)
+	Log.Debugf("Attempting to trace %s tx via trace_transaction method via JSON-RPC; tx hash: %s", *network.Name, addr)
+	err := InvokeParityJsonRpcClient(network, "trace_transaction", params, &result)
 	if err != nil {
-		Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
+		Log.Warningf("Failed to invoke trace_transaction method via JSON-RPC; %s", err.Error())
 		return nil, err
 	}
 	return result, nil
