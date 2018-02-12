@@ -450,7 +450,7 @@ func transactionDetailsHandler(c *gin.Context) {
 	if tx == nil || tx.ID == uuid.Nil {
 		renderError("transaction not found", 404, c)
 		return
-	} else if appID != nil && &tx.ApplicationID != &appID {
+	} else if appID != nil && *tx.ApplicationID != *appID {
 		renderError("forbidden", 403, c)
 		return
 	}
@@ -498,10 +498,10 @@ func walletBalanceHandler(c *gin.Context) {
 	if wallet == nil || wallet.ID == uuid.Nil {
 		renderError("wallet not found", 404, c)
 		return
-	} else if appID != nil && &wallet.ApplicationID != &appID {
+	} else if appID != nil && *wallet.ApplicationID != *appID {
 		renderError("forbidden", 403, c)
 		return
-	} else if userID != nil && &wallet.UserID != &userID {
+	} else if userID != nil && *wallet.UserID != *userID {
 		renderError("forbidden", 403, c)
 		return
 	}
