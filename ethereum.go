@@ -49,6 +49,13 @@ type EthereumTxTraceResponse []struct {
 	Type                string        `json:"type"`
 }
 
+type ParityJsonRpcErrorResponse struct {
+	Error struct {
+		Message string `json:"message"`
+		Data    string `json:"data"`
+	} `json:"error"`
+}
+
 type ParityJsonRpcResponse struct {
 	ID     uint64  `json:"id"`
 	Result *string `json:"result"`
@@ -110,8 +117,7 @@ func InvokeParityJsonRpcClient(network *Network, method string, params []interfa
 	buf.ReadFrom(resp.Body)
 	err = json.Unmarshal(buf.Bytes(), response)
 	if err != nil {
-		Log.Warningf("Failed to unmarshal %s parity JSON-RPC response; network: %s; %s", method, *network.Name, err.Error())
-		return err
+		return fmt.Errorf("Failed to unmarshal %s parity JSON-RPC response: %s; network: %s; %s", method, buf.Bytes(), *network.Name, err.Error())
 	}
 	Log.Debugf("Parity invocation of %s JSON-RPC method %s succeeded (%v-byte response)", *network.Name, method, buf.Len())
 	return nil
@@ -220,10 +226,17 @@ func TraceTx(network *Network, hash *string) (interface{}, error) {
 	params := make([]interface{}, 0)
 	params = append(params, hash)
 	var result = &EthereumTxTraceResponse{}
-	err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", append(params, []string{"vmTrace"}), &result)
-	if err != nil {
-		Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
-		return nil, err
+	var txNotFound = true
+	for txNotFound {
+		Log.Debugf("Attempting to trace %s tx via trace_replayTransaction method via JSON-RPC; tx hash: %s", *network.Name, *hash)
+		err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", append(params, []string{"vmTrace"}), &result)
+		if err != nil {
+			txNotFound = strings.Contains(err.Error(), "TransactionNotFound")
+			if !txNotFound {
+				Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
+				return nil, err
+			}
+		}
 	}
 	return result, nil
 }
