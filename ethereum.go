@@ -223,20 +223,18 @@ func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 }
 
 func TraceTx(network *Network, hash *string) (interface{}, error) {
+	var addr = *hash
+	if !strings.HasPrefix(addr, "0x") {
+		addr = fmt.Sprintf("0x%s", addr)
+	}
 	params := make([]interface{}, 0)
-	params = append(params, hash)
+	params = append(params, addr)
 	var result = &EthereumTxTraceResponse{}
-	var txNotFound = true
-	for txNotFound {
-		Log.Debugf("Attempting to trace %s tx via trace_replayTransaction method via JSON-RPC; tx hash: %s", *network.Name, *hash)
-		err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", append(params, []string{"vmTrace"}), &result)
-		if err != nil {
-			txNotFound = strings.Contains(err.Error(), "TransactionNotFound")
-			if !txNotFound {
-				Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
-				return nil, err
-			}
-		}
+	Log.Debugf("Attempting to trace %s tx via trace_replayTransaction method via JSON-RPC; tx hash: %s", *network.Name, addr)
+	err := InvokeParityJsonRpcClient(network, "trace_replayTransaction", append(params, []string{"vmTrace"}), &result)
+	if err != nil {
+		Log.Warningf("Failed to invoke trace_replayTransaction method via JSON-RPC; %s", err.Error())
+		return nil, err
 	}
 	return result, nil
 }
