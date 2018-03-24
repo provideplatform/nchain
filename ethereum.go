@@ -332,12 +332,12 @@ func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
 		return v, nil
 	case abi.FixedBytesTy:
 		return readFixedBytes(t, v.([]byte))
-		return readFunctionType(t, v.([]byte))
 	case abi.FunctionTy:
+		return readFunctionType(t, v.([]byte))
 	default:
-		return nil, fmt.Errorf("abi: unknown type %v", t.T)
+		// no-op
 	}
-	return nil, fmt.Errorf("Failed to coerce %s parameter for ABI encoding", t.String())
+	return nil, fmt.Errorf("Failed to coerce %s parameter for ABI encoding; unhandled type: %v", t.String(), t)
 }
 
 // reads the integer based on its kind
