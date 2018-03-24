@@ -331,7 +331,7 @@ func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
 	case abi.BytesTy:
 		return v, nil
 	case abi.FixedBytesTy:
-		return v, nil
+		return readFixedBytes(t, v.([]byte))
 	case abi.FunctionTy:
 		return readFunctionType(t, v.([]byte))
 	default:
@@ -376,6 +376,19 @@ func readFunctionType(t abi.Type, word []byte) (funcTy [24]byte, err error) {
 		copy(funcTy[:], word[0:24])
 	}
 	return
+}
+
+// through reflection, creates a fixed array to be read from
+func readFixedBytes(t abi.Type, word []byte) (interface{}, error) {
+	if t.T != abi.FixedBytesTy {
+		return nil, fmt.Errorf("abi: invalid type in call to make fixed byte array")
+	}
+	// convert
+	array := reflect.New(t.Type).Elem()
+
+	reflect.Copy(array, reflect.ValueOf(word[0:t.Size]))
+	return array.Interface(), nil
+
 }
 
 func requiresLengthPrefix(t *abi.Type) bool {
