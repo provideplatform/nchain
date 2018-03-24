@@ -331,7 +331,7 @@ func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
 	case abi.BytesTy:
 		return v, nil
 	case abi.FixedBytesTy:
-		return readFixedBytes(t, v.([]byte))
+		return readFixedBytes(t, []byte(v.(string)))
 	case abi.FunctionTy:
 		return readFunctionType(t, v.([]byte))
 	default:
