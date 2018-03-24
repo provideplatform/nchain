@@ -202,24 +202,34 @@ func EncodeFunctionSignature(funcsig string) []byte {
 
 func EncodeABI(method *abi.Method, params ...interface{}) ([]byte, error) {
 	var methodDescriptor = fmt.Sprintf("method %s", method.Name)
-	Log.Debugf("Attempting to encode %d parameters prior to executing contract %s", len(params), methodDescriptor)
+	Log.Debugf("Attempting to encode %d parameters prior to executing contract method: %s", len(params), methodDescriptor)
 	var args []interface{}
 
 	for i := range params {
 		input := method.Inputs[i]
+		Log.Debugf("Attempting to coerce encoding of %v abi parameter; value: %s", input.Type, params[i])
 		param, err := coerceAbiParameter(input.Type, params[i])
 		if err != nil {
-			Log.Warningf("Failed to encode ABI parameter %s in accordance with contract %s; %s", input.Name, methodDescriptor, err.Error())
+			Log.Warningf("Failed to encode abi parameter %s in accordance with contract %s; %s", input.Name, methodDescriptor, err.Error())
 		} else {
+			switch reflect.TypeOf(param).Kind() {
+			case reflect.String:
+				param = []byte(param.(string))
+			default:
+				// no-op
+			}
+
 			args = append(args, param)
+			Log.Debugf("Coerced encoding of %v abi parameter; value: %s", input.Type, param)
 		}
 	}
+
 	encodedArgs, err := method.Inputs.Pack(args...)
 	if err != nil {
-		Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract; %s", len(params), methodDescriptor, err.Error())
 		return nil, err
 	}
-	Log.Debugf("Encoded abi params: %s", encodedArgs)
+
+	Log.Debugf("Encoded %v abi params prior to executing contract method: %s; abi-encoded arguments %v bytes packed", len(params), methodDescriptor, len(encodedArgs))
 	return append(method.Id(), encodedArgs...), nil
 }
 
@@ -314,18 +324,51 @@ func (n *Network) ethereumNetworkStatus() (*NetworkStatus, error) {
 
 func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
 	switch t.T {
-	case abi.SliceTy:
-		return forEachUnpack(t, v.([]byte), 0, len(v.([]interface{}))-1)
-	case abi.ArrayTy:
-		return forEachUnpack(t, v.([]byte), 0, len(v.([]interface{}))-1)
+	case abi.ArrayTy, abi.SliceTy:
+		switch v.(type) {
+		case []byte:
+			return forEachUnpack(t, v.([]byte), 0, len(v.([]interface{}))-1)
+		case string:
+			return forEachUnpack(t, []byte(v.(string)), 0, len(v.(string)))
+		default:
+			// HACK-- this fallback for edge case handling isn't the cleanest
+			typestr := fmt.Sprintf("%s", t)
+			if typestr == "uint256[]" {
+				Log.Debugf("Attempting fallback coercion of uint256[] abi parameter")
+				vals := make([]*big.Int, t.Size)
+				for _, val := range v.([]interface{}) {
+					vals = append(vals, big.NewInt(int64(val.(float64))))
+				}
+				return vals, nil
+			}
+		}
 	case abi.StringTy: // variable arrays are written at the end of the return bytes
 		return string(v.([]byte)), nil
 	case abi.IntTy, abi.UintTy:
-		return readInteger(t.Kind, v.([]byte)), nil
+		switch t.Kind {
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return big.NewInt(int64(v.(int64))), nil
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return big.NewInt(int64(v.(int64))), nil
+		case reflect.Float64:
+			return big.NewInt(int64(v.(float64))), nil
+		case reflect.Ptr:
+			switch v.(type) {
+			case float64:
+				return big.NewInt(int64(v.(float64))), nil
+			}
+		default:
+			return readInteger(t.Kind, v.([]byte)), nil
+		}
 	case abi.BoolTy:
-		return readBool(v.([]byte))
+		return v.(bool), nil
 	case abi.AddressTy:
-		return common.BytesToAddress(v.([]byte)), nil
+		switch v.(type) {
+		case string:
+			return common.HexToAddress(v.(string)), nil
+		default:
+			return common.BytesToAddress(v.([]byte)), nil
+		}
 	case abi.HashTy:
 		return common.BytesToHash(v.([]byte)), nil
 	case abi.BytesTy:
@@ -337,7 +380,50 @@ func coerceAbiParameter(t abi.Type, v interface{}) (interface{}, error) {
 	default:
 		// no-op
 	}
-	return nil, fmt.Errorf("Failed to coerce %s parameter for ABI encoding; unhandled type: %v", t.String(), t)
+	return nil, fmt.Errorf("Failed to coerce %s parameter for abi encoding; unhandled type: %v", t.String(), t)
+}
+
+// iteratively unpack elements
+func forEachUnpack(t abi.Type, output []byte, start, size int) (interface{}, error) {
+	if size < 0 {
+		return nil, fmt.Errorf("cannot marshal input to array, size is negative (%d)", size)
+	}
+	if start+32*size > len(output) {
+		return nil, fmt.Errorf("abi: cannot marshal in to go array: offset %d would go over slice boundary (len=%d)", len(output), start+32*size)
+	}
+
+	// this value will become our slice or our array, depending on the type
+	var refSlice reflect.Value
+
+	if t.T == abi.SliceTy {
+		// declare our slice
+		refSlice = reflect.MakeSlice(t.Type, size, size)
+	} else if t.T == abi.ArrayTy {
+		// declare our array
+		refSlice = reflect.New(t.Type).Elem()
+	} else {
+		return nil, fmt.Errorf("abi: invalid type in array/slice unpacking stage")
+	}
+
+	// Arrays have packed elements, resulting in longer unpack steps.
+	// Slices have just 32 bytes per element (pointing to the contents).
+	elemSize := 32
+	if t.T == abi.ArrayTy {
+		elemSize = getFullElemSize(t.Elem)
+	}
+
+	for i, j := start, 0; j < size; i, j = i+elemSize, j+1 {
+		inter, err := coerceAbiParameter(t, output)
+		if err != nil {
+			return nil, err
+		}
+
+		// append the item to our reflect slice
+		refSlice.Index(j).Set(reflect.ValueOf(inter))
+	}
+
+	// return the interface
+	return refSlice.Interface(), nil
 }
 
 // reads the integer based on its kind
@@ -383,59 +469,17 @@ func readFixedBytes(t abi.Type, word []byte) (interface{}, error) {
 	if t.T != abi.FixedBytesTy {
 		return nil, fmt.Errorf("abi: invalid type in call to make fixed byte array")
 	}
+
+	Log.Debugf("Attempting to read fixed bytes in accordance with Ethereum contract ABI; type: %v; word: %s", t, word)
+
 	// convert
 	array := reflect.New(t.Type).Elem()
-
-	reflect.Copy(array, reflect.ValueOf(word[0:t.Size]))
+	reflect.Copy(array, reflect.ValueOf(word))
 	return array.Interface(), nil
-
 }
 
 func requiresLengthPrefix(t *abi.Type) bool {
 	return t.T == abi.StringTy || t.T == abi.BytesTy || t.T == abi.SliceTy
-}
-
-// iteratively unpack elements
-func forEachUnpack(t abi.Type, output []byte, start, size int) (interface{}, error) {
-	if size < 0 {
-		return nil, fmt.Errorf("cannot marshal input to array, size is negative (%d)", size)
-	}
-	if start+32*size > len(output) {
-		return nil, fmt.Errorf("abi: cannot marshal in to go array: offset %d would go over slice boundary (len=%d)", len(output), start+32*size)
-	}
-
-	// this value will become our slice or our array, depending on the type
-	var refSlice reflect.Value
-
-	if t.T == abi.SliceTy {
-		// declare our slice
-		refSlice = reflect.MakeSlice(t.Type, size, size)
-	} else if t.T == abi.ArrayTy {
-		// declare our array
-		refSlice = reflect.New(t.Type).Elem()
-	} else {
-		return nil, fmt.Errorf("abi: invalid type in array/slice unpacking stage")
-	}
-
-	// Arrays have packed elements, resulting in longer unpack steps.
-	// Slices have just 32 bytes per element (pointing to the contents).
-	elemSize := 32
-	if t.T == abi.ArrayTy {
-		elemSize = getFullElemSize(t.Elem)
-	}
-
-	for i, j := start, 0; j < size; i, j = i+elemSize, j+1 {
-		inter, err := coerceAbiParameter(t, output)
-		if err != nil {
-			return nil, err
-		}
-
-		// append the item to our reflect slice
-		refSlice.Index(j).Set(reflect.ValueOf(inter))
-	}
-
-	// return the interface
-	return refSlice.Interface(), nil
 }
 
 func getFullElemSize(elem *abi.Type) int {
@@ -512,7 +556,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 		methodDescriptor = "constructor"
 	}
 	if abiMethod != nil {
-		Log.Debugf("Attempting to encode %d parameters prior to executing contract %s on contract: %s", len(params), methodDescriptor, c.ID)
+		Log.Debugf("Attempting to encode %d parameters [ %s ] prior to executing contract %s on contract: %s", len(params), params, methodDescriptor, c.ID)
 		invocationSig, err := EncodeABI(abiMethod, params...)
 		if err != nil {
 			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
@@ -523,7 +567,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 		tx.Data = &data
 
 		if abiMethod.Const {
-			Log.Debugf("Attempting to execute constant method %s on contract: %s", method, c.ID)
+			Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 			network, _ := tx.GetNetwork()
 			client, err := DialJsonRpc(network)
 			gasPrice, _ := client.SuggestGasPrice(context.TODO())
@@ -531,8 +575,28 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			result, _ := client.CallContract(context.TODO(), msg, nil)
 			var out interface{}
 			err = abiMethod.Outputs.Unpack(&out, result)
+			if len(abiMethod.Outputs) == 1 {
+				err = abiMethod.Outputs.Unpack(&out, result)
+			} else if len(abiMethod.Outputs) > 1 {
+				// handle tuple
+				vals := make([]interface{}, len(abiMethod.Outputs))
+				for i := range abiMethod.Outputs {
+					typestr := fmt.Sprintf("%s", abiMethod.Outputs[i].Type)
+					Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
+					typ, err := abi.NewType(typestr)
+					if err != nil {
+						err = fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
+						Log.Warning(err.Error())
+						return nil, err
+					}
+					vals[i] = reflect.New(typ.Type).Interface()
+				}
+				err = abiMethod.Outputs.Unpack(&vals, result)
+				out = vals
+				Log.Debugf("Unpacked %v returned values from read of constant %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
+			}
 			if err != nil {
-				err = fmt.Errorf("Failed to execute constant %s on contract: %s (signature with encoded parameters: %s)", methodDescriptor, c.ID, *tx.Data)
+				err = fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
 				Log.Warning(err.Error())
 				return nil, err
 			}
