@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kthomas/go.uuid"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -941,13 +943,24 @@ func (n *Network) isEthereumNetwork() bool {
 	return false
 }
 
-// TokenBalance
+// Retrieve a wallet's native currency balance
+func ethereumNativeBalance(network *Network, addr string) (*big.Int, error) {
+	client, err := DialJsonRpc(network)
+	if err != nil {
+		return nil, err
+	}
+	return client.BalanceAt(context.TODO(), common.HexToAddress(addr), nil)
+}
+
 // Retrieve a wallet's token balance for a given token id
-func ethereumTokenBalance(network *Network, token *Token, addr string) (uint64, error) {
-	balance := uint64(0)
+func ethereumTokenBalance(network *Network, token *Token, addr string) (*big.Int, error) {
+	var balance *big.Int
+	if token.ID == uuid.Nil {
+		return nil, errors.New("Unable to read balance of nil token contract")
+	}
 	abi, err := token.readEthereumContractAbi()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	client, err := DialJsonRpc(network)
 	gasPrice, _ := client.SuggestGasPrice(context.TODO())
@@ -961,11 +974,9 @@ func ethereumTokenBalance(network *Network, token *Token, addr string) (uint64, 
 		Data:     common.FromHex(common.Bytes2Hex(EncodeFunctionSignature("balanceOf(address)"))),
 	}
 	result, _ := client.CallContract(context.TODO(), msg, nil)
-	var out *big.Int
 	if method, ok := abi.Methods["balanceOf"]; ok {
-		method.Outputs.Unpack(&out, result)
-		if out != nil {
-			balance = out.Uint64()
+		method.Outputs.Unpack(&balance, result)
+		if balance != nil {
 			Log.Debugf("Read %s %s token balance (%v) from token contract address: %s", *network.Name, token.Symbol, balance, token.Address)
 		}
 	} else {

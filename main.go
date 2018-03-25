@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strings"
 
@@ -489,6 +490,7 @@ func walletDetailsHandler(c *gin.Context) {
 		return
 	}
 
+	var err error
 	var wallet = &Wallet{}
 	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
 	if wallet == nil || wallet.ID == uuid.Nil {
@@ -501,12 +503,21 @@ func walletDetailsHandler(c *gin.Context) {
 		renderError("forbidden", 403, c)
 		return
 	}
-	balance, err := wallet.TokenBalance(c.Param("tokenId"))
-	if err != nil {
-		renderError(err.Error(), 400, c)
-		return
+	tokenId := c.Param("tokenId")
+	if tokenId == "" {
+		wallet.Balance, err = wallet.NativeCurrencyBalance()
+		if err != nil {
+			renderError(err.Error(), 400, c)
+			return
+		}
+	} else {
+		wallet.Balance, err = wallet.TokenBalance(c.Param("tokenId"))
+		if err != nil {
+			renderError(err.Error(), 400, c)
+			return
+		}
 	}
-	wallet.Balance = balance
+
 	render(wallet, 200, c)
 }
 
@@ -535,7 +546,7 @@ func walletBalanceHandler(c *gin.Context) {
 		renderError(err.Error(), 400, c)
 		return
 	}
-	response := map[string]uint64{
+	response := map[string]*big.Int{
 		c.Param("tokenId"): balance,
 	}
 	render(response, 200, c)

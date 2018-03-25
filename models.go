@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/url"
 
 	"github.com/provideapp/go-core"
@@ -112,7 +113,7 @@ type Wallet struct {
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
-	Balance       uint64     `sql:"-" json:"balance"`
+	Balance       *big.Int   `sql:"-" json:"balance"`
 }
 
 // Create and persist a new network
@@ -647,24 +648,43 @@ func (w *Wallet) Validate() bool {
 	return len(w.Errors) == 0
 }
 
+// NativeCurrencyBalance
+// Retrieve a wallet's native currency/token balance
+func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
+	var balance *big.Int
+	var err error
+	db := DatabaseConnection()
+	var network = &Network{}
+	db.Model(w).Related(&network)
+	if network.isEthereumNetwork() {
+		balance, err = ethereumNativeBalance(network, w.Address)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		Log.Warningf("Unable to read native currency balance for unsupported network: %s", *network.Name)
+	}
+	return balance, nil
+}
+
 // TokenBalance
 // Retrieve a wallet's token balance for a given token id
-func (w *Wallet) TokenBalance(tokenID string) (uint64, error) {
-	balance := uint64(0)
+func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
+	var balance *big.Int
+	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
 	var token = &Token{}
 	db.Model(w).Related(&network)
 	db.Where("id = ?", tokenID).Find(&token)
 	if token == nil {
-		return 0, fmt.Errorf("Unable to read token balance for invalid token: %s", tokenID)
+		return nil, fmt.Errorf("Unable to read token balance for invalid token: %s", tokenID)
 	}
 	if network.isEthereumNetwork() {
-		_balance, err := ethereumTokenBalance(network, token, w.Address)
+		balance, err = ethereumTokenBalance(network, token, w.Address)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
-		balance = _balance
 	} else {
 		Log.Warningf("Unable to read token balance for unsupported network: %s", *network.Name)
 	}
