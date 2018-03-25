@@ -30,6 +30,13 @@ type NetworkStatus struct {
 	Meta    map[string]interface{} `json:"meta"`    // network-specific metadata
 }
 
+// Bridge instances are still in the process of being defined.
+type Bridge struct {
+	gocore.Model
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"-"`
+	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+}
+
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	gocore.Model
@@ -105,6 +112,7 @@ type Wallet struct {
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
+	Balance       uint64     `sql:"-" json:"balance"`
 }
 
 // Create and persist a new network

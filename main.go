@@ -482,7 +482,32 @@ func walletsListHandler(c *gin.Context) {
 }
 
 func walletDetailsHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+	appID := authorizedSubjectId(c, "application")
+	userID := authorizedSubjectId(c, "user")
+	if appID == nil && userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	var wallet = &Wallet{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
+	if wallet == nil || wallet.ID == uuid.Nil {
+		renderError("wallet not found", 404, c)
+		return
+	} else if appID != nil && *wallet.ApplicationID != *appID {
+		renderError("forbidden", 403, c)
+		return
+	} else if userID != nil && *wallet.UserID != *userID {
+		renderError("forbidden", 403, c)
+		return
+	}
+	balance, err := wallet.TokenBalance(c.Param("tokenId"))
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+	wallet.Balance = balance
+	render(wallet, 200, c)
 }
 
 func walletBalanceHandler(c *gin.Context) {
