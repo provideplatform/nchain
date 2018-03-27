@@ -20,7 +20,7 @@ type Network struct {
 	Name          *string          `sql:"not null" json:"name"`
 	Description   *string          `json:"description"`
 	IsProduction  *bool            `sql:"not null" json:"is_production"`
-	IsEnabled     *bool            `sql:"not null" json:"enabled"`
+	Enabled       *bool            `sql:"not null" json:"enabled"`
 	SidechainID   *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
 	Config        *json.RawMessage `sql:"type:json" json:"config"`
 }
