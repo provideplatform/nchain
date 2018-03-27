@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -97,7 +99,7 @@ type Transaction struct {
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
 	WalletID      uuid.UUID                  `sql:"not null;type:uuid" json:"wallet_id"`
 	To            *string                    `json:"to"`
-	Value         *big.Int                   `sql:"not null;default:0" json:"value"`
+	Value         *TxValue                   `sql:"not null;type:decimal;default:0" json:"value"`
 	Data          *string                    `json:"data"`
 	Hash          *string                    `sql:"not null" json:"hash"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
@@ -114,6 +116,44 @@ type Wallet struct {
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 	Balance       *big.Int   `sql:"-" json:"balance"`
+}
+
+type TxValue struct {
+	value *big.Int
+}
+
+func (v *TxValue) Value() (driver.Value, error) {
+	f := new(big.Float)
+	f.SetUint64(v.value.Uint64())
+	f64, _ := f.Float64()
+	return f64, nil
+}
+
+func (v *TxValue) Scan(val interface{}) error {
+	f64 := new(sql.NullFloat64)
+	err := f64.Scan(val)
+	if err != nil {
+		return err
+	}
+	v.value = new(big.Int)
+	if f64.Valid {
+		v.value.SetUint64(uint64(f64.Float64)) // HACK -- loss of precision possible
+	}
+	return nil
+}
+
+func (v *TxValue) BigInt() *big.Int {
+	return v.value
+}
+
+func (v *TxValue) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.value)
+}
+
+func (v *TxValue) UnmarshalJSON(data []byte) error {
+	v.value = new(big.Int)
+	v.value.SetString(string(data), 10)
+	return nil
 }
 
 // Create and persist a new network
@@ -200,7 +240,7 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 		NetworkID:     c.NetworkID,
 		WalletID:      *walletID,
 		To:            c.Address,
-		Value:         value,
+		Value:         &TxValue{value: value},
 	}
 
 	var result *interface{}
