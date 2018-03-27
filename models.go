@@ -54,7 +54,7 @@ type ContractExecution struct {
 	WalletID *uuid.UUID    `json:"wallet_id"`
 	Method   string        `json:"method"`
 	Params   []interface{} `json:"params"`
-	Value    uint64        `json:"value"`
+	Value    *big.Int      `json:"value"`
 }
 
 // ContractExecutionResponse is returned upon successful contract execution
@@ -97,7 +97,7 @@ type Transaction struct {
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
 	WalletID      uuid.UUID                  `sql:"not null;type:uuid" json:"wallet_id"`
 	To            *string                    `json:"to"`
-	Value         uint64                     `sql:"not null;default:0" json:"value"`
+	Value         *big.Int                   `sql:"not null;default:0" json:"value"`
 	Data          *string                    `json:"data"`
 	Hash          *string                    `sql:"not null" json:"hash"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
@@ -188,7 +188,7 @@ func (c *Contract) ParseParams() map[string]interface{} {
 }
 
 // Execute - execute functionality encapsulated in the contract by invoking a specific method using given parameters
-func (c *Contract) Execute(walletID *uuid.UUID, value uint64, method string, params []interface{}) (*ContractExecutionResponse, error) {
+func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, params []interface{}) (*ContractExecutionResponse, error) {
 	var err error
 	db := DatabaseConnection()
 	var network = &Network{}

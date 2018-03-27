@@ -689,7 +689,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 		To:       to,
 		Gas:      gasLimit,
 		GasPrice: big.NewInt(int64(gasPrice)),
-		Value:    big.NewInt(int64(t.Value)),
+		Value:    t.Value,
 		Data:     data,
 	}
 }
@@ -885,7 +885,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 				return nil, err
 			}
 			Log.Debugf("Estimated %d total gas required for %s tx with %d-byte data payload", gasLimit, *network.Name, len(data))
-			tx = types.NewTransaction(nonce, addr, big.NewInt(int64(t.Value)), gasLimit, gasPrice, data)
+			tx = types.NewTransaction(nonce, addr, t.Value, gasLimit, gasPrice, data)
 		} else {
 			Log.Debugf("Attempting to deploy %s contract via tx; estimating total gas requirements", *network.Name)
 			callMsg := t.asEthereumCallMsg(gasPrice.Uint64(), 0)
@@ -895,7 +895,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet, cfg *para
 				return nil, err
 			}
 			Log.Debugf("Estimated %d total gas required for %s contract deployment tx with %d-byte data payload", gasLimit, *network.Name, len(data))
-			tx = types.NewContractCreation(nonce, big.NewInt(int64(t.Value)), gasLimit, gasPrice, data)
+			tx = types.NewContractCreation(nonce, t.Value, gasLimit, gasPrice, data)
 		}
 		signer := types.MakeSigner(cfg, big.NewInt(int64(blockNumber)))
 		hash := signer.Hash(tx).Bytes()
