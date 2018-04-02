@@ -249,8 +249,14 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
+	db := DatabaseConnection()
 	var contract = &Contract{}
-	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&contract)
+
+	db.Where("id = ?", c.Param("id")).Find(&contract)
+
+	if contract == nil || contract.ID == uuid.Nil { // attempt to lookup the contract by address
+		db.Where("address = ?", c.Param("id")).Find(&contract)
+	}
 
 	if contract == nil || contract.ID == uuid.Nil {
 		renderError("contract not found", 404, c)

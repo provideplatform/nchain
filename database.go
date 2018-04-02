@@ -39,6 +39,7 @@ func migrateSchema() {
 
 		db.AutoMigrate(&Contract{})
 		db.Model(&Contract{}).AddIndex("idx_contracts_application_id", "application_id")
+		db.Model(&Contract{}).AddIndex("idx_contracts_address", "address")
 		db.Model(&Contract{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Contract{}).AddForeignKey("transaction_id", "transactions(id)", "SET NULL", "CASCADE")
 
