@@ -36,6 +36,7 @@ type EthereumTxTraceResponse struct {
 			CallType string `json:"callType"`
 			From     string `json:"from"`
 			Gas      string `json:"gas"`
+			Init     string `json:"init"`
 			Input    string `json:"input"`
 			To       string `json:"to"`
 			Value    string `json:"value"`
@@ -43,6 +44,8 @@ type EthereumTxTraceResponse struct {
 		BlockHash   string `json:"blockHash"`
 		BlockNumber int    `json:"blockNumber"`
 		Result      struct {
+			Address string `json:"address"`
+			Code    string `json:"code"`
 			GasUsed string `json:"gasUsed"`
 			Output  string `json:"output"`
 		} `json:"result"`
