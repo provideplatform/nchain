@@ -105,7 +105,7 @@ type Transaction struct {
 	Hash          *string                    `sql:"not null" json:"hash"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
-	Traces        []interface{}              `sql:"-" json:"traces"`
+	Traces        *EthereumTxTraceResponse   `sql:"-" json:"traces"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
@@ -588,7 +588,7 @@ func (t *Transaction) RefreshDetails() error {
 	if err != nil {
 		return err
 	}
-	t.Traces = traces.([]interface{})
+	t.Traces = traces.(*EthereumTxTraceResponse)
 	return nil
 }
 
