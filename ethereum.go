@@ -51,7 +51,7 @@ type EthereumTxTraceResponse struct {
 		TransactionHash     string        `json:"transactionHash"`
 		TransactionPosition int           `json:"transactionPosition"`
 		Type                string        `json:"type"`
-	}
+	} `json:"result"`
 }
 
 type ParityJsonRpcErrorResponse struct {
