@@ -30,26 +30,28 @@ import (
 )
 
 // EthereumTxTraceResponse is returned upon successful contract execution
-type EthereumTxTraceResponse []struct {
-	Action struct {
-		CallType string `json:"callType"`
-		From     string `json:"from"`
-		Gas      string `json:"gas"`
-		Input    string `json:"input"`
-		To       string `json:"to"`
-		Value    string `json:"value"`
-	} `json:"action"`
-	BlockHash   string `json:"blockHash"`
-	BlockNumber int    `json:"blockNumber"`
-	Result      struct {
-		GasUsed string `json:"gasUsed"`
-		Output  string `json:"output"`
-	} `json:"result"`
-	Subtraces           int           `json:"subtraces"`
-	TraceAddress        []interface{} `json:"traceAddress"`
-	TransactionHash     string        `json:"transactionHash"`
-	TransactionPosition int           `json:"transactionPosition"`
-	Type                string        `json:"type"`
+type EthereumTxTraceResponse struct {
+	Result []struct {
+		Action struct {
+			CallType string `json:"callType"`
+			From     string `json:"from"`
+			Gas      string `json:"gas"`
+			Input    string `json:"input"`
+			To       string `json:"to"`
+			Value    string `json:"value"`
+		} `json:"action"`
+		BlockHash   string `json:"blockHash"`
+		BlockNumber int    `json:"blockNumber"`
+		Result      struct {
+			GasUsed string `json:"gasUsed"`
+			Output  string `json:"output"`
+		} `json:"result"`
+		Subtraces           int           `json:"subtraces"`
+		TraceAddress        []interface{} `json:"traceAddress"`
+		TransactionHash     string        `json:"transactionHash"`
+		TransactionPosition int           `json:"transactionPosition"`
+		Type                string        `json:"type"`
+	}
 }
 
 type ParityJsonRpcErrorResponse struct {
