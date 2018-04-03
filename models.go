@@ -316,7 +316,7 @@ func (c *Contract) Validate() bool {
 		c.Errors = append(c.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to associate contract with unspecified network"),
 		})
-	} else if c.NetworkID != transaction.NetworkID {
+	} else if transaction != nil && c.NetworkID != transaction.NetworkID {
 		c.Errors = append(c.Errors, &gocore.Error{
 			Message: stringOrNil("Contract network did not match transaction network"),
 		})

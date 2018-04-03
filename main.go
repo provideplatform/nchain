@@ -36,6 +36,7 @@ func main() {
 	r.GET("/api/v1/prices", pricesHandler)
 
 	r.GET("/api/v1/contracts", contractsListHandler)
+	r.POST("/api/v1/contracts", createContractHandler)
 	r.POST("/api/v1/contracts/:id/execute", contractExecutionHandler)
 
 	r.GET("/api/v1/oracles", oraclesListHandler)
@@ -234,6 +235,36 @@ func contractsListHandler(c *gin.Context) {
 	var contracts []Contract
 	query.Order("created_at ASC").Find(&contracts)
 	render(contracts, 200, c)
+}
+
+func createContractHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	contract := &Contract{}
+	err = json.Unmarshal(buf, contract)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	contract.ApplicationID = appID
+
+	if contract.Create() {
+		render(contract, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = contract.Errors
+		render(obj, 422, c)
+	}
 }
 
 func contractExecutionHandler(c *gin.Context) {
