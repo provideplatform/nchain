@@ -309,8 +309,11 @@ func (c *Contract) GetTransaction() (*Transaction, error) {
 // Validate a contract for persistence
 func (c *Contract) Validate() bool {
 	db := DatabaseConnection()
-	var transaction = &Transaction{}
-	db.Model(c).Related(&transaction)
+	var transaction *Transaction
+	if *c.TransactionID != uuid.Nil {
+		transaction = &Transaction{}
+		db.Model(c).Related(&transaction)
+	}
 	c.Errors = make([]*gocore.Error, 0)
 	if c.NetworkID == uuid.Nil {
 		c.Errors = append(c.Errors, &gocore.Error{
