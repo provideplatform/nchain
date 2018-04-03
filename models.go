@@ -310,7 +310,7 @@ func (c *Contract) GetTransaction() (*Transaction, error) {
 func (c *Contract) Validate() bool {
 	db := DatabaseConnection()
 	var transaction *Transaction
-	if *c.TransactionID != uuid.Nil {
+	if c.TransactionID != nil {
 		transaction = &Transaction{}
 		db.Model(c).Related(&transaction)
 	}
