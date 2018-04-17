@@ -615,6 +615,7 @@ func (t *Transaction) Create() bool {
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
+				t.fetchReceipt(db, network, wallet)
 				t.updateStatus(db, "success")
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0
