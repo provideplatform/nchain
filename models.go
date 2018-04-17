@@ -485,21 +485,7 @@ func (t *Transaction) ParseParams() map[string]interface{} {
 	return params
 }
 
-// Create and persist a new transaction. Side effects include persistence of contract and/or token instances
-// when the tx represents a contract and/or token creation.
-func (t *Transaction) Create() bool {
-	if !t.Validate() {
-		return false
-	}
-
-	db := DatabaseConnection()
-	var network = &Network{}
-	var wallet = &Wallet{}
-	if t.NetworkID != uuid.Nil {
-		db.Model(t).Related(&network)
-		db.Model(t).Related(&wallet)
-	}
-
+func (t *Transaction) broadcast(network *Network, wallet *Wallet) error {
 	var err error
 
 	if network.isEthereumNetwork() {
@@ -515,8 +501,36 @@ func (t *Transaction) Create() bool {
 		})
 	}
 
-	if len(t.Errors) > 0 {
+	return err
+}
+
+func (t *Transaction) fetchReceipt(network *Network, wallet *Wallet) {
+	if network.isEthereumNetwork() {
+		receipt, err := t.fetchEthereumTxReceipt(network, wallet)
+		if err != nil {
+			Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", t.Hash, err.Error())
+			t.Errors = append(t.Errors, &gocore.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		} else {
+			Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", t.Hash, receipt)
+		}
+	}
+}
+
+// Create and persist a new transaction. Side effects include persistence of contract and/or token instances
+// when the tx represents a contract and/or token creation.
+func (t *Transaction) Create() bool {
+	if !t.Validate() {
 		return false
+	}
+
+	db := DatabaseConnection()
+	var network = &Network{}
+	var wallet = &Wallet{}
+	if t.NetworkID != uuid.Nil {
+		db.Model(t).Related(&network)
+		db.Model(t).Related(&wallet)
 	}
 
 	if db.NewRecord(t) {
@@ -529,21 +543,17 @@ func (t *Transaction) Create() bool {
 					Message: stringOrNil(err.Error()),
 				})
 			}
+			return false
 		}
+
+		t.broadcast(network, wallet)
+		if len(t.Errors) > 0 {
+			return false
+		}
+
 		if !db.NewRecord(t) {
 			if t.To == nil && rowsAffected > 0 {
-				if network.isEthereumNetwork() {
-					receipt, err := t.fetchEthereumTxReceipt(network, wallet)
-					if err != nil {
-						Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", t.Hash, err.Error())
-						t.Errors = append(t.Errors, &gocore.Error{
-							Message: stringOrNil(err.Error()),
-						})
-					} else {
-						Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", t.Hash, receipt)
-
-					}
-				}
+				t.fetchReceipt(network, wallet)
 			}
 			return rowsAffected > 0
 		}
