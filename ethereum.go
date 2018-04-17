@@ -551,8 +551,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 	var err error
 	_abi, err := c.readEthereumContractAbi()
 	if err != nil {
-		err := fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
-		return nil, err
+		return nil, fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
 	}
 	var methodDescriptor = fmt.Sprintf("method %s", method)
 	var abiMethod *abi.Method
@@ -566,8 +565,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 		Log.Debugf("Attempting to encode %d parameters [ %s ] prior to executing contract %s on contract: %s", len(params), params, methodDescriptor, c.ID)
 		invocationSig, err := EncodeABI(abiMethod, params...)
 		if err != nil {
-			Log.Warningf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
-			return nil, err
+			return nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 		}
 
 		data := common.Bytes2Hex(invocationSig)
@@ -592,9 +590,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 					Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
 					typ, err := abi.NewType(typestr)
 					if err != nil {
-						err = fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
-						Log.Warning(err.Error())
-						return nil, err
+						return nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
 					}
 					vals[i] = reflect.New(typ.Type).Interface()
 				}
@@ -603,9 +599,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				Log.Debugf("Unpacked %v returned values from read of constant %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
 			}
 			if err != nil {
-				err = fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
-				Log.Warning(err.Error())
-				return nil, err
+				return nil, fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
 			}
 			return &out, nil
 		}
