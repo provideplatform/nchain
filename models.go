@@ -14,6 +14,7 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
+// Network
 type Network struct {
 	gocore.Model
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
@@ -103,6 +104,7 @@ type Transaction struct {
 	Value         *TxValue                   `sql:"not null;type:decimal;default:0" json:"value"`
 	Data          *string                    `json:"data"`
 	Hash          *string                    `sql:"not null" json:"hash"`
+	Status        *string                    `sql:"not null;default:'pending'" json:"status"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
 	Traces        *EthereumTxTraceResponse   `sql:"-" json:"traces"`
