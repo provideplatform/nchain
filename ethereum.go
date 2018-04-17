@@ -828,7 +828,7 @@ func signAndBroadcastEthereumTx(t *Transaction, network *Network, wallet *Wallet
 		if err == nil {
 			Log.Debugf("Transmitting signed %s tx to JSON-RPC host", *network.Name)
 			var out interface{}
-			err := broadcastEthereumTx(context.TODO(), network, tx, client, &out)
+			err = broadcastEthereumTx(context.TODO(), network, tx, client, &out)
 			if err != nil {
 				Log.Warningf("Failed to transmit signed %s tx to JSON-RPC host; %s", *network.Name, err.Error())
 			} else if out == nil { // FIXME-- out pointer not yet handled by broadcastEthereumTx
