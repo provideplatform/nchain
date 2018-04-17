@@ -827,21 +827,21 @@ func (t *Transaction) broadcastSignedEthereumTx(network *Network, wallet *Wallet
 		err = broadcastEthereumTx(context.TODO(), network, t.SignedTx.(*types.Transaction), client, nil)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to transmit signed %s tx to JSON-RPC host; %s", *network.Name, err.Error())
+		}
+
+		receipt, err := t.fetchEthereumTxReceipt(network, wallet)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
 		} else {
-			receipt, err := t.fetchEthereumTxReceipt(network, wallet)
-			if err != nil {
-				Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
-			} else {
-				Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", *t.Hash, receipt)
-				trace, err := traceEthereumTx(network, t.Hash)
-				if err != nil {
-					Log.Warningf("Failed to fetch ethereum tx trace with tx hash: %s; %s", *t.Hash, err.Error())
-				}
-				response = &ContractExecutionResponse{
-					Receipt:     receipt,
-					Trace:       trace,
-					Transaction: t,
-				}
+			Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", *t.Hash, receipt)
+			trace, traceErr := traceEthereumTx(network, t.Hash)
+			if traceErr != nil {
+				Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
+			}
+			response = &ContractExecutionResponse{
+				Receipt:     receipt,
+				Traces:      trace,
+				Transaction: t,
 			}
 		}
 	}

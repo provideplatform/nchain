@@ -64,7 +64,7 @@ type ContractExecution struct {
 // ContractExecutionResponse is returned upon successful contract execution
 type ContractExecutionResponse struct {
 	Receipt     interface{}  `json:"receipt"`
-	Trace       interface{}  `json:"traces"`
+	Traces      interface{}  `json:"traces"`
 	Transaction *Transaction `json:"transaction"`
 }
 
@@ -264,6 +264,7 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
 			Receipt:     receipt,
+			Traces:      tx.Traces,
 			Transaction: tx,
 		}
 	} else if tx.Response.Transaction == nil {
