@@ -711,7 +711,7 @@ func (t *Transaction) fetchEthereumTxReceipt(network *Network, wallet *Wallet) (
 		Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, txHash)
 		receipt, err = client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
 		if err != nil && err == ethereum.NotFound {
-			Log.Warningf("%s contract created by broadcast tx: %s; address must be retrieved from tx receipt", *network.Name, txHash)
+			Log.Debugf("%s contract created by broadcast tx: %s; address must be retrieved from pending tx receipt", *network.Name, txHash)
 		} else {
 			Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, txHash, receipt.ContractAddress.Hex())
 			params := t.ParseParams()
