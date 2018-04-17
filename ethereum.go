@@ -860,7 +860,7 @@ func (t *Transaction) broadcastSignedEthereumTx(network *Network, wallet *Wallet
 
 func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet) (*types.Transaction, error) {
 	client := JsonRpcClient(network)
-	syncProgress, err := client.SyncProgress(context.TODO())
+	_, err := client.SyncProgress(context.TODO())
 	if err == nil {
 		cfg := GetChainConfig(network)
 		blockNumber, err := network.ethereumNetworkLatestBlock()
@@ -882,8 +882,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet) (*types.T
 			callMsg := t.asEthereumCallMsg(gasPrice.Uint64(), 0)
 			gasLimit, err := client.EstimateGas(context.TODO(), callMsg)
 			if err != nil {
-				Log.Warningf("Failed to estimate gas for %s tx; %s", *network.Name, err.Error())
-				return nil, err
+				return nil, fmt.Errorf("Failed to estimate gas for %s tx; %s", *network.Name, err.Error())
 			}
 			Log.Debugf("Estimated %d total gas required for %s tx with %d-byte data payload", gasLimit, *network.Name, len(data))
 			tx = types.NewTransaction(nonce, addr, t.Value.BigInt(), gasLimit, gasPrice, data)
@@ -892,8 +891,7 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet) (*types.T
 			callMsg := t.asEthereumCallMsg(gasPrice.Uint64(), 0)
 			gasLimit, err := client.EstimateGas(context.TODO(), callMsg)
 			if err != nil {
-				Log.Warningf("Failed to estimate gas for %s tx; %s", *network.Name, err.Error())
-				return nil, err
+				return nil, fmt.Errorf("Failed to estimate gas for %s tx; %s", *network.Name, err.Error())
 			}
 			Log.Debugf("Estimated %d total gas required for %s contract deployment tx with %d-byte data payload", gasLimit, *network.Name, len(data))
 			tx = types.NewContractCreation(nonce, t.Value.BigInt(), gasLimit, gasPrice, data)
@@ -902,14 +900,12 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet) (*types.T
 		hash := signer.Hash(tx).Bytes()
 		privateKey, err := decryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 		if err != nil {
-			Log.Warningf("Failed to sign %s tx using wallet: %s", *network.Name, wallet.ID)
-			return nil, err
+			return nil, fmt.Errorf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
 		}
 		Log.Debugf("Signing %s tx using wallet: %s", *network.Name, wallet.ID)
 		sig, err := ethcrypto.Sign(hash, privateKey)
 		if err != nil {
-			Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
-			return nil, err
+			return nil, fmt.Errorf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
 		}
 		if err == nil {
 			signedTx, _ := tx.WithSignature(signer, sig)
@@ -918,8 +914,6 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet) (*types.T
 			return signedTx, nil
 		}
 		return nil, err
-	} else if syncProgress == nil {
-		Log.Debugf("%s JSON-RPC is in sync with the network", *network.Name)
 	}
 	return nil, err
 }

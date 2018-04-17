@@ -533,7 +533,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 	}
 
 	if err != nil {
-		Log.Warningf("Failed to broadcast %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
+		Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil(err.Error()),
 		})
