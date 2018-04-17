@@ -259,6 +259,8 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	if err != nil {
 		err = fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 		return nil, err
+	} else {
+		tx.updateStatus(db, "success")
 	}
 
 	if tx.Response == nil {
