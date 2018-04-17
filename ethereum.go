@@ -910,7 +910,8 @@ func (t *Transaction) signEthereumTx(network *Network, wallet *Wallet) (*types.T
 		if err == nil {
 			signedTx, _ := tx.WithSignature(signer, sig)
 			t.Hash = stringOrNil(fmt.Sprintf("%x", signedTx.Hash()))
-			Log.Debugf("Signed %s tx for broadcast via JSON-RPC: %s", *network.Name, signedTx)
+			signedTxJSON, _ := signedTx.MarshalJSON()
+			Log.Debugf("Signed %s tx for broadcast via JSON-RPC: %s", *network.Name, signedTxJSON)
 			return signedTx, nil
 		}
 		return nil, err
