@@ -509,7 +509,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 	if network.isEthereumNetwork() {
 		t.Response, err = t.broadcastSignedEthereumTx(network, wallet)
 	} else {
-		Log.Warningf("Unable to generate signed tx for unsupported network: %s", *network.Name)
+		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
 
 	if err != nil {
@@ -529,7 +529,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 	if network.isEthereumNetwork() {
 		t.SignedTx, err = t.signEthereumTx(network, wallet)
 	} else {
-		Log.Warningf("Unable to generate signed tx for unsupported network: %s", *network.Name)
+		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
 
 	if err != nil {
