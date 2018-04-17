@@ -107,6 +107,7 @@ type Transaction struct {
 	Status        *string                    `sql:"not null;default:'pending'" json:"status"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
+	SignedTx      interface{}                `sql:"-" json:"-"`
 	Traces        *EthereumTxTraceResponse   `sql:"-" json:"traces"`
 }
 
@@ -501,8 +502,32 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string) {
 func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) error {
 	var err error
 
+	if t.SignedTx == nil {
+		return fmt.Errorf("Failed to broadcast %s tx using wallet: %s; tx not yet signed", *network.Name, wallet.ID)
+	}
+
 	if network.isEthereumNetwork() {
-		t.Response, err = signAndBroadcastEthereumTx(t, network, wallet)
+		t.Response, err = t.broadcastSignedEthereumTx(network, wallet)
+	} else {
+		Log.Warningf("Unable to generate signed tx for unsupported network: %s", *network.Name)
+	}
+
+	if err != nil {
+		Log.Warningf("Failed to broadcast %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
+		t.Errors = append(t.Errors, &gocore.Error{
+			Message: stringOrNil(err.Error()),
+		})
+		t.updateStatus(db, "failed")
+	}
+
+	return err
+}
+
+func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error {
+	var err error
+
+	if network.isEthereumNetwork() {
+		t.SignedTx, err = t.signEthereumTx(network, wallet)
 	} else {
 		Log.Warningf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
@@ -546,6 +571,14 @@ func (t *Transaction) Create() bool {
 	if t.NetworkID != uuid.Nil {
 		db.Model(t).Related(&network)
 		db.Model(t).Related(&wallet)
+	}
+
+	err := t.sign(db, network, wallet)
+	if err != nil {
+		t.Errors = append(t.Errors, &gocore.Error{
+			Message: stringOrNil(err.Error()),
+		})
+		return false
 	}
 
 	if db.NewRecord(t) {
