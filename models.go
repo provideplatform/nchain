@@ -485,7 +485,20 @@ func (t *Transaction) ParseParams() map[string]interface{} {
 	return params
 }
 
-func (t *Transaction) broadcast(network *Network, wallet *Wallet) error {
+func (t *Transaction) updateStatus(db *gorm.DB, status string) {
+	t.Status = stringOrNil(status)
+	result := db.Save(&t)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			t.Errors = append(t.Errors, &gocore.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
+}
+
+func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) error {
 	var err error
 
 	if network.isEthereumNetwork() {
@@ -499,12 +512,13 @@ func (t *Transaction) broadcast(network *Network, wallet *Wallet) error {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil(err.Error()),
 		})
+		t.updateStatus(db, "failed")
 	}
 
 	return err
 }
 
-func (t *Transaction) fetchReceipt(network *Network, wallet *Wallet) {
+func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet) {
 	if network.isEthereumNetwork() {
 		receipt, err := t.fetchEthereumTxReceipt(network, wallet)
 		if err != nil {
@@ -514,6 +528,7 @@ func (t *Transaction) fetchReceipt(network *Network, wallet *Wallet) {
 			})
 		} else {
 			Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", t.Hash, receipt)
+			t.updateStatus(db, "success")
 		}
 	}
 }
@@ -546,16 +561,16 @@ func (t *Transaction) Create() bool {
 			return false
 		}
 
-		t.broadcast(network, wallet)
+		t.broadcast(db, network, wallet)
 		if len(t.Errors) > 0 {
 			return false
 		}
 
 		if !db.NewRecord(t) {
 			if t.To == nil && rowsAffected > 0 {
-				t.fetchReceipt(network, wallet)
+				t.fetchReceipt(db, network, wallet)
 			}
-			return rowsAffected > 0
+			return rowsAffected > 0 && len(t.Errors) == 0
 		}
 	}
 	return false
