@@ -433,6 +433,10 @@ func transactionsListHandler(c *gin.Context) {
 		query = query.Where("transactions.to IS NULL")
 	}
 
+	if c.Query("status") != "" {
+		query = query.Where("transactions.status IN ?", strings.Split(c.Query("status"), ","))
+	}
+
 	var txs []Transaction
 	query.Order("created_at DESC").Find(&txs)
 	render(txs, 200, c)
