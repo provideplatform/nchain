@@ -702,7 +702,7 @@ func (t *Transaction) fetchEthereumTxReceipt(network *Network, wallet *Wallet) (
 	Log.Debugf("Attempting to retrieve %s tx receipt for broadcast tx: %s", *network.Name, txHash)
 	err = ethereum.NotFound
 	for receipt == nil && err == ethereum.NotFound {
-		Log.Debugf("Retrieving tx receipt for %s contract creation tx: %s", *network.Name, txHash)
+		Log.Debugf("Retrieving broadcast tx receipt for %s tx: %s", *network.Name, txHash)
 		receipt, err = client.TransactionReceipt(context.TODO(), common.HexToHash(txHash))
 		if t.To == nil {
 			if err != nil && err == ethereum.NotFound {
