@@ -511,7 +511,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 	}
 
 	if network.isEthereumNetwork() {
-		t.Response, err = t.broadcastSignedEthereumTx(network, wallet)
+		err = t.broadcastSignedEthereumTx(network, wallet)
 	} else {
 		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
@@ -557,7 +557,17 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 			})
 		} else {
 			Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", t.Hash, receipt)
-			t.updateStatus(db, "success")
+
+			traces, traceErr := traceEthereumTx(network, t.Hash)
+			if traceErr != nil {
+				Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
+			}
+			t.Response = &ContractExecutionResponse{
+				Receipt:     receipt,
+				Traces:      traces,
+				Transaction: t,
+			}
+			t.Traces = traces
 		}
 	}
 }
@@ -604,8 +614,8 @@ func (t *Transaction) Create() bool {
 		}
 
 		if !db.NewRecord(t) {
-			if t.To == nil && rowsAffected > 0 {
-				t.fetchReceipt(db, network, wallet)
+			if rowsAffected > 0 {
+				t.updateStatus(db, "success")
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0
 		}
