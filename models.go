@@ -63,7 +63,8 @@ type ContractExecution struct {
 
 // ContractExecutionResponse is returned upon successful contract execution
 type ContractExecutionResponse struct {
-	Result      interface{}  `json:"result"`
+	Receipt     interface{}  `json:"receipt"`
+	Trace       interface{}  `json:"traces"`
 	Transaction *Transaction `json:"transaction"`
 }
 
@@ -108,7 +109,7 @@ type Transaction struct {
 	Params        *json.RawMessage           `sql:"-" json:"params"`
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
 	SignedTx      interface{}                `sql:"-" json:"-"`
-	Traces        *EthereumTxTraceResponse   `sql:"-" json:"traces"`
+	Traces        interface{}                `sql:"-" json:"traces"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
@@ -247,10 +248,10 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 		Value:         &TxValue{value: value},
 	}
 
-	var result *interface{}
+	var receipt *interface{}
 
 	if network.isEthereumNetwork() {
-		result, err = c.executeEthereumContract(network, tx, method, params)
+		receipt, err = c.executeEthereumContract(network, tx, method, params)
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *network.Name)
 	}
@@ -262,7 +263,7 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
-			Result:      result,
+			Receipt:     receipt,
 			Transaction: tx,
 		}
 	} else if tx.Response.Transaction == nil {
@@ -646,12 +647,14 @@ func (t *Transaction) Validate() bool {
 
 // RefreshDetails populates transaction details which were not necessarily available upon broadcast, including network-specific metadata and VM execution tracing if applicable
 func (t *Transaction) RefreshDetails() error {
+	var err error
 	network, _ := t.GetNetwork()
-	traces, err := TraceTx(network, t.Hash)
+	if network.isEthereumNetwork() {
+		t.Traces, err = traceEthereumTx(network, t.Hash)
+	}
 	if err != nil {
 		return err
 	}
-	t.Traces = traces.(*EthereumTxTraceResponse)
 	return nil
 }
 
