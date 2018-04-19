@@ -170,6 +170,10 @@ func networksListHandler(c *gin.Context) {
 		query = query.Or("networks.application_id = ?", appID)
 	}
 
+	if strings.ToLower(c.Query("cloneable")) == "true" {
+		query = query.Where("networks.cloneable = true")
+	}
+
 	query.Order("created_at ASC").Find(&networks)
 	render(networks, 200, c)
 }
