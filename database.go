@@ -23,6 +23,9 @@ func migrateSchema() {
 
 		db.AutoMigrate(&Network{})
 		db.Model(&Network{}).AddIndex("idx_networks_application_id", "application_id")
+		db.Model(&Network{}).AddIndex("idx_networks_cloneable", "cloneable")
+		db.Model(&Network{}).AddIndex("idx_networks_enabled", "enabled")
+		db.Model(&Network{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Wallet{})
