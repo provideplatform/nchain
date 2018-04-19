@@ -163,7 +163,7 @@ func createNetworkHandler(c *gin.Context) {
 
 func networksListHandler(c *gin.Context) {
 	var networks []Network
-	query := DatabaseConnection().Where("networks.application_id IS NULL").Order("created_at ASC")
+	query := DatabaseConnection().Where("networks.enabled = true AND networks.application_id IS NULL").Order("created_at ASC")
 
 	appID := authorizedSubjectId(c, "application")
 	if appID != nil {
