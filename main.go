@@ -133,7 +133,8 @@ func statusHandler(c *gin.Context) {
 
 func createNetworkHandler(c *gin.Context) {
 	appID := authorizedSubjectId(c, "application")
-	if appID == nil {
+	userID := authorizedSubjectId(c, "user")
+	if appID == nil && userID == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
@@ -151,6 +152,7 @@ func createNetworkHandler(c *gin.Context) {
 		return
 	}
 	network.ApplicationID = appID
+	network.UserID = userID
 
 	if network.Create() {
 		render(network, 201, c)

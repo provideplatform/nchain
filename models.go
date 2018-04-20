@@ -18,6 +18,7 @@ import (
 type Network struct {
 	gocore.Model
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
 	Name          *string          `sql:"not null" json:"name"`
 	Description   *string          `json:"description"`
 	IsProduction  *bool            `sql:"not null" json:"is_production"`
@@ -165,11 +166,11 @@ func (v *TxValue) UnmarshalJSON(data []byte) error {
 
 // Create and persist a new network
 func (n *Network) Create() bool {
-	db := DatabaseConnection()
-
 	if !n.Validate() {
 		return false
 	}
+
+	db := DatabaseConnection()
 
 	if db.NewRecord(n) {
 		result := db.Create(&n)
