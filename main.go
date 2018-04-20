@@ -181,7 +181,13 @@ func networksListHandler(c *gin.Context) {
 }
 
 func networkDetailsHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+	var network = &Network{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
+	if network == nil || network.ID == uuid.Nil {
+		renderError("network not found", 404, c)
+		return
+	}
+	render(network, 200, c)
 }
 
 func networkAddressesHandler(c *gin.Context) {
