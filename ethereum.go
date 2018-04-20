@@ -79,7 +79,6 @@ func GetJsonRpcUrl(network *Network) *string {
 		url = jsonRpcUrl
 	} else {
 		Log.Warningf("No JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
-		url = DefaultEthereumMainnetJsonRpcUrl
 	}
 	return stringOrNil(url)
 }
@@ -91,7 +90,6 @@ func GetParityJsonRpcUrl(network *Network) *string {
 		url = jsonRpcUrl
 	} else {
 		Log.Warningf("No parity JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
-		url = DefaultEthereumMainnetJsonRpcUrl
 	}
 	return stringOrNil(url)
 }
@@ -133,6 +131,10 @@ func InvokeParityJsonRpcClient(network *Network, method string, params []interfa
 
 func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 	url := GetJsonRpcUrl(network)
+	if url == nil {
+		return nil, fmt.Errorf("No JSON-RPC url was configured for network: %s (%s)", *network.Name, network.ID)
+	}
+
 	var client *ethclient.Client
 
 	if networkClients, _ := EthereumGethClients[network.ID.String()]; len(networkClients) == 0 {
@@ -161,6 +163,10 @@ func DialJsonRpc(network *Network) (*ethclient.Client, error) {
 
 func ResolveJsonRpcClient(network *Network) (*ethrpc.Client, error) {
 	url := GetJsonRpcUrl(network)
+	if url == nil {
+		return nil, fmt.Errorf("No JSON-RPC url configured for network: %s", *network.Name)
+	}
+
 	var client *ethrpc.Client
 
 	if rpcClients, _ := EthereumGethRpcClients[network.ID.String()]; len(rpcClients) == 0 {
@@ -287,7 +293,12 @@ func (n *Network) ethereumNetworkStatus() (*NetworkStatus, error) {
 	client, err := DialJsonRpc(n)
 	if err != nil {
 		Log.Warningf("Failed to dial %s JSON-RPC host; %s", *n.Name, err.Error())
-		return nil, err
+		return &NetworkStatus{
+			State: stringOrNil("configuring"),
+			Meta: map[string]interface{}{
+				"error": err.Error(),
+			},
+		}, nil
 	}
 
 	syncProgress, err := client.SyncProgress(context.TODO())
