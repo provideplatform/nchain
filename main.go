@@ -30,6 +30,10 @@ func main() {
 	r.GET("/api/v1/networks/:id/addresses", networkAddressesHandler)
 	r.GET("/api/v1/networks/:id/blocks", networkBlocksHandler)
 	r.GET("/api/v1/networks/:id/contracts", networkContractsHandler)
+	r.GET("/api/v1/networks/:id/nodes", networkNodesListHandler)
+	r.POST("/api/v1/networks/:id/nodes", createNetworkNodeHandler)
+	r.GET("/api/v1/networks/:id/nodes/:nodeId", networkNodeDetailsHandler)
+	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNetworkNodeHandler)
 	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
 	r.GET("/api/v1/networks/:id/transactions", networkTransactionsHandler)
 
@@ -199,6 +203,92 @@ func networkBlocksHandler(c *gin.Context) {
 }
 
 func networkContractsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func networkNodesListHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	query := DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.user_id = ?", c.Param("id"), userID)
+
+	var nodes []NetworkNode
+	query.Order("created_at ASC").Find(&nodes)
+	render(nodes, 200, c)
+}
+
+func networkNodeDetailsHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	var node = &NetworkNode{}
+	DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		renderError("network node not found", 404, c)
+		return
+	} else if userID != nil && *node.UserID != *userID {
+		renderError("forbidden", 403, c)
+		return
+	}
+
+	render(node, 200, c)
+}
+
+func createNetworkNodeHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	networkID, err := uuid.FromString(c.Param("id"))
+	if err != nil {
+		renderError(err.Error(), 400, c)
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	node := &NetworkNode{}
+	err = json.Unmarshal(buf, node)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	node.UserID = userID
+	node.NetworkID = networkID
+
+	var network = &Network{}
+	DatabaseConnection().Model(node).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		renderError("network not found", 404, c)
+		return
+	}
+
+	if *network.UserID != *userID {
+		renderError("forbidden", 403, c)
+		return
+	}
+
+	if node.Create() {
+		render(node, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = node.Errors
+		render(obj, 422, c)
+	}
+}
+
+func deleteNetworkNodeHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 

@@ -29,6 +29,16 @@ type Network struct {
 	Config        *json.RawMessage `sql:"type:json" json:"config"`
 }
 
+// NetworkNode
+type NetworkNode struct {
+	gocore.Model
+	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	Host        *string          `json:"host"`
+	Description *string          `json:"description"`
+	Config      *json.RawMessage `sql:"type:json" json:"config"`
+}
+
 // NetworkStatus provides network-agnostic status
 type NetworkStatus struct {
 	Block   *uint64                `json:"block"`   // current block
@@ -220,6 +230,38 @@ func (n *Network) Status() (status *NetworkStatus, err error) {
 		Log.Warningf("Unable to determine status of %s network; %s", *n.Name, err.Error())
 	}
 	return status, err
+}
+
+// Create and persist a new network node
+func (n *NetworkNode) Create() bool {
+	if !n.Validate() {
+		return false
+	}
+
+	db := DatabaseConnection()
+
+	if db.NewRecord(n) {
+		result := db.Create(&n)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				n.Errors = append(n.Errors, &gocore.Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(n) {
+			return rowsAffected > 0
+		}
+	}
+	return false
+}
+
+// Validate a network node for persistence
+func (n *NetworkNode) Validate() bool {
+	n.Errors = make([]*gocore.Error, 0)
+	return len(n.Errors) == 0
 }
 
 // ParseParams - parse the original JSON params used for contract creation

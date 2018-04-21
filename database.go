@@ -29,6 +29,10 @@ func migrateSchema() {
 		db.Model(&Network{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
 
+		db.AutoMigrate(&NetworkNode{})
+		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
+		db.Model(&NetworkNode{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+
 		db.AutoMigrate(&Wallet{})
 		db.Model(&Wallet{}).AddIndex("idx_wallets_application_id", "application_id")
 		db.Model(&Wallet{}).AddIndex("idx_wallets_user_id", "user_id")
