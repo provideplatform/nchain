@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -17,8 +19,7 @@ func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
 }
 
 // LaunchAMI  launches an EC2 instance for a given AMI id
-func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, minCount, maxCount int64) error {
-	var err error
+func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, minCount, maxCount int64) (instanceIds []string, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
 
 	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
@@ -28,13 +29,16 @@ func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, m
 		UserData: stringOrNil(userData),
 	})
 
+	if err != nil {
+		return instanceIds, fmt.Errorf("Failed to launch AMI in region: %s; %s", region, err.Error())
+	}
+
 	if reservation != nil {
 		Log.Debugf("EC2 run instance reservation created: %s", reservation)
+		for i := range reservation.Instances {
+			instanceIds = append(instanceIds, *reservation.Instances[i].InstanceId)
+		}
 	}
 
-	if err != nil {
-		Log.Warningf("Failed to launch AMI in region: %s; %s", err.Error())
-	}
-
-	return err
+	return instanceIds, err
 }

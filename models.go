@@ -323,9 +323,16 @@ func (n *NetworkNode) deploy() error {
 						version := imageVersions[versions[len(versions)-1]] // defaults to latest version for now
 						if imageID, imageIDOk := imageVersions[version]; imageIDOk {
 							for region := range regions {
-								Log.Debugf("Attempting to deploy image (%s) version %s in EC2 region: %s", imageID, version, region)
+								Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
 								if deployCount, deployCountOk := regions[region]; deployCountOk {
-									LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, int64(deployCount))
+									instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, int64(deployCount))
+									if err != nil {
+										return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
+									}
+									Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+									cfg["target_instance_ids"] = instanceIds
+									Log.Debugf("Network node config: %s", n.Config)
+									Log.Debugf("Local cfg: %s", cfg)
 								}
 							}
 						}
