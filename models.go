@@ -411,7 +411,7 @@ func (n *NetworkNode) undeploy() error {
 			if strings.ToLower(targetID) == "aws" {
 				accessKeyID := credentials["aws_access_key_id"].(string)
 				secretAccessKey := credentials["aws_secret_access_key"].(string)
-	
+
 				_, err := TerminateInstance(accessKeyID, secretAccessKey, region, instanceID)
 				if err == nil {
 					Log.Debugf("Terminated EC2 instance with id: %s", instanceID)

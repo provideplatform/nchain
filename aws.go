@@ -20,7 +20,7 @@ func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
 
 // LaunchAMI  launches an EC2 instance for a given AMI id
 func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, minCount, maxCount int64) (instanceIds []string, err error) {
-	client, err := NewEC2(accessKeyID, secretAccessKey, stringOrNil(region))
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
 
 	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
 		ImageId:  stringOrNil(imageID),
@@ -45,7 +45,7 @@ func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, m
 
 // GetInstanceDetails retrieves EC2 instance details for a given instance id
 func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.DescribeInstancesOutput, err error) {
-	client, err := NewEC2(accessKeyID, secretAccessKey, stringOrNil(region))
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
 
 	response, err = client.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{stringOrNil(instanceID)},
@@ -60,7 +60,7 @@ func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string)
 
 // TerminateInstance destroys an EC2 instance given its instance id
 func TerminateInstance(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.TerminateInstancesOutput, err error) {
-	client, err := NewEC2(accessKeyID, secretAccessKey, nil)
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
 
 	response, err = client.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{stringOrNil(instanceID)},
