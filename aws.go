@@ -10,12 +10,9 @@ import (
 )
 
 // NewEC2
-func NewEC2(accessKeyID, secretAccessKey string, region *string) (*ec2.EC2, error) {
+func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
 	var err error
-	cfg := aws.NewConfig().WithMaxRetries(10).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
-	if region != nil {
-		cfg = cfg.WithRegion(*region)
-	}
+	cfg := aws.NewConfig().WithMaxRetries(10).WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
 	sess := session.New(cfg)
 	ec2 := ec2.New(sess)
 	return ec2, err
@@ -62,7 +59,7 @@ func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string)
 }
 
 // TerminateInstance destroys an EC2 instance given its instance id
-func TerminateInstance(accessKeyID, secretAccessKey, instanceID string) (response *ec2.TerminateInstancesOutput, err error) {
+func TerminateInstance(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.TerminateInstancesOutput, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, nil)
 
 	response, err = client.TerminateInstances(&ec2.TerminateInstancesInput{
@@ -70,7 +67,7 @@ func TerminateInstance(accessKeyID, secretAccessKey, instanceID string) (respons
 	})
 
 	if err != nil {
-		Log.Warningf("EC2 instance not terminated for %s: %s", instanceID, response)
+		Log.Warningf("EC2 instance not terminated for %s; %s", instanceID, err.Error())
 	}
 
 	return response, err

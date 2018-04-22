@@ -359,6 +359,7 @@ func (n *NetworkNode) deploy() error {
 									return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
 								}
 								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+								cfg["region"] = region
 								cfg["target_instance_ids"] = instanceIds
 								for n.Host == nil {
 									instanceID := instanceIds[len(instanceIds)-1]
@@ -377,7 +378,7 @@ func (n *NetworkNode) deploy() error {
 								*n.Config = json.RawMessage(cfgJSON)
 								n.Status = stringOrNil("running")
 								db.Save(n)
-								Log.Debugf("Depoyed %v %s@%s instances in EC2 %s region", len(instanceIds), region)
+								Log.Debugf("Depoyed %v %s@%s instances in EC2 %s region", len(instanceIds), imageID, version, region)
 							}
 						}
 					}
@@ -396,18 +397,22 @@ func (n *NetworkNode) undeploy() error {
 
 	cfg := n.ParseConfig()
 	targetID, targetOk := cfg["target_id"].(string)
-	instanceIds, instanceIdsOk := cfg["target_instance_ids"].([]string)
+	region, regionOk := cfg["region"].(string)
+	instanceIds, instanceIdsOk := cfg["target_instance_ids"].([]interface{})
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 
-	if targetOk && instanceIdsOk && credsOk {
+	Log.Debugf("Configuration for network node undeploy: target id: %s; crendentials: %s; target instance ids: %s",
+		targetID, credentials, instanceIds)
+
+	if targetOk && regionOk && instanceIdsOk && credsOk {
 		for i := range instanceIds {
-			instanceID := instanceIds[i]
+			instanceID := instanceIds[i].(string)
 
 			if strings.ToLower(targetID) == "aws" {
 				accessKeyID := credentials["aws_access_key_id"].(string)
 				secretAccessKey := credentials["aws_secret_access_key"].(string)
-
-				_, err := TerminateInstance(accessKeyID, secretAccessKey, instanceID)
+	
+				_, err := TerminateInstance(accessKeyID, secretAccessKey, region, instanceID)
 				if err == nil {
 					Log.Debugf("Terminated EC2 instance with id: %s", instanceID)
 					n.Status = stringOrNil("terminated")
