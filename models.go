@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"strings"
 
 	"github.com/provideapp/go-core"
 
@@ -253,7 +254,11 @@ func (n *NetworkNode) Create() bool {
 			}
 		}
 		if !db.NewRecord(n) {
-			return rowsAffected > 0
+			success := rowsAffected > 0
+			if success {
+				n.deploy()
+			}
+			return success
 		}
 	}
 	return false
@@ -263,6 +268,74 @@ func (n *NetworkNode) Create() bool {
 func (n *NetworkNode) Validate() bool {
 	n.Errors = make([]*gocore.Error, 0)
 	return len(n.Errors) == 0
+}
+
+// ParseConfig - parse the network node configuration JSON
+func (n *NetworkNode) ParseConfig() map[string]interface{} {
+	config := map[string]interface{}{}
+	if n.Config != nil {
+		err := json.Unmarshal(*n.Config, &config)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal network node config; %s", err.Error())
+			return nil
+		}
+	}
+	return config
+}
+
+func (n *NetworkNode) deploy() error {
+	db := DatabaseConnection()
+	var network = &Network{}
+	db.Model(n).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		return fmt.Errorf("Failed to retrieve network for network node: %s", n.ID)
+	}
+
+	cfg := n.ParseConfig()
+	networkCfg := n.ParseConfig()
+
+	targetID, targetOk := cfg["target_id"].(string)
+	role, roleOk := cfg["role"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	regions, regionsOk := cfg["regions"].(map[string]int)
+	rcd, rcdOk := cfg["rc.d"].(string)
+	cloneableImages, cloneableImagesOk := networkCfg["cloneable_images"].(map[string]map[string]interface{})
+	cloneableImagesByRegion, cloneableImagesByRegionOk := cloneableImages[targetID]["regions"].(map[string]interface{})
+
+	if targetOk && roleOk && credsOk && regionsOk && cloneableImagesOk && cloneableImagesByRegionOk {
+		if strings.ToLower(targetID) == "aws" {
+			accessKeyID := credentials["access_key_id"].(string)
+			secretAccessKey := credentials["secret_access_key"].(string)
+
+			var userData = ""
+			if rcdOk {
+				userData = rcd
+			}
+
+			for region := range cloneableImagesByRegion {
+				Log.Debugf("Attempting to deploy %v network node instance(s) in EC2 region: %s", region)
+				if imageByRegion, imageByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imageByRegionOk {
+					if imageVersions, imageVersionsOk := imageByRegion[role].(map[string]string); imageVersionsOk {
+						versions := make([]string, 0)
+						for version := range imageVersions {
+							versions = append(versions, version)
+						}
+						version := imageVersions[versions[len(versions)-1]] // defaults to latest version for now
+						if imageID, imageIDOk := imageVersions[version]; imageIDOk {
+							for region := range regions {
+								Log.Debugf("Attempting to deploy image (%s) version %s in EC2 region: %s", imageID, version, region)
+								if deployCount, deployCountOk := regions[region]; deployCountOk {
+									LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, int64(deployCount))
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // ParseParams - parse the original JSON params used for contract creation
