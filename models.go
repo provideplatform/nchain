@@ -375,6 +375,7 @@ func (n *NetworkNode) deploy() error {
 								}
 								cfgJSON, _ := json.Marshal(cfg)
 								*n.Config = json.RawMessage(cfgJSON)
+								n.Status = stringOrNil("running")
 								db.Save(n)
 								Log.Debugf("Depoyed %v %s@%s instances in EC2 %s region", len(instanceIds), region)
 							}
