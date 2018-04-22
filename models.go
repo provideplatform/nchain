@@ -283,6 +283,22 @@ func (n *NetworkNode) ParseConfig() map[string]interface{} {
 	return config
 }
 
+// Delete a network node
+func (n *NetworkNode) Delete() bool {
+	n.undeploy()
+	db := DatabaseConnection()
+	result := db.Delete(n)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			n.Errors = append(n.Errors, &gocore.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
+	return len(n.Errors) == 0
+}
+
 func (n *NetworkNode) deploy() error {
 	Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
 

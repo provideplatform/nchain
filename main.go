@@ -290,7 +290,27 @@ func createNetworkNodeHandler(c *gin.Context) {
 }
 
 func deleteNetworkNodeHandler(c *gin.Context) {
-	renderError("not implemented", 501, c)
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	var node = &NetworkNode{}
+	DatabaseConnection().Where("network_id = ? id = ?", c.Param("id"), c.Param("nodeId")).Find(&node)
+	if node.ID == uuid.Nil {
+		renderError("network node not found", 404, c)
+		return
+	}
+	if *userID != *node.UserID {
+		renderError("forbidden", 403, c)
+		return
+	}
+	if !node.Delete() {
+		renderError("token not deleted", 500, c)
+		return
+	}
+	render(nil, 204, c)
 }
 
 func networkStatusHandler(c *gin.Context) {
