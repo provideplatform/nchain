@@ -42,3 +42,18 @@ func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, m
 
 	return instanceIds, err
 }
+
+// GetInstanceDetails retrieves EC2 instance details for a given instance id
+func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.DescribeInstancesOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	response, err = client.DescribeInstances(&ec2.DescribeInstancesInput{
+		InstanceIds: []*string{stringOrNil(instanceID)},
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 instance details retrieved for %s: %s", instanceID, response)
+	}
+
+	return response, err
+}

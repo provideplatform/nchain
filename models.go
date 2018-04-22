@@ -343,6 +343,19 @@ func (n *NetworkNode) deploy() error {
 								}
 								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
 								cfg["target_instance_ids"] = instanceIds
+								for n.Host == nil {
+									instanceID := instanceIds[len(instanceIds)-1]
+									instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
+									if err != nil {
+										if len(instanceDetails.Reservations) > 0 {
+											reservation := instanceDetails.Reservations[0]
+											if len(reservation.Instances) > 0 {
+												instance := reservation.Instances[0]
+												n.Host = instance.PublicDnsName
+											}
+										}
+									}
+								}
 								cfgJSON, _ := json.Marshal(cfg)
 								*n.Config = json.RawMessage(cfgJSON)
 								db.Save(n)
