@@ -69,8 +69,8 @@ func TerminateInstance(accessKeyID, secretAccessKey, instanceID string) (respons
 		InstanceIds: []*string{stringOrNil(instanceID)},
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 instance not terminated for %s: %s", instanceID, response)
+	if err != nil {
+		Log.Warningf("EC2 instance not terminated for %s: %s", instanceID, response)
 	}
 
 	return response, err
