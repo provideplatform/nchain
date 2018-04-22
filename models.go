@@ -284,6 +284,8 @@ func (n *NetworkNode) ParseConfig() map[string]interface{} {
 }
 
 func (n *NetworkNode) deploy() error {
+	Log.Debugf("Attempting to deploy network node with id: %s", n.ID)
+
 	db := DatabaseConnection()
 	var network = &Network{}
 	db.Model(n).Related(&network)
