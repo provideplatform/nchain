@@ -294,7 +294,7 @@ func (n *NetworkNode) deploy() error {
 	}
 
 	cfg := n.ParseConfig()
-	networkCfg := n.ParseConfig()
+	networkCfg := network.ParseConfig()
 
 	targetID, targetOk := cfg["target_id"].(string)
 	role, roleOk := cfg["role"].(string)
