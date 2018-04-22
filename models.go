@@ -314,28 +314,28 @@ func (n *NetworkNode) deploy() error {
 				userData = rcd
 			}
 
-			for region := range cloneableImagesByRegion {
+			for region := range regions {
 				Log.Debugf("Attempting to deploy %v network node instance(s) in EC2 region: %s", region)
-				if imageByRegion, imageByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imageByRegionOk {
-					if imageVersions, imageVersionsOk := imageByRegion[role].(map[string]string); imageVersionsOk {
+				if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
+					Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
+					if imageVersions, imageVersionsOk := imagesByRegion[role].(map[string]string); imageVersionsOk {
 						versions := make([]string, 0)
 						for version := range imageVersions {
 							versions = append(versions, version)
 						}
+						Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
 						version := imageVersions[versions[len(versions)-1]] // defaults to latest version for now
 						if imageID, imageIDOk := imageVersions[version]; imageIDOk {
-							for region := range regions {
-								Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-								if deployCount, deployCountOk := regions[region]; deployCountOk {
-									instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, int64(deployCount))
-									if err != nil {
-										return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
-									}
-									Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-									cfg["target_instance_ids"] = instanceIds
-									Log.Debugf("Network node config: %s", n.Config)
-									Log.Debugf("Local cfg: %s", cfg)
+							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
+							if deployCount, deployCountOk := regions[region]; deployCountOk {
+								instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, int64(deployCount))
+								if err != nil {
+									return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
 								}
+								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+								cfg["target_instance_ids"] = instanceIds
+								Log.Debugf("Network node config: %s", n.Config)
+								Log.Debugf("Local cfg: %s", cfg)
 							}
 						}
 					}
