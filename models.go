@@ -346,7 +346,7 @@ func (n *NetworkNode) deploy() error {
 								for n.Host == nil {
 									instanceID := instanceIds[len(instanceIds)-1]
 									instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
-									if err != nil {
+									if err == nil {
 										if len(instanceDetails.Reservations) > 0 {
 											reservation := instanceDetails.Reservations[0]
 											if len(reservation.Instances) > 0 {
