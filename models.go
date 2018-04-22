@@ -304,6 +304,8 @@ func (n *NetworkNode) deploy() error {
 	cloneableImages, cloneableImagesOk := networkCfg["cloneable_images"].(map[string]map[string]interface{})
 	cloneableImagesByRegion, cloneableImagesByRegionOk := cloneableImages[targetID]["regions"].(map[string]interface{})
 
+	Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; rc.d: %s; cloneable images: %s", targetID, role, credentials, regions, rcd, cloneableImages)
+
 	if targetOk && roleOk && credsOk && regionsOk && cloneableImagesOk && cloneableImagesByRegionOk {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["access_key_id"].(string)
