@@ -351,7 +351,7 @@ func (n *NetworkNode) deploy() error {
 											reservation := instanceDetails.Reservations[0]
 											if len(reservation.Instances) > 0 {
 												instance := reservation.Instances[0]
-												n.Host = instance.PublicDnsName
+												n.Host = stringOrNil(*instance.PublicDnsName)
 											}
 										}
 									}
