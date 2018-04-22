@@ -264,6 +264,7 @@ func createNetworkNodeHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
+	node.Status = stringOrNil("pending")
 	node.UserID = userID
 	node.NetworkID = networkID
 

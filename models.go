@@ -36,6 +36,7 @@ type NetworkNode struct {
 	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
 	Host        *string          `json:"host"`
 	Description *string          `json:"description"`
+	Status      *string          `sql:"not null" json:"status"`
 	Config      *json.RawMessage `sql:"type:json" json:"config"`
 }
 

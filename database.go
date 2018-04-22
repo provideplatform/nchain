@@ -31,6 +31,7 @@ func migrateSchema() {
 
 		db.AutoMigrate(&NetworkNode{})
 		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
+		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_status", "status")
 		db.Model(&NetworkNode{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Wallet{})
