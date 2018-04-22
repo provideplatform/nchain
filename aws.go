@@ -10,9 +10,12 @@ import (
 )
 
 // NewEC2
-func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
+func NewEC2(accessKeyID, secretAccessKey string, region *string) (*ec2.EC2, error) {
 	var err error
-	cfg := aws.NewConfig().WithRegion(region).WithMaxRetries(10).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
+	cfg := aws.NewConfig().WithMaxRetries(10).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
+	if region != nil {
+		cfg = cfg.WithRegion(*region)
+	}
 	sess := session.New(cfg)
 	ec2 := ec2.New(sess)
 	return ec2, err
@@ -20,7 +23,7 @@ func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
 
 // LaunchAMI  launches an EC2 instance for a given AMI id
 func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, minCount, maxCount int64) (instanceIds []string, err error) {
-	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+	client, err := NewEC2(accessKeyID, secretAccessKey, stringOrNil(region))
 
 	reservation, err := client.RunInstances(&ec2.RunInstancesInput{
 		ImageId:  stringOrNil(imageID),
@@ -45,7 +48,7 @@ func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, m
 
 // GetInstanceDetails retrieves EC2 instance details for a given instance id
 func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.DescribeInstancesOutput, err error) {
-	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+	client, err := NewEC2(accessKeyID, secretAccessKey, stringOrNil(region))
 
 	response, err = client.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{stringOrNil(instanceID)},
@@ -53,6 +56,21 @@ func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string)
 
 	if response != nil {
 		Log.Debugf("EC2 instance details retrieved for %s: %s", instanceID, response)
+	}
+
+	return response, err
+}
+
+// TerminateInstance destroys an EC2 instance given its instance id
+func TerminateInstance(accessKeyID, secretAccessKey, instanceID string) (response *ec2.TerminateInstancesOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, nil)
+
+	response, err = client.TerminateInstances(&ec2.TerminateInstancesInput{
+		InstanceIds: []*string{stringOrNil(instanceID)},
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 instance not terminated for %s: %s", instanceID, response)
 	}
 
 	return response, err

@@ -37,7 +37,7 @@ type NetworkNode struct {
 	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
 	Host        *string          `json:"host"`
 	Description *string          `json:"description"`
-	Status      *string          `sql:"not null" json:"status"`
+	Status      *string          `sql:"not null;default:'pending'" json:"status"`
 	Config      *json.RawMessage `sql:"type:json" json:"config"`
 }
 
@@ -305,7 +305,8 @@ func (n *NetworkNode) deploy() error {
 	cloneableImages, cloneableImagesOk := networkCfg["cloneable_images"].(map[string]interface{})
 	cloneableImagesByRegion, cloneableImagesByRegionOk := cloneableImages[targetID].(map[string]interface{})["regions"].(map[string]interface{})
 
-	Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; regions: %s, rc.d: %s; cloneable images: %s; network config: %s", targetID, role, credentials, regions, rcd, cloneableImages, networkCfg)
+	Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; regions: %s, rc.d: %s; cloneable images: %s; network config: %s",
+		targetID, role, credentials, regions, rcd, cloneableImages, networkCfg)
 
 	if targetOk && roleOk && credsOk && regionsOk && cloneableImagesOk && cloneableImagesByRegionOk {
 		if strings.ToLower(targetID) == "aws" {
@@ -363,6 +364,39 @@ func (n *NetworkNode) deploy() error {
 							}
 						}
 					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (n *NetworkNode) undeploy() error {
+	Log.Debugf("Attempting to undeploy network node with id: %s", n.ID, n)
+
+	db := DatabaseConnection()
+
+	cfg := n.ParseConfig()
+	targetID, targetOk := cfg["target_id"].(string)
+	instanceIds, instanceIdsOk := cfg["target_instance_ids"].([]string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+
+	if targetOk && instanceIdsOk && credsOk {
+		for i := range instanceIds {
+			instanceID := instanceIds[i]
+
+			if strings.ToLower(targetID) == "aws" {
+				accessKeyID := credentials["aws_access_key_id"].(string)
+				secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+				_, err := TerminateInstance(accessKeyID, secretAccessKey, instanceID)
+				if err != nil {
+					Log.Debugf("Terminated EC2 instance with id: %s", instanceID)
+					n.Status = stringOrNil("terminated")
+					db.Save(n)
+				} else {
+					Log.Warningf("Failed to terminate EC2 instance with id: %s", instanceID)
 				}
 			}
 		}
