@@ -408,7 +408,7 @@ func (n *NetworkNode) undeploy() error {
 				secretAccessKey := credentials["aws_secret_access_key"].(string)
 
 				_, err := TerminateInstance(accessKeyID, secretAccessKey, instanceID)
-				if err != nil {
+				if err == nil {
 					Log.Debugf("Terminated EC2 instance with id: %s", instanceID)
 					n.Status = stringOrNil("terminated")
 					db.Save(n)
