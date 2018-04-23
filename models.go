@@ -299,6 +299,18 @@ func (n *NetworkNode) Delete() bool {
 	return len(n.Errors) == 0
 }
 
+func (n *NetworkNode) clone(cfg json.RawMessage) *NetworkNode {
+	clone := &NetworkNode{
+		NetworkID:   n.NetworkID,
+		UserID:      n.UserID,
+		Description: n.Description,
+		Status:      n.Status,
+		Config:      &cfg,
+	}
+	clone.Create()
+	return clone
+}
+
 func (n *NetworkNode) deploy() error {
 	Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
 
@@ -316,15 +328,44 @@ func (n *NetworkNode) deploy() error {
 	targetID, targetOk := cfg["target_id"].(string)
 	role, roleOk := cfg["role"].(string)
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
-	regions, regionsOk := cfg["regions"].(map[string]interface{})
 	rcd, rcdOk := cfg["rc.d"].(string)
+	region, regionOk := cfg["region"].(string)
 	cloneableImages, cloneableImagesOk := networkCfg["cloneable_images"].(map[string]interface{})
 	cloneableImagesByRegion, cloneableImagesByRegionOk := cloneableImages[targetID].(map[string]interface{})["regions"].(map[string]interface{})
 
-	Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; regions: %s, rc.d: %s; cloneable images: %s; network config: %s",
-		targetID, role, credentials, regions, rcd, cloneableImages, networkCfg)
+	regions, regionsOk := cfg["regions"].(map[string]interface{})
+	if regionsOk && !regionOk {
+		delete(cfg, "regions")
+		Log.Debugf("Handling multi-region deployment request for network node: %s", n.ID)
+		accountedForInitialDeploy := false
+		for _region := range regions {
+			deployCount, deployCountOk := regions[_region]
+			if deployCountOk && deployCount.(float64) > 0 {
+				Log.Debugf("Multi-region deployment request specified %v instances in %s region for network node: %s", deployCount, _region, n.ID)
+				for i := float64(0); i < deployCount.(float64); i++ {
+					if !accountedForInitialDeploy {
+						region = _region
+						regionOk = true
+						accountedForInitialDeploy = true
+						continue
+					}
 
-	if targetOk && roleOk && credsOk && regionsOk && cloneableImagesOk && cloneableImagesByRegionOk {
+					_cfg := map[string]interface{}{}
+					for key, val := range cfg {
+						_cfg[key] = val
+					}
+					_cfg["region"] = _region
+					_cfgJSON, _ := json.Marshal(cfg)
+					n.clone(json.RawMessage(_cfgJSON))
+				}
+			}
+		}
+	}
+
+	Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable images: %s; network config: %s",
+		targetID, role, credentials, region, rcd, cloneableImages, networkCfg)
+
+	if targetOk && roleOk && credsOk && regionOk && cloneableImagesOk && cloneableImagesByRegionOk {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
@@ -334,53 +375,45 @@ func (n *NetworkNode) deploy() error {
 				userData = rcd
 			}
 
-			for region := range regions {
-				deployCount, deployCountOk := regions[region]
-				if deployCount == 0 {
-					continue
-				}
-				Log.Debugf("Attempting to deploy %v network node instance(s) in EC2 region: %s", deployCount, region)
-				if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
-					Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
-					if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
-						Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
-						versions := make([]string, 0)
-						for version := range imageVersionsByRole {
-							versions = append(versions, version)
+			Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
+			if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
+				Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
+				if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
+					Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
+					versions := make([]string, 0)
+					for version := range imageVersionsByRole {
+						versions = append(versions, version)
+					}
+					Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
+					version := versions[len(versions)-1] // defaults to latest version for now
+					Log.Debugf("Attempting to lookup update for version: %s", version)
+					if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
+						Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
+						instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
+						if err != nil {
+							return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
 						}
-						Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
-						version := versions[len(versions)-1] // defaults to latest version for now
-						Log.Debugf("Attempting to lookup update for version: %s", version)
-						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
-							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-							if deployCountOk && deployCount.(float64) > 0 {
-								instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, int64(deployCount.(float64)))
-								if err != nil {
-									return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
-								}
-								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-								cfg["region"] = region
-								cfg["target_instance_ids"] = instanceIds
-								for n.Host == nil {
-									instanceID := instanceIds[len(instanceIds)-1]
-									instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
-									if err == nil {
-										if len(instanceDetails.Reservations) > 0 {
-											reservation := instanceDetails.Reservations[0]
-											if len(reservation.Instances) > 0 {
-												instance := reservation.Instances[0]
-												n.Host = stringOrNil(*instance.PublicDnsName)
-											}
-										}
+						Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+						cfg["region"] = region
+						cfg["target_instance_ids"] = instanceIds
+						for n.Host == nil {
+							instanceID := instanceIds[len(instanceIds)-1]
+							instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
+							if err == nil {
+								if len(instanceDetails.Reservations) > 0 {
+									reservation := instanceDetails.Reservations[0]
+									if len(reservation.Instances) > 0 {
+										instance := reservation.Instances[0]
+										n.Host = stringOrNil(*instance.PublicDnsName)
 									}
 								}
-								cfgJSON, _ := json.Marshal(cfg)
-								*n.Config = json.RawMessage(cfgJSON)
-								n.Status = stringOrNil("running")
-								db.Save(n)
-								Log.Debugf("Depoyed %v %s@%s instances in EC2 %s region", len(instanceIds), imageID, version, region)
 							}
 						}
+						cfgJSON, _ := json.Marshal(cfg)
+						*n.Config = json.RawMessage(cfgJSON)
+						n.Status = stringOrNil("running")
+						db.Save(n)
+						Log.Debugf("Depoyed %v %s@%s instances in EC2 %s region", len(instanceIds), imageID, version, region)
 					}
 				}
 			}
