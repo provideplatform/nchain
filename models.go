@@ -355,7 +355,7 @@ func (n *NetworkNode) deploy() error {
 						_cfg[key] = val
 					}
 					_cfg["region"] = _region
-					_cfgJSON, _ := json.Marshal(cfg)
+					_cfgJSON, _ := json.Marshal(_cfg)
 					n.clone(json.RawMessage(_cfgJSON))
 				}
 			}
