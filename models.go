@@ -1,15 +1,23 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/core/types"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/provideapp/go-core"
+	provide "github.com/provideservices/provide-go"
 
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
@@ -39,15 +47,6 @@ type NetworkNode struct {
 	Description *string          `json:"description"`
 	Status      *string          `sql:"not null;default:'pending'" json:"status"`
 	Config      *json.RawMessage `sql:"type:json" json:"config"`
-}
-
-// NetworkStatus provides network-agnostic status
-type NetworkStatus struct {
-	Block   *uint64                `json:"block"`   // current block
-	Height  *uint64                `json:"height"`  // total height of the blockchain; null after syncing completed
-	State   *string                `json:"state"`   // i.e., syncing, synced, etc
-	Syncing bool                   `json:"syncing"` // when true, the network is in the process of syncing the ledger; available functionaltiy will be network-specific
-	Meta    map[string]interface{} `json:"meta"`    // network-specific metadata
 }
 
 // Bridge instances are still in the process of being defined.
@@ -221,10 +220,15 @@ func (n *Network) ParseConfig() map[string]interface{} {
 	return config
 }
 
+func (n *Network) rpcURL() string {
+	cfg := n.ParseConfig()
+	return cfg["json_rpc_url"].(string)
+}
+
 // Status retrieves metadata and metrics specific to the given network
-func (n *Network) Status() (status *NetworkStatus, err error) {
+func (n *Network) Status() (status *provide.NetworkStatus, err error) {
 	if n.isEthereumNetwork() {
-		status, err = n.ethereumNetworkStatus()
+		status, err = provide.GetNetworkStatus(n.ID.String(), n.rpcURL())
 	} else {
 		Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
 	}
@@ -232,6 +236,25 @@ func (n *Network) Status() (status *NetworkStatus, err error) {
 		Log.Warningf("Unable to determine status of %s network; %s", *n.Name, err.Error())
 	}
 	return status, err
+}
+
+func (n *Network) isEthereumNetwork() bool {
+	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
+		return true
+	}
+
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isEthereumNetwork, ok := cfg["is_ethereum_network"]; ok {
+			if _ok := isEthereumNetwork.(bool); _ok {
+				return isEthereumNetwork.(bool)
+			}
+		}
+		if _, ok := cfg["parity_json_rpc_url"]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Create and persist a new network node
@@ -479,6 +502,8 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	db := DatabaseConnection()
 	var network = &Network{}
 	db.Model(c).Related(&network)
+	var wallet = &Wallet{}
+	db.Where("id = ?", walletID).Find(&wallet)
 
 	tx := &Transaction{
 		ApplicationID: c.ApplicationID,
@@ -492,7 +517,8 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	var receipt *interface{}
 
 	if network.isEthereumNetwork() {
-		receipt, err = c.executeEthereumContract(network, tx, method, params)
+		contractAbi, _ := c.readEthereumContractAbi()
+		receipt, err = provide.ExecuteContract(network.ID.String(), network.rpcURL(), wallet.Address, tx.To, tx.Data, value, method, contractAbi, params)
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *network.Name)
 	}
@@ -541,6 +567,29 @@ func (c *Contract) Create() bool {
 		}
 	}
 	return false
+}
+
+func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
+	var _abi *abi.ABI
+	params := c.ParseParams()
+	if contractAbi, ok := params["abi"]; ok {
+		abistr, err := json.Marshal(contractAbi)
+		if err != nil {
+			Log.Warningf("Failed to marshal ABI from contract params to json; %s", err.Error())
+			return nil, err
+		}
+
+		abival, err := abi.JSON(strings.NewReader(string(abistr)))
+		if err != nil {
+			Log.Warningf("Failed to initialize ABI from contract  params to json; %s", err.Error())
+			return nil, err
+		}
+
+		_abi = &abival
+	} else {
+		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
+	}
+	return _abi, nil
 }
 
 // GetTransaction - retrieve the associated contract creation transaction
@@ -707,6 +756,14 @@ func (t *Token) GetContract() (*Contract, error) {
 	return contract, nil
 }
 
+func (t *Token) readEthereumContractAbi() (*abi.ABI, error) {
+	contract, err := t.GetContract()
+	if err != nil {
+		return nil, err
+	}
+	return contract.readEthereumContractAbi()
+}
+
 // GetNetwork - retrieve the associated transaction network
 func (t *Transaction) GetNetwork() (*Network, error) {
 	db := DatabaseConnection()
@@ -752,7 +809,11 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 	}
 
 	if network.isEthereumNetwork() {
-		err = t.broadcastSignedEthereumTx(network, wallet)
+		if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
+			err = provide.BroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
+		} else {
+			err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
+		}
 	} else {
 		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
@@ -772,7 +833,8 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 	var err error
 
 	if network.isEthereumNetwork() {
-		t.SignedTx, err = t.signEthereumTx(network, wallet)
+		privateKey := wallet.PrivateKey // FIXME: decrypt
+		t.SignedTx, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, *privateKey, t.To, t.Data, t.Value.BigInt())
 	} else {
 		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
@@ -790,7 +852,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 
 func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet) {
 	if network.isEthereumNetwork() {
-		receipt, err := t.fetchEthereumTxReceipt(network, wallet)
+		receipt, err := provide.GetTxReceipt(network.ID.String(), network.rpcURL(), *t.Hash, wallet.Address)
 		if err != nil {
 			Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", t.Hash, err.Error())
 			t.Errors = append(t.Errors, &gocore.Error{
@@ -799,7 +861,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 		} else {
 			Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", t.Hash, receipt)
 
-			traces, traceErr := traceEthereumTx(network, t.Hash)
+			traces, traceErr := provide.TraceTx(network.ID.String(), network.rpcURL(), t.Hash)
 			if traceErr != nil {
 				Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
 			}
@@ -905,7 +967,7 @@ func (t *Transaction) RefreshDetails() error {
 	var err error
 	network, _ := t.GetNetwork()
 	if network.isEthereumNetwork() {
-		t.Traces, err = traceEthereumTx(network, t.Hash)
+		t.Traces, err = provide.TraceTx(network.ID.String(), network.rpcURL(), t.Hash)
 	}
 	if err != nil {
 		return err
@@ -924,10 +986,10 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 	var encodedPrivateKey *string
 
 	if network.isEthereumNetwork() {
-		addr, _encodedPrivateKey, err := generateEthereumKeyPair()
+		addr, privateKey, err := provide.GenerateKeyPair()
 		if err == nil {
 			w.Address = *addr
-			encodedPrivateKey = _encodedPrivateKey
+			encodedPrivateKey = stringOrNil(hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
 		}
 	} else {
 		Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", *network.Name)
@@ -1019,7 +1081,7 @@ func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
 	var network = &Network{}
 	db.Model(w).Related(&network)
 	if network.isEthereumNetwork() {
-		balance, err = ethereumNativeBalance(network, w.Address)
+		balance, err = provide.GetNativeBalance(network.ID.String(), network.rpcURL(), w.Address)
 		if err != nil {
 			return nil, err
 		}
@@ -1033,7 +1095,6 @@ func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
 // Retrieve a wallet's token balance for a given token id
 func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
 	var balance *big.Int
-	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
 	var token = &Token{}
@@ -1043,7 +1104,8 @@ func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
 		return nil, fmt.Errorf("Unable to read token balance for invalid token: %s", tokenID)
 	}
 	if network.isEthereumNetwork() {
-		balance, err = ethereumTokenBalance(network, token, w.Address)
+		contractAbi, err := token.readEthereumContractAbi()
+		balance, err = provide.GetTokenBalance(network.ID.String(), network.rpcURL(), *token.Address, w.Address, contractAbi)
 		if err != nil {
 			return nil, err
 		}
@@ -1059,4 +1121,24 @@ func (w *Wallet) TxCount() (count *uint64) {
 	db := DatabaseConnection()
 	db.Model(&Transaction{}).Where("wallet_id = ?", w.ID).Count(&count)
 	return count
+}
+
+// decryptECDSAPrivateKey - read the wallet-specific ECDSA private key; required for signing transactions on behalf of the wallet
+func decryptECDSAPrivateKey(encryptedKey, gpgPrivateKey, gpgEncryptionKey string) (*ecdsa.PrivateKey, error) {
+	results := make([]byte, 1)
+	db := DatabaseConnection()
+	rows, err := db.Raw("SELECT pgp_pub_decrypt(?, dearmor(?), ?) as private_key", encryptedKey, gpgPrivateKey, gpgEncryptionKey).Rows()
+	if err != nil {
+		return nil, err
+	}
+	if rows.Next() {
+		rows.Scan(&results)
+		privateKeyBytes, err := hex.DecodeString(string(results))
+		if err != nil {
+			Log.Warningf("Failed to read ecdsa private key from encrypted storage; %s", err.Error())
+			return nil, err
+		}
+		return ethcrypto.ToECDSA(privateKeyBytes)
+	}
+	return nil, errors.New("Failed to decode ecdsa private key after retrieval from encrypted storage")
 }
