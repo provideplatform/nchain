@@ -1072,8 +1072,7 @@ func (w *Wallet) Validate() bool {
 	return len(w.Errors) == 0
 }
 
-// NativeCurrencyBalance
-// Retrieve a wallet's native currency/token balance
+// NativeCurrencyBalance retrieves a wallet's native currency/token balance
 func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
 	var balance *big.Int
 	var err error
@@ -1091,8 +1090,7 @@ func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
 	return balance, nil
 }
 
-// TokenBalance
-// Retrieve a wallet's token balance for a given token id
+// TokenBalance retrieves a wallet's token balance for a given token id
 func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
 	var balance *big.Int
 	db := DatabaseConnection()
@@ -1115,8 +1113,7 @@ func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
 	return balance, nil
 }
 
-// TxCount
-// Retrieve a count of transactions signed by the wallet
+// TxCount retrieves a count of transactions signed by the wallet
 func (w *Wallet) TxCount() (count *uint64) {
 	db := DatabaseConnection()
 	db.Model(&Transaction{}).Where("wallet_id = ?", w.ID).Count(&count)
