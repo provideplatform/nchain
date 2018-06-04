@@ -176,7 +176,7 @@ func networksListHandler(c *gin.Context) {
 		query = query.Or("networks.application_id = ?", appID)
 	}
 
-	if strings.ToLower(c.Query("networks.cloneable")) == "true" {
+	if strings.ToLower(c.Query("cloneable")) == "true" {
 		query = query.Where("networks.cloneable = true")
 	}
 
