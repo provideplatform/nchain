@@ -176,6 +176,11 @@ func (v *TxValue) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
+func NetworkListQuery() *gorm.DB {
+	return DatabaseConnection().Select("networks.id, networks.application_id, networks.user_id, networks.name, networks.description", "networks.is_production", "networks.enabled", "networks.chain_id", "networks.sidechain_id", "networks.network_id")
+}
+
 // Create and persist a new network
 func (n *Network) Create() bool {
 	if !n.Validate() {
@@ -487,6 +492,11 @@ func (n *NetworkNode) undeploy() error {
 	}
 
 	return nil
+}
+
+// ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
+func ContractListQuery() *gorm.DB {
+	return DatabaseConnection().Select("contracts.id, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.name, contracts.address")
 }
 
 // ParseParams - parse the original JSON params used for contract creation

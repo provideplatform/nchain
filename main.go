@@ -169,18 +169,18 @@ func createNetworkHandler(c *gin.Context) {
 
 func networksListHandler(c *gin.Context) {
 	var networks []Network
-	query := DatabaseConnection().Where("networks.enabled = true AND networks.application_id IS NULL").Order("created_at ASC")
+	query := NetworkListQuery().Where("networks.enabled = true AND networks.application_id IS NULL")
 
 	appID := authorizedSubjectId(c, "application")
 	if appID != nil {
 		query = query.Or("networks.application_id = ?", appID)
 	}
 
-	if strings.ToLower(c.Query("cloneable")) == "true" {
+	if strings.ToLower(c.Query("networks.cloneable")) == "true" {
 		query = query.Where("networks.cloneable = true")
 	}
 
-	query.Omit("config").Order("created_at ASC").Find(&networks)
+	query.Order("networks.created_at ASC").Find(&networks)
 	render(networks, 200, c)
 }
 
@@ -348,7 +348,7 @@ func contractsListHandler(c *gin.Context) {
 		return
 	}
 
-	query := DatabaseConnection().Where("contracts.application_id = ?", appID)
+	query := ContractListQuery().Where("contracts.application_id = ?", appID)
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
 	if filterTokens {
