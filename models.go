@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -185,6 +186,7 @@ func (n *Network) Create() bool {
 	db := DatabaseConnection()
 
 	if db.NewRecord(n) {
+		n.setChainID()
 		result := db.Create(&n)
 		rowsAffected := result.RowsAffected
 		errors := result.GetErrors()
@@ -200,6 +202,17 @@ func (n *Network) Create() bool {
 		}
 	}
 	return false
+}
+
+// setChainID is an internal method used to set a unique chainID for the network prior to its creation
+func (n *Network) setChainID() {
+	n.ChainID = stringOrNil(fmt.Sprintf("0x%x", time.Now().Unix()))
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if chainspec, ok := cfg["chainspec"].(map[string]interface{}); ok {
+			chainspec["networkID"] = n.ChainID
+		}
+	}
 }
 
 // Validate a network for persistence
