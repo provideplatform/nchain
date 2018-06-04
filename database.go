@@ -28,7 +28,7 @@ func migrateSchema() {
 		db.Model(&Network{}).AddIndex("idx_networks_enabled", "enabled")
 		db.Model(&Network{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
-		db.Model(&Network{}).AddUniqueIndex("idx_chain_id", "chain_id")
+		db.Model(&Network{}).AddUniqueIndex("idx_network_chain_id", "network_id", "chain_id")
 
 		db.AutoMigrate(&NetworkNode{})
 		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
