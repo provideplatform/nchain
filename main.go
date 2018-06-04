@@ -637,12 +637,19 @@ func walletsListHandler(c *gin.Context) {
 		return
 	}
 
+	query := DatabaseConnection()
+
 	var wallets []Wallet
 	if appID != nil {
-		DatabaseConnection().Where("application_id = ?", appID).Find(&wallets)
+		query = query.Where("application_id = ?", appID).Find(&wallets)
 	} else if userID != nil {
-		DatabaseConnection().Where("user_id = ?", userID).Find(&wallets)
+		query = query.Where("user_id = ?", userID).Find(&wallets)
 	}
+
+	if c.Query("network_id") != "" {
+		query = query.Where("wallets.network_id = ?", c.Query("network_id"))
+	}
+
 	render(wallets, 200, c)
 }
 
