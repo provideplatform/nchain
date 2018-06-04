@@ -222,7 +222,12 @@ func (n *Network) ParseConfig() map[string]interface{} {
 
 func (n *Network) rpcURL() string {
 	cfg := n.ParseConfig()
-	return cfg["json_rpc_url"].(string)
+	if rpcURL, ok := cfg["json_rpc_url"].(string); ok {
+		return rpcURL
+	} else if rpcURL, ok := cfg["parity_json_rpc_url"].(string); ok {
+		return rpcURL
+	}
+	return ""
 }
 
 // Status retrieves metadata and metrics specific to the given network
