@@ -204,13 +204,22 @@ func (n *Network) Create() bool {
 	return false
 }
 
+// setConfig sets the network config in-memory
+func (n *Network) setConfig(cfg map[string]interface{}) {
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+}
+
 // setChainID is an internal method used to set a unique chainID for the network prior to its creation
 func (n *Network) setChainID() {
 	n.ChainID = stringOrNil(fmt.Sprintf("0x%x", time.Now().Unix()))
 	cfg := n.ParseConfig()
 	if cfg != nil {
-		if chainspec, ok := cfg["chainspec"].(map[string]interface{}); ok {
-			chainspec["networkID"] = n.ChainID
+		if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+			if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
+				params["networkID"] = n.ChainID
+			}
+			n.setConfig(cfg)
 		}
 	}
 }
