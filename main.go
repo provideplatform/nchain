@@ -180,7 +180,7 @@ func networksListHandler(c *gin.Context) {
 		query = query.Where("networks.cloneable = true")
 	}
 
-	query.Order("created_at ASC").Find(&networks)
+	query.Omit("config").Order("created_at ASC").Find(&networks)
 	render(networks, 200, c)
 }
 
@@ -356,7 +356,7 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	query.Order("created_at ASC").Find(&contracts)
+	query.Omit("params").Order("created_at ASC").Find(&contracts)
 	render(contracts, 200, c)
 }
 
