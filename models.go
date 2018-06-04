@@ -866,8 +866,9 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 	var err error
 
 	if network.isEthereumNetwork() {
-		privateKey := wallet.PrivateKey // FIXME: decrypt
-		t.SignedTx, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, *privateKey, t.To, t.Data, t.Value.BigInt())
+		privateKey, _ := decryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
+		_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+		t.SignedTx, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt())
 	} else {
 		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
