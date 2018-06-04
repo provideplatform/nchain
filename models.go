@@ -1093,9 +1093,16 @@ func (w *Wallet) Validate() bool {
 		})
 	}
 	var err error
-	if network.isEthereumNetwork() {
-		_, err = decryptECDSAPrivateKey(*w.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
+	if w.PrivateKey != nil {
+		if network.isEthereumNetwork() {
+			_, err = decryptECDSAPrivateKey(*w.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
+		}
+	} else {
+		w.Errors = append(w.Errors, &gocore.Error{
+			Message: stringOrNil("private key generation failed"),
+		})
 	}
+
 	if err != nil {
 		msg := err.Error()
 		w.Errors = append(w.Errors, &gocore.Error{
