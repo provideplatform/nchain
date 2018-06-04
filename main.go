@@ -674,18 +674,21 @@ func walletDetailsHandler(c *gin.Context) {
 		renderError("forbidden", 403, c)
 		return
 	}
-	tokenId := c.Param("tokenId")
-	if tokenId == "" {
-		wallet.Balance, err = wallet.NativeCurrencyBalance()
-		if err != nil {
-			renderError(err.Error(), 400, c)
-			return
-		}
-	} else {
-		wallet.Balance, err = wallet.TokenBalance(c.Param("tokenId"))
-		if err != nil {
-			renderError(err.Error(), 400, c)
-			return
+	network, err := wallet.GetNetwork()
+	if err == nil && network.rpcURL() != "" {
+		tokenId := c.Param("tokenId")
+		if tokenId == "" {
+			wallet.Balance, err = wallet.NativeCurrencyBalance()
+			if err != nil {
+				renderError(err.Error(), 400, c)
+				return
+			}
+		} else {
+			wallet.Balance, err = wallet.TokenBalance(c.Param("tokenId"))
+			if err != nil {
+				renderError(err.Error(), 400, c)
+				return
+			}
 		}
 	}
 
