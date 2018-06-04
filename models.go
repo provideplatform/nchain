@@ -513,7 +513,7 @@ func (n *NetworkNode) undeploy() error {
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
 func ContractListQuery() *gorm.DB {
-	return DatabaseConnection().Select("contracts.id, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.name, contracts.address")
+	return DatabaseConnection().Select("id, application_id, network_id, transaction_id, name, address")
 }
 
 // ParseParams - parse the original JSON params used for contract creation
