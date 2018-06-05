@@ -760,20 +760,6 @@ func (t *Token) Validate() bool {
 				})
 			}
 		}
-		// if t.SaleContractID != nil {
-		// 	if t.NetworkID != saleContract.NetworkID {
-		// 		t.Errors = append(t.Errors, &gocore.Error{
-		// 			Message: stringOrNil("Token network did not match token sale contract network"),
-		// 		})
-		// 	}
-		// 	if t.SaleAddress == nil {
-		// 		t.SaleAddress = saleContract.Address
-		// 	} else if t.SaleAddress != nil && *t.SaleAddress != *saleContract.Address {
-		// 		t.Errors = append(t.Errors, &gocore.Error{
-		// 			Message: stringOrNil("Token sale address did not match referenced token sale contract address"),
-		// 		})
-		// 	}
-		// }
 	}
 	return len(t.Errors) == 0
 }
@@ -1101,9 +1087,6 @@ func (w *Wallet) Validate() bool {
 	if w.PrivateKey != nil {
 		if network.isEthereumNetwork() {
 			_, err = decryptECDSAPrivateKey(*w.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
-			if err != nil {
-				Log.Errorf("NOOOOO; %s", err.Error())
-			}
 		}
 	} else {
 		w.Errors = append(w.Errors, &gocore.Error{
