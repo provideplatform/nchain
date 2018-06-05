@@ -869,7 +869,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 		if wallet.PrivateKey != nil {
 			privateKey, _ := decryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-			t.SignedTx, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt())
+			t.SignedTx, t.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt())
 		} else {
 			err = fmt.Errorf("Unable to sign tx; no private key for wallet: %s", wallet.ID)
 		}
@@ -1101,6 +1101,9 @@ func (w *Wallet) Validate() bool {
 	if w.PrivateKey != nil {
 		if network.isEthereumNetwork() {
 			_, err = decryptECDSAPrivateKey(*w.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
+			if err != nil {
+				Log.Errorf("NOOOOO; %s", err.Error())
+			}
 		}
 	} else {
 		w.Errors = append(w.Errors, &gocore.Error{
