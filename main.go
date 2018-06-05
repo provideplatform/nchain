@@ -356,7 +356,7 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	query.Order("created_at ASC").Find(&contracts)
+	query.Order("contracts.created_at ASC").Find(&contracts)
 	render(contracts, 200, c)
 }
 
