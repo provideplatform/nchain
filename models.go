@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
@@ -122,7 +121,7 @@ type Transaction struct {
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
 	WalletID      uuid.UUID                  `sql:"not null;type:uuid" json:"wallet_id"`
 	To            *string                    `json:"to"`
-	Value         *TxValue                   `sql:"not null;type:decimal;default:0" json:"value"`
+	Value         *TxValue                   `sql:"not null" json:"value"`
 	Data          *string                    `json:"data"`
 	Hash          *string                    `sql:"not null" json:"hash"`
 	Status        *string                    `sql:"not null;default:'pending'" json:"status"`
@@ -148,21 +147,13 @@ type TxValue struct {
 }
 
 func (v *TxValue) Value() (driver.Value, error) {
-	f := new(big.Float)
-	f.SetUint64(v.value.Uint64())
-	f64, _ := f.Float64()
-	return f64, nil
+	return v.value.String(), nil
 }
 
 func (v *TxValue) Scan(val interface{}) error {
-	f64 := new(sql.NullFloat64)
-	err := f64.Scan(val)
-	if err != nil {
-		return err
-	}
 	v.value = new(big.Int)
-	if f64.Valid {
-		v.value.SetUint64(uint64(f64.Float64)) // HACK -- loss of precision possible
+	if str, ok := val.(string); ok {
+		v.value.SetString(str, 10)
 	}
 	return nil
 }
