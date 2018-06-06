@@ -894,7 +894,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 							t.Errors = append(t.Errors, &gocore.Error{
 								Message: stringOrNil(err.Error()),
 							})
-							db.Save(&t)
+							t.updateStatus(db, "failed")
 							ticker.Stop()
 							return
 						}
@@ -912,8 +912,8 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 						}
 						t.Traces = traces
 
+						t.updateStatus(db, "success")
 						t.handleEthereumTxReceipt(db, network, wallet, receipt)
-						db.Save(&t)
 						ticker.Stop()
 						return
 					}
