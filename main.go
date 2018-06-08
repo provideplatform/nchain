@@ -40,6 +40,7 @@ func main() {
 	r.GET("/api/v1/prices", pricesHandler)
 
 	r.GET("/api/v1/contracts", contractsListHandler)
+	r.GET("/api/v1/contracts/:id", contractDetailsHandler)
 	r.POST("/api/v1/contracts", createContractHandler)
 	r.POST("/api/v1/contracts/:id/execute", contractExecutionHandler)
 
@@ -358,6 +359,33 @@ func contractsListHandler(c *gin.Context) {
 	var contracts []Contract
 	query.Order("contracts.created_at ASC").Find(&contracts)
 	render(contracts, 200, c)
+}
+
+func contractDetailsHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	db := DatabaseConnection()
+	var contract = &Contract{}
+
+	db.Where("id = ?", c.Param("id")).Find(&contract)
+
+	if contract == nil || contract.ID == uuid.Nil { // attempt to lookup the contract by address
+		db.Where("address = ?", c.Param("id")).Find(&contract)
+	}
+
+	if contract == nil || contract.ID == uuid.Nil {
+		renderError("contract not found", 404, c)
+		return
+	} else if appID != nil && *contract.ApplicationID != *appID {
+		renderError("forbidden", 403, c)
+		return
+	}
+
+	render(contract, 200, c)
 }
 
 func createContractHandler(c *gin.Context) {
