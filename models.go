@@ -27,6 +27,9 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
+const receiptTickerInterval = time.Millisecond * 2500
+const receiptTickerTimeout = time.Minute * 1
+
 // Network
 type Network struct {
 	gocore.Model
@@ -871,8 +874,9 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 
 func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet) {
 	if network.isEthereumNetwork() {
-		ticker := time.NewTicker(time.Millisecond * 1000)
+		ticker := time.NewTicker(time.Millisecond * 2500)
 		go func() {
+			startedAt := time.Now()
 			for {
 				select {
 				case <-ticker.C:
@@ -880,6 +884,12 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 					if err != nil {
 						if err == ethereum.NotFound {
 							Log.Debugf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
+							if time.Now().Sub(startedAt) >= receiptTickerTimeout {
+								Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; timing out after %v", *t.Hash, receiptTickerTimeout)
+								t.updateStatus(db, "failed")
+								ticker.Stop()
+								return
+							}
 						} else {
 							Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
 							t.Errors = append(t.Errors, &gocore.Error{
