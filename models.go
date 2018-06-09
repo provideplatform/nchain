@@ -1290,6 +1290,7 @@ func decryptECDSAPrivateKey(encryptedKey, gpgPrivateKey, gpgEncryptionKey string
 	results := make([]byte, 1)
 	db := DatabaseConnection()
 	rows, err := db.Raw("SELECT pgp_pub_decrypt(?, dearmor(?), ?) as private_key", encryptedKey, gpgPrivateKey, gpgEncryptionKey).Rows()
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
