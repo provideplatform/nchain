@@ -276,7 +276,7 @@ func createNetworkNodeHandler(c *gin.Context) {
 		return
 	}
 
-	if *network.UserID != *userID {
+	if network.UserID != nil && *network.UserID != *userID {
 		renderError("forbidden", 403, c)
 		return
 	}
