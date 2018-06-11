@@ -29,6 +29,8 @@ import (
 
 const receiptTickerInterval = time.Millisecond * 2500
 const receiptTickerTimeout = time.Minute * 1
+const resolveHostTickerInterval = time.Millisecond * 5000
+const resolveHostTickerTimeout = time.Minute * 5
 
 // Network
 type Network struct {
@@ -305,12 +307,25 @@ func (n *NetworkNode) Create() bool {
 		if !db.NewRecord(n) {
 			success := rowsAffected > 0
 			if success {
-				n.deploy()
+				n.deploy(db)
 			}
 			return success
 		}
 	}
 	return false
+}
+
+func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
+	n.Status = stringOrNil(status)
+	result := db.Save(&n)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			n.Errors = append(n.Errors, &gocore.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
 }
 
 // Validate a network node for persistence
@@ -360,116 +375,139 @@ func (n *NetworkNode) clone(cfg json.RawMessage) *NetworkNode {
 	return clone
 }
 
-func (n *NetworkNode) deploy() error {
-	Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
+func (n *NetworkNode) deploy(db *gorm.DB) {
+	go func() {
+		Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
 
-	db := DatabaseConnection()
+		db := DatabaseConnection()
 
-	var network = &Network{}
-	db.Model(n).Related(&network)
-	if network == nil || network.ID == uuid.Nil {
-		return fmt.Errorf("Failed to retrieve network for network node: %s", n.ID)
-	}
+		var network = &Network{}
+		db.Model(n).Related(&network)
+		if network == nil || network.ID == uuid.Nil {
+			n.updateStatus(db, "failed")
+			Log.Warningf("Failed to retrieve network for network node: %s", n.ID)
+			return
+		}
 
-	cfg := n.ParseConfig()
-	networkCfg := network.ParseConfig()
+		cfg := n.ParseConfig()
+		networkCfg := network.ParseConfig()
 
-	targetID, targetOk := cfg["target_id"].(string)
-	role, roleOk := cfg["role"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
-	rcd, rcdOk := cfg["rc.d"].(string)
-	region, regionOk := cfg["region"].(string)
-	cloneableImages, cloneableImagesOk := networkCfg["cloneable_images"].(map[string]interface{})
-	cloneableImagesByRegion, cloneableImagesByRegionOk := cloneableImages[targetID].(map[string]interface{})["regions"].(map[string]interface{})
+		targetID, targetOk := cfg["target_id"].(string)
+		role, roleOk := cfg["role"].(string)
+		credentials, credsOk := cfg["credentials"].(map[string]interface{})
+		rcd, rcdOk := cfg["rc.d"].(string)
+		region, regionOk := cfg["region"].(string)
+		cloneableImages, cloneableImagesOk := networkCfg["cloneable_images"].(map[string]interface{})
+		cloneableImagesByRegion, cloneableImagesByRegionOk := cloneableImages[targetID].(map[string]interface{})["regions"].(map[string]interface{})
 
-	regions, regionsOk := cfg["regions"].(map[string]interface{})
-	if regionsOk && !regionOk {
-		delete(cfg, "regions")
-		Log.Debugf("Handling multi-region deployment request for network node: %s", n.ID)
-		accountedForInitialDeploy := false
-		for _region := range regions {
-			deployCount, deployCountOk := regions[_region]
-			if deployCountOk && deployCount.(float64) > 0 {
-				Log.Debugf("Multi-region deployment request specified %v instances in %s region for network node: %s", deployCount, _region, n.ID)
-				for i := float64(0); i < deployCount.(float64); i++ {
-					if !accountedForInitialDeploy {
-						region = _region
-						regionOk = true
-						accountedForInitialDeploy = true
-						continue
+		regions, regionsOk := cfg["regions"].(map[string]interface{})
+		if regionsOk && !regionOk {
+			delete(cfg, "regions")
+			Log.Debugf("Handling multi-region deployment request for network node: %s", n.ID)
+			accountedForInitialDeploy := false
+			for _region := range regions {
+				deployCount, deployCountOk := regions[_region]
+				if deployCountOk && deployCount.(float64) > 0 {
+					Log.Debugf("Multi-region deployment request specified %v instances in %s region for network node: %s", deployCount, _region, n.ID)
+					for i := float64(0); i < deployCount.(float64); i++ {
+						if !accountedForInitialDeploy {
+							region = _region
+							regionOk = true
+							accountedForInitialDeploy = true
+							continue
+						}
+
+						_cfg := map[string]interface{}{}
+						for key, val := range cfg {
+							_cfg[key] = val
+						}
+						_cfg["region"] = _region
+						_cfgJSON, _ := json.Marshal(_cfg)
+						n.clone(json.RawMessage(_cfgJSON))
 					}
-
-					_cfg := map[string]interface{}{}
-					for key, val := range cfg {
-						_cfg[key] = val
-					}
-					_cfg["region"] = _region
-					_cfgJSON, _ := json.Marshal(_cfg)
-					n.clone(json.RawMessage(_cfgJSON))
 				}
 			}
 		}
-	}
 
-	Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable images: %s; network config: %s",
-		targetID, role, credentials, region, rcd, cloneableImages, networkCfg)
+		Log.Debugf("Configuration for network node deploy: target id: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable images: %s; network config: %s",
+			targetID, role, credentials, region, rcd, cloneableImages, networkCfg)
 
-	if targetOk && roleOk && credsOk && regionOk && cloneableImagesOk && cloneableImagesByRegionOk {
-		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
+		if targetOk && roleOk && credsOk && regionOk && cloneableImagesOk && cloneableImagesByRegionOk {
+			if strings.ToLower(targetID) == "aws" {
+				accessKeyID := credentials["aws_access_key_id"].(string)
+				secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-			var userData = ""
-			if rcdOk {
-				userData = rcd
-			}
+				var userData = ""
+				if rcdOk {
+					userData = rcd
+				}
 
-			Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
-			if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
-				Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
-				if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
-					Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
-					versions := make([]string, 0)
-					for version := range imageVersionsByRole {
-						versions = append(versions, version)
-					}
-					Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
-					version := versions[len(versions)-1] // defaults to latest version for now
-					Log.Debugf("Attempting to lookup update for version: %s", version)
-					if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
-						Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-						instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
-						if err != nil {
-							return fmt.Errorf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
+				Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
+				if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
+					Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
+					if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
+						Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
+						versions := make([]string, 0)
+						for version := range imageVersionsByRole {
+							versions = append(versions, version)
 						}
-						Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-						cfg["region"] = region
-						cfg["target_instance_ids"] = instanceIds
-						for n.Host == nil {
-							instanceID := instanceIds[len(instanceIds)-1]
-							instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
-							if err == nil {
-								if len(instanceDetails.Reservations) > 0 {
-									reservation := instanceDetails.Reservations[0]
-									if len(reservation.Instances) > 0 {
-										instance := reservation.Instances[0]
-										n.Host = stringOrNil(*instance.PublicDnsName)
-									}
-								}
+						Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
+						version := versions[len(versions)-1] // defaults to latest version for now
+						Log.Debugf("Attempting to lookup update for version: %s", version)
+						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
+							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
+							instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
+							if err != nil {
+								n.updateStatus(db, "failed")
+								Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
+								return
 							}
+							Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+							cfg["region"] = region
+							cfg["target_instance_ids"] = instanceIds
+							n.resolveHost(db, network, cfg, instanceIds, accessKeyID, secretAccessKey, region)
 						}
-						cfgJSON, _ := json.Marshal(cfg)
-						*n.Config = json.RawMessage(cfgJSON)
-						n.Status = stringOrNil("running")
-						db.Save(n)
-						Log.Debugf("Depoyed %v %s@%s instances in EC2 %s region", len(instanceIds), imageID, version, region)
 					}
 				}
 			}
 		}
-	}
+	}()
+}
 
-	return nil
+func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]interface{}, instanceIds []string, accessKeyID, secretAccessKey, region string) {
+	ticker := time.NewTicker(resolveHostTickerInterval)
+	startedAt := time.Now()
+	for {
+		select {
+		case <-ticker.C:
+			for n.Host == nil {
+				if time.Now().Sub(startedAt) >= resolveHostTickerTimeout {
+					Log.Warningf("Failed to resolve hostname for network node: %s; timing out after %v", n.ID.String(), resolveHostTickerTimeout)
+					n.updateStatus(db, "failed")
+					ticker.Stop()
+					return
+				}
+
+				instanceID := instanceIds[len(instanceIds)-1]
+				instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
+				if err == nil {
+					if len(instanceDetails.Reservations) > 0 {
+						reservation := instanceDetails.Reservations[0]
+						if len(reservation.Instances) > 0 {
+							instance := reservation.Instances[0]
+							n.Host = stringOrNil(*instance.PublicDnsName)
+						}
+					}
+				}
+			}
+			cfgJSON, _ := json.Marshal(cfg)
+			*n.Config = json.RawMessage(cfgJSON)
+			n.Status = stringOrNil("running")
+			db.Save(n)
+			ticker.Stop()
+			return
+		}
+	}
 }
 
 func (n *NetworkNode) undeploy() error {
@@ -874,7 +912,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 
 func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet) {
 	if network.isEthereumNetwork() {
-		ticker := time.NewTicker(time.Millisecond * 2500)
+		ticker := time.NewTicker(receiptTickerInterval)
 		go func() {
 			startedAt := time.Now()
 			for {
