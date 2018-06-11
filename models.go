@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -565,8 +566,189 @@ func (c *Contract) ParseParams() map[string]interface{} {
 	return params
 }
 
-// Execute - execute functionality encapsulated in the contract by invoking a specific method using given parameters
+func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, method string, params []interface{}) (*interface{}, error) { // given tx has been built but broadcast has not yet been attempted
+	var err error
+	_abi, err := c.readEthereumContractAbi()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
+	}
+	var methodDescriptor = fmt.Sprintf("method %s", method)
+	var abiMethod *abi.Method
+	if mthd, ok := _abi.Methods[method]; ok {
+		abiMethod = &mthd
+	} else if method == "" {
+		abiMethod = &_abi.Constructor
+		methodDescriptor = "constructor"
+	}
+	if abiMethod != nil {
+		Log.Debugf("Attempting to encode %d parameters [ %s ] prior to executing contract %s on contract: %s", len(params), params, methodDescriptor, c.ID)
+		invocationSig, err := provide.EncodeABI(abiMethod, params...)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
+		}
+
+		data := common.Bytes2Hex(invocationSig)
+		tx.Data = &data
+
+		if abiMethod.Const {
+			Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
+			network, _ := tx.GetNetwork()
+			client, err := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
+			gasPrice, _ := client.SuggestGasPrice(context.TODO())
+			msg := tx.asEthereumCallMsg(gasPrice.Uint64(), 0)
+			result, _ := client.CallContract(context.TODO(), msg, nil)
+			var out interface{}
+			err = abiMethod.Outputs.Unpack(&out, result)
+			if len(abiMethod.Outputs) == 1 {
+				err = abiMethod.Outputs.Unpack(&out, result)
+			} else if len(abiMethod.Outputs) > 1 {
+				// handle tuple
+				vals := make([]interface{}, len(abiMethod.Outputs))
+				for i := range abiMethod.Outputs {
+					typestr := fmt.Sprintf("%s", abiMethod.Outputs[i].Type)
+					Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
+					typ, err := abi.NewType(typestr)
+					if err != nil {
+						return nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
+					}
+					vals[i] = reflect.New(typ.Type).Interface()
+				}
+				err = abiMethod.Outputs.Unpack(&vals, result)
+				out = vals
+				Log.Debugf("Unpacked %v returned values from read of constant %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
+			}
+			return &out, nil
+		}
+		if tx.Create() {
+			Log.Debugf("Executed contract %s on contract: %s", methodDescriptor, c.ID)
+
+			if tx.Response != nil {
+				Log.Debugf("Received response to tx broadcast attempt calling contract %s on contract: %s", methodDescriptor, c.ID)
+
+				var out interface{}
+				switch (tx.Response.Receipt).(type) {
+				case []byte:
+					out = (tx.Response.Receipt).([]byte)
+					Log.Debugf("Received response: %s", out)
+				case types.Receipt:
+					client, _ := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
+					receipt := tx.Response.Receipt.(*types.Receipt)
+					txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
+					if err != nil {
+						err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
+						Log.Warning(err.Error())
+						return nil, err
+					}
+					out = txdeets
+				default:
+					// no-op
+				}
+				return &out, nil
+			}
+		} else {
+			err = fmt.Errorf("Failed to execute contract %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
+			Log.Warning(err.Error())
+		}
+	} else {
+		err = fmt.Errorf("Failed to execute contract %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)
+	}
+	return nil, err
+}
+
+func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
+	var _abi *abi.ABI
+	params := c.ParseParams()
+	if contractAbi, ok := params["abi"]; ok {
+		abistr, err := json.Marshal(contractAbi)
+		if err != nil {
+			Log.Warningf("Failed to marshal ABI from contract params to json; %s", err.Error())
+			return nil, err
+		}
+
+		abival, err := abi.JSON(strings.NewReader(string(abistr)))
+		if err != nil {
+			Log.Warningf("Failed to initialize ABI from contract  params to json; %s", err.Error())
+			return nil, err
+		}
+
+		_abi = &abival
+	} else {
+		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
+	}
+	return _abi, nil
+}
+
+func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.CallMsg {
+	db := DatabaseConnection()
+	var wallet = &Wallet{}
+	db.Model(t).Related(&wallet)
+	var to *common.Address
+	var data []byte
+	if t.To != nil {
+		addr := common.HexToAddress(*t.To)
+		to = &addr
+	}
+	if t.Data != nil {
+		data = common.FromHex(*t.Data)
+	}
+	return ethereum.CallMsg{
+		From:     common.HexToAddress(wallet.Address),
+		To:       to,
+		Gas:      gasLimit,
+		GasPrice: big.NewInt(int64(gasPrice)),
+		Value:    t.Value.BigInt(),
+		Data:     data,
+	}
+}
+
 func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, params []interface{}) (*ContractExecutionResponse, error) {
+	var err error
+	db := DatabaseConnection()
+	var network = &Network{}
+	db.Model(c).Related(&network)
+
+	tx := &Transaction{
+		ApplicationID: c.ApplicationID,
+		UserID:        nil,
+		NetworkID:     c.NetworkID,
+		WalletID:      *walletID,
+		To:            c.Address,
+		Value:         &TxValue{value: value},
+	}
+
+	var receipt *interface{}
+
+	if network.isEthereumNetwork() {
+		receipt, err = c.executeEthereumContract(network, tx, method, params)
+	} else {
+		err = fmt.Errorf("unsupported network: %s", *network.Name)
+	}
+
+	if err != nil {
+		tx.updateStatus(db, "failed")
+		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
+	} else {
+		tx.updateStatus(db, "success")
+	}
+
+	if tx.Response == nil {
+		tx.Response = &ContractExecutionResponse{
+			Receipt:     receipt,
+			Traces:      tx.Traces,
+			Transaction: tx,
+		}
+	} else if tx.Response.Transaction == nil {
+		tx.Response.Transaction = tx
+	}
+
+	return tx.Response, nil
+}
+
+// Execute - execute functionality encapsulated in the contract by invoking a specific method using given parameters
+func (c *Contract) Execute2(walletID *uuid.UUID, value *big.Int, method string, params []interface{}) (*ContractExecutionResponse, error) {
 	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
@@ -674,29 +856,6 @@ func (c *Contract) Create() bool {
 		}
 	}
 	return false
-}
-
-func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
-	var _abi *abi.ABI
-	params := c.ParseParams()
-	if contractAbi, ok := params["abi"]; ok {
-		abistr, err := json.Marshal(contractAbi)
-		if err != nil {
-			Log.Warningf("Failed to marshal ABI from contract params to json; %s", err.Error())
-			return nil, err
-		}
-
-		abival, err := abi.JSON(strings.NewReader(string(abistr)))
-		if err != nil {
-			Log.Warningf("Failed to initialize ABI from contract  params to json; %s", err.Error())
-			return nil, err
-		}
-
-		_abi = &abival
-	} else {
-		return nil, fmt.Errorf("Failed to read ABI from params for contract: %s", c.ID)
-	}
-	return _abi, nil
 }
 
 // GetTransaction - retrieve the associated contract creation transaction
