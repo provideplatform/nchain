@@ -588,6 +588,44 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	if network.isEthereumNetwork() {
 		contractAbi, _ := c.readEthereumContractAbi()
 		receipt, err = provide.ExecuteContract(network.ID.String(), network.rpcURL(), wallet.Address, tx.To, tx.Data, value, method, contractAbi, params)
+
+		var abiMethod *abi.Method
+		if mthd, ok := contractAbi.Methods[method]; ok {
+			abiMethod = &mthd
+		}
+
+		if abiMethod != nil && !abiMethod.Const {
+			if tx.Create() {
+				Log.Debugf("Executed %s method on contract:", method, c.ID)
+
+				if tx.Response != nil {
+					Log.Debugf("Received response to tx broadcast attempt calling contract %s on contract: %s", method, c.ID)
+
+					var out interface{}
+					switch (tx.Response.Receipt).(type) {
+					case []byte:
+						out = (tx.Response.Receipt).([]byte)
+						Log.Debugf("Received response: %s", out)
+					case types.Receipt:
+						client, _ := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
+						receipt := tx.Response.Receipt.(*types.Receipt)
+						txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
+						if err != nil {
+							err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
+							Log.Warning(err.Error())
+							return nil, err
+						}
+						out = txdeets
+					default:
+						// no-op
+					}
+					return nil, nil
+				}
+			} else {
+				err = fmt.Errorf("Failed to execute %s method on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, c.ID, *tx.Data)
+				Log.Warning(err.Error())
+			}
+		}
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *network.Name)
 	}
