@@ -205,6 +205,27 @@ func (n *Network) Create() bool {
 	return false
 }
 
+// Update an existing network
+func (network *Network) Update() bool {
+	db := DatabaseConnection()
+
+	if !network.Validate() {
+		return false
+	}
+
+	result := db.Save(&network)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			network.Errors = append(network.Errors, &gocore.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
+
+	return len(network.Errors) == 0
+}
+
 // setConfig sets the network config in-memory
 func (n *Network) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
