@@ -26,6 +26,7 @@ func main() {
 
 	r.GET("/api/v1/networks", networksListHandler)
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)
+	r.PUT("/api/v1/networks/:id", updateNetworkHandler)
 	r.POST("/api/v1/networks", createNetworkHandler)
 	r.GET("/api/v1/networks/:id/addresses", networkAddressesHandler)
 	r.GET("/api/v1/networks/:id/blocks", networkBlocksHandler)
@@ -161,6 +162,46 @@ func createNetworkHandler(c *gin.Context) {
 
 	if network.Create() {
 		render(network, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = network.Errors
+		render(obj, 422, c)
+	}
+}
+
+func updateNetworkHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	network := &Network{}
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
+	if network.ID == uuid.Nil {
+		renderError("network not found", 404, c)
+		return
+	}
+
+	if userID != nil && network.UserID != nil && *userID != *network.UserID {
+		renderError("forbidden", 403, c)
+		return
+	}
+
+	err = json.Unmarshal(buf, network)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	if network.Update() {
+		render(nil, 204, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = network.Errors
