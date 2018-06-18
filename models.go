@@ -289,6 +289,19 @@ func (n *Network) Status() (status *provide.NetworkStatus, err error) {
 	return status, err
 }
 
+// NodeCount retrieves a count of platform-managed network nodes
+func (n *Network) NodeCount() (count *uint64) {
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ?", n.ID).Count(&count)
+	return count
+}
+
+// Nodes retrieves a list of network nodes
+func (n *Network) Nodes() (nodes []*NetworkNode, err error) {
+	query := DatabaseConnection().Where("network_nodes.network_id = ?", n.ID)
+	query.Order("created_at ASC").Find(&nodes)
+	return nodes, err
+}
+
 func (n *Network) isEthereumNetwork() bool {
 	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
 		return true
@@ -527,6 +540,19 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 			*n.Config = json.RawMessage(cfgJSON)
 			n.Status = stringOrNil("running")
 			db.Save(n)
+
+			// resolve the JSON-RPC URL and enrich the network cfg
+			networkCfg := network.ParseConfig()
+			if jsonRpcUrl, jsonRpcUrlOk := networkCfg["json_rpc_url"]; !jsonRpcUrlOk || jsonRpcUrl == nil {
+				if network.isEthereumNetwork() {
+					networkCfg["json_rpc_url"] = fmt.Sprintf("http://%s:8050", *n.Host)
+					networkCfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:8050", *n.Host) // deprecated
+					networkCFGJSON, _ := json.Marshal(networkCfg)
+					*network.Config = json.RawMessage(networkCFGJSON)
+					db.Save(network)
+				}
+			}
+
 			ticker.Stop()
 			return
 		}
