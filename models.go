@@ -247,6 +247,29 @@ func (n *Network) setChainID() {
 	}
 }
 
+func (n *Network) resolveJsonRpcUrl(db *gorm.DB) {
+	// update the JSON-RPC URL and enrich the network cfg
+	cfg := n.ParseConfig()
+	cfg["json_rpc_url"] = nil
+
+	if n.isEthereumNetwork() {
+		cfg["parity_json_rpc_url"] = nil
+
+		var node = &NetworkNode{}
+		db.Where("network_id = ? AND status = 'running'", n.ID).First(&node)
+
+		if node != nil && node.ID != uuid.Nil {
+			cfg["json_rpc_url"] = fmt.Sprintf("http://%s:8050", *node.Host)
+			cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:8050", *node.Host) // deprecated
+			cfgJSON, _ := json.Marshal(cfg)
+			*n.Config = json.RawMessage(cfgJSON)
+
+		}
+	}
+
+	db.Save(n)
+}
+
 // Validate a network for persistence
 func (n *Network) Validate() bool {
 	n.Errors = make([]*gocore.Error, 0)
@@ -540,19 +563,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 			*n.Config = json.RawMessage(cfgJSON)
 			n.Status = stringOrNil("running")
 			db.Save(n)
-
-			// resolve the JSON-RPC URL and enrich the network cfg
-			networkCfg := network.ParseConfig()
-			if jsonRpcUrl, jsonRpcUrlOk := networkCfg["json_rpc_url"]; !jsonRpcUrlOk || jsonRpcUrl == nil {
-				if network.isEthereumNetwork() {
-					networkCfg["json_rpc_url"] = fmt.Sprintf("http://%s:8050", *n.Host)
-					networkCfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:8050", *n.Host) // deprecated
-					networkCFGJSON, _ := json.Marshal(networkCfg)
-					*network.Config = json.RawMessage(networkCFGJSON)
-					db.Save(network)
-				}
-			}
-
+			network.resolveJsonRpcUrl(db)
 			ticker.Stop()
 			return
 		}
@@ -589,6 +600,10 @@ func (n *NetworkNode) undeploy() error {
 				} else {
 					Log.Warningf("Failed to terminate EC2 instance with id: %s", instanceID)
 				}
+
+				var network = &Network{}
+				db.Where("id = ?", n.NetworkID).Find(&network)
+				network.resolveJsonRpcUrl(db)
 			}
 		}
 	}
