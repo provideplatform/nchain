@@ -308,6 +308,7 @@ func (n *Network) Status() (status *provide.NetworkStatus, err error) {
 	}
 	if err != nil {
 		Log.Warningf("Unable to determine status of %s network; %s", *n.Name, err.Error())
+		n.resolveJsonRpcUrl(DatabaseConnection())
 	}
 	return status, err
 }
