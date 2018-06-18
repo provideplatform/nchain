@@ -525,15 +525,16 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							cfg["region"] = region
 							cfg["target_instance_ids"] = instanceIds
 
-							securityGroupsByImageID, securityGroupsByImageIDOk := cloneableImages[targetID].(map[string]interface{})["security_groups"].(map[string]interface{})[imageID].([]interface{})
-							if securityGroupsByImageIDOk {
-								securityGroups := make([]string, 0)
-								for i := range securityGroupsByImageID {
-									securityGroups = append(securityGroups, securityGroupsByImageID[i].(string))
-								}
-								Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroups), imageID, version, region, instanceIds)
-								for i := range instanceIds {
-									SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroups)
+							if securityGroups, securityGroupsOk := cloneableImages[targetID].(map[string]interface{})["security_groups"].(map[string]interface{}); securityGroupsOk {
+								if securityGroupsByImageID, securityGroupsByImageIDOk := securityGroups[imageID].([]interface{}); securityGroupsByImageIDOk {
+									securityGroups := make([]string, 0)
+									for i := range securityGroupsByImageID {
+										securityGroups = append(securityGroups, securityGroupsByImageID[i].(string))
+									}
+									Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroups), imageID, version, region, instanceIds)
+									for i := range instanceIds {
+										SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroups)
+									}
 								}
 							}
 
