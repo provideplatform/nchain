@@ -58,6 +58,27 @@ func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string)
 	return response, err
 }
 
+// SetInstanceSecurityGroups sets the security groups for a given instance id and array of security group ids
+func SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceID string, securityGroupIds []string) (response *ec2.ModifyInstanceAttributeOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	groupIds := make([]*string, 0)
+	for i := range securityGroupIds {
+		groupIds = append(groupIds, stringOrNil(securityGroupIds[i]))
+	}
+
+	response, err = client.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
+		InstanceId: stringOrNil(instanceID),
+		Groups:     groupIds,
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 instance attribute modified for %s: %s", instanceID, response)
+	}
+
+	return response, err
+}
+
 // TerminateInstance destroys an EC2 instance given its instance id
 func TerminateInstance(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.TerminateInstancesOutput, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
