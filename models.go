@@ -261,11 +261,11 @@ func (n *Network) resolveJsonRpcUrl(db *gorm.DB) {
 		if node != nil && node.ID != uuid.Nil {
 			cfg["json_rpc_url"] = fmt.Sprintf("http://%s:8050", *node.Host)
 			cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:8050", *node.Host) // deprecated
-			cfgJSON, _ := json.Marshal(cfg)
-			*n.Config = json.RawMessage(cfgJSON)
-
 		}
 	}
+
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
 
 	db.Save(n)
 }
