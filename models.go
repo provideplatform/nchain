@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql/driver"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -461,7 +462,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 
 				var userData = ""
 				if rcdOk {
-					userData = rcd
+					userData = base64.StdEncoding.EncodeToString([]byte(rcd))
 				}
 
 				Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
