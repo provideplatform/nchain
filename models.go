@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"net/url"
 	"reflect"
 	"strings"
@@ -34,20 +35,24 @@ const receiptTickerTimeout = time.Minute * 1
 const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
 
+const defaultJsonRpcPort = 8050
+const defaultWebsocketPort = 8051
+
 // Network
 type Network struct {
 	gocore.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
-	Name          *string          `sql:"not null" json:"name"`
-	Description   *string          `json:"description"`
-	IsProduction  *bool            `sql:"not null" json:"is_production"`
-	Cloneable     *bool            `sql:"not null" json:"cloneable"`
-	Enabled       *bool            `sql:"not null" json:"enabled"`
-	ChainID       *string          `json:"chain_id"`                     // protocol-specific chain id
-	SidechainID   *uuid.UUID       `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
-	NetworkID     *uuid.UUID       `sql:"type:uuid" json:"network_id"`   // network id used as the parent
-	Config        *json.RawMessage `sql:"type:json" json:"config"`
+	ApplicationID *uuid.UUID             `sql:"type:uuid" json:"application_id"`
+	UserID        *uuid.UUID             `sql:"type:uuid" json:"user_id"`
+	Name          *string                `sql:"not null" json:"name"`
+	Description   *string                `json:"description"`
+	IsProduction  *bool                  `sql:"not null" json:"is_production"`
+	Cloneable     *bool                  `sql:"not null" json:"cloneable"`
+	Enabled       *bool                  `sql:"not null" json:"enabled"`
+	ChainID       *string                `json:"chain_id"`                     // protocol-specific chain id
+	SidechainID   *uuid.UUID             `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
+	NetworkID     *uuid.UUID             `sql:"type:uuid" json:"network_id"`   // network id used as the parent
+	Config        *json.RawMessage       `sql:"type:json" json:"config"`
+	Stats         *provide.NetworkStatus `sql:"-" json:"stats"`
 }
 
 // NetworkNode
@@ -247,7 +252,7 @@ func (n *Network) setChainID() {
 	}
 }
 
-func (n *Network) resolveJsonRpcUrl(db *gorm.DB) {
+func (n *Network) resolveJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	// update the JSON-RPC URL and enrich the network cfg
 	cfg := n.ParseConfig()
 
@@ -256,8 +261,19 @@ func (n *Network) resolveJsonRpcUrl(db *gorm.DB) {
 		db.Where("network_id = ? AND status = 'running'", n.ID).First(&node)
 
 		if node != nil && node.ID != uuid.Nil {
-			cfg["json_rpc_url"] = fmt.Sprintf("http://%s:8050", *node.Host)
-			cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:8050", *node.Host) // deprecated
+			if node.reachableViaJsonRpc() {
+				cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort)
+				cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort) // deprecated
+			} else {
+				cfg["json_rpc_url"] = nil
+				cfg["parity_json_rpc_url"] = nil // deprecated
+			}
+
+			if node.reachableViaWebsocket() {
+				cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, defaultWebsocketPort)
+			} else {
+				cfg["websocket_url"] = nil
+			}
 		}
 	}
 
@@ -296,6 +312,14 @@ func (n *Network) rpcURL() string {
 	return ""
 }
 
+func (n *Network) websocketURL() string {
+	cfg := n.ParseConfig()
+	if websocketURL, ok := cfg["websocket_url"].(string); ok {
+		return websocketURL
+	}
+	return ""
+}
+
 // Status retrieves metadata and metrics specific to the given network
 func (n *Network) Status() (status *provide.NetworkStatus, err error) {
 	if n.isEthereumNetwork() {
@@ -306,7 +330,7 @@ func (n *Network) Status() (status *provide.NetworkStatus, err error) {
 	if err != nil {
 		Log.Warningf("Unable to determine status of %s network; %s", *n.Name, err.Error())
 		go func() {
-			n.resolveJsonRpcUrl(DatabaseConnection())
+			n.resolveJsonRpcAndWebsocketUrls(DatabaseConnection())
 		}()
 	}
 	return status, err
@@ -370,6 +394,27 @@ func (n *NetworkNode) Create() bool {
 			}
 			return success
 		}
+	}
+	return false
+}
+
+func (n *NetworkNode) reachableViaJsonRpc() bool {
+	return n.reachableOnPort(defaultJsonRpcPort)
+}
+
+func (n *NetworkNode) reachableViaWebsocket() bool {
+	return n.reachableOnPort(defaultWebsocketPort)
+}
+
+func (n *NetworkNode) reachableOnPort(port uint) bool {
+	addr := fmt.Sprintf("%s:%v", *n.Host, port)
+	conn, err := net.Dial("tcp", addr)
+	if err == nil {
+		Log.Debugf("%s:%v is reachable", *n.Host, port)
+		defer conn.Close()
+		return true
+	} else {
+		Log.Debugf("%s:%v is unreachable", *n.Host, port)
 	}
 	return false
 }
@@ -577,7 +622,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 			*n.Config = json.RawMessage(cfgJSON)
 			n.Status = stringOrNil("running")
 			db.Save(n)
-			network.resolveJsonRpcUrl(db)
+			network.resolveJsonRpcAndWebsocketUrls(db)
 			ticker.Stop()
 			return
 		}
@@ -617,7 +662,7 @@ func (n *NetworkNode) undeploy() error {
 
 				var network = &Network{}
 				db.Where("id = ?", n.NetworkID).Find(&network)
-				network.resolveJsonRpcUrl(db)
+				network.resolveJsonRpcAndWebsocketUrls(db)
 			}
 		}
 	}
