@@ -233,19 +233,7 @@ func networksListHandler(c *gin.Context) {
 
 func networkDetailsHandler(c *gin.Context) {
 	var network = &Network{}
-	query := DatabaseConnection().Where("networks.id = ? AND networks.application_id IS NULL AND networks.user_id IS NULL", c.Param("id"))
-
-	appID := authorizedSubjectId(c, "application")
-	if appID != nil {
-		query = query.Or("networks.application_id = ?", appID)
-	}
-
-	userID := authorizedSubjectId(c, "user")
-	if userID != nil {
-		query = query.Or("networks.user_id = ?", userID)
-	}
-
-	query.Find(&network)
+	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
 	if network == nil || network.ID == uuid.Nil {
 		renderError("network not found", 404, c)
 		return
