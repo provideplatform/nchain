@@ -20,7 +20,6 @@ var (
 )
 
 func RunConsumers() {
-
 	go func() {
 		waitGroup.Add(1)
 		for _, currencyPair := range currencyPairs {
