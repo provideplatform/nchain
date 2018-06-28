@@ -211,11 +211,16 @@ func updateNetworkHandler(c *gin.Context) {
 
 func networksListHandler(c *gin.Context) {
 	var networks []Network
-	query := DatabaseConnection().Where("networks.enabled = true AND networks.application_id IS NULL")
+	query := DatabaseConnection().Where("networks.enabled = true AND networks.application_id IS NULL AND networks.user_id IS NULL")
 
 	appID := authorizedSubjectId(c, "application")
 	if appID != nil {
 		query = query.Or("networks.application_id = ?", appID)
+	}
+
+	userID := authorizedSubjectId(c, "user")
+	if userID != nil {
+		query = query.Or("networks.user_id = ?", userID)
 	}
 
 	if strings.ToLower(c.Query("cloneable")) == "true" {
@@ -228,7 +233,19 @@ func networksListHandler(c *gin.Context) {
 
 func networkDetailsHandler(c *gin.Context) {
 	var network = &Network{}
-	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
+	query := DatabaseConnection().Where("networks.id = ? AND networks.application_id IS NULL AND networks.user_id IS NULL", c.Param("id"))
+
+	appID := authorizedSubjectId(c, "application")
+	if appID != nil {
+		query = query.Or("networks.application_id = ?", appID)
+	}
+
+	userID := authorizedSubjectId(c, "user")
+	if userID != nil {
+		query = query.Or("networks.user_id = ?", userID)
+	}
+
+	query.Find(&network)
 	if network == nil || network.ID == uuid.Nil {
 		renderError("network not found", 404, c)
 		return
