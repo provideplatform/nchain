@@ -66,15 +66,14 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 					status, err := network.Status()
 					if err != nil {
 						Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
-						break
+						ticker.Stop()
+						return nil
 					} else {
 						Log.Debugf("Received network status via JSON-RPC: %s; %s", rpcURL, status)
 						ch <- status
 					}
 				}
 			}
-			ticker.Stop()
-			return nil
 		},
 
 		Stream: func(ch chan *provide.NetworkStatus) error {
