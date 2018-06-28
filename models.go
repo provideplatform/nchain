@@ -250,11 +250,8 @@ func (n *Network) setChainID() {
 func (n *Network) resolveJsonRpcUrl(db *gorm.DB) {
 	// update the JSON-RPC URL and enrich the network cfg
 	cfg := n.ParseConfig()
-	cfg["json_rpc_url"] = nil
 
 	if n.isEthereumNetwork() {
-		cfg["parity_json_rpc_url"] = nil
-
 		var node = &NetworkNode{}
 		db.Where("network_id = ? AND status = 'running'", n.ID).First(&node)
 
