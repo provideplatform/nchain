@@ -215,12 +215,12 @@ func networksListHandler(c *gin.Context) {
 
 	appID := authorizedSubjectId(c, "application")
 	if appID != nil {
-		query = query.Or("networks.application_id = ?", appID)
+		query = query.Or("networks.enabled = true AND networks.application_id = ?", appID)
 	}
 
 	userID := authorizedSubjectId(c, "user")
 	if userID != nil {
-		query = query.Or("networks.user_id = ?", userID)
+		query = query.Or("networks.enabled = true AND networks.user_id = ?", userID)
 	}
 
 	if strings.ToLower(c.Query("cloneable")) == "true" {
