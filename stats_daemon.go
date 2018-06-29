@@ -139,18 +139,18 @@ func (sd *StatsDaemon) consume() {
 				sd.log.Warningf("Configured stats daemon data source does not support JSON-RPC: %s; attempting to upgrade to websocket stream...", sd)
 				err := sd.dataSource.Stream(sd.queue)
 				if err != nil {
-					sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s%; restarting stream...", err.Error())
+					sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
 					// FIXME-- this could mean the stats daemon is incapable of getting stats at this time for the network in question...
 				}
 			case websocketNotSupported:
 				sd.log.Warningf("Configured stats daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon: %s", sd)
 				err := sd.dataSource.Poll(sd.queue)
 				if err != nil {
-					sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s%; restarting stream...", err.Error())
+					sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
 					// FIXME-- this could mean the stats daemon is incapable of getting stats at this time for the network in question...
 				}
 			default:
-				sd.log.Warningf("Configured stats daemon data source returned error while consuming websocket stream: %s%; restarting stream...", err.Error())
+				sd.log.Warningf("Configured stats daemon data source returned error while consuming websocket stream: %s; restarting stream...", err.Error())
 			}
 		}
 	}
