@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"os"
 	"os/signal"
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -45,8 +46,9 @@ type StatsDaemon struct {
 	queue       chan *provide.EthereumWebsocketSubscriptionResponse
 	statusQueue chan *provide.NetworkStatus
 
-	recentBlocks []interface{}
-	stats        *provide.NetworkStatus
+	recentBlocks          []interface{}
+	recentBlockTimestamps []uint64
+	stats                 *provide.NetworkStatus
 }
 
 type jsonRpcNotSupported string
@@ -187,7 +189,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 				} else if header != nil && header.Number != nil {
 					sd.stats.Block = header.Number.Uint64()
 
-					lastBlockAt := header.Time.Uint64()
+					lastBlockAt := uint64(time.Now().UnixNano() / 1000000)
 					sd.stats.LastBlockAt = &lastBlockAt
 					sd.stats.Syncing = sd.stats.Block == 0
 
@@ -197,6 +199,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 
 					if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != header.Hash().String() {
 						sd.recentBlocks = append(sd.recentBlocks, header)
+						sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
 					}
 
 					for len(sd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
@@ -209,9 +212,9 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 						timedelta := float64(0)
 						i := 0
 						for i < len(sd.recentBlocks)-1 {
-							currentBlocktime := time.Unix(sd.recentBlocks[i].(*types.Header).Time.Int64(), 0)
-							nextBlocktime := time.Unix(sd.recentBlocks[i+1].(*types.Header).Time.Int64(), 0)
-							blockDelta := nextBlocktime.Sub(currentBlocktime).Seconds()
+							currentBlocktime := sd.recentBlockTimestamps[i]
+							nextBlocktime := sd.recentBlockTimestamps[i+1]
+							blockDelta := float64(nextBlocktime-currentBlocktime) / 1000.0
 							blocktimes = append(blocktimes, blockDelta)
 							timedelta += blockDelta
 							i++
@@ -293,9 +296,10 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.statusQueue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
 	sd.handleSignals()
 
-	var chainID *big.Int
-	if network.ChainID != nil {
-		chainID = provide.GetChainID(*network.ChainID, network.rpcURL())
+	chainID := network.ChainID
+	if chainID == nil {
+		_chainID := hexutil.EncodeBig(provide.GetChainID(network.ID.String(), network.rpcURL()))
+		chainID = &_chainID
 	}
 	sd.stats = &provide.NetworkStatus{
 		ChainID: chainID,
