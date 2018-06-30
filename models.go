@@ -322,6 +322,10 @@ func (n *Network) websocketURL() string {
 
 // Status retrieves metadata and metrics specific to the given network
 func (n *Network) Status() (status *provide.NetworkStatus, err error) {
+	if cachedStatus, ok := currentNetworkStats[n.ID.String()]; ok {
+		return cachedStatus.stats, nil
+	}
+	go RequireNetworkStatsDaemon(n)
 	if n.isEthereumNetwork() {
 		status, err = provide.GetNetworkStatus(n.ID.String(), n.rpcURL())
 	} else {
