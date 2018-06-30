@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"os/signal"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -35,7 +34,6 @@ type StatsDaemon struct {
 
 	log   *logger.Logger
 	queue chan *provide.NetworkStatus
-	wg    sync.WaitGroup
 }
 
 type jsonRpcNotSupported string
@@ -121,12 +119,9 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
 func (sd *StatsDaemon) consumeAsync() {
-	sd.wg.Add(1)
 	go func() {
-		defer sd.wg.Done()
 		sd.consume()
 	}()
-	sd.wg.Wait()
 }
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
@@ -184,7 +179,6 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 	daemon = NewNetworkStatsDaemon(Log, network)
 	currentNetworkStats[network.ID.String()] = daemon
 
-	daemon.wg.Add(1)
 	go func() {
 		var err error
 
@@ -235,9 +229,7 @@ func (sd *StatsDaemon) handleSignals() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	sd.wg.Add(1)
 	go func() {
-		defer sd.wg.Done()
 		select {
 		case sig := <-sigs:
 			Log.Infof("Received signal: %s", sig)
