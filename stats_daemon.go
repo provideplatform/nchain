@@ -86,10 +86,13 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 				Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
 			} else {
 				defer wsConn.Close()
-				subscribe := map[string]interface{}{
-					"type": "subscribe",
+				payload := map[string]interface{}{
+					"method":  "eth_subscribe",
+					"params":  []string{"newHeads"},
+					"id":      nil,
+					"jsonrpc": "2.0",
 				}
-				if err := wsConn.WriteJSON(subscribe); err != nil {
+				if err := wsConn.WriteJSON(payload); err != nil {
 					Log.Errorf("Failed to write subscribe message to network stats websocket connection")
 				} else {
 					Log.Debugf("Subscribed to %s network stats websocket: %s", websocketURL)
