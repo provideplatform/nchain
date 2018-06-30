@@ -191,9 +191,8 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 					sd.stats.LastBlockAt = &lastBlockAt
 					sd.stats.Syncing = sd.stats.Block == 0
 
-					headerJSON, err := header.MarshalJSON()
 					if err == nil {
-						sd.stats.Meta["last_block_header"] = string(headerJSON)
+						sd.stats.Meta["last_block_header"] = header
 					}
 
 					if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != header.Hash().String() {
