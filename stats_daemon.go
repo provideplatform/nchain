@@ -138,13 +138,6 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 }
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
-func (sd *StatsDaemon) consumeAsync() {
-	go func() {
-		sd.consume()
-	}()
-}
-
-// Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
 func (sd *StatsDaemon) consume() {
 	for {
 		err := sd.dataSource.Stream(sd.queue)
@@ -308,7 +301,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 
 // Run the configured stats daemon instance
 func (sd *StatsDaemon) run() error {
-	sd.consumeAsync()
+	go sd.consume()
 	err := sd.loop()
 
 	if err == nil {
