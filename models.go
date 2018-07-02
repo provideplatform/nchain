@@ -367,6 +367,9 @@ func (n *Network) isEthereumNetwork() bool {
 				return isEthereumNetwork.(bool)
 			}
 		}
+		if _, ok := cfg["json_rpc_url"]; ok {
+			return true
+		}
 		if _, ok := cfg["parity_json_rpc_url"]; ok {
 			return true
 		}
