@@ -230,7 +230,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 			if !sd.longPolling {
 				lastBlockAt = uint64(time.Now().UnixNano() / 1000000)
 			} else {
-				lastBlockAt = header.Time.Uint64()
+				lastBlockAt = header.Time.Uint64() * 1000.0
 			}
 			sd.stats.LastBlockAt = &lastBlockAt
 
