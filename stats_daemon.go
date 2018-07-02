@@ -35,10 +35,9 @@ type NetworkStatsDataSource struct {
 }
 
 type StatsDaemon struct {
-	attempt     uint32
-	backoff     int64
-	dataSource  *NetworkStatsDataSource
-	longPolling bool
+	attempt    uint32
+	backoff    int64
+	dataSource *NetworkStatsDataSource
 
 	log *logger.Logger
 
@@ -160,19 +159,17 @@ func (sd *StatsDaemon) consume() []error {
 			}
 		case websocketNotSupported:
 			sd.log.Warningf("Configured stats daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon for network id: %s", sd.dataSource.Network.ID)
-			sd.longPolling = true
 			err := sd.dataSource.Poll(sd.statusQueue)
 			if err != nil {
 				errs = append(errs, err)
 				sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
-				sd.longPolling = false
 			}
 		}
 	}
 	return errs
 }
 
-func (sd *StatsDaemon) ingest(response interface{}) {
+func (sd *StatsDaemon) ingest(response interface{}, realtime bool) {
 	if sd.dataSource.Network.isEthereumNetwork() {
 		switch response.(type) {
 		case *provide.EthereumWebsocketSubscriptionResponse:
@@ -190,7 +187,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 					if err != nil {
 						Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
 					} else if header != nil && header.Number != nil {
-						sd.ingest(header)
+						sd.ingest(header, realtime)
 					}
 				}
 			}
@@ -211,7 +208,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 						if err != nil {
 							Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
 						} else if hdr != nil && hdr.Number != nil {
-							sd.ingest(hdr)
+							sd.ingest(hdr, realtime)
 						}
 					}
 				} else {
@@ -227,7 +224,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 			sd.stats.Syncing = sd.stats.Block == 0
 
 			var lastBlockAt uint64
-			if !sd.longPolling {
+			if realtime {
 				lastBlockAt = uint64(time.Now().UnixNano() / 1000000)
 			} else {
 				lastBlockAt = header.Time.Uint64() * 1000.0
@@ -274,10 +271,10 @@ func (sd *StatsDaemon) loop() error {
 	for {
 		select {
 		case msg := <-sd.queue:
-			sd.ingest(msg)
+			sd.ingest(msg, true)
 
 		case msg := <-sd.statusQueue:
-			sd.ingest(msg)
+			sd.ingest(msg, false)
 
 		case <-sd.shutdownCtx.Done():
 			sd.log.Debugf("Closing stats daemon on shutdown")
