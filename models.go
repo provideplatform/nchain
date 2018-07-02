@@ -212,24 +212,24 @@ func (n *Network) Create() bool {
 }
 
 // Update an existing network
-func (network *Network) Update() bool {
+func (n *Network) Update() bool {
 	db := DatabaseConnection()
 
-	if !network.Validate() {
+	if !n.Validate() {
 		return false
 	}
 
-	result := db.Save(&network)
+	result := db.Save(&n)
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			network.Errors = append(network.Errors, &gocore.Error{
+			n.Errors = append(n.Errors, &gocore.Error{
 				Message: stringOrNil(err.Error()),
 			})
 		}
 	}
 
-	return len(network.Errors) == 0
+	return len(n.Errors) == 0
 }
 
 // setConfig sets the network config in-memory
