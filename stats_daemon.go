@@ -35,9 +35,10 @@ type NetworkStatsDataSource struct {
 }
 
 type StatsDaemon struct {
-	attempt    uint32
-	backoff    int64
-	dataSource *NetworkStatsDataSource
+	attempt     uint32
+	backoff     int64
+	dataSource  *NetworkStatsDataSource
+	longPolling bool
 
 	log *logger.Logger
 
@@ -159,10 +160,12 @@ func (sd *StatsDaemon) consume() []error {
 			}
 		case websocketNotSupported:
 			sd.log.Warningf("Configured stats daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon for network id: %s", sd.dataSource.Network.ID)
+			sd.longPolling = true
 			err := sd.dataSource.Poll(sd.statusQueue)
 			if err != nil {
 				errs = append(errs, err)
 				sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
+				sd.longPolling = false
 			}
 		}
 	}
@@ -221,10 +224,15 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 			header := response.(*types.Header)
 			sd.stats.Block = header.Number.Uint64()
 			sd.stats.State = nil
-
-			lastBlockAt := uint64(time.Now().UnixNano() / 1000000)
-			sd.stats.LastBlockAt = &lastBlockAt
 			sd.stats.Syncing = sd.stats.Block == 0
+
+			var lastBlockAt uint64
+			if !sd.longPolling {
+				lastBlockAt = uint64(time.Now().UnixNano() / 1000000)
+			} else {
+				lastBlockAt = header.Time.Uint64()
+			}
+			sd.stats.LastBlockAt = &lastBlockAt
 
 			sd.stats.Meta["last_block_header"] = header
 
