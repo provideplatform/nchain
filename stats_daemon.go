@@ -237,10 +237,7 @@ func (sd *StatsDaemon) loop() error {
 	for {
 		select {
 		case msg := <-sd.queue:
-			// sd.log.Debugf("Stats daemon runloop received network stats msg via websocket: %s", msg)
 			sd.ingest(msg)
-			// sd.log.Debugf("Stats daemon runloop injested network stats msg via websocket: %s", msg)
-			Log.Debugf("Calculated network stats; latest: %s", sd.stats)
 
 		case msg := <-sd.statusQueue:
 			sd.log.Debugf("Stats daemon runloop received network stats msg via JSON-RPC polling: %s", msg)
