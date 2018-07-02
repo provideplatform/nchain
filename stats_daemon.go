@@ -21,7 +21,7 @@ import (
 )
 
 const defaultStatsDaemonQueueSize = 32
-const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 5000
+const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 32
 const networkStatsMinimumRecentBlockCacheSize = 3
 const statsDaemonMaximumBackoffMillis = 12800
