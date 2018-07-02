@@ -320,9 +320,11 @@ func (n *Network) websocketURL() string {
 	return ""
 }
 
-// Status retrieves metadata and metrics specific to the given network
-func (n *Network) Status() (status *provide.NetworkStatus, err error) {
-	if cachedStatus, ok := currentNetworkStats[n.ID.String()]; ok {
+// Status retrieves metadata and metrics specific to the given network;
+// when force is true, it forces a JSON-RPC request to be made to retrieve
+// the latest status; when false, cached network stats are returned if available
+func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) {
+	if cachedStatus, ok := currentNetworkStats[n.ID.String()]; ok && !force {
 		return cachedStatus.stats, nil
 	}
 	RequireNetworkStatsDaemon(n)

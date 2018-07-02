@@ -80,14 +80,13 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 			for {
 				select {
 				case <-ticker.C:
-					status, err := network.Status()
+					status, err := network.Status(true)
 					if err != nil {
 						Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
 						ticker.Stop()
 						return nil
 					}
 
-					Log.Debugf("Received network status via JSON-RPC: %s; %s", rpcURL, status)
 					ch <- status
 				}
 			}
@@ -172,59 +171,85 @@ func (sd *StatsDaemon) consume() []error {
 
 func (sd *StatsDaemon) ingest(response interface{}) {
 	if sd.dataSource.Network.isEthereumNetwork() {
-		resp := response.(*provide.EthereumWebsocketSubscriptionResponse)
-		if result, ok := resp.Params["result"].(map[string]interface{}); ok {
-			if _, mixHashOk := result["mixHash"]; !mixHashOk {
-				result["mixHash"] = common.HexToHash("0x")
+		switch response.(type) {
+		case *provide.EthereumWebsocketSubscriptionResponse:
+			resp := response.(*provide.EthereumWebsocketSubscriptionResponse)
+			if result, ok := resp.Params["result"].(map[string]interface{}); ok {
+				if _, mixHashOk := result["mixHash"]; !mixHashOk {
+					result["mixHash"] = common.HexToHash("0x")
+				}
+				if _, nonceOk := result["nonce"]; !nonceOk {
+					result["nonce"] = types.EncodeNonce(0)
+				}
+				if resultJSON, err := json.Marshal(result); err == nil {
+					header := &types.Header{}
+					err := json.Unmarshal(resultJSON, header)
+					if err != nil {
+						Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
+					} else if header != nil && header.Number != nil {
+						sd.ingest(header)
+					}
+				}
 			}
-			if _, nonceOk := result["nonce"]; !nonceOk {
-				result["nonce"] = types.EncodeNonce(0)
+		case *provide.NetworkStatus:
+			resp := response.(*provide.NetworkStatus)
+			if header, headerOk := resp.Meta["last_block_header"].(map[string]interface{}); headerOk {
+				if _, mixHashOk := header["mixHash"]; !mixHashOk {
+					header["mixHash"] = common.HexToHash("0x")
+				}
+				if _, nonceOk := header["nonce"]; !nonceOk {
+					header["nonce"] = types.EncodeNonce(0)
+				}
+
+				if headerJSON, err := json.Marshal(header); err == nil {
+					hdr := &types.Header{}
+					err := json.Unmarshal(headerJSON, hdr)
+					if err != nil {
+						Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
+					} else if hdr != nil && hdr.Number != nil {
+						sd.ingest(hdr)
+					}
+				}
+			} else {
+				Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
 			}
-			if resultJSON, err := json.Marshal(result); err == nil {
-				header := &types.Header{}
-				err := json.Unmarshal(resultJSON, header)
-				if err != nil {
-					Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
-				} else if header != nil && header.Number != nil {
-					sd.stats.Block = header.Number.Uint64()
+		case *types.Header:
+			header := response.(*types.Header)
+			sd.stats.Block = header.Number.Uint64()
 
-					lastBlockAt := uint64(time.Now().UnixNano() / 1000000)
-					sd.stats.LastBlockAt = &lastBlockAt
-					sd.stats.Syncing = sd.stats.Block == 0
+			lastBlockAt := uint64(time.Now().UnixNano() / 1000000)
+			sd.stats.LastBlockAt = &lastBlockAt
+			sd.stats.Syncing = sd.stats.Block == 0
 
-					if err == nil {
-						sd.stats.Meta["last_block_header"] = header
-					}
+			sd.stats.Meta["last_block_header"] = header
 
-					if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != header.Hash().String() {
-						sd.recentBlocks = append(sd.recentBlocks, header)
-						sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
-					}
+			if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != header.Hash().String() {
+				sd.recentBlocks = append(sd.recentBlocks, header)
+				sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
+			}
 
-					for len(sd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
-						i := len(sd.recentBlocks) - 1
-						sd.recentBlocks = append(sd.recentBlocks[:i], sd.recentBlocks[i+1:]...)
-					}
+			for len(sd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
+				i := len(sd.recentBlocks) - 1
+				sd.recentBlocks = append(sd.recentBlocks[:i], sd.recentBlocks[i+1:]...)
+			}
 
-					if len(sd.recentBlocks) >= networkStatsMinimumRecentBlockCacheSize {
-						blocktimes := make([]float64, 0)
-						timedelta := float64(0)
-						i := 0
-						for i < len(sd.recentBlocks)-1 {
-							currentBlocktime := sd.recentBlockTimestamps[i]
-							nextBlocktime := sd.recentBlockTimestamps[i+1]
-							blockDelta := float64(nextBlocktime-currentBlocktime) / 1000.0
-							blocktimes = append(blocktimes, blockDelta)
-							timedelta += blockDelta
-							i++
-						}
+			if len(sd.recentBlocks) >= networkStatsMinimumRecentBlockCacheSize {
+				blocktimes := make([]float64, 0)
+				timedelta := float64(0)
+				i := 0
+				for i < len(sd.recentBlocks)-1 {
+					currentBlocktime := sd.recentBlockTimestamps[i]
+					nextBlocktime := sd.recentBlockTimestamps[i+1]
+					blockDelta := float64(nextBlocktime-currentBlocktime) / 1000.0
+					blocktimes = append(blocktimes, blockDelta)
+					timedelta += blockDelta
+					i++
+				}
 
-						if len(blocktimes) > 0 {
-							sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
-							sd.stats.Meta["blocktimes"] = blocktimes
-							sd.stats.Meta["last_block_hash"] = header.Hash().String()
-						}
-					}
+				if len(blocktimes) > 0 {
+					sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
+					sd.stats.Meta["blocktimes"] = blocktimes
+					sd.stats.Meta["last_block_hash"] = header.Hash().String()
 				}
 			}
 		}
@@ -239,7 +264,7 @@ func (sd *StatsDaemon) loop() error {
 			sd.ingest(msg)
 
 		case msg := <-sd.statusQueue:
-			sd.log.Debugf("Stats daemon runloop received network stats msg via JSON-RPC polling: %s", msg)
+			sd.ingest(msg)
 
 		case <-sd.shutdownCtx.Done():
 			sd.log.Debugf("Closing stats daemon on shutdown")

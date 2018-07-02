@@ -367,7 +367,7 @@ func networkStatusHandler(c *gin.Context) {
 		renderError("network not found", 404, c)
 		return
 	}
-	status, err := network.Status()
+	status, err := network.Status(false)
 	if err != nil {
 		msg := fmt.Sprintf("failed to retrieve network status; %s", err.Error())
 		renderError(msg, 500, c)
