@@ -103,10 +103,14 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 				Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
 			} else {
 				defer wsConn.Close()
+				var chainID string
+				if network.ChainID != nil {
+					chainID = *network.ChainID
+				}
 				payload := map[string]interface{}{
 					"method":  "eth_subscribe",
 					"params":  []string{"newHeads"},
-					"id":      nil,
+					"id":      chainID,
 					"jsonrpc": "2.0",
 				}
 				if err := wsConn.WriteJSON(payload); err != nil {
@@ -258,7 +262,6 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 
 	go func() {
 		var err error
-
 		for !daemon.shuttingDown() {
 			daemon.attempt++
 			Log.Debugf("Stepping into main runloop of stats daemon instance; attempt #%v", daemon.attempt)
