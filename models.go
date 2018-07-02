@@ -333,12 +333,6 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 	} else {
 		Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
 	}
-	if err != nil {
-		Log.Warningf("Unable to determine status of %s network; %s", *n.Name, err.Error())
-		go func() {
-			n.resolveJsonRpcAndWebsocketUrls(DatabaseConnection())
-		}()
-	}
 	return status, err
 }
 
