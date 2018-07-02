@@ -216,6 +216,7 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 		case *types.Header:
 			header := response.(*types.Header)
 			sd.stats.Block = header.Number.Uint64()
+			sd.stats.State = nil
 
 			lastBlockAt := uint64(time.Now().UnixNano() / 1000000)
 			sd.stats.LastBlockAt = &lastBlockAt
@@ -312,6 +313,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.stats = &provide.NetworkStatus{
 		ChainID: chainID,
 		Meta:    map[string]interface{}{},
+		State:   stringOrNil("configuring"),
 	}
 
 	return sd
