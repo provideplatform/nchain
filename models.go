@@ -422,9 +422,8 @@ func (n *NetworkNode) reachableOnPort(port uint) bool {
 		Log.Debugf("%s:%v is reachable", *n.Host, port)
 		defer conn.Close()
 		return true
-	} else {
-		Log.Debugf("%s:%v is unreachable", *n.Host, port)
 	}
+	Log.Debugf("%s:%v is unreachable", *n.Host, port)
 	return false
 }
 
