@@ -193,25 +193,29 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 			}
 		case *provide.NetworkStatus:
 			resp := response.(*provide.NetworkStatus)
-			if header, headerOk := resp.Meta["last_block_header"].(map[string]interface{}); headerOk {
-				if _, mixHashOk := header["mixHash"]; !mixHashOk {
-					header["mixHash"] = common.HexToHash("0x")
-				}
-				if _, nonceOk := header["nonce"]; !nonceOk {
-					header["nonce"] = types.EncodeNonce(0)
-				}
-
-				if headerJSON, err := json.Marshal(header); err == nil {
-					hdr := &types.Header{}
-					err := json.Unmarshal(headerJSON, hdr)
-					if err != nil {
-						Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
-					} else if hdr != nil && hdr.Number != nil {
-						sd.ingest(hdr)
+			if resp.Meta != nil {
+				if header, headerOk := resp.Meta["last_block_header"].(map[string]interface{}); headerOk {
+					if _, mixHashOk := header["mixHash"]; !mixHashOk {
+						header["mixHash"] = common.HexToHash("0x")
 					}
+					if _, nonceOk := header["nonce"]; !nonceOk {
+						header["nonce"] = types.EncodeNonce(0)
+					}
+
+					if headerJSON, err := json.Marshal(header); err == nil {
+						hdr := &types.Header{}
+						err := json.Unmarshal(headerJSON, hdr)
+						if err != nil {
+							Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
+						} else if hdr != nil && hdr.Number != nil {
+							sd.ingest(hdr)
+						}
+					}
+				} else {
+					Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
 				}
 			} else {
-				Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
+				Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
 			}
 		case *types.Header:
 			header := response.(*types.Header)
