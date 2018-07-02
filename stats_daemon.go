@@ -142,30 +142,30 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 }
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
-func (sd *StatsDaemon) consume() {
-	for {
-		err := sd.dataSource.Stream(sd.queue)
-		if err != nil {
-			switch err.(type) {
-			case jsonRpcNotSupported:
-				sd.log.Warningf("Configured stats daemon data source does not support JSON-RPC: %s; attempting to upgrade to websocket stream...", sd)
-				err := sd.dataSource.Stream(sd.queue)
-				if err != nil {
-					sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
-					// FIXME-- this could mean the stats daemon is incapable of getting stats at this time for the network in question...
-				}
-			case websocketNotSupported:
-				sd.log.Warningf("Configured stats daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon: %s", sd)
-				err := sd.dataSource.Poll(sd.statusQueue)
-				if err != nil {
-					sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
-					// FIXME-- this could mean the stats daemon is incapable of getting stats at this time for the network in question...
-				}
-			default:
-				sd.log.Warningf("Configured stats daemon data source returned error while consuming websocket stream: %s; restarting stream...", err.Error())
+func (sd *StatsDaemon) consume() []error {
+	errs := make([]error, 0)
+	Log.Debugf("Attempting to consume configured stats daemon data source; attempt #%v", sd.attempt)
+	err := sd.dataSource.Stream(sd.queue)
+	if err != nil {
+		errs = append(errs, err)
+		switch err.(type) {
+		case jsonRpcNotSupported:
+			sd.log.Warningf("Configured stats daemon data source does not support JSON-RPC: %s; attempting to upgrade to websocket stream for network id: %s", sd.dataSource.Network.ID)
+			err := sd.dataSource.Stream(sd.queue)
+			if err != nil {
+				errs = append(errs, err)
+				sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
+			}
+		case websocketNotSupported:
+			sd.log.Warningf("Configured stats daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon for network id: %s", sd.dataSource.Network.ID)
+			err := sd.dataSource.Poll(sd.statusQueue)
+			if err != nil {
+				errs = append(errs, err)
+				sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
 			}
 		}
 	}
+	return errs
 }
 
 func (sd *StatsDaemon) ingest(response interface{}) {
@@ -260,19 +260,7 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 	daemon = NewNetworkStatsDaemon(Log, network)
 	currentNetworkStats[network.ID.String()] = daemon
 
-	go func() {
-		var err error
-		for !daemon.shuttingDown() {
-			daemon.attempt++
-			Log.Debugf("Stepping into main runloop of stats daemon instance; attempt #%v", daemon.attempt)
-			err = daemon.run()
-		}
-
-		if !daemon.shuttingDown() {
-			Log.Errorf("Forcing shutdown of stats daemon due to error; %s", err)
-			daemon.shutdown()
-		}
-	}()
+	go daemon.run()
 
 	return daemon
 }
@@ -287,7 +275,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.dataSource = NetworkStatsDataSourceFactory(network)
 	sd.queue = make(chan *provide.EthereumWebsocketSubscriptionResponse, defaultStatsDaemonQueueSize)
 	sd.statusQueue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
-	sd.handleSignals()
+	//sd.handleSignals()
 
 	chainID := network.ChainID
 	if chainID == nil {
@@ -304,13 +292,26 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 
 // Run the configured stats daemon instance
 func (sd *StatsDaemon) run() error {
-	go sd.consume()
+	go func() {
+		for !sd.shuttingDown() {
+			sd.attempt++
+			Log.Debugf("Stepping into main runloop of stats daemon instance; attempt #%v", sd.attempt)
+			errs := sd.consume()
+			if len(errs) > 0 {
+				Log.Warningf("Configured stats daemon data source returned %v error(s) while attempting to consume configured data source", len(errs))
+			}
+		}
+	}()
+
 	err := sd.loop()
 
 	if err == nil {
-		sd.log.Info("StatsDaemon exited cleanly")
+		sd.log.Info("Stats daemon exited cleanly")
 	} else {
-		sd.log.Warningf("StatsDaemon exited; %s", err)
+		if !sd.shuttingDown() {
+			Log.Errorf("Forcing shutdown of stats daemon due to error; %s", err)
+			sd.shutdown()
+		}
 	}
 
 	return err
