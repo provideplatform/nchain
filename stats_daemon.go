@@ -24,6 +24,7 @@ const defaultStatsDaemonQueueSize = 32
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 5000
 const networkStatsMaxRecentBlockCacheSize = 32
 const networkStatsMinimumRecentBlockCacheSize = 3
+const statsDaemonMaximumBackoffMillis = 12800
 
 var currentNetworkStats = map[string]*StatsDaemon{}
 
@@ -35,6 +36,7 @@ type NetworkStatsDataSource struct {
 
 type StatsDaemon struct {
 	attempt    uint32
+	backoff    int64
 	dataSource *NetworkStatsDataSource
 
 	log *logger.Logger
@@ -299,6 +301,15 @@ func (sd *StatsDaemon) run() error {
 			errs := sd.consume()
 			if len(errs) > 0 {
 				Log.Warningf("Configured stats daemon data source returned %v error(s) while attempting to consume configured data source", len(errs))
+				if sd.backoff == 0 {
+					sd.backoff = 100
+				} else {
+					sd.backoff *= 2
+				}
+				if sd.backoff > statsDaemonMaximumBackoffMillis {
+					sd.backoff = 0
+				}
+				time.Sleep(time.Duration(sd.backoff) * time.Millisecond)
 			}
 		}
 	}()
