@@ -193,7 +193,7 @@ func (sd *StatsDaemon) ingest(response interface{}, realtime bool) {
 			}
 		case *provide.NetworkStatus:
 			resp := response.(*provide.NetworkStatus)
-			if resp.Meta != nil {
+			if resp != nil && resp.Meta != nil {
 				if header, headerOk := resp.Meta["last_block_header"].(map[string]interface{}); headerOk {
 					if _, mixHashOk := header["mixHash"]; !mixHashOk {
 						header["mixHash"] = common.HexToHash("0x")
