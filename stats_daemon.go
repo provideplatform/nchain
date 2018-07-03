@@ -346,6 +346,7 @@ func (sd *StatsDaemon) run() error {
 					sd.backoff = 0
 				}
 				time.Sleep(time.Duration(sd.backoff) * time.Millisecond)
+				sd.dataSource.Network.Reload()
 			}
 		}
 	}()
