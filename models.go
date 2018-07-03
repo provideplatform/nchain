@@ -96,6 +96,7 @@ type ContractExecution struct {
 
 // ContractExecutionResponse is returned upon successful contract execution
 type ContractExecutionResponse struct {
+	Response    interface{}  `json:"response"`
 	Receipt     interface{}  `json:"receipt"`
 	Traces      interface{}  `json:"traces"`
 	Transaction *Transaction `json:"transaction"`
@@ -216,9 +217,7 @@ func (n *Network) Create() bool {
 // Reload the underlying network instance
 func (n *Network) Reload() {
 	db := DatabaseConnection()
-	Log.Debugf("attempting to reload network... %s", n)
 	db.Model(&Network{}).Find(n)
-	Log.Debugf("reloaded network... %s", n)
 }
 
 // Update an existing network
@@ -700,11 +699,13 @@ func (c *Contract) ParseParams() map[string]interface{} {
 	return params
 }
 
-func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, method string, params []interface{}) (*interface{}, error) { // given tx has been built but broadcast has not yet been attempted
+// Execute an ethereum contract; returns the tx receipt and retvals; if the method is constant, the receipt will be nil.
+// If the methid is non-constant, the retvals will be nil.
+func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, method string, params []interface{}) (*interface{}, *interface{}, error) { // given tx has been built but broadcast has not yet been attempted
 	var err error
 	_abi, err := c.readEthereumContractAbi()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
+		return nil, nil, fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
 	}
 	var methodDescriptor = fmt.Sprintf("method %s", method)
 	var abiMethod *abi.Method
@@ -718,7 +719,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 		Log.Debugf("Attempting to encode %d parameters [ %s ] prior to executing contract %s on contract: %s", len(params), params, methodDescriptor, c.ID)
 		invocationSig, err := provide.EncodeABI(abiMethod, params...)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
+			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 		}
 
 		data := common.Bytes2Hex(invocationSig)
@@ -743,7 +744,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 					Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
 					typ, err := abi.NewType(typestr)
 					if err != nil {
-						return nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
+						return nil, nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
 					}
 					vals[i] = reflect.New(typ.Type).Interface()
 				}
@@ -752,9 +753,9 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				Log.Debugf("Unpacked %v returned values from read of constant %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
 			}
 			if err != nil {
-				return nil, fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
+				return nil, nil, fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
 			}
-			return &out, nil
+			return nil, &out, nil
 		}
 		if tx.Create() {
 			Log.Debugf("Executed contract %s on contract: %s", methodDescriptor, c.ID)
@@ -774,13 +775,14 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 					if err != nil {
 						err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
 						Log.Warning(err.Error())
-						return nil, err
+						return nil, nil, err
 					}
 					out = txdeets
 				default:
 					// no-op
+					Log.Warningf("Unhandled transaction receipt type; %s", tx.Response.Receipt)
 				}
-				return &out, nil
+				return &out, nil, nil
 			}
 		} else {
 			err = fmt.Errorf("Failed to execute contract %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
@@ -789,7 +791,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 	} else {
 		err = fmt.Errorf("Failed to execute contract %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)
 	}
-	return nil, err
+	return nil, nil, err
 }
 
 func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
@@ -838,6 +840,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 	}
 }
 
+// Execute a transaction on the contract instance using a specific signer, value, method and params
 func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, params []interface{}) (*ContractExecutionResponse, error) {
 	var err error
 	db := DatabaseConnection()
@@ -854,9 +857,10 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	}
 
 	var receipt *interface{}
+	var response *interface{}
 
 	if network.isEthereumNetwork() {
-		receipt, err = c.executeEthereumContract(network, tx, method, params)
+		receipt, response, err = c.executeEthereumContract(network, tx, method, params)
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *network.Name)
 	}
@@ -870,6 +874,7 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
+			Response:    response,
 			Receipt:     receipt,
 			Traces:      tx.Traces,
 			Transaction: tx,
