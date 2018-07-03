@@ -390,12 +390,20 @@ func pricesHandler(c *gin.Context) {
 
 func contractsListHandler(c *gin.Context) {
 	appID := authorizedSubjectId(c, "application")
-	if appID == nil {
+	userID := authorizedSubjectId(c, "user")
+	if appID == nil && userID == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
 
-	query := ContractListQuery().Where("contracts.application_id = ?", appID)
+	query := ContractListQuery()
+
+	if appID != nil {
+		query = query.Where("contracts.application_id = ?", appID)
+	}
+	if userID != nil {
+		query = query.Where("contracts.user_id = ? OR contracts.application_id IS NULL AND contracts.user_id IS NULL", userID)
+	}
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
 	if filterTokens {
@@ -409,7 +417,8 @@ func contractsListHandler(c *gin.Context) {
 
 func contractDetailsHandler(c *gin.Context) {
 	appID := authorizedSubjectId(c, "application")
-	if appID == nil {
+	userID := authorizedSubjectId(c, "user")
+	if appID == nil && userID == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
@@ -417,7 +426,15 @@ func contractDetailsHandler(c *gin.Context) {
 	db := DatabaseConnection()
 	var contract = &Contract{}
 
-	db.Where("id = ?", c.Param("id")).Find(&contract)
+	query := db.Where("id = ?", c.Param("id"))
+	if appID != nil {
+		query = query.Where("contracts.application_id = ?", appID)
+	}
+	if userID != nil {
+		query = query.Where("contracts.user_id = ? OR contracts.application_id IS NULL AND contracts.user_id IS NULL", userID)
+	}
+
+	query.Find(&contract)
 
 	if contract == nil || contract.ID == uuid.Nil { // attempt to lookup the contract by address
 		db.Where("address = ?", c.Param("id")).Find(&contract)
@@ -464,9 +481,60 @@ func createContractHandler(c *gin.Context) {
 	}
 }
 
+func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	execution := &ContractExecution{}
+	err := json.Unmarshal(buf, execution)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+
+	network := &Network{}
+	if execution.NetworkID != nil && *execution.NetworkID != uuid.Nil {
+		db.Where("id = ?", execution.NetworkID).Find(&network)
+	}
+
+	if network == nil || network.ID == uuid.Nil {
+		renderError("network not found for arbitrary contract execution", 404, c)
+		return
+	}
+
+	params := map[string]interface{}{
+		"abi": execution.ABI,
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		renderError("failed to marshal ephemeral contract params containing ABI", 422, c)
+		return
+	}
+	paramsMsg := json.RawMessage(paramsJSON)
+
+	ephemeralContract := &Contract{
+		NetworkID: network.ID,
+		Address:   stringOrNil(c.Param("id")),
+		Params:    &paramsMsg,
+	}
+
+	resp, err := ephemeralContract.Execute(execution.WalletID, execution.Value, execution.Method, execution.Params)
+	if err == nil {
+		render(resp, 202, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = []string{err.Error()}
+		render(obj, 422, c)
+	}
+}
+
 func contractExecutionHandler(c *gin.Context) {
 	appID := authorizedSubjectId(c, "application")
-	if appID == nil {
+	userID := authorizedSubjectId(c, "user")
+	if appID == nil && userID == nil {
 		renderError("unauthorized", 401, c)
 		return
 	}
@@ -487,7 +555,13 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	if contract == nil || contract.ID == uuid.Nil {
-		renderError("contract not found", 404, c)
+		if appID != nil {
+			renderError("contract not found", 404, c)
+			return
+		}
+
+		Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
+		contractArbitraryExecutionHandler(c, db, buf)
 		return
 	} else if appID != nil && *contract.ApplicationID != *appID {
 		renderError("forbidden", 403, c)

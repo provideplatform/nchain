@@ -86,10 +86,12 @@ type Contract struct {
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
-	WalletID *uuid.UUID    `json:"wallet_id"`
-	Method   string        `json:"method"`
-	Params   []interface{} `json:"params"`
-	Value    *big.Int      `json:"value"`
+	ABI       interface{}   `json:"abi"`
+	NetworkID *uuid.UUID    `json:"network_id"`
+	WalletID  *uuid.UUID    `json:"wallet_id"`
+	Method    string        `json:"method"`
+	Params    []interface{} `json:"params"`
+	Value     *big.Int      `json:"value"`
 }
 
 // ContractExecutionResponse is returned upon successful contract execution
@@ -358,7 +360,7 @@ func (n *Network) Nodes() (nodes []*NetworkNode, err error) {
 }
 
 func (n *Network) isEthereumNetwork() bool {
-	if strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
+	if n.Name != nil && strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
 		return true
 	}
 
