@@ -80,7 +80,7 @@ type Contract struct {
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
-	Address       *string          `sql:"not null" json:"address"` // network-specific token contract address
+	Address       *string          `sql:"not null" json:"address"`
 	Params        *json.RawMessage `sql:"type:json" json:"params"`
 }
 
@@ -209,6 +209,14 @@ func (n *Network) Create() bool {
 		}
 	}
 	return false
+}
+
+// Reload the underlying network instance
+func (n *Network) Reload() {
+	db := DatabaseConnection()
+	Log.Debugf("attempting to reload network... %s", n)
+	db.Model(&Network{}).Find(n)
+	Log.Debugf("reloaded network... %s", n)
 }
 
 // Update an existing network
@@ -857,91 +865,6 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	} else {
 		tx.updateStatus(db, "success")
 	}
-
-	if tx.Response == nil {
-		tx.Response = &ContractExecutionResponse{
-			Receipt:     receipt,
-			Traces:      tx.Traces,
-			Transaction: tx,
-		}
-	} else if tx.Response.Transaction == nil {
-		tx.Response.Transaction = tx
-	}
-
-	return tx.Response, nil
-}
-
-// Execute - execute functionality encapsulated in the contract by invoking a specific method using given parameters
-func (c *Contract) Execute2(walletID *uuid.UUID, value *big.Int, method string, params []interface{}) (*ContractExecutionResponse, error) {
-	var err error
-	db := DatabaseConnection()
-	var network = &Network{}
-	db.Model(c).Related(&network)
-	var wallet = &Wallet{}
-	db.Where("id = ?", walletID).Find(&wallet)
-
-	tx := &Transaction{
-		ApplicationID: c.ApplicationID,
-		UserID:        nil,
-		NetworkID:     c.NetworkID,
-		WalletID:      *walletID,
-		To:            c.Address,
-		Value:         &TxValue{value: value},
-	}
-
-	var receipt *interface{}
-
-	if network.isEthereumNetwork() {
-		contractAbi, _ := c.readEthereumContractAbi()
-		receipt, err = provide.ExecuteContract(network.ID.String(), network.rpcURL(), wallet.Address, tx.To, tx.Data, value, method, contractAbi, params)
-
-		var abiMethod *abi.Method
-		if mthd, ok := contractAbi.Methods[method]; ok {
-			abiMethod = &mthd
-		}
-
-		if abiMethod != nil && !abiMethod.Const {
-			if tx.Create() {
-				Log.Debugf("Executed %s method on contract:", method, c.ID)
-
-				if tx.Response != nil {
-					Log.Debugf("Received response to tx broadcast attempt calling contract %s on contract: %s", method, c.ID)
-
-					var out interface{}
-					switch (tx.Response.Receipt).(type) {
-					case []byte:
-						out = (tx.Response.Receipt).([]byte)
-						Log.Debugf("Received response: %s", out)
-					case types.Receipt:
-						client, _ := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
-						receipt := tx.Response.Receipt.(*types.Receipt)
-						txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
-						if err != nil {
-							err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
-							Log.Warning(err.Error())
-							return nil, err
-						}
-						out = txdeets
-					default:
-						// no-op
-					}
-					return nil, nil
-				}
-			} else {
-				err = fmt.Errorf("Failed to execute %s method on contract: %s (signature with encoded parameters: %s); tx broadcast failed", method, c.ID, *tx.Data)
-				Log.Warning(err.Error())
-			}
-		}
-	} else {
-		err = fmt.Errorf("unsupported network: %s", *network.Name)
-	}
-
-	if err != nil {
-		tx.updateStatus(db, "failed")
-		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
-	}
-
-	tx.updateStatus(db, "success")
 
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
