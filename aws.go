@@ -7,9 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ecs"
 )
 
-// NewEC2
+// NewEC2 initializes and returns an instance of the EC2 API client
 func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
 	var err error
 	cfg := aws.NewConfig().WithMaxRetries(10).WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
@@ -18,7 +19,16 @@ func NewEC2(accessKeyID, secretAccessKey, region string) (*ec2.EC2, error) {
 	return ec2, err
 }
 
-// LaunchAMI  launches an EC2 instance for a given AMI id
+// NewECS initializes and returns an instance of the ECS API client
+func NewECS(accessKeyID, secretAccessKey, region string) (*ecs.ECS, error) {
+	var err error
+	cfg := aws.NewConfig().WithMaxRetries(10).WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
+	sess := session.New(cfg)
+	ecs := ecs.New(sess)
+	return ecs, err
+}
+
+// LaunchAMI launches an EC2 instance for a given AMI id
 func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, minCount, maxCount int64) (instanceIds []string, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
 
@@ -89,6 +99,65 @@ func TerminateInstance(accessKeyID, secretAccessKey, region, instanceID string) 
 
 	if err != nil {
 		Log.Warningf("EC2 instance not terminated for %s; %s", instanceID, err.Error())
+	}
+
+	return response, err
+}
+
+// StartContainer starts a new ECS task for the given task definition
+func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string, overrides map[string]interface{}) (taskIds []string, err error) {
+	client, err := NewECS(accessKeyID, secretAccessKey, region)
+
+	containerOverrides := make([]*ecs.ContainerOverride, 0)
+	for container := range overrides {
+		env := make([]*ecs.KeyValuePair, 0)
+		envOverrides, envOverridesOk := overrides[container].(map[string]interface{})["environment"].(map[string]string)
+		if envOverridesOk {
+			for envVar := range envOverrides {
+				env = append(env, &ecs.KeyValuePair{
+					Name:  stringOrNil(envVar),
+					Value: stringOrNil(envOverrides[envVar]),
+				})
+			}
+		}
+		override := &ecs.ContainerOverride{
+			Name:        stringOrNil(container),
+			Environment: env,
+		}
+		containerOverrides = append(containerOverrides, override)
+	}
+
+	response, err := client.RunTask(&ecs.RunTaskInput{
+		TaskDefinition: stringOrNil(taskDefinition),
+		Overrides: &ecs.TaskOverride{
+			ContainerOverrides: containerOverrides,
+		},
+	})
+
+	if err != nil {
+		return taskIds, fmt.Errorf("Failed to start container in region: %s; %s", region, err.Error())
+	}
+
+	if response != nil {
+		Log.Debugf("ECS run task response received: %s", response)
+		for i := range response.Tasks {
+			taskIds = append(taskIds, *response.Tasks[i].TaskArn)
+		}
+	}
+
+	return taskIds, err
+}
+
+// StopContainer destroys an EC2 instance given its instance id
+func StopContainer(accessKeyID, secretAccessKey, region, taskID string) (response *ecs.StopTaskOutput, err error) {
+	client, err := NewECS(accessKeyID, secretAccessKey, region)
+
+	response, err = client.StopTask(&ecs.StopTaskInput{
+		Task: stringOrNil(taskID),
+	})
+
+	if err != nil {
+		Log.Warningf("Container instance not stopped for %s; %s", taskID, err.Error())
 	}
 
 	return response, err
