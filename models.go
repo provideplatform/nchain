@@ -282,16 +282,16 @@ func (n *Network) resolveJsonRpcAndWebsocketUrls(db *gorm.DB) {
 			if isLoadBalanced {
 				Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
 			} else {
-				if node.reachableViaJsonRpc() {
-					cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort)
-					cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort) // deprecated
+				if reachable, port := node.reachableViaJsonRpc(); reachable {
+					cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port)
+					cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port) // deprecated
 				} else {
 					cfg["json_rpc_url"] = nil
 					cfg["parity_json_rpc_url"] = nil // deprecated
 				}
 
-				if node.reachableViaWebsocket() {
-					cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, defaultWebsocketPort)
+				if reachable, port := node.reachableViaWebsocket(); reachable {
+					cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, port)
 				} else {
 					cfg["websocket_url"] = nil
 				}
@@ -429,24 +429,24 @@ func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
 	*n.Config = json.RawMessage(cfgJSON)
 }
 
-func (n *NetworkNode) reachableViaJsonRpc() bool {
+func (n *NetworkNode) reachableViaJsonRpc() (bool, uint) {
 	cfg := n.ParseConfig()
 	port := uint(defaultJsonRpcPort)
 	if jsonRpcPortOverride, jsonRpcPortOverrideOk := cfg["default_json_rpc_port"].(float64); jsonRpcPortOverrideOk {
 		port = uint(jsonRpcPortOverride)
 	}
 
-	return n.reachableOnPort(port)
+	return n.reachableOnPort(port), port
 }
 
-func (n *NetworkNode) reachableViaWebsocket() bool {
+func (n *NetworkNode) reachableViaWebsocket() (bool, uint) {
 	cfg := n.ParseConfig()
 	port := uint(defaultWebsocketPort)
 	if websocketPortOverride, websocketPortOverrideOk := cfg["default_websocket_port"].(float64); websocketPortOverrideOk {
 		port = uint(websocketPortOverride)
 	}
 
-	return n.reachableOnPort(port)
+	return n.reachableOnPort(port), port
 }
 
 func (n *NetworkNode) reachableOnPort(port uint) bool {
@@ -537,6 +537,9 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 
 		cfg := n.ParseConfig()
 		networkCfg := network.ParseConfig()
+
+		cfg["default_json_rpc_port"] = networkCfg["default_json_rpc_port"]
+		cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
 
 		targetID, targetOk := cfg["target_id"].(string)
 		providerID, providerOk := cfg["provider_id"].(string)
