@@ -117,7 +117,7 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 				if err := wsConn.WriteJSON(payload); err != nil {
 					Log.Errorf("Failed to write subscribe message to network stats websocket connection")
 				} else {
-					Log.Debugf("Subscribed to %s network stats websocket: %s", websocketURL)
+					Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
 
 					for {
 						_, message, err := wsConn.ReadMessage()
