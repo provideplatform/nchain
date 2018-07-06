@@ -30,6 +30,7 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
+const reachabilityTimeout = time.Millisecond * 2500
 const receiptTickerInterval = time.Millisecond * 2500
 const receiptTickerTimeout = time.Minute * 1
 const resolveHostTickerInterval = time.Millisecond * 5000
@@ -422,6 +423,12 @@ func (n *NetworkNode) Create() bool {
 	return false
 }
 
+// setConfig sets the network config in-memory
+func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+}
+
 func (n *NetworkNode) reachableViaJsonRpc() bool {
 	return n.reachableOnPort(defaultJsonRpcPort)
 }
@@ -432,7 +439,7 @@ func (n *NetworkNode) reachableViaWebsocket() bool {
 
 func (n *NetworkNode) reachableOnPort(port uint) bool {
 	addr := fmt.Sprintf("%s:%v", *n.Host, port)
-	conn, err := net.Dial("tcp", addr)
+	conn, err := net.DialTimeout("tcp", addr, reachabilityTimeout)
 	if err == nil {
 		Log.Debugf("%s:%v is reachable", *n.Host, port)
 		defer conn.Close()
@@ -604,6 +611,10 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 				securityGroupIds := make([]string, 0)
 				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
 
+				cfg["region"] = region
+				cfg["target_security_group_ids"] = securityGroupIds
+				n.setConfig(cfg)
+
 				if err != nil {
 					Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s", region, n.ID.String())
 				} else {
@@ -701,9 +712,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 									return
 								}
 								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-								cfg["region"] = region
 								cfg["target_instance_ids"] = instanceIds
-								cfg["target_security_group_ids"] = securityGroupIds
 
 								Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroupIds), imageID, version, region, instanceIds)
 								for i := range instanceIds {
@@ -736,9 +745,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 								return
 							}
 							Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", container, region, taskIds)
-							cfg["region"] = region
 							cfg["target_task_ids"] = taskIds
-							cfg["target_security_group_ids"] = securityGroupIds
 
 							n.resolveHost(db, network, cfg, taskIds)
 						}
@@ -859,37 +866,6 @@ func (n *NetworkNode) undeploy() error {
 						Log.Debugf("Terminated EC2 instance with id: %s", instanceID)
 						n.Status = stringOrNil("terminated")
 						db.Save(n)
-
-						ticker := time.NewTicker(securityGroupTerminationTickerInterval)
-						go func() {
-							startedAt := time.Now()
-							for {
-								select {
-								case <-ticker.C:
-									instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID)
-									if err == nil {
-										if len(instanceDetails.Reservations) > 0 {
-											reservation := instanceDetails.Reservations[0]
-											if len(reservation.Instances) > 0 {
-												if *reservation.Instances[0].State.Code == 48 { // terminated
-													n.unregisterSecurityGroups()
-													ticker.Stop()
-													return
-												}
-											}
-										}
-									} else {
-										Log.Warningf("Failed to retrieve EC2 instance with id: %s; %s", instanceID, err.Error())
-									}
-
-									if time.Now().Sub(startedAt) >= securityGroupTerminationTickerTimeout {
-										Log.Warningf("Failed to unregister security groups for EC2 instance with id: %s; timing out after %v...", instanceID, securityGroupTerminationTickerTimeout)
-										ticker.Stop()
-										return
-									}
-								}
-							}
-						}()
 					} else {
 						Log.Warningf("Failed to terminate EC2 instance with id: %s; %s", instanceID, err.Error())
 					}
@@ -903,37 +879,37 @@ func (n *NetworkNode) undeploy() error {
 						Log.Debugf("Terminated ECS docker container with id: %s", taskID)
 						n.Status = stringOrNil("terminated")
 						db.Save(n)
-
-						ticker := time.NewTicker(securityGroupTerminationTickerInterval)
-						go func() {
-							startedAt := time.Now()
-							for {
-								select {
-								case <-ticker.C:
-									err := n.unregisterSecurityGroups()
-									if err == nil {
-										ticker.Stop()
-										return
-									}
-
-									if time.Now().Sub(startedAt) >= securityGroupTerminationTickerTimeout {
-										Log.Warningf("Failed to unregister security groups for ECS docker container with id: %s; timing out after %v...", taskID, securityGroupTerminationTickerTimeout)
-										ticker.Stop()
-										return
-									}
-								}
-							}
-						}()
 					} else {
 						Log.Warningf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
 					}
 				}
 			}
+
+			ticker := time.NewTicker(securityGroupTerminationTickerInterval)
+			go func() {
+				startedAt := time.Now()
+				for {
+					select {
+					case <-ticker.C:
+						err := n.unregisterSecurityGroups()
+						if err == nil {
+							ticker.Stop()
+							return
+						}
+
+						if time.Now().Sub(startedAt) >= securityGroupTerminationTickerTimeout {
+							Log.Warningf("Failed to unregister security groups for network node with id: %s; timing out after %v...", n.ID, securityGroupTerminationTickerTimeout)
+							ticker.Stop()
+							return
+						}
+					}
+				}
+			}()
 		}
 
 		var network = &Network{}
 		db.Where("id = ?", n.NetworkID).Find(&network)
-		network.resolveJsonRpcAndWebsocketUrls(db)
+		go network.resolveJsonRpcAndWebsocketUrls(db)
 	}
 
 	return nil
@@ -959,7 +935,7 @@ func (n *NetworkNode) unregisterSecurityGroups() error {
 				if strings.ToLower(targetID) == "aws" {
 					_, err := DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID)
 					if err != nil {
-						Log.Warningf("Failed to delete EC2 security group with id: %s", securityGroupID)
+						Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
 						return err
 					}
 				}
