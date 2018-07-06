@@ -53,6 +53,21 @@ func LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData string, m
 	return instanceIds, err
 }
 
+// GetTaskDefinition retrieves ECS task definition containing one or more docker containers
+func GetTaskDefinition(accessKeyID, secretAccessKey, region, taskDefinition string) (response *ecs.DescribeTaskDefinitionOutput, err error) {
+	client, err := NewECS(accessKeyID, secretAccessKey, region)
+
+	response, err = client.DescribeTaskDefinition(&ecs.DescribeTaskDefinitionInput{
+		TaskDefinition: stringOrNil(taskDefinition),
+	})
+
+	if response != nil {
+		Log.Debugf("ECS task definition retrieved for %s: %s", taskDefinition, response)
+	}
+
+	return response, err
+}
+
 // GetInstanceDetails retrieves EC2 instance details for a given instance id
 func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string) (response *ec2.DescribeInstancesOutput, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
@@ -347,23 +362,29 @@ func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string,
 		}
 	}
 
+	taskDefinitionResp, err := GetTaskDefinition(accessKeyID, secretAccessKey, region, taskDefinition)
+	if err != nil {
+		return taskIds, fmt.Errorf("Failed to start container in region: %s; %s", region, err.Error())
+	}
+
 	containerOverrides := make([]*ecs.ContainerOverride, 0)
-	for container := range overrides {
+	for i := range taskDefinitionResp.TaskDefinition.ContainerDefinitions {
+		containerDefinition := taskDefinitionResp.TaskDefinition.ContainerDefinitions[i]
+
 		env := make([]*ecs.KeyValuePair, 0)
-		if _containerOverrides, containerOverridesOk := overrides[container].(map[string]interface{}); containerOverridesOk {
-			if envOverrides, envOverridesOk := _containerOverrides["environment"].(map[string]string); envOverridesOk {
-				for envVar := range envOverrides {
-					env = append(env, &ecs.KeyValuePair{
-						Name:  stringOrNil(envVar),
-						Value: stringOrNil(envOverrides[envVar]),
-					})
-				}
+		if envOverrides, envOverridesOk := overrides["environment"].(map[string]string); envOverridesOk {
+			for envVar := range envOverrides {
+				env = append(env, &ecs.KeyValuePair{
+					Name:  stringOrNil(envVar),
+					Value: stringOrNil(envOverrides[envVar]),
+				})
 			}
-			containerOverrides = append(containerOverrides, &ecs.ContainerOverride{
-				Name:        stringOrNil(container),
-				Environment: env,
-			})
 		}
+
+		containerOverrides = append(containerOverrides, &ecs.ContainerOverride{
+			Name:        containerDefinition.Name,
+			Environment: env,
+		})
 	}
 
 	response, err := client.RunTask(&ecs.RunTaskInput{

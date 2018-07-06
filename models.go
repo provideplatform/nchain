@@ -268,32 +268,40 @@ func (n *Network) resolveJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	// update the JSON-RPC URL and enrich the network cfg
 	cfg := n.ParseConfig()
 
+	isLoadBalanced := false
+	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
+		isLoadBalanced = loadBalanced
+	}
+
 	if n.isEthereumNetwork() {
 		var node = &NetworkNode{}
 		db.Where("network_id = ? AND status = 'running'", n.ID).First(&node)
 
 		if node != nil && node.ID != uuid.Nil {
-			Log.Warningf("Load balancer configuration unaltered")
-			// if node.reachableViaJsonRpc() {
-			// 	cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort)
-			// 	cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort) // deprecated
-			// } else {
-			// 	cfg["json_rpc_url"] = nil
-			// 	cfg["parity_json_rpc_url"] = nil // deprecated
-			// }
+			if isLoadBalanced {
+				Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
+			} else {
+				if node.reachableViaJsonRpc() {
+					cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort)
+					cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultJsonRpcPort) // deprecated
+				} else {
+					cfg["json_rpc_url"] = nil
+					cfg["parity_json_rpc_url"] = nil // deprecated
+				}
 
-			// if node.reachableViaWebsocket() {
-			// 	cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, defaultWebsocketPort)
-			// } else {
-			// 	cfg["websocket_url"] = nil
-			// }
+				if node.reachableViaWebsocket() {
+					cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, defaultWebsocketPort)
+				} else {
+					cfg["websocket_url"] = nil
+				}
+
+				cfgJSON, _ := json.Marshal(cfg)
+				*n.Config = json.RawMessage(cfgJSON)
+
+				db.Save(n)
+			}
 		}
 	}
-
-	cfgJSON, _ := json.Marshal(cfg)
-	*n.Config = json.RawMessage(cfgJSON)
-
-	db.Save(n)
 }
 
 // Validate a network for persistence
@@ -715,10 +723,8 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							Log.Debugf("Attempting to deploy container %s in EC2 region: %s", container, region)
 							overrides := map[string]interface{}{}
 							if chain, chainOk := networkCfg["chain"].(string); chainOk {
-								overrides["parity"] = map[string]interface{}{
-									"environment": map[string]string{
-										"CHAIN": chain,
-									},
+								overrides["environment"] = map[string]string{
+									"CHAIN": chain,
 								}
 							}
 							taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
