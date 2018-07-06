@@ -508,6 +508,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 		networkCfg := network.ParseConfig()
 
 		targetID, targetOk := cfg["target_id"].(string)
+		providerID, providerOk := cfg["provider_id"].(string)
 		role, roleOk := cfg["role"].(string)
 		credentials, credsOk := cfg["credentials"].(map[string]interface{})
 		rcd, rcdOk := cfg["rc.d"].(string)
@@ -552,51 +553,55 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 				accessKeyID := credentials["aws_access_key_id"].(string)
 				secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-				var userData = ""
-				if rcdOk {
-					userData = base64.StdEncoding.EncodeToString([]byte(rcd))
-				}
-
-				Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
-				if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
-					Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
-					if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
-						Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
-						versions := make([]string, 0)
-						for version := range imageVersionsByRole {
-							versions = append(versions, version)
-						}
-						Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
-						version := versions[len(versions)-1] // defaults to latest version for now
-						Log.Debugf("Attempting to lookup update for version: %s", version)
-						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
-							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-							instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
-							if err != nil {
-								n.updateStatus(db, "failed")
-								Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
-								return
+				if strings.ToLower(providerID) == "ubuntu-vm" {
+					var userData = ""
+					if rcdOk {
+						userData = base64.StdEncoding.EncodeToString([]byte(rcd))
+					}
+	
+					Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
+					if imagesByRegion, imagesByRegionOk := cloneableImagesByRegion[region].(map[string]interface{}); imagesByRegionOk {
+						Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
+						if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
+							Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
+							versions := make([]string, 0)
+							for version := range imageVersionsByRole {
+								versions = append(versions, version)
 							}
-							Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-							cfg["region"] = region
-							cfg["target_instance_ids"] = instanceIds
-
-							if securityGroups, securityGroupsOk := cloneableImages[targetID].(map[string]interface{})["security_groups"].(map[string]interface{}); securityGroupsOk {
-								if securityGroupsByImageID, securityGroupsByImageIDOk := securityGroups[imageID].([]interface{}); securityGroupsByImageIDOk {
-									securityGroups := make([]string, 0)
-									for i := range securityGroupsByImageID {
-										securityGroups = append(securityGroups, securityGroupsByImageID[i].(string))
-									}
-									Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroups), imageID, version, region, instanceIds)
-									for i := range instanceIds {
-										SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroups)
+							Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
+							version := versions[len(versions)-1] // defaults to latest version for now
+							Log.Debugf("Attempting to lookup update for version: %s", version)
+							if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
+								Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
+								instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
+								if err != nil {
+									n.updateStatus(db, "failed")
+									Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
+									return
+								}
+								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+								cfg["region"] = region
+								cfg["target_instance_ids"] = instanceIds
+	
+								if securityGroups, securityGroupsOk := cloneableImages[targetID].(map[string]interface{})["security_groups"].(map[string]interface{}); securityGroupsOk {
+									if securityGroupsByImageID, securityGroupsByImageIDOk := securityGroups[imageID].([]interface{}); securityGroupsByImageIDOk {
+										securityGroups := make([]string, 0)
+										for i := range securityGroupsByImageID {
+											securityGroups = append(securityGroups, securityGroupsByImageID[i].(string))
+										}
+										Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroups), imageID, version, region, instanceIds)
+										for i := range instanceIds {
+											SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroups)
+										}
 									}
 								}
+	
+								n.resolveHost(db, network, cfg, instanceIds, accessKeyID, secretAccessKey, region)
 							}
-
-							n.resolveHost(db, network, cfg, instanceIds, accessKeyID, secretAccessKey, region)
 						}
 					}
+				} else if strings.ToLower(providerID) == "docker" {
+					Log.Warningf("Docker provider not yet supported")
 				}
 			}
 		}
