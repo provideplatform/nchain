@@ -254,6 +254,7 @@ func (n *Network) setChainID() {
 	n.ChainID = stringOrNil(fmt.Sprintf("0x%x", time.Now().Unix()))
 	cfg := n.ParseConfig()
 	if cfg != nil {
+		cfg["network_id"] = n.ChainID
 		if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
 			if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
 				params["networkID"] = n.ChainID
