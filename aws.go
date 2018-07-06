@@ -61,8 +61,9 @@ func GetTaskDefinition(accessKeyID, secretAccessKey, region, taskDefinition stri
 		TaskDefinition: stringOrNil(taskDefinition),
 	})
 
-	if response != nil {
-		Log.Debugf("ECS task definition retrieved for %s: %s", taskDefinition, response)
+	if err != nil {
+		Log.Warningf("ECS task definition retrieval failed for task definition: %;: %s", taskDefinition, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -76,8 +77,9 @@ func GetInstanceDetails(accessKeyID, secretAccessKey, region, instanceID string)
 		InstanceIds: []*string{stringOrNil(instanceID)},
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 instance details retrieved for %s: %s", instanceID, response)
+	if err != nil {
+		Log.Warningf("ECS instance details retrieval failed for instance: %s; %s", instanceID, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -89,8 +91,9 @@ func GetSecurityGroups(accessKeyID, secretAccessKey, region string) (response *e
 
 	response, err = client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{})
 
-	if response != nil {
-		Log.Debugf("EC2 security group details retrieved for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 security group details retrieval failed for region: %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -102,8 +105,9 @@ func GetSubnets(accessKeyID, secretAccessKey, region string) (response *ec2.Desc
 
 	response, err = client.DescribeSubnets(&ec2.DescribeSubnetsInput{})
 
-	if response != nil {
-		Log.Debugf("EC2 subnet details retrieved for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 subnet details retrieval failed for region: %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -115,8 +119,9 @@ func GetClusters(accessKeyID, secretAccessKey, region string) (response *ecs.Lis
 
 	response, err = client.ListClusters(&ecs.ListClustersInput{})
 
-	if response != nil {
-		Log.Debugf("ECS cluster details retrieved for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("ECS cluster details retrieval failed for region: %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -156,8 +161,9 @@ func AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, security
 		IpPermissions: permissions,
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 security group egress authorization failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -183,8 +189,9 @@ func AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessK
 		IpPermissions: permissions,
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 security group egress authorization failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -210,8 +217,9 @@ func AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccess
 		IpPermissions: permissions,
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 security group ingress authorization failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -251,8 +259,9 @@ func AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, securit
 		IpPermissions: permissions,
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 security group ingress authorization failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -268,8 +277,9 @@ func CreateSecurityGroup(accessKeyID, secretAccessKey, region, name, description
 		VpcId:       vpcID,
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 security group created for %s: %s", region, response)
+	if err != nil {
+		Log.Warningf("EC2 security group creation failed failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -283,8 +293,9 @@ func DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID s
 		GroupId: stringOrNil(securityGroupID),
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 security group deleted for %s: %s; security group id: %s", region, response, securityGroupID)
+	if err != nil {
+		Log.Warningf("EC2 security group deletion failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -304,8 +315,9 @@ func SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceID 
 		Groups:     groupIds,
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 instance attribute modified for %s: %s", instanceID, response)
+	if err != nil {
+		Log.Warningf("EC2 instance attribute modification failed for %s; %s", region, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -320,7 +332,8 @@ func TerminateInstance(accessKeyID, secretAccessKey, region, instanceID string) 
 	})
 
 	if err != nil {
-		Log.Warningf("EC2 instance not terminated for %s; %s", instanceID, err.Error())
+		Log.Warningf("EC2 instance termination request failed for instance id: %s; %s", instanceID, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -404,11 +417,11 @@ func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string,
 	})
 
 	if err != nil {
-		return taskIds, fmt.Errorf("Failed to start container in region: %s; %s", region, err.Error())
+		Log.Warningf("ECS docker container start request failed for task definition: %s; %s", taskDefinition, err.Error())
+		return taskIds, err
 	}
 
 	if response != nil {
-		Log.Debugf("ECS run task response received: %s", response)
 		for i := range response.Tasks {
 			taskIds = append(taskIds, *response.Tasks[i].TaskArn)
 		}
@@ -436,7 +449,8 @@ func StopContainer(accessKeyID, secretAccessKey, region, taskID string, cluster 
 	})
 
 	if err != nil {
-		Log.Warningf("Container instance not stopped for %s; %s", taskID, err.Error())
+		Log.Warningf("ECS docker container not stopped for task id: %s; %s", taskID, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -461,7 +475,12 @@ func GetContainerDetails(accessKeyID, secretAccessKey, region, taskID string, cl
 	})
 
 	if response != nil {
-		Log.Debugf("ECS container details retrieved for %s: %s", taskID, response)
+		Log.Debugf("ECS container details retrieved for %s; %s", taskID, response)
+	}
+
+	if err != nil {
+		Log.Warningf("ECS container details retreival failed for task id: %s; %s", taskID, err.Error())
+		return nil, err
 	}
 
 	return response, err
@@ -475,8 +494,9 @@ func GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, networkInt
 		NetworkInterfaceIds: []*string{stringOrNil(networkInterfaceID)},
 	})
 
-	if response != nil {
-		Log.Debugf("EC2 network interface details retrieved for %s: %s", networkInterfaceID, response)
+	if err != nil {
+		Log.Warningf("ECE network interface details retreival failed for network interface id: %s; %s", networkInterfaceID, err.Error())
+		return nil, err
 	}
 
 	return response, err
