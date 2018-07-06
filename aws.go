@@ -107,6 +107,174 @@ func GetClusters(accessKeyID, secretAccessKey, region string) (response *ecs.Lis
 	return response, err
 }
 
+// AuthorizeSecurityGroupEgress authorizes egress for a given lists of tcp and udp ports on a given security group
+func AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, securityGroupID, ipv4Cidr string, tcpPorts, udpPorts []int64) (response *ec2.AuthorizeSecurityGroupEgressOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	ranges := make([]*ec2.IpRange, 0)
+	ranges = append(ranges, &ec2.IpRange{
+		CidrIp: stringOrNil(ipv4Cidr),
+	})
+
+	permissions := make([]*ec2.IpPermission, 0)
+	for i := range tcpPorts {
+		port := tcpPorts[i]
+		permissions = append(permissions, &ec2.IpPermission{
+			FromPort:   &port,
+			ToPort:     &port,
+			IpProtocol: stringOrNil("tcp"),
+			IpRanges:   ranges,
+		})
+	}
+	for i := range udpPorts {
+		port := udpPorts[i]
+		permissions = append(permissions, &ec2.IpPermission{
+			FromPort:   &port,
+			ToPort:     &port,
+			IpProtocol: stringOrNil("udp"),
+			IpRanges:   ranges,
+		})
+	}
+
+	response, err = client.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
+		GroupId:       stringOrNil(securityGroupID),
+		IpPermissions: permissions,
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	}
+
+	return response, err
+}
+
+// AuthorizeSecurityGroupEgressAllPortsAllProtocols authorizes egress for all ports and protocols on a given security group
+func AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, securityGroupID string) (response *ec2.AuthorizeSecurityGroupEgressOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	ranges := make([]*ec2.IpRange, 0)
+	ranges = append(ranges, &ec2.IpRange{
+		CidrIp: stringOrNil("0.0.0.0/0"),
+	})
+
+	permissions := make([]*ec2.IpPermission, 0)
+	permissions = append(permissions, &ec2.IpPermission{
+		IpProtocol: stringOrNil("-1"),
+		IpRanges:   ranges,
+	})
+
+	response, err = client.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
+		GroupId:       stringOrNil(securityGroupID),
+		IpPermissions: permissions,
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	}
+
+	return response, err
+}
+
+// AuthorizeSecurityGroupIngressAllPortsAllProtocols authorizes egress for all ports and protocols on a given security group
+func AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, securityGroupID string) (response *ec2.AuthorizeSecurityGroupIngressOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	ranges := make([]*ec2.IpRange, 0)
+	ranges = append(ranges, &ec2.IpRange{
+		CidrIp: stringOrNil("0.0.0.0/0"),
+	})
+
+	permissions := make([]*ec2.IpPermission, 0)
+	permissions = append(permissions, &ec2.IpPermission{
+		IpProtocol: stringOrNil("-1"),
+		IpRanges:   ranges,
+	})
+
+	response, err = client.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId:       stringOrNil(securityGroupID),
+		IpPermissions: permissions,
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	}
+
+	return response, err
+}
+
+// AuthorizeSecurityGroupIngress authorizes ingress for a given lists of tcp and udp ports on a given security group
+func AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, securityGroupID, ipv4Cidr string, tcpPorts, udpPorts []int64) (response *ec2.AuthorizeSecurityGroupIngressOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	ranges := make([]*ec2.IpRange, 0)
+	ranges = append(ranges, &ec2.IpRange{
+		CidrIp: stringOrNil(ipv4Cidr),
+	})
+
+	permissions := make([]*ec2.IpPermission, 0)
+	for i := range tcpPorts {
+		port := tcpPorts[i]
+		permissions = append(permissions, &ec2.IpPermission{
+			FromPort:   &port,
+			ToPort:     &port,
+			IpProtocol: stringOrNil("tcp"),
+			IpRanges:   ranges,
+		})
+	}
+	for i := range udpPorts {
+		port := udpPorts[i]
+		permissions = append(permissions, &ec2.IpPermission{
+			FromPort:   &port,
+			ToPort:     &port,
+			IpProtocol: stringOrNil("udp"),
+			IpRanges:   ranges,
+		})
+	}
+
+	response, err = client.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId:       stringOrNil(securityGroupID),
+		IpPermissions: permissions,
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 security group egress authorization successful for %s: %s", region, response)
+	}
+
+	return response, err
+}
+
+// CreateSecurityGroup creates a new EC2 security group in the given region using the given rules
+func CreateSecurityGroup(accessKeyID, secretAccessKey, region, name, description string, vpcID *string) (response *ec2.CreateSecurityGroupOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	response, err = client.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
+		Description: stringOrNil(description),
+		GroupName:   stringOrNil(name),
+		VpcId:       vpcID,
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 security group created for %s: %s", region, response)
+	}
+
+	return response, err
+}
+
+// DeleteSecurityGroup removes an EC2 security group in the given region given the security group id
+func DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID string) (response *ec2.DeleteSecurityGroupOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	response, err = client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
+		GroupId: stringOrNil(securityGroupID),
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 security group deleted for %s: %s; security group id: %s", region, response, securityGroupID)
+	}
+
+	return response, err
+}
+
 // SetInstanceSecurityGroups sets the security groups for a given instance id and array of security group ids
 func SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceID string, securityGroupIds []string) (response *ec2.ModifyInstanceAttributeOutput, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
@@ -182,20 +350,20 @@ func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string,
 	containerOverrides := make([]*ecs.ContainerOverride, 0)
 	for container := range overrides {
 		env := make([]*ecs.KeyValuePair, 0)
-		envOverrides, envOverridesOk := overrides[container].(map[string]interface{})["environment"].(map[string]string)
-		if envOverridesOk {
-			for envVar := range envOverrides {
-				env = append(env, &ecs.KeyValuePair{
-					Name:  stringOrNil(envVar),
-					Value: stringOrNil(envOverrides[envVar]),
-				})
+		if _containerOverrides, containerOverridesOk := overrides[container].(map[string]interface{}); containerOverridesOk {
+			if envOverrides, envOverridesOk := _containerOverrides["environment"].(map[string]string); envOverridesOk {
+				for envVar := range envOverrides {
+					env = append(env, &ecs.KeyValuePair{
+						Name:  stringOrNil(envVar),
+						Value: stringOrNil(envOverrides[envVar]),
+					})
+				}
 			}
+			containerOverrides = append(containerOverrides, &ecs.ContainerOverride{
+				Name:        stringOrNil(container),
+				Environment: env,
+			})
 		}
-		override := &ecs.ContainerOverride{
-			Name:        stringOrNil(container),
-			Environment: env,
-		}
-		containerOverrides = append(containerOverrides, override)
 	}
 
 	response, err := client.RunTask(&ecs.RunTaskInput{
@@ -228,17 +396,66 @@ func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string,
 	return taskIds, err
 }
 
-// StopContainer destroys an EC2 instance given its instance id
-func StopContainer(accessKeyID, secretAccessKey, region, cluster, taskID string) (response *ecs.StopTaskOutput, err error) {
+// StopContainer destroys an ECS docker container task given its task id
+func StopContainer(accessKeyID, secretAccessKey, region, taskID string, cluster *string) (response *ecs.StopTaskOutput, err error) {
 	client, err := NewECS(accessKeyID, secretAccessKey, region)
 
+	if cluster == nil {
+		clusters, err := GetClusters(accessKeyID, secretAccessKey, region)
+		if err == nil {
+			if len(clusters.ClusterArns) > 0 {
+				cluster = clusters.ClusterArns[0]
+			}
+		}
+	}
+
 	response, err = client.StopTask(&ecs.StopTaskInput{
-		Cluster: stringOrNil(cluster),
+		Cluster: cluster,
 		Task:    stringOrNil(taskID),
 	})
 
 	if err != nil {
 		Log.Warningf("Container instance not stopped for %s; %s", taskID, err.Error())
+	}
+
+	return response, err
+}
+
+// GetContainerDetails retrieves an ECS docker container task given its task id
+func GetContainerDetails(accessKeyID, secretAccessKey, region, taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error) {
+	client, err := NewECS(accessKeyID, secretAccessKey, region)
+
+	if cluster == nil {
+		clusters, err := GetClusters(accessKeyID, secretAccessKey, region)
+		if err == nil {
+			if len(clusters.ClusterArns) > 0 {
+				cluster = clusters.ClusterArns[0]
+			}
+		}
+	}
+
+	response, err = client.DescribeTasks(&ecs.DescribeTasksInput{
+		Cluster: cluster,
+		Tasks:   []*string{stringOrNil(taskID)},
+	})
+
+	if response != nil {
+		Log.Debugf("ECS container details retrieved for %s: %s", taskID, response)
+	}
+
+	return response, err
+}
+
+// GetNetworkInterfaceDetails retrieves elastic network interface details for a given network interface id
+func GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, networkInterfaceID string) (response *ec2.DescribeNetworkInterfacesOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	response, err = client.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{
+		NetworkInterfaceIds: []*string{stringOrNil(networkInterfaceID)},
+	})
+
+	if response != nil {
+		Log.Debugf("EC2 network interface details retrieved for %s: %s", networkInterfaceID, response)
 	}
 
 	return response, err
