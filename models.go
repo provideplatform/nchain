@@ -430,11 +430,23 @@ func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
 }
 
 func (n *NetworkNode) reachableViaJsonRpc() bool {
-	return n.reachableOnPort(defaultJsonRpcPort)
+	cfg := n.ParseConfig()
+	port := uint(defaultJsonRpcPort)
+	if jsonRpcPortOverride, jsonRpcPortOverrideOk := cfg["default_json_rpc_port"].(float64); jsonRpcPortOverrideOk {
+		port = uint(jsonRpcPortOverride)
+	}
+
+	return n.reachableOnPort(port)
 }
 
 func (n *NetworkNode) reachableViaWebsocket() bool {
-	return n.reachableOnPort(defaultWebsocketPort)
+	cfg := n.ParseConfig()
+	port := uint(defaultWebsocketPort)
+	if websocketPortOverride, websocketPortOverrideOk := cfg["default_websocket_port"].(float64); websocketPortOverrideOk {
+		port = uint(websocketPortOverride)
+	}
+
+	return n.reachableOnPort(port)
 }
 
 func (n *NetworkNode) reachableOnPort(port uint) bool {
