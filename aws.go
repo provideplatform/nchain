@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
 )
@@ -26,6 +27,15 @@ func NewECS(accessKeyID, secretAccessKey, region string) (*ecs.ECS, error) {
 	sess := session.New(cfg)
 	ecs := ecs.New(sess)
 	return ecs, err
+}
+
+// NewCloudwatchLogs initializes and returns an instance of the Cloudwatch logs API client
+func NewCloudwatchLogs(accessKeyID, secretAccessKey, region string) (*cloudwatchlogs.CloudWatchLogs, error) {
+	var err error
+	cfg := aws.NewConfig().WithMaxRetries(10).WithRegion(region).WithCredentials(credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""))
+	sess := session.New(cfg)
+	logs := cloudwatchlogs.New(sess)
+	return logs, err
 }
 
 // LaunchAMI launches an EC2 instance for a given AMI id
@@ -486,6 +496,24 @@ func GetContainerDetails(accessKeyID, secretAccessKey, region, taskID string, cl
 	return response, err
 }
 
+// GetContainerLogs retrieves the cloudwatch logstream for a given log stream id
+func GetContainerLogs(accessKeyID, secretAccessKey, region, logGroupID string, logStreamID string, startFromHead bool) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
+	client, err := NewCloudwatchLogs(accessKeyID, secretAccessKey, region)
+
+	response, err = client.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
+		LogGroupName:  stringOrNil(logGroupID),
+		LogStreamName: stringOrNil(logStreamID),
+		StartFromHead: &startFromHead,
+	})
+
+	if err != nil {
+		Log.Warningf("Cloudwatch log retreival failed for log stream: %s; %s", logStreamID, err.Error())
+		return nil, err
+	}
+
+	return response, err
+}
+
 // GetNetworkInterfaceDetails retrieves elastic network interface details for a given network interface id
 func GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, networkInterfaceID string) (response *ec2.DescribeNetworkInterfacesOutput, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
@@ -495,7 +523,7 @@ func GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, networkInt
 	})
 
 	if err != nil {
-		Log.Warningf("ECE network interface details retreival failed for network interface id: %s; %s", networkInterfaceID, err.Error())
+		Log.Warningf("EC2 network interface details retreival failed for network interface id: %s; %s", networkInterfaceID, err.Error())
 		return nil, err
 	}
 
