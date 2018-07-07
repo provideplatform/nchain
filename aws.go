@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -484,10 +485,6 @@ func GetContainerDetails(accessKeyID, secretAccessKey, region, taskID string, cl
 		Tasks:   []*string{stringOrNil(taskID)},
 	})
 
-	if response != nil {
-		Log.Debugf("ECS container details retrieved for %s; %s", taskID, response)
-	}
-
 	if err != nil {
 		Log.Warningf("ECS container details retreival failed for task id: %s; %s", taskID, err.Error())
 		return nil, err
@@ -496,8 +493,37 @@ func GetContainerDetails(accessKeyID, secretAccessKey, region, taskID string, cl
 	return response, err
 }
 
-// GetContainerLogs retrieves the cloudwatch logstream for a given log stream id
-func GetContainerLogs(accessKeyID, secretAccessKey, region, logGroupID string, logStreamID string, startFromHead bool) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
+// GetContainerLogEvents returns cloudwatch log events for the given ECS docker container task given its task id=
+func GetContainerLogEvents(accessKeyID, secretAccessKey, region, taskID string, cluster *string) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
+	containerDetails, err := GetContainerDetails(accessKeyID, secretAccessKey, region, taskID, cluster)
+	if err == nil {
+		if len(containerDetails.Tasks) > 0 {
+			task := containerDetails.Tasks[0]
+			taskDefinition, err := GetTaskDefinition(accessKeyID, secretAccessKey, region, *task.TaskDefinitionArn)
+			if err == nil {
+				if len(taskDefinition.TaskDefinition.ContainerDefinitions) > 0 {
+					containerDefinition := taskDefinition.TaskDefinition.ContainerDefinitions[0]
+					containerLogConfig := containerDefinition.LogConfiguration
+					if containerLogConfig != nil && containerLogConfig.LogDriver != nil && *containerLogConfig.LogDriver == "awslogs" {
+						logGroup := containerLogConfig.Options["awslogs-group"]
+						logRegion := containerLogConfig.Options["awslogs-region"]
+						logStreamPrefix := containerLogConfig.Options["awslogs-stream-prefix"]
+						if logGroup != nil && logRegion != nil && logStreamPrefix != nil {
+							taskArnSplitIdx := strings.LastIndex(*task.TaskArn, "/")
+							taskArn := string(*task.TaskArn)
+							logStream := fmt.Sprintf("%s/%s/%s", *logStreamPrefix, *containerDefinition.Name, taskArn[taskArnSplitIdx+1:])
+							return GetLogEvents(accessKeyID, secretAccessKey, *logRegion, *logGroup, logStream, true)
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil, err
+}
+
+// GetLogEvents retrieves cloudwatch log events for a given log stream id
+func GetLogEvents(accessKeyID, secretAccessKey, region, logGroupID string, logStreamID string, startFromHead bool) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
 	client, err := NewCloudwatchLogs(accessKeyID, secretAccessKey, region)
 
 	response, err = client.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{

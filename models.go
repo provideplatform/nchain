@@ -35,6 +35,8 @@ const receiptTickerInterval = time.Millisecond * 2500
 const receiptTickerTimeout = time.Minute * 1
 const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
+const resolvePeerUrlTickerInterval = time.Millisecond * 5000
+const resolvePeerTickerTimeout = time.Minute * 5
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
@@ -525,8 +527,6 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 	go func() {
 		Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
 
-		db := DatabaseConnection()
-
 		var network = &Network{}
 		db.Model(n).Related(&network)
 		if network == nil || network.ID == uuid.Nil {
@@ -734,6 +734,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 								}
 
 								n.resolveHost(db, network, cfg, instanceIds)
+								n.resolvePeerURL(db, network, cfg, instanceIds)
 							}
 						}
 					}
@@ -762,6 +763,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							cfg["target_task_ids"] = taskIds
 
 							n.resolveHost(db, network, cfg, taskIds)
+							n.resolvePeerURL(db, network, cfg, taskIds)
 						}
 					}
 				}
@@ -843,6 +845,75 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 				n.Status = stringOrNil("running")
 				db.Save(n)
 				network.resolveJsonRpcAndWebsocketUrls(db)
+				ticker.Stop()
+				return
+			}
+		}
+	}
+}
+
+func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) {
+	ticker := time.NewTicker(resolvePeerUrlTickerInterval)
+	startedAt := time.Now()
+	var peerURL *string
+	for {
+		select {
+		case <-ticker.C:
+			if peerURL == nil {
+				if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
+					Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", n.ID.String(), resolvePeerTickerTimeout)
+					ticker.Stop()
+					return
+				}
+
+				id := identifiers[len(identifiers)-1]
+				targetID, targetOk := cfg["target_id"].(string)
+				providerID, providerOk := cfg["provider_id"].(string)
+				region, regionOk := cfg["region"].(string)
+				credentials, credsOk := cfg["credentials"].(map[string]interface{})
+
+				if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk && credsOk {
+					accessKeyID := credentials["aws_access_key_id"].(string)
+					secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+					if strings.ToLower(providerID) == "ubuntu-vm" {
+						Log.Warningf("Peer URL resolution is not yet implemented for non-containerized AWS deployments")
+						ticker.Stop()
+						return
+					} else if strings.ToLower(providerID) == "docker" {
+						if network.isEthereumNetwork() {
+							logs, err := GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
+							if err == nil {
+								for i := range logs.Events {
+									event := logs.Events[i]
+									if event.Message != nil {
+										msg := string(*event.Message)
+										nodeInfo := &provide.EthereumJsonRpcResponse{}
+										err := json.Unmarshal([]byte(msg), &nodeInfo)
+										if err == nil && nodeInfo != nil {
+											result, resultOk := nodeInfo.Result.(map[string]interface{})
+											if resultOk {
+												if enode, enodeOk := result["enode"].(string); enodeOk {
+													peerURL = stringOrNil(enode)
+													ticker.Stop()
+													break
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if peerURL != nil {
+				Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, peerURL)
+				cfg["peer_url"] = peerURL
+				cfgJSON, _ := json.Marshal(cfg)
+				*n.Config = json.RawMessage(cfgJSON)
+				db.Save(n)
 				ticker.Stop()
 				return
 			}
