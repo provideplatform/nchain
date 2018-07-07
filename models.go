@@ -511,6 +511,57 @@ func (n *NetworkNode) Delete() bool {
 	return len(n.Errors) == 0
 }
 
+// Logs exposes the paginated logstream for the underlying node
+func (n *NetworkNode) Logs() (*[]string, error) {
+	var network = &Network{}
+	DatabaseConnection().Model(n).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		return nil, fmt.Errorf("Failed to retrieve network for network node: %s", n.ID)
+	}
+
+	cfg := n.ParseConfig()
+
+	targetID, targetOk := cfg["target_id"].(string)
+	providerID, providerOk := cfg["provider_id"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	region, regionOk := cfg["region"].(string)
+
+	if !targetOk || !providerOk || !credsOk {
+		return nil, fmt.Errorf("Cannot retrieve logs for network node without a target and provider configuration; target id: %s; provider id: %s", targetID, providerID)
+	}
+
+	if network.isEthereumNetwork() && regionOk {
+		if strings.ToLower(targetID) == "aws" {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+			if providerID, providerIdOk := cfg["provider_id"].(string); providerIdOk {
+				if strings.ToLower(providerID) == "docker" {
+					if ids, idsOk := cfg["target_task_ids"].([]string); idsOk {
+						logs := make([]string, 0)
+						for i := range ids {
+							logEvents, err := GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i], nil)
+							if err == nil {
+								for i := range logEvents.Events {
+									event := logEvents.Events[i]
+									logs = append(logs, string(*event.Message))
+								}
+							}
+						}
+						return &logs, nil
+					}
+				}
+
+				return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; unsupported AWS provider: %s", *network.Name, providerID)
+			}
+		}
+	} else if !regionOk {
+		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided: %s", *network.Name, providerID)
+	}
+
+	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
+}
+
 func (n *NetworkNode) clone(cfg json.RawMessage) *NetworkNode {
 	clone := &NetworkNode{
 		NetworkID:   n.NetworkID,

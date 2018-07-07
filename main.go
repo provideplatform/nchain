@@ -34,6 +34,7 @@ func main() {
 	r.GET("/api/v1/networks/:id/nodes", networkNodesListHandler)
 	r.POST("/api/v1/networks/:id/nodes", createNetworkNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId", networkNodeDetailsHandler)
+	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", networkNodeLogsHandler)
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNetworkNodeHandler)
 	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
 	r.GET("/api/v1/networks/:id/transactions", networkTransactionsHandler)
@@ -285,6 +286,32 @@ func networkNodeDetailsHandler(c *gin.Context) {
 	}
 
 	render(node, 200, c)
+}
+
+func networkNodeLogsHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	var node = &NetworkNode{}
+	DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		renderError("network node not found", 404, c)
+		return
+	} else if userID != nil && *node.UserID != *userID {
+		renderError("forbidden", 403, c)
+		return
+	}
+
+	logs, err := node.Logs()
+	if err != nil {
+		renderError("log retrieval failed", 500, c)
+		return
+	}
+
+	render(logs, 200, c)
 }
 
 func createNetworkNodeHandler(c *gin.Context) {
