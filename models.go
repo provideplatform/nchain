@@ -220,7 +220,7 @@ func (n *Network) Create() bool {
 // Reload the underlying network instance
 func (n *Network) Reload() {
 	db := DatabaseConnection()
-	db.Model(&Network{}).Find(n)
+	db.Model(&n).Find(n)
 }
 
 // Update an existing network
@@ -676,7 +676,6 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							}
 						case map[string]interface{}:
 							ingressCfg := ingress.(map[string]interface{})
-							Log.Debugf("ingress cfg: %s", ingressCfg)
 							for cidr := range ingressCfg {
 								tcp := make([]int64, 0)
 								udp := make([]int64, 0)
