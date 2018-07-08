@@ -598,6 +598,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 		credentials, credsOk := cfg["credentials"].(map[string]interface{})
 		rcd, rcdOk := cfg["rc.d"].(string)
 		region, regionOk := cfg["region"].(string)
+		env, envOk := cfg["env"].(map[string]string)
 
 		cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
 		if !cloneableCfgOk {
@@ -796,11 +797,17 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 						if container, containerOk := containerRolesByRegion[role].(string); containerOk {
 							Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, container)
 							Log.Debugf("Attempting to deploy container %s in EC2 region: %s", container, region)
-							overrides := map[string]interface{}{}
-							if chain, chainOk := networkCfg["chain"].(string); chainOk {
-								overrides["environment"] = map[string]string{
-									"CHAIN": chain,
+							envOverrides := map[string]interface{}{}
+							if envOk {
+								for k := range env {
+									envOverrides[k] = env[k]
 								}
+							}
+							if chain, chainOk := networkCfg["chain"].(string); chainOk {
+								envOverrides["CHAIN"] = chain
+							}
+							overrides := map[string]interface{}{
+								"environemnt": envOverrides,
 							}
 							taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
 
