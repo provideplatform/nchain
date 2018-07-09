@@ -65,6 +65,7 @@ type NetworkNode struct {
 	gocore.Model
 	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
 	Host        *string          `json:"host"`
 	Description *string          `json:"description"`
 	Status      *string          `sql:"not null;default:'pending'" json:"status"`
@@ -364,6 +365,20 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 func (n *Network) NodeCount() (count *uint64) {
 	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ?", n.ID).Count(&count)
 	return count
+}
+
+// Bootnodes retrieves a list of network bootnodes
+func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
+	query := DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID)
+	query.Order("created_at ASC").Find(&nodes)
+	return nodes, err
+}
+
+// BootnodesCount returns a count of the number of bootnodes on the network
+func (n *Network) BootnodesCount() (count *uint64, err error) {
+	db := DatabaseConnection()
+	db.Model(&Transaction{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
+	return count, err
 }
 
 // Nodes retrieves a list of network nodes
