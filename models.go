@@ -167,6 +167,12 @@ type TxValue struct {
 	value *big.Int
 }
 
+type bootnodesInitialized string
+
+func (err bootnodesInitialized) Error() string {
+	return "network bootnodes initialized"
+}
+
 func (v *TxValue) Value() (driver.Value, error) {
 	return v.value.String(), nil
 }
@@ -250,7 +256,8 @@ func (n *Network) Update() bool {
 // setConfig sets the network config in-memory
 func (n *Network) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
-	*n.Config = json.RawMessage(cfgJSON)
+	_cfgJSON := json.RawMessage(cfgJSON)
+	n.Config = &_cfgJSON
 }
 
 // setChainID is an internal method used to set a unique chainID for the network prior to its creation
@@ -367,6 +374,41 @@ func (n *Network) NodeCount() (count *uint64) {
 	return count
 }
 
+// BootnodesTxt retrieves the current bootnodes string for the network; this value can be used
+// to set peer/bootnodes list from which new network nodes are initialized
+func (n *Network) BootnodesTxt() (*string, error) {
+	bootnodes, err := n.Bootnodes()
+	if err != nil {
+		return nil, err
+	}
+
+	txt := ""
+	for i := range bootnodes {
+		bootnode := bootnodes[i]
+		peerURL := bootnode.peerURL()
+		if peerURL != nil {
+			txt += *peerURL
+		}
+	}
+
+	Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, txt)
+
+	return stringOrNil(txt), err
+}
+
+// GenesisBootnodePending returns true if the network genesis node is in the process of being deployed
+func (n *Network) GenesisBootnodePending() (bool, error) {
+	db := DatabaseConnection()
+	var count *uint64
+	db.Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true AND network.status = 'genesis'", n.ID).Count(&count)
+	if count != nil && *count > 0 {
+		return true, nil
+	} else if count == nil {
+		return false, fmt.Errorf("Failed to retrieve genesis bootnodes count for network with id: %s", n.ID)
+	}
+	return false, nil
+}
+
 // Bootnodes retrieves a list of network bootnodes
 func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
 	query := DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID)
@@ -377,7 +419,7 @@ func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
 // BootnodesCount returns a count of the number of bootnodes on the network
 func (n *Network) BootnodesCount() (count *uint64, err error) {
 	db := DatabaseConnection()
-	db.Model(&Transaction{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
+	db.Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
 	return count, err
 }
 
@@ -443,7 +485,17 @@ func (n *NetworkNode) Create() bool {
 // setConfig sets the network config in-memory
 func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
-	*n.Config = json.RawMessage(cfgJSON)
+	_cfgJSON := json.RawMessage(cfgJSON)
+	n.Config = &_cfgJSON
+}
+
+func (n *NetworkNode) peerURL() *string {
+	cfg := n.ParseConfig()
+	if peerURL, peerURLOk := cfg["peer_url"].(string); peerURLOk {
+		return stringOrNil(peerURL)
+	}
+
+	return nil
 }
 
 func (n *NetworkNode) reachableViaJsonRpc() (bool, uint) {
@@ -526,6 +578,12 @@ func (n *NetworkNode) Delete() bool {
 	return len(n.Errors) == 0
 }
 
+// Reload the underlying network node instance
+func (n *NetworkNode) Reload() {
+	db := DatabaseConnection()
+	db.Model(&n).Find(n)
+}
+
 // Logs exposes the paginated logstream for the underlying node
 func (n *NetworkNode) Logs() (*[]string, error) {
 	var network = &Network{}
@@ -577,19 +635,98 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
 }
 
-func (n *NetworkNode) clone(cfg json.RawMessage) *NetworkNode {
+// clone a network node given its configuration; does not inherit 'bootnode' property from cloned node
+func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode {
 	clone := &NetworkNode{
 		NetworkID:   n.NetworkID,
 		UserID:      n.UserID,
 		Description: n.Description,
 		Status:      n.Status,
-		Config:      &cfg,
+		Config:      n.Config,
 	}
-	clone.Create()
+
+	if (n.Bootnode && n.Status != nil && *n.Status == "genesis") || n.peerURL() == nil {
+		clone.Config = nil
+		clone.Status = stringOrNil("awaiting_peers")
+		clone.Create()
+
+		Log.Debugf("Initial bootnodes initializing for network with id: %s", n.ID)
+		ticker := time.NewTicker(resolveHostTickerInterval)
+		startedAt := time.Now()
+		var peerURL *string
+		for peerURL == nil {
+			select {
+			case <-ticker.C:
+				if peerURL == nil {
+					if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
+						Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", n.ID.String(), resolvePeerTickerTimeout)
+						ticker.Stop()
+						break
+					}
+
+					n.Reload()
+					peerURL = n.peerURL()
+					if peerURL == nil {
+						Log.Debugf("Genesis bootnode has not yet resolved peer information; network node id: %s", n.ID.String())
+					} else {
+						Log.Debugf("Genesis bootnode resolved peer information; network node id: %s; peer: %s", n.ID.String(), *peerURL)
+
+						cfg := n.ParseConfig()
+						cfg["peer_url"] = peerURL
+
+						db := DatabaseConnection()
+						clone.setConfig(cfg)
+						clone.updateStatus(db, "pending")
+						cloneCfg := clone.ParseConfig()
+						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = peerURL
+						delete(cloneCfg, "regions")
+						clone.setConfig(cloneCfg)
+						n.setConfig(cfg)
+
+						clone.deploy(db)
+
+						ticker.Stop()
+						break
+					}
+				}
+			}
+		}
+	} else {
+		clone.Create()
+	}
+
 	return clone
 }
 
+func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*NetworkNode, error) {
+	count, err := n.BootnodesCount()
+	if err != nil {
+		return nil, err
+	}
+
+	bootnodes := make([]*NetworkNode, 0)
+
+	if count == nil || *count == 0 {
+		pending.Bootnode = true
+		pending.updateStatus(db, "genesis")
+		bootnodes = append(bootnodes, pending)
+		err := new(bootnodesInitialized)
+		Log.Debugf("Coerced network node into initial bootnode for network with id: %s", n.ID)
+		return bootnodes, *err
+	}
+
+	bootnodes, err = n.Bootnodes()
+	Log.Debugf("Resolved %d initial bootnodes for network with id: %s", len(bootnodes), n.ID)
+
+	return bootnodes, err
+}
+
 func (n *NetworkNode) deploy(db *gorm.DB) {
+	if n.Config == nil {
+		Log.Debugf("Not attempting to deploy network node without a valid configuration; network node id: %s", n.ID)
+		return
+	}
+
 	go func() {
 		Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
 
@@ -601,248 +738,269 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 			return
 		}
 
-		cfg := n.ParseConfig()
-		networkCfg := network.ParseConfig()
+		bootnodes, _ := network.requireBootnodes(db, n) // Blocking or returns immediately if the network has bootnodes
+		n._deploy(network, bootnodes, db)
+	}()
+}
 
-		cfg["default_json_rpc_port"] = networkCfg["default_json_rpc_port"]
-		cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
+func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *gorm.DB) {
+	cfg := n.ParseConfig()
+	networkCfg := network.ParseConfig()
 
-		targetID, targetOk := cfg["target_id"].(string)
-		providerID, providerOk := cfg["provider_id"].(string)
-		role, roleOk := cfg["role"].(string)
-		credentials, credsOk := cfg["credentials"].(map[string]interface{})
-		rcd, rcdOk := cfg["rc.d"].(string)
-		region, regionOk := cfg["region"].(string)
-		env, envOk := cfg["env"].(map[string]string)
+	cfg["default_json_rpc_port"] = networkCfg["default_json_rpc_port"]
+	cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
 
-		cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
-		if !cloneableCfgOk {
-			n.updateStatus(db, "failed")
-			Log.Warningf("Failed to parse cloneable configuration for network node: %s", n.ID)
-			return
-		}
+	targetID, targetOk := cfg["target_id"].(string)
+	providerID, providerOk := cfg["provider_id"].(string)
+	role, roleOk := cfg["role"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	rcd, rcdOk := cfg["rc.d"].(string)
+	region, regionOk := cfg["region"].(string)
+	env, envOk := cfg["env"].(map[string]interface{})
 
-		securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{})
-		if !securityCfgOk {
-			n.updateStatus(db, "failed")
-			Log.Warningf("Failed to parse cloneable security configuration for network node: %s", n.ID)
-			return
-		}
+	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
+	if !cloneableCfgOk {
+		n.updateStatus(db, "failed")
+		Log.Warningf("Failed to parse cloneable configuration for network node: %s", n.ID)
+		return
+	}
 
-		cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
-		if !cloneableTargetOk {
-			n.updateStatus(db, "failed")
-			Log.Warningf("Failed to parse cloneable target configuration for network node: %s", n.ID)
-			return
-		}
+	securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{})
+	if !securityCfgOk {
+		n.updateStatus(db, "failed")
+		Log.Warningf("Failed to parse cloneable security configuration for network node: %s", n.ID)
+		return
+	}
 
-		cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
-		if !cloneableProviderOk {
-			n.updateStatus(db, "failed")
-			Log.Warningf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
-			return
-		}
+	cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
+	if !cloneableTargetOk {
+		n.updateStatus(db, "failed")
+		Log.Warningf("Failed to parse cloneable target configuration for network node: %s", n.ID)
+		return
+	}
 
-		providerCfgByRegion, providerCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
-		if !providerCfgByRegionOk {
-			n.updateStatus(db, "failed")
-			Log.Warningf("Failed to parse cloneable provider configuration by region for network node: %s", n.ID)
-			return
-		}
+	cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
+	if !cloneableProviderOk {
+		n.updateStatus(db, "failed")
+		Log.Warningf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
+		return
+	}
 
-		regions, regionsOk := cfg["regions"].(map[string]interface{})
-		if regionsOk && !regionOk {
-			delete(cfg, "regions")
-			Log.Debugf("Handling multi-region deployment request for network node: %s", n.ID)
-			accountedForInitialDeploy := false
-			for _region := range regions {
-				deployCount, deployCountOk := regions[_region]
-				if deployCountOk && deployCount.(float64) > 0 {
-					Log.Debugf("Multi-region deployment request specified %v instances in %s region for network node: %s", deployCount, _region, n.ID)
-					for i := float64(0); i < deployCount.(float64); i++ {
-						if !accountedForInitialDeploy {
-							region = _region
-							regionOk = true
-							accountedForInitialDeploy = true
-							continue
-						}
+	providerCfgByRegion, providerCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
+	if !providerCfgByRegionOk {
+		n.updateStatus(db, "failed")
+		Log.Warningf("Failed to parse cloneable provider configuration by region for network node: %s", n.ID)
+		return
+	}
 
-						_cfg := map[string]interface{}{}
-						for key, val := range cfg {
-							_cfg[key] = val
-						}
-						_cfg["region"] = _region
-						_cfgJSON, _ := json.Marshal(_cfg)
-						n.clone(json.RawMessage(_cfgJSON))
+	regions, regionsOk := cfg["regions"].(map[string]interface{})
+	if regionsOk && !regionOk {
+		delete(cfg, "regions")
+		Log.Debugf("Handling multi-region deployment request for network node: %s", n.ID)
+		accountedForInitialDeploy := false
+		for _region := range regions {
+			deployCount, deployCountOk := regions[_region]
+			if deployCountOk && deployCount.(float64) > 0 {
+				Log.Debugf("Multi-region deployment request specified %v instances in %s region for network node: %s", deployCount, _region, n.ID)
+				for i := float64(0); i < deployCount.(float64); i++ {
+					if !accountedForInitialDeploy {
+						region = _region
+						regionOk = true
+						accountedForInitialDeploy = true
+						continue
 					}
+
+					_cfg := map[string]interface{}{}
+					for key, val := range cfg {
+						_cfg[key] = val
+					}
+					_cfg["region"] = _region
+					_cfgJSON, _ := json.Marshal(_cfg)
+					go n.clone(network, json.RawMessage(_cfgJSON))
 				}
 			}
 		}
+	}
 
-		Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable provider cfg: %s; network config: %s",
-			targetID, providerID, role, credentials, region, rcd, providerCfgByRegion, networkCfg)
+	Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable provider cfg: %s; network config: %s",
+		targetID, providerID, role, credentials, region, rcd, providerCfgByRegion, networkCfg)
 
-		if targetOk && providerOk && roleOk && credsOk && regionOk {
-			if strings.ToLower(targetID) == "aws" {
-				accessKeyID := credentials["aws_access_key_id"].(string)
-				secretAccessKey := credentials["aws_secret_access_key"].(string)
+	if targetOk && providerOk && roleOk && credsOk && regionOk {
+		if strings.ToLower(targetID) == "aws" {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-				// start security group handling
-				securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-				securityGroup, err := CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, nil)
-				securityGroupIds := make([]string, 0)
-				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
+			// start security group handling
+			securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
+			securityGroup, err := CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, nil)
+			securityGroupIds := make([]string, 0)
+			securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
 
-				cfg["region"] = region
-				cfg["target_security_group_ids"] = securityGroupIds
-				n.setConfig(cfg)
+			cfg["region"] = region
+			cfg["target_security_group_ids"] = securityGroupIds
+			n.setConfig(cfg)
 
-				if err != nil {
-					Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s", region, n.ID.String())
-				} else {
-					if egress, egressOk := securityCfg["egress"]; egressOk {
-						switch egress.(type) {
-						case string:
-							if egress.(string) == "*" {
-								_, err := AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
-								if err != nil {
-									Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
-								}
-							}
-						case map[string]interface{}:
-							egressCfg := egress.(map[string]interface{})
-							for cidr := range egressCfg {
-								tcp := make([]int64, 0)
-								udp := make([]int64, 0)
-								if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-									for i := range _tcp {
-										tcp = append(tcp, int64(_tcp[i].(float64)))
-									}
-								}
-								if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-									for i := range _udp {
-										udp = append(udp, int64(_udp[i].(float64)))
-									}
-								}
-								_, err := AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
-								if err != nil {
-									Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-								}
+			if err != nil {
+				Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s", region, n.ID.String())
+			} else {
+				if egress, egressOk := securityCfg["egress"]; egressOk {
+					switch egress.(type) {
+					case string:
+						if egress.(string) == "*" {
+							_, err := AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+							if err != nil {
+								Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 							}
 						}
-					}
-
-					if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-						switch ingress.(type) {
-						case string:
-							if ingress.(string) == "*" {
-								_, err := AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
-								if err != nil {
-									Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+					case map[string]interface{}:
+						egressCfg := egress.(map[string]interface{})
+						for cidr := range egressCfg {
+							tcp := make([]int64, 0)
+							udp := make([]int64, 0)
+							if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+								for i := range _tcp {
+									tcp = append(tcp, int64(_tcp[i].(float64)))
 								}
 							}
-						case map[string]interface{}:
-							ingressCfg := ingress.(map[string]interface{})
-							for cidr := range ingressCfg {
-								tcp := make([]int64, 0)
-								udp := make([]int64, 0)
-								if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-									for i := range _tcp {
-										tcp = append(tcp, int64(_tcp[i].(float64)))
-									}
+							if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+								for i := range _udp {
+									udp = append(udp, int64(_udp[i].(float64)))
 								}
-								if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-									for i := range _udp {
-										udp = append(udp, int64(_udp[i].(float64)))
-									}
-								}
-								_, err := AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
-								if err != nil {
-									Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-								}
+							}
+							_, err := AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+							if err != nil {
+								Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 							}
 						}
 					}
 				}
 
-				if strings.ToLower(providerID) == "ubuntu-vm" {
-					var userData = ""
-					if rcdOk {
-						userData = base64.StdEncoding.EncodeToString([]byte(rcd))
-					}
-
-					Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
-					if imagesByRegion, imagesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); imagesByRegionOk {
-						Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
-						if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
-							Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
-							versions := make([]string, 0)
-							for version := range imageVersionsByRole {
-								versions = append(versions, version)
+				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+					switch ingress.(type) {
+					case string:
+						if ingress.(string) == "*" {
+							_, err := AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+							if err != nil {
+								Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 							}
-							Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
-							version := versions[len(versions)-1] // defaults to latest version for now
-							Log.Debugf("Attempting to lookup update for version: %s", version)
-							if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
-								Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-								instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
-								if err != nil {
-									n.updateStatus(db, "failed")
-									n.unregisterSecurityGroups()
-									Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
-									return
+						}
+					case map[string]interface{}:
+						ingressCfg := ingress.(map[string]interface{})
+						for cidr := range ingressCfg {
+							tcp := make([]int64, 0)
+							udp := make([]int64, 0)
+							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+								for i := range _tcp {
+									tcp = append(tcp, int64(_tcp[i].(float64)))
 								}
-								Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-								cfg["target_instance_ids"] = instanceIds
-
-								Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroupIds), imageID, version, region, instanceIds)
-								for i := range instanceIds {
-									SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroupIds)
+							}
+							if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+								for i := range _udp {
+									udp = append(udp, int64(_udp[i].(float64)))
 								}
-
-								n.resolveHost(db, network, cfg, instanceIds)
-								n.resolvePeerURL(db, network, cfg, instanceIds)
+							}
+							_, err := AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+							if err != nil {
+								Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 							}
 						}
 					}
-				} else if strings.ToLower(providerID) == "docker" {
-					Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
-					if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
-						Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
-						if container, containerOk := containerRolesByRegion[role].(string); containerOk {
-							Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, container)
-							Log.Debugf("Attempting to deploy container %s in EC2 region: %s", container, region)
-							envOverrides := map[string]interface{}{}
-							if envOk {
-								for k := range env {
-									envOverrides[k] = env[k]
-								}
-							}
-							if chain, chainOk := networkCfg["chain"].(string); chainOk {
-								envOverrides["CHAIN"] = chain
-							}
-							overrides := map[string]interface{}{
-								"environemnt": envOverrides,
-							}
-							taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
+				}
+			}
 
+			if strings.ToLower(providerID) == "ubuntu-vm" {
+				var userData = ""
+				if rcdOk {
+					userData = base64.StdEncoding.EncodeToString([]byte(rcd))
+				}
+
+				Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
+				if imagesByRegion, imagesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); imagesByRegionOk {
+					Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
+					if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
+						Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
+						versions := make([]string, 0)
+						for version := range imageVersionsByRole {
+							versions = append(versions, version)
+						}
+						Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
+						version := versions[len(versions)-1] // defaults to latest version for now
+						Log.Debugf("Attempting to lookup update for version: %s", version)
+						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
+							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
+							instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
 							if err != nil {
 								n.updateStatus(db, "failed")
 								n.unregisterSecurityGroups()
-								Log.Warningf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())
+								Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
 								return
 							}
-							Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", container, region, taskIds)
-							cfg["target_task_ids"] = taskIds
+							Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
+							cfg["target_instance_ids"] = instanceIds
 
-							n.resolveHost(db, network, cfg, taskIds)
-							n.resolvePeerURL(db, network, cfg, taskIds)
+							Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroupIds), imageID, version, region, instanceIds)
+							for i := range instanceIds {
+								SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroupIds)
+							}
+
+							n.resolveHost(db, network, cfg, instanceIds)
+							n.resolvePeerURL(db, network, cfg, instanceIds)
 						}
+					}
+				}
+			} else if strings.ToLower(providerID) == "docker" {
+				Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
+				if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
+					Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
+					if container, containerOk := containerRolesByRegion[role].(string); containerOk {
+						Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, container)
+						Log.Debugf("Attempting to deploy container %s in EC2 region: %s", container, region)
+						envOverrides := map[string]interface{}{}
+						if envOk {
+							for k := range env {
+								envOverrides[k] = env[k]
+							}
+						}
+
+						if bootnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+							envOverrides["BOOTNODES"] = bootnodes
+						} else {
+							bootnodesTxt, err := network.BootnodesTxt()
+							if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+								envOverrides["BOOTNODES"] = bootnodesTxt
+							} else if err != nil {
+								Log.Warningf("Failed to read network bootnodes environment variable; %s", err.Error())
+							}
+						}
+						if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
+							envOverrides["PEER_SET"] = envOverrides["BOOTNODES"]
+						}
+
+						if chain, chainOk := networkCfg["chain"].(string); chainOk {
+							envOverrides["CHAIN"] = chain
+						}
+						overrides := map[string]interface{}{
+							"environment": envOverrides,
+						}
+
+						taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
+
+						if err != nil {
+							n.updateStatus(db, "failed")
+							n.unregisterSecurityGroups()
+							Log.Warningf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())
+							return
+						}
+						Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", container, region, taskIds)
+						cfg["target_task_ids"] = taskIds
+
+						n.resolveHost(db, network, cfg, taskIds)
+						n.resolvePeerURL(db, network, cfg, taskIds)
 					}
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) {
