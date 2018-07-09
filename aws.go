@@ -396,12 +396,19 @@ func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string,
 		containerDefinition := taskDefinitionResp.TaskDefinition.ContainerDefinitions[i]
 
 		env := make([]*ecs.KeyValuePair, 0)
-		if envOverrides, envOverridesOk := overrides["environment"].(map[string]string); envOverridesOk {
+		if envOverrides, envOverridesOk := overrides["environment"].(map[string]interface{}); envOverridesOk {
 			for envVar := range envOverrides {
-				env = append(env, &ecs.KeyValuePair{
-					Name:  stringOrNil(envVar),
-					Value: stringOrNil(envOverrides[envVar]),
-				})
+				if val, valOk := envOverrides[envVar].(string); valOk {
+					env = append(env, &ecs.KeyValuePair{
+						Name:  stringOrNil(envVar),
+						Value: stringOrNil(val),
+					})
+				} else if val, valOk := envOverrides[envVar].(*string); valOk {
+					env = append(env, &ecs.KeyValuePair{
+						Name:  stringOrNil(envVar),
+						Value: val,
+					})
+				}
 			}
 		}
 
