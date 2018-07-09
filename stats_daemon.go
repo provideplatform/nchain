@@ -223,6 +223,11 @@ func (sd *StatsDaemon) ingest(response interface{}, realtime bool) {
 			sd.stats.State = nil
 			sd.stats.Syncing = sd.stats.Block == 0
 
+			if sd.stats.Block == 0 {
+				Log.Debugf("Ignoring genesis header")
+				return
+			}
+
 			var lastBlockAt uint64
 			if realtime {
 				lastBlockAt = uint64(time.Now().UnixNano() / 1000000)
@@ -347,6 +352,7 @@ func (sd *StatsDaemon) run() error {
 				}
 				time.Sleep(time.Duration(sd.backoff) * time.Millisecond)
 				sd.dataSource.Network.Reload()
+				sd.dataSource.Network.resolveJsonRpcAndWebsocketUrls(DatabaseConnection())
 			}
 		}
 	}()
