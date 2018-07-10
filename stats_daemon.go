@@ -352,7 +352,7 @@ func (sd *StatsDaemon) run() error {
 				}
 				time.Sleep(time.Duration(sd.backoff) * time.Millisecond)
 				sd.dataSource.Network.Reload()
-				sd.dataSource.Network.resolveJsonRpcAndWebsocketUrls(DatabaseConnection())
+				sd.dataSource.Network.resolveAndBalanceJsonRpcAndWebsocketUrls(DatabaseConnection())
 			}
 		}
 	}()

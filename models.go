@@ -20,6 +20,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
@@ -29,6 +30,9 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
 )
+
+var defaultNetworkNodeCloneConfigWhitelist = []string{"cloneable_cfg", "is_ethereum_network", "protocol_id", "engine_id", "chainspec_url"}
+var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
 
 const reachabilityTimeout = time.Millisecond * 2500
 const receiptTickerInterval = time.Millisecond * 2500
@@ -40,6 +44,7 @@ const resolvePeerTickerTimeout = time.Minute * 5
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
+const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
 
@@ -63,13 +68,13 @@ type Network struct {
 // NetworkNode
 type NetworkNode struct {
 	gocore.Model
-	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
-	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
-	Host        *string          `json:"host"`
-	Description *string          `json:"description"`
-	Status      *string          `sql:"not null;default:'pending'" json:"status"`
-	Config      *json.RawMessage `sql:"type:json" json:"config"`
+	NetworkID   uuid.UUID          `sql:"not null;type:uuid" json:"network_id"`
+	UserID      *uuid.UUID         `sql:"type:uuid" json:"user_id"`
+	Bootnode    bool               `sql:"not null;default:'false'" json:"is_bootnode"`
+	Host        *string            `json:"host"`
+	Description *string            `json:"description"`
+	Status      *string            `sql:"not null;default:'pending'" json:"status"`
+	Config      *NetworkNodeConfig `sql:"type:json" json:"config"`
 }
 
 // Bridge instances are still in the process of being defined.
@@ -161,6 +166,21 @@ type Wallet struct {
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 	Balance       *big.Int   `sql:"-" json:"balance"`
+}
+
+// NetworkNodeConfig is raw JSON that is redacted upon marshaing to JSON
+type NetworkNodeConfig json.RawMessage
+
+// MarshalJSON provides a way for a network node config to be redacted when marshaling
+func (cfg *NetworkNodeConfig) MarshalJSON() ([]byte, error) {
+	redactedCfg := map[string]interface{}{}
+	cfgJSON, _ := json.Marshal(cfg)
+	json.Unmarshal(cfgJSON, &redactedCfg)
+	for i := range defaultNetworkNodeConfigMarshalingBlacklist {
+		key := defaultNetworkNodeConfigMarshalingBlacklist[i]
+		delete(redactedCfg, key)
+	}
+	return json.Marshal(redactedCfg)
 }
 
 type TxValue struct {
@@ -265,18 +285,24 @@ func (n *Network) setChainID() {
 	n.ChainID = stringOrNil(fmt.Sprintf("0x%x", time.Now().Unix()))
 	cfg := n.ParseConfig()
 	if cfg != nil {
-		cfg["network_id"] = n.ChainID
-		if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
-			if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
-				params["networkID"] = n.ChainID
+		if n.ChainID != nil {
+			networkID, err := hexutil.DecodeBig(*n.ChainID)
+			if err == nil {
+				cfg["network_id"] = networkID.Uint64()
+				if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+					if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
+						params["networkID"] = n.ChainID
+					}
+				}
+				n.setConfig(cfg)
 			}
-			n.setConfig(cfg)
 		}
 	}
 }
 
-func (n *Network) resolveJsonRpcAndWebsocketUrls(db *gorm.DB) {
-	// update the JSON-RPC URL and enrich the network cfg
+// resolveAndBalanceJsonRpcAndWebsocketUrls updates the network's configured block
+// JSON-RPC urls (i.e. web-based IDE), and enriches the network cfg
+func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	cfg := n.ParseConfig()
 
 	isLoadBalanced := false
@@ -286,7 +312,7 @@ func (n *Network) resolveJsonRpcAndWebsocketUrls(db *gorm.DB) {
 
 	if n.isEthereumNetwork() {
 		var node = &NetworkNode{}
-		db.Where("network_id = ? AND status = 'running'", n.ID).First(&node)
+		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full')", n.ID).First(&node)
 
 		if node != nil && node.ID != uuid.Nil {
 			if isLoadBalanced {
@@ -304,6 +330,72 @@ func (n *Network) resolveJsonRpcAndWebsocketUrls(db *gorm.DB) {
 					cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, port)
 				} else {
 					cfg["websocket_url"] = nil
+				}
+
+				cfgJSON, _ := json.Marshal(cfg)
+				*n.Config = json.RawMessage(cfgJSON)
+
+				db.Save(n)
+			}
+		}
+	}
+}
+
+// resolveAndBalanceExplorerUrls updates the network's configured block
+// explorer urls (i.e. web-based IDE), and enriches the network cfg
+func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
+	cfg := n.ParseConfig()
+
+	isLoadBalanced := false
+	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
+		isLoadBalanced = loadBalanced
+	}
+
+	if n.isEthereumNetwork() {
+		var node = &NetworkNode{}
+		db.Where("network_id = ? AND status = 'running' AND role = 'explorer')", n.ID).First(&node)
+
+		if node != nil && node.ID != uuid.Nil {
+			if isLoadBalanced {
+				Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
+			} else {
+				if node.reachableOnPort(defaultWebappPort) {
+					cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
+				} else {
+					cfg["block_explorer_url"] = nil
+				}
+
+				cfgJSON, _ := json.Marshal(cfg)
+				*n.Config = json.RawMessage(cfgJSON)
+
+				db.Save(n)
+			}
+		}
+	}
+}
+
+// resolveAndBalanceStudioUrls updates the network's configured studio url
+// (i.e. web-based IDE), and enriches the network cfg
+func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
+	cfg := n.ParseConfig()
+
+	isLoadBalanced := false
+	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
+		isLoadBalanced = loadBalanced
+	}
+
+	if n.isEthereumNetwork() {
+		var node = &NetworkNode{}
+		db.Where("network_id = ? AND status = 'running' AND role = 'studio'", n.ID).First(&node)
+
+		if node != nil && node.ID != uuid.Nil {
+			if isLoadBalanced {
+				Log.Warningf("Studio load balancer may contain unhealthy or undeployed nodes")
+			} else {
+				if node.reachableOnPort(defaultWebappPort) {
+					cfg["studio_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
+				} else {
+					cfg["studio_url"] = nil
 				}
 
 				cfgJSON, _ := json.Marshal(cfg)
@@ -396,19 +488,6 @@ func (n *Network) BootnodesTxt() (*string, error) {
 	return stringOrNil(txt), err
 }
 
-// GenesisBootnodePending returns true if the network genesis node is in the process of being deployed
-func (n *Network) GenesisBootnodePending() (bool, error) {
-	db := DatabaseConnection()
-	var count *uint64
-	db.Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true AND network.status = 'genesis'", n.ID).Count(&count)
-	if count != nil && *count > 0 {
-		return true, nil
-	} else if count == nil {
-		return false, fmt.Errorf("Failed to retrieve genesis bootnodes count for network with id: %s", n.ID)
-	}
-	return false, nil
-}
-
 // Bootnodes retrieves a list of network bootnodes
 func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
 	query := DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID)
@@ -485,7 +564,7 @@ func (n *NetworkNode) Create() bool {
 // setConfig sets the network config in-memory
 func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
-	_cfgJSON := json.RawMessage(cfgJSON)
+	_cfgJSON := NetworkNodeConfig(cfgJSON)
 	n.Config = &_cfgJSON
 }
 
@@ -635,6 +714,20 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
 }
 
+// cloneConfig returns a new config object in memory, derived from a
+// calling prototype node
+func (n *NetworkNode) cloneConfig() *NetworkNodeConfig {
+	prototypeCfg := n.ParseConfig()
+	clonedCfg := map[string]interface{}{}
+	for i := range defaultNetworkNodeCloneConfigWhitelist {
+		key := defaultNetworkNodeCloneConfigWhitelist[i]
+		clonedCfg[key] = prototypeCfg[key]
+	}
+	cfgJSON, _ := json.Marshal(clonedCfg)
+	msg := NetworkNodeConfig(cfgJSON)
+	return &msg
+}
+
 // clone a network node given its configuration; does not inherit 'bootnode' property from cloned node
 func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode {
 	clone := &NetworkNode{
@@ -642,7 +735,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 		UserID:      n.UserID,
 		Description: n.Description,
 		Status:      n.Status,
-		Config:      n.Config,
+		Config:      n.cloneConfig(),
 	}
 
 	if (n.Bootnode && n.Status != nil && *n.Status == "genesis") || n.peerURL() == nil {
@@ -681,8 +774,8 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = peerURL
 						delete(cloneCfg, "regions")
 						clone.setConfig(cloneCfg)
-						n.setConfig(cfg)
 
+						n.setConfig(cfg)
 						clone.deploy(db)
 
 						ticker.Stop()
@@ -716,7 +809,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*Networ
 	}
 
 	bootnodes, err = n.Bootnodes()
-	Log.Debugf("Resolved %d initial bootnodes for network with id: %s", len(bootnodes), n.ID)
+	Log.Debugf("Resolved %d initial bootnode(s) for network with id: %s", len(bootnodes), n.ID)
 
 	return bootnodes, err
 }
@@ -968,8 +1061,6 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 							bootnodesTxt, err := network.BootnodesTxt()
 							if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
 								envOverrides["BOOTNODES"] = bootnodesTxt
-							} else if err != nil {
-								Log.Warningf("Failed to read network bootnodes environment variable; %s", err.Error())
 							}
 						}
 						if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
@@ -1072,10 +1163,21 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 
 			if n.Host != nil {
 				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
+				*n.Config = NetworkNodeConfig(cfgJSON)
 				n.Status = stringOrNil("running")
 				db.Save(n)
-				network.resolveJsonRpcAndWebsocketUrls(db)
+
+				role, roleOk := cfg["role"].(string)
+				if roleOk {
+					if role == "peer" || role != "full" {
+						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
+					} else if role == "explorer" {
+						network.resolveAndBalanceExplorerUrls(db)
+					} else if role == "studio" {
+						network.resolveAndBalanceStudioUrls(db)
+					}
+				}
+
 				ticker.Stop()
 				return
 			}
@@ -1084,6 +1186,13 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 }
 
 func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) {
+	role, roleOk := cfg["role"].(string)
+	if !roleOk || role != "peer" && role != "full" {
+		return
+	}
+
+	Log.Debugf("Attempting to resolve peer url for network node: %s", n.ID.String())
+
 	ticker := time.NewTicker(resolvePeerUrlTickerInterval)
 	startedAt := time.Now()
 	var peerURL *string
@@ -1126,6 +1235,8 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 											if resultOk {
 												if enode, enodeOk := result["enode"].(string); enodeOk {
 													peerURL = stringOrNil(enode)
+													cfg["peer"] = result
+													cfg["peer_url"] = peerURL
 													ticker.Stop()
 													break
 												}
@@ -1141,9 +1252,8 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 
 			if peerURL != nil {
 				Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, peerURL)
-				cfg["peer_url"] = peerURL
 				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
+				*n.Config = NetworkNodeConfig(cfgJSON)
 				db.Save(n)
 				ticker.Stop()
 				return
@@ -1161,6 +1271,7 @@ func (n *NetworkNode) undeploy() error {
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	region, regionOk := cfg["region"].(string)
+	role, roleOk := cfg["role"].(string)
 	instanceIds, instanceIdsOk := cfg["target_instance_ids"].([]interface{})
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
@@ -1225,7 +1336,16 @@ func (n *NetworkNode) undeploy() error {
 
 		var network = &Network{}
 		db.Where("id = ?", n.NetworkID).Find(&network)
-		go network.resolveJsonRpcAndWebsocketUrls(db)
+
+		if roleOk {
+			if role == "peer" || role != "full" {
+				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
+			} else if role == "explorer" {
+				go network.resolveAndBalanceExplorerUrls(db)
+			} else if role == "studio" {
+				go network.resolveAndBalanceStudioUrls(db)
+			}
+		}
 	}
 
 	return nil
