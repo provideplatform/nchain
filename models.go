@@ -183,6 +183,11 @@ func (cfg *NetworkNodeConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(redactedCfg)
 }
 
+// Unmarshal JSON
+func (cfg *NetworkNodeConfig) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &cfg)
+}
+
 type TxValue struct {
 	value *big.Int
 }
