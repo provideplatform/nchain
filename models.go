@@ -68,13 +68,13 @@ type Network struct {
 // NetworkNode
 type NetworkNode struct {
 	gocore.Model
-	NetworkID   uuid.UUID          `sql:"not null;type:uuid" json:"network_id"`
-	UserID      *uuid.UUID         `sql:"type:uuid" json:"user_id"`
-	Bootnode    bool               `sql:"not null;default:'false'" json:"is_bootnode"`
-	Host        *string            `json:"host"`
-	Description *string            `json:"description"`
-	Status      *string            `sql:"not null;default:'pending'" json:"status"`
-	Config      *NetworkNodeConfig `sql:"type:json" json:"config"`
+	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
+	Host        *string          `json:"host"`
+	Description *string          `json:"description"`
+	Status      *string          `sql:"not null;default:'pending'" json:"status"`
+	Config      *json.RawMessage `sql:"type:json" json:"config"`
 }
 
 // Bridge instances are still in the process of being defined.
@@ -166,26 +166,6 @@ type Wallet struct {
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 	Balance       *big.Int   `sql:"-" json:"balance"`
-}
-
-// NetworkNodeConfig is raw JSON that is redacted upon marshaing to JSON
-type NetworkNodeConfig json.RawMessage
-
-// MarshalJSON provides a way for a network node config to be redacted when marshaling
-func (cfg *NetworkNodeConfig) MarshalJSON() ([]byte, error) {
-	redactedCfg := map[string]interface{}{}
-	cfgJSON, _ := json.Marshal(cfg)
-	json.Unmarshal(cfgJSON, &redactedCfg)
-	for i := range defaultNetworkNodeConfigMarshalingBlacklist {
-		key := defaultNetworkNodeConfigMarshalingBlacklist[i]
-		delete(redactedCfg, key)
-	}
-	return json.Marshal(redactedCfg)
-}
-
-// Unmarshal JSON
-func (cfg *NetworkNodeConfig) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &cfg)
 }
 
 type TxValue struct {
@@ -569,7 +549,7 @@ func (n *NetworkNode) Create() bool {
 // setConfig sets the network config in-memory
 func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
-	_cfgJSON := NetworkNodeConfig(cfgJSON)
+	_cfgJSON := json.RawMessage(cfgJSON)
 	n.Config = &_cfgJSON
 }
 
@@ -721,7 +701,7 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 
 // cloneConfig returns a new config object in memory, derived from a
 // calling prototype node
-func (n *NetworkNode) cloneConfig() *NetworkNodeConfig {
+func (n *NetworkNode) cloneConfig() *json.RawMessage {
 	prototypeCfg := n.ParseConfig()
 	clonedCfg := map[string]interface{}{}
 	for i := range defaultNetworkNodeCloneConfigWhitelist {
@@ -729,7 +709,7 @@ func (n *NetworkNode) cloneConfig() *NetworkNodeConfig {
 		clonedCfg[key] = prototypeCfg[key]
 	}
 	cfgJSON, _ := json.Marshal(clonedCfg)
-	msg := NetworkNodeConfig(cfgJSON)
+	msg := json.RawMessage(cfgJSON)
 	return &msg
 }
 
@@ -1168,7 +1148,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 
 			if n.Host != nil {
 				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = NetworkNodeConfig(cfgJSON)
+				*n.Config = json.RawMessage(cfgJSON)
 				n.Status = stringOrNil("running")
 				db.Save(n)
 
@@ -1258,7 +1238,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 			if peerURL != nil {
 				Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, peerURL)
 				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = NetworkNodeConfig(cfgJSON)
+				*n.Config = json.RawMessage(cfgJSON)
 				db.Save(n)
 				ticker.Stop()
 				return
