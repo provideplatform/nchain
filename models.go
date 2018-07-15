@@ -322,6 +322,15 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 
 				db.Save(n)
 			}
+		} else if !isLoadBalanced {
+			cfg["json_rpc_url"] = nil
+			cfg["parity_json_rpc_url"] = nil
+			cfg["websocket_url"] = nil
+
+			cfgJSON, _ := json.Marshal(cfg)
+			*n.Config = json.RawMessage(cfgJSON)
+
+			db.Save(n)
 		}
 	}
 }
@@ -355,6 +364,13 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 
 				db.Save(n)
 			}
+		} else if !isLoadBalanced {
+			cfg["block_explorer_url"] = nil
+
+			cfgJSON, _ := json.Marshal(cfg)
+			*n.Config = json.RawMessage(cfgJSON)
+
+			db.Save(n)
 		}
 	}
 }
@@ -388,6 +404,13 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
 
 				db.Save(n)
 			}
+		} else if !isLoadBalanced {
+			cfg["studio_url"] = nil
+
+			cfgJSON, _ := json.Marshal(cfg)
+			*n.Config = json.RawMessage(cfgJSON)
+
+			db.Save(n)
 		}
 	}
 }
@@ -448,6 +471,12 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 // NodeCount retrieves a count of platform-managed network nodes
 func (n *Network) NodeCount() (count *uint64) {
 	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ?", n.ID).Count(&count)
+	return count
+}
+
+// RunningPeers retrieves a count of platform-managed network nodes which also have the 'peer' or 'full' role
+func (n *Network) RunningPeerNodeCount() (count *uint64) {
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.role IN ('peer', 'full')", n.ID).Count(&count)
 	return count
 }
 
