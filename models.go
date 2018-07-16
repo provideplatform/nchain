@@ -34,6 +34,8 @@ import (
 var defaultNetworkNodeCloneConfigWhitelist = []string{"cloneable_cfg", "is_ethereum_network", "protocol_id", "engine_id", "chainspec_url"}
 var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
 
+const hostReachabilityTimeout = time.Minute * 5
+const hostReachabilityInterval = time.Millisecond * reachabilityTimeout
 const reachabilityTimeout = time.Millisecond * 2500
 const receiptTickerInterval = time.Millisecond * 2500
 const receiptTickerTimeout = time.Minute * 1
@@ -348,39 +350,60 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 // resolveAndBalanceExplorerUrls updates the network's configured block
 // explorer urls (i.e. web-based IDE), and enriches the network cfg
 func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
-	cfg := n.ParseConfig()
+	Log.Debugf("Attempting to resolve block explorer url for network node: %s", n.ID.String())
 
-	isLoadBalanced := false
-	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
-		isLoadBalanced = loadBalanced
-	}
+	ticker := time.NewTicker(hostReachabilityInterval)
+	startedAt := time.Now()
+	for {
+		select {
+		case <-ticker.C:
+			cfg := n.ParseConfig()
 
-	if n.isEthereumNetwork() {
-		var node = &NetworkNode{}
-		db.Where("network_id = ? AND status = 'running' AND role = 'explorer')", n.ID).First(&node)
-
-		if node != nil && node.ID != uuid.Nil {
-			if isLoadBalanced {
-				Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
-			} else {
-				if node.reachableOnPort(defaultWebappPort) {
-					cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
-				} else {
-					cfg["block_explorer_url"] = nil
-				}
-
-				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
-
-				db.Save(n)
+			isLoadBalanced := false
+			if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
+				isLoadBalanced = loadBalanced
 			}
-		} else if !isLoadBalanced {
-			cfg["block_explorer_url"] = nil
 
-			cfgJSON, _ := json.Marshal(cfg)
-			*n.Config = json.RawMessage(cfgJSON)
+			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
+				Log.Warningf("Failed to resolve and balance explorer urls for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
+				if !isLoadBalanced {
+					cfg["block_explorer_url"] = nil
+					cfgJSON, _ := json.Marshal(cfg)
+					*n.Config = json.RawMessage(cfgJSON)
+					db.Save(n)
+				}
+				ticker.Stop()
+				return
+			}
 
-			db.Save(n)
+			if n.isEthereumNetwork() {
+				var node = &NetworkNode{}
+				db.Where("network_id = ? AND status = 'running' AND role = 'explorer')", n.ID).First(&node)
+
+				if node != nil && node.ID != uuid.Nil {
+					if isLoadBalanced {
+						Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
+					} else {
+						if node.reachableOnPort(defaultWebappPort) {
+							cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
+							cfgJSON, _ := json.Marshal(cfg)
+							*n.Config = json.RawMessage(cfgJSON)
+							db.Save(n)
+							ticker.Stop()
+							return
+						} else {
+							cfg["block_explorer_url"] = nil
+						}
+					}
+				} else if !isLoadBalanced {
+					cfg["block_explorer_url"] = nil
+					cfgJSON, _ := json.Marshal(cfg)
+					*n.Config = json.RawMessage(cfgJSON)
+					db.Save(n)
+					ticker.Stop()
+					return
+				}
+			}
 		}
 	}
 }
@@ -388,39 +411,59 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 // resolveAndBalanceStudioUrls updates the network's configured studio url
 // (i.e. web-based IDE), and enriches the network cfg
 func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
-	cfg := n.ParseConfig()
+	ticker := time.NewTicker(hostReachabilityInterval)
+	startedAt := time.Now()
+	for {
+		select {
+		case <-ticker.C:
+			cfg := n.ParseConfig()
 
-	isLoadBalanced := false
-	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
-		isLoadBalanced = loadBalanced
-	}
-
-	if n.isEthereumNetwork() {
-		var node = &NetworkNode{}
-		db.Where("network_id = ? AND status = 'running' AND role = 'studio'", n.ID).First(&node)
-
-		if node != nil && node.ID != uuid.Nil {
-			if isLoadBalanced {
-				Log.Warningf("Studio load balancer may contain unhealthy or undeployed nodes")
-			} else {
-				if node.reachableOnPort(defaultWebappPort) {
-					cfg["studio_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
-				} else {
-					cfg["studio_url"] = nil
-				}
-
-				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
-
-				db.Save(n)
+			isLoadBalanced := false
+			if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
+				isLoadBalanced = loadBalanced
 			}
-		} else if !isLoadBalanced {
-			cfg["studio_url"] = nil
 
-			cfgJSON, _ := json.Marshal(cfg)
-			*n.Config = json.RawMessage(cfgJSON)
+			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
+				Log.Warningf("Failed to resolve and balance studio (IDE) url for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
+				if !isLoadBalanced {
+					cfg["studio_url"] = nil
+					cfgJSON, _ := json.Marshal(cfg)
+					*n.Config = json.RawMessage(cfgJSON)
+					db.Save(n)
+				}
+				ticker.Stop()
+				return
+			}
 
-			db.Save(n)
+			if n.isEthereumNetwork() {
+				var node = &NetworkNode{}
+				db.Where("network_id = ? AND status = 'running' AND role = 'studio'", n.ID).First(&node)
+
+				if node != nil && node.ID != uuid.Nil {
+					if isLoadBalanced {
+						Log.Warningf("Studio load balancer may contain unhealthy or undeployed nodes")
+					} else {
+						if node.reachableOnPort(defaultWebappPort) {
+							cfg["studio_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
+							cfgJSON, _ := json.Marshal(cfg)
+							*n.Config = json.RawMessage(cfgJSON)
+
+							db.Save(n)
+							ticker.Stop()
+							return
+						} else {
+							cfg["studio_url"] = nil
+						}
+					}
+				} else if !isLoadBalanced {
+					cfg["studio_url"] = nil
+					cfgJSON, _ := json.Marshal(cfg)
+					*n.Config = json.RawMessage(cfgJSON)
+					db.Save(n)
+					ticker.Stop()
+					return
+				}
+			}
 		}
 	}
 }
@@ -847,7 +890,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 						Log.Debugf("Genesis bootnode resolved peer information; network node id: %s; peer: %s", n.ID.String(), *peerURL)
 
 						cfg := n.ParseConfig()
-						cfg["peer_url"] = peerURL
+						cfg["peer_url"] = *peerURL
 
 						db := DatabaseConnection()
 						clone.setConfig(cfg)
@@ -913,7 +956,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 			return
 		}
 
-		bootnodes, _ := network.requireBootnodes(db, n) // Blocking or returns immediately if the network has bootnodes
+		bootnodes, _ := network.requireBootnodes(db, n) // error is of type bootnodesInitialized if the bootstrapping of network bootnodes is occuring for the first time
 		n._deploy(network, bootnodes, db)
 	}()
 }
@@ -1016,7 +1059,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 			n.setConfig(cfg)
 
 			if err != nil {
-				Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s", region, n.ID.String())
+				Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
 			} else {
 				if egress, egressOk := securityCfg["egress"]; egressOk {
 					switch egress.(type) {
@@ -1248,6 +1291,16 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 				*n.Config = json.RawMessage(cfgJSON)
 				n.Status = stringOrNil("running")
 				db.Save(n)
+
+				role, roleOk := cfg["role"].(string)
+				if roleOk {
+					if role == "explorer" {
+						go network.resolveAndBalanceExplorerUrls(db)
+					} else if role == "studio" {
+						go network.resolveAndBalanceStudioUrls(db)
+					}
+				}
+
 				ticker.Stop()
 				return
 			}
@@ -1272,6 +1325,8 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 			if peerURL == nil {
 				if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
 					Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", n.ID.String(), resolvePeerTickerTimeout)
+					n.Status = stringOrNil("peer_resolution_failed")
+					db.Save(n)
 					ticker.Stop()
 					return
 				}
@@ -1306,7 +1361,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 												if enode, enodeOk := result["enode"].(string); enodeOk {
 													peerURL = stringOrNil(enode)
 													cfg["peer"] = result
-													cfg["peer_url"] = peerURL
+													cfg["peer_url"] = enode
 													ticker.Stop()
 													break
 												}
@@ -1330,10 +1385,6 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 				if roleOk {
 					if role == "peer" || role == "full" {
 						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
-					} else if role == "explorer" {
-						network.resolveAndBalanceExplorerUrls(db)
-					} else if role == "studio" {
-						network.resolveAndBalanceStudioUrls(db)
 					}
 				}
 
