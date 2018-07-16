@@ -688,7 +688,7 @@ func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
 
 // Validate a network node for persistence
 func (n *NetworkNode) Validate() bool {
-	// cfg := n.ParseConfig()
+	cfg := n.ParseConfig()
 	// if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
 	// 	n.Errors = append(n.Errors, &gocore.Error{
 	// 		Message: stringOrNil("Failed to parse protocol_id in network node configuration"),
@@ -728,11 +728,12 @@ func (n *NetworkNode) Validate() bool {
 	// 		Message: stringOrNil("Failed to parse provider_id in network node configuration"),
 	// 	})
 	// }
-	// if role, roleOk := cfg["role"].(string); roleOk {
-	// 	if n.Role == nil || *n.Role != role {
-	// 		Log.Debugf("Coercing network node role to match node configuration; role: %s", role)
-	// 		n.Role = stringOrNil(role)
-	// 	}
+	if role, roleOk := cfg["role"].(string); roleOk {
+		if n.Role == nil || *n.Role != role {
+			Log.Debugf("Coercing network node role to match node configuration; role: %s", role)
+			n.Role = stringOrNil(role)
+		}
+	}
 	// } else {
 	// 	n.Errors = append(n.Errors, &gocore.Error{
 	// 		Message: stringOrNil("Failed to parse role in network node configuration"),
