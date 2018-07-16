@@ -535,9 +535,6 @@ func (n *Network) isEthereumNetwork() bool {
 				return isEthereumNetwork.(bool)
 			}
 		}
-		if _, ok := cfg["json_rpc_url"]; ok {
-			return true
-		}
 		if _, ok := cfg["parity_json_rpc_url"]; ok {
 			return true
 		}
@@ -703,11 +700,11 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 
 			if providerID, providerIdOk := cfg["provider_id"].(string); providerIdOk {
 				if strings.ToLower(providerID) == "docker" {
-					if ids, idsOk := cfg["target_task_ids"].([]string); idsOk {
+					if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
 						logs := make([]string, 0)
 						for i := range ids {
-							logEvents, err := GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i], nil)
-							if err == nil {
+							logEvents, err := GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i].(string), nil)
+							if err == nil && logEvents != nil {
 								for i := range logEvents.Events {
 									event := logEvents.Events[i]
 									logs = append(logs, string(*event.Message))
@@ -1180,18 +1177,6 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 				*n.Config = json.RawMessage(cfgJSON)
 				n.Status = stringOrNil("running")
 				db.Save(n)
-
-				role, roleOk := cfg["role"].(string)
-				if roleOk {
-					if role == "peer" || role != "full" {
-						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
-					} else if role == "explorer" {
-						network.resolveAndBalanceExplorerUrls(db)
-					} else if role == "studio" {
-						network.resolveAndBalanceStudioUrls(db)
-					}
-				}
-
 				ticker.Stop()
 				return
 			}
@@ -1265,10 +1250,22 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 			}
 
 			if peerURL != nil {
-				Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, peerURL)
+				Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
 				cfgJSON, _ := json.Marshal(cfg)
 				*n.Config = json.RawMessage(cfgJSON)
 				db.Save(n)
+
+				role, roleOk := cfg["role"].(string)
+				if roleOk {
+					if role == "peer" || role == "full" {
+						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
+					} else if role == "explorer" {
+						network.resolveAndBalanceExplorerUrls(db)
+					} else if role == "studio" {
+						network.resolveAndBalanceStudioUrls(db)
+					}
+				}
+
 				ticker.Stop()
 				return
 			}

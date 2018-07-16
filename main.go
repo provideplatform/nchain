@@ -307,7 +307,7 @@ func networkNodeLogsHandler(c *gin.Context) {
 
 	logs, err := node.Logs()
 	if err != nil {
-		renderError("log retrieval failed", 500, c)
+		renderError(fmt.Sprintf("log retrieval failed; %s", err.Error()), 500, c)
 		return
 	}
 
