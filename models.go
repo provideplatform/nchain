@@ -1053,7 +1053,10 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 			securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
 			securityGroup, err := CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, nil)
 			securityGroupIds := make([]string, 0)
-			securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
+
+			if securityGroup != nil {
+				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
+			}
 
 			cfg["region"] = region
 			cfg["target_security_group_ids"] = securityGroupIds
@@ -1061,6 +1064,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 
 			if err != nil {
 				Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
+				n.updateStatus(db, "failed")
+				return
 			} else {
 				if egress, egressOk := securityCfg["egress"]; egressOk {
 					switch egress.(type) {
