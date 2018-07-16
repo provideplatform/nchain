@@ -282,6 +282,7 @@ func (n *Network) setChainID() {
 				cfg["network_id"] = networkID.Uint64()
 				if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
 					if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
+						params["chainID"] = n.ChainID
 						params["networkID"] = n.ChainID
 					}
 				}
