@@ -48,7 +48,8 @@ const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
 
-// Network
+// Network represents a blockchain network; the network could fall at any level of
+// a heirarchy of blockchain networks
 type Network struct {
 	gocore.Model
 	ApplicationID *uuid.UUID             `sql:"type:uuid" json:"application_id"`
@@ -65,7 +66,9 @@ type Network struct {
 	Stats         *provide.NetworkStatus `sql:"-" json:"stats"`
 }
 
-// NetworkNode
+// NetworkNode instances represent nodes of the network to which they belong, acting in a specific role;
+// each NetworkNode may have a set or sets of deployed resources, such as application containers, VMs
+// or even phyiscal infrastructure
 type NetworkNode struct {
 	gocore.Model
 	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
@@ -73,6 +76,7 @@ type NetworkNode struct {
 	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
 	Host        *string          `json:"host"`
 	Description *string          `json:"description"`
+	Role        *string          `sql:"not null;default:'peer'" json:"role"`
 	Status      *string          `sql:"not null;default:'pending'" json:"status"`
 	Config      *json.RawMessage `sql:"type:json" json:"config"`
 }
@@ -296,6 +300,8 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	}
 
 	if n.isEthereumNetwork() {
+		Log.Debugf("Attempting to resolve and balance JSON-RPC and websocket urls for ethereum network with id: %s", n.ID)
+
 		var node = &NetworkNode{}
 		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full')", n.ID).First(&node)
 
@@ -304,9 +310,13 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 				Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
 			} else {
 				if reachable, port := node.reachableViaJsonRpc(); reachable {
+					Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
+
 					cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port)
 					cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port) // deprecated
 				} else {
+					Log.Debugf("Node unreachable via JSON-RPC port; node id: %s", n.ID)
+
 					cfg["json_rpc_url"] = nil
 					cfg["parity_json_rpc_url"] = nil // deprecated
 				}
@@ -635,7 +645,68 @@ func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
 
 // Validate a network node for persistence
 func (n *NetworkNode) Validate() bool {
-	n.Errors = make([]*gocore.Error, 0)
+	cfg := n.ParseConfig()
+	if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
+		n.Errors = append(n.Errors, &gocore.Error{
+			Message: stringOrNil("Failed to parse protocol_id in network node configuration"),
+		})
+	}
+	if _, engineOk := cfg["engine_id"].(string); !engineOk {
+		n.Errors = append(n.Errors, &gocore.Error{
+			Message: stringOrNil("Failed to parse engine_id in network node configuration"),
+		})
+	}
+	if targetID, targetOk := cfg["target_id"].(string); targetOk {
+		if creds, credsOk := cfg["credentials"].(map[string]interface{}); credsOk {
+			if strings.ToLower(targetID) == "aws" {
+				if _, accessKeyIdOk := creds["aws_access_key_id"].(string); !accessKeyIdOk {
+					n.Errors = append(n.Errors, &gocore.Error{
+						Message: stringOrNil("Failed to parse aws_access_key_id in network node credentials configuration for AWS target"),
+					})
+				}
+				if _, secretAccessKeyOk := creds["aws_secret_access_key"].(string); !secretAccessKeyOk {
+					n.Errors = append(n.Errors, &gocore.Error{
+						Message: stringOrNil("Failed to parse aws_secret_access_key in network node credentials configuration for AWS target"),
+					})
+				}
+			}
+		} else {
+			n.Errors = append(n.Errors, &gocore.Error{
+				Message: stringOrNil("Failed to parse credentials in network node configuration"),
+			})
+		}
+	} else {
+		n.Errors = append(n.Errors, &gocore.Error{
+			Message: stringOrNil("Failed to parse target_id in network node configuration"),
+		})
+	}
+	if _, providerOk := cfg["provider_id"].(string); !providerOk {
+		n.Errors = append(n.Errors, &gocore.Error{
+			Message: stringOrNil("Failed to parse provider_id in network node configuration"),
+		})
+	}
+	if role, roleOk := cfg["role"].(string); roleOk {
+		if n.Role == nil || *n.Role != role {
+			Log.Debugf("Coercing network node role to match node configuration; role: %s", role)
+			n.Role = stringOrNil(role)
+		}
+	} else {
+		n.Errors = append(n.Errors, &gocore.Error{
+			Message: stringOrNil("Failed to parse role in network node configuration"),
+		})
+	}
+	if _, regionOk := cfg["region"].(string); regionOk {
+		if _, regionsOk := cfg["regions"].(map[string]interface{}); regionsOk {
+			n.Errors = append(n.Errors, &gocore.Error{
+				Message: stringOrNil("Parsed both region and regions in network node configuration; specify only one of region or regions"),
+			})
+		}
+	} else if _, regionsOk := cfg["regions"].(map[string]interface{}); !regionsOk {
+		n.Errors = append(n.Errors, &gocore.Error{
+			Message: stringOrNil("Failed to parse region or regions in network node configuration; specify one of region or regions"),
+		})
+	}
+
 	return len(n.Errors) == 0
 }
 
@@ -782,7 +853,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 						clone.setConfig(cfg)
 						clone.updateStatus(db, "pending")
 						cloneCfg := clone.ParseConfig()
-						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = peerURL
+						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = *peerURL
 						delete(cloneCfg, "regions")
 						clone.setConfig(cloneCfg)
 
@@ -1349,7 +1420,7 @@ func (n *NetworkNode) undeploy() error {
 		db.Where("id = ?", n.NetworkID).Find(&network)
 
 		if roleOk {
-			if role == "peer" || role != "full" {
+			if role == "peer" || role == "full" {
 				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 			} else if role == "explorer" {
 				go network.resolveAndBalanceExplorerUrls(db)
