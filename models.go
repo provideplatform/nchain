@@ -378,13 +378,15 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 
 			if n.isEthereumNetwork() {
 				var node = &NetworkNode{}
-				db.Where("network_id = ? AND status = 'running' AND role = 'explorer')", n.ID).First(&node)
+				db.Where("network_id = ? AND status = 'running' AND role = 'explorer'", n.ID).First(&node)
 
 				if node != nil && node.ID != uuid.Nil {
 					if isLoadBalanced {
 						Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
 					} else {
 						if node.reachableOnPort(defaultWebappPort) {
+							Log.Debugf("Block explorer reachable via port %d; node id: %s", defaultWebappPort, n.ID)
+
 							cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
 							cfgJSON, _ := json.Marshal(cfg)
 							*n.Config = json.RawMessage(cfgJSON)
@@ -392,6 +394,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 							ticker.Stop()
 							return
 						} else {
+							Log.Debugf("Block explorer unreachable via webapp port; node id: %s", n.ID)
 							cfg["block_explorer_url"] = nil
 						}
 					}
