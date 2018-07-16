@@ -35,7 +35,7 @@ var defaultNetworkNodeCloneConfigWhitelist = []string{"cloneable_cfg", "is_ether
 var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
 
 const hostReachabilityTimeout = time.Minute * 5
-const hostReachabilityInterval = time.Millisecond * reachabilityTimeout
+const hostReachabilityInterval = time.Millisecond * 2500
 const reachabilityTimeout = time.Millisecond * 2500
 const receiptTickerInterval = time.Millisecond * 2500
 const receiptTickerTimeout = time.Minute * 1
@@ -350,8 +350,6 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 // resolveAndBalanceExplorerUrls updates the network's configured block
 // explorer urls (i.e. web-based IDE), and enriches the network cfg
 func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
-	Log.Debugf("Attempting to resolve block explorer url for network node: %s", n.ID.String())
-
 	ticker := time.NewTicker(hostReachabilityInterval)
 	startedAt := time.Now()
 	for {
@@ -377,8 +375,10 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 			}
 
 			if n.isEthereumNetwork() {
+				Log.Debugf("Attempting to resolve and balance block explorer url for network node: %s", n.ID.String())
+
 				var node = &NetworkNode{}
-				db.Where("network_id = ? AND status = 'running' AND role = 'explorer'", n.ID).First(&node)
+				db.Where("network_id = ? AND status = 'running' AND role IN ('explorer')", n.ID).First(&node)
 
 				if node != nil && node.ID != uuid.Nil {
 					if isLoadBalanced {
@@ -403,8 +403,6 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 					cfgJSON, _ := json.Marshal(cfg)
 					*n.Config = json.RawMessage(cfgJSON)
 					db.Save(n)
-					ticker.Stop()
-					return
 				}
 			}
 		}
@@ -439,12 +437,14 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
 			}
 
 			if n.isEthereumNetwork() {
+				Log.Debugf("Attempting to resolve and balance studio IDE url for network node: %s", n.ID.String())
+
 				var node = &NetworkNode{}
-				db.Where("network_id = ? AND status = 'running' AND role = 'studio'", n.ID).First(&node)
+				db.Where("network_id = ? AND status = 'running' AND role IN ('studio')", n.ID).First(&node)
 
 				if node != nil && node.ID != uuid.Nil {
 					if isLoadBalanced {
-						Log.Warningf("Studio load balancer may contain unhealthy or undeployed nodes")
+						Log.Warningf("Studio IDE load balancer may contain unhealthy or undeployed nodes")
 					} else {
 						if node.reachableOnPort(defaultWebappPort) {
 							cfg["studio_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
@@ -463,8 +463,6 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
 					cfgJSON, _ := json.Marshal(cfg)
 					*n.Config = json.RawMessage(cfgJSON)
 					db.Save(n)
-					ticker.Stop()
-					return
 				}
 			}
 		}
@@ -586,12 +584,10 @@ func (n *Network) isEthereumNetwork() bool {
 
 	cfg := n.ParseConfig()
 	if cfg != nil {
-		if isEthereumNetwork, ok := cfg["is_ethereum_network"]; ok {
-			if _ok := isEthereumNetwork.(bool); _ok {
-				return isEthereumNetwork.(bool)
-			}
+		if isEthereumNetwork, ok := cfg["is_ethereum_network"].(bool); ok {
+			return isEthereumNetwork
 		}
-		if _, ok := cfg["parity_json_rpc_url"]; ok {
+		if _, ok := cfg["parity_json_rpc_url"].(string); ok {
 			return true
 		}
 	}
