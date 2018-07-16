@@ -20,7 +20,7 @@ import (
 	logger "github.com/kthomas/go-logger"
 )
 
-const defaultStatsDaemonQueueSize = 32
+const defaultStatsDaemonQueueSize = 8
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 32
 const networkStatsMinimumRecentBlockCacheSize = 3
