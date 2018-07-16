@@ -687,67 +687,67 @@ func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
 
 // Validate a network node for persistence
 func (n *NetworkNode) Validate() bool {
-	cfg := n.ParseConfig()
-	if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
-		n.Errors = append(n.Errors, &gocore.Error{
-			Message: stringOrNil("Failed to parse protocol_id in network node configuration"),
-		})
-	}
-	if _, engineOk := cfg["engine_id"].(string); !engineOk {
-		n.Errors = append(n.Errors, &gocore.Error{
-			Message: stringOrNil("Failed to parse engine_id in network node configuration"),
-		})
-	}
-	if targetID, targetOk := cfg["target_id"].(string); targetOk {
-		if creds, credsOk := cfg["credentials"].(map[string]interface{}); credsOk {
-			if strings.ToLower(targetID) == "aws" {
-				if _, accessKeyIdOk := creds["aws_access_key_id"].(string); !accessKeyIdOk {
-					n.Errors = append(n.Errors, &gocore.Error{
-						Message: stringOrNil("Failed to parse aws_access_key_id in network node credentials configuration for AWS target"),
-					})
-				}
-				if _, secretAccessKeyOk := creds["aws_secret_access_key"].(string); !secretAccessKeyOk {
-					n.Errors = append(n.Errors, &gocore.Error{
-						Message: stringOrNil("Failed to parse aws_secret_access_key in network node credentials configuration for AWS target"),
-					})
-				}
-			}
-		} else {
-			n.Errors = append(n.Errors, &gocore.Error{
-				Message: stringOrNil("Failed to parse credentials in network node configuration"),
-			})
-		}
-	} else {
-		n.Errors = append(n.Errors, &gocore.Error{
-			Message: stringOrNil("Failed to parse target_id in network node configuration"),
-		})
-	}
-	if _, providerOk := cfg["provider_id"].(string); !providerOk {
-		n.Errors = append(n.Errors, &gocore.Error{
-			Message: stringOrNil("Failed to parse provider_id in network node configuration"),
-		})
-	}
-	if role, roleOk := cfg["role"].(string); roleOk {
-		if n.Role == nil || *n.Role != role {
-			Log.Debugf("Coercing network node role to match node configuration; role: %s", role)
-			n.Role = stringOrNil(role)
-		}
-	} else {
-		n.Errors = append(n.Errors, &gocore.Error{
-			Message: stringOrNil("Failed to parse role in network node configuration"),
-		})
-	}
-	if _, regionOk := cfg["region"].(string); regionOk {
-		if _, regionsOk := cfg["regions"].(map[string]interface{}); regionsOk {
-			n.Errors = append(n.Errors, &gocore.Error{
-				Message: stringOrNil("Parsed both region and regions in network node configuration; specify only one of region or regions"),
-			})
-		}
-	} else if _, regionsOk := cfg["regions"].(map[string]interface{}); !regionsOk {
-		n.Errors = append(n.Errors, &gocore.Error{
-			Message: stringOrNil("Failed to parse region or regions in network node configuration; specify one of region or regions"),
-		})
-	}
+	// cfg := n.ParseConfig()
+	// if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
+	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 		Message: stringOrNil("Failed to parse protocol_id in network node configuration"),
+	// 	})
+	// }
+	// if _, engineOk := cfg["engine_id"].(string); !engineOk {
+	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 		Message: stringOrNil("Failed to parse engine_id in network node configuration"),
+	// 	})
+	// }
+	// if targetID, targetOk := cfg["target_id"].(string); targetOk {
+	// 	if creds, credsOk := cfg["credentials"].(map[string]interface{}); credsOk {
+	// 		if strings.ToLower(targetID) == "aws" {
+	// 			if _, accessKeyIdOk := creds["aws_access_key_id"].(string); !accessKeyIdOk {
+	// 				n.Errors = append(n.Errors, &gocore.Error{
+	// 					Message: stringOrNil("Failed to parse aws_access_key_id in network node credentials configuration for AWS target"),
+	// 				})
+	// 			}
+	// 			if _, secretAccessKeyOk := creds["aws_secret_access_key"].(string); !secretAccessKeyOk {
+	// 				n.Errors = append(n.Errors, &gocore.Error{
+	// 					Message: stringOrNil("Failed to parse aws_secret_access_key in network node credentials configuration for AWS target"),
+	// 				})
+	// 			}
+	// 		}
+	// 	} else {
+	// 		n.Errors = append(n.Errors, &gocore.Error{
+	// 			Message: stringOrNil("Failed to parse credentials in network node configuration"),
+	// 		})
+	// 	}
+	// } else {
+	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 		Message: stringOrNil("Failed to parse target_id in network node configuration"),
+	// 	})
+	// }
+	// if _, providerOk := cfg["provider_id"].(string); !providerOk {
+	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 		Message: stringOrNil("Failed to parse provider_id in network node configuration"),
+	// 	})
+	// }
+	// if role, roleOk := cfg["role"].(string); roleOk {
+	// 	if n.Role == nil || *n.Role != role {
+	// 		Log.Debugf("Coercing network node role to match node configuration; role: %s", role)
+	// 		n.Role = stringOrNil(role)
+	// 	}
+	// } else {
+	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 		Message: stringOrNil("Failed to parse role in network node configuration"),
+	// 	})
+	// }
+	// if _, regionOk := cfg["region"].(string); regionOk {
+	// 	if _, regionsOk := cfg["regions"].(map[string]interface{}); regionsOk {
+	// 		n.Errors = append(n.Errors, &gocore.Error{
+	// 			Message: stringOrNil("Parsed both region and regions in network node configuration; specify only one of region or regions"),
+	// 		})
+	// 	}
+	// } else if _, regionsOk := cfg["regions"].(map[string]interface{}); !regionsOk {
+	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 		Message: stringOrNil("Failed to parse region or regions in network node configuration; specify one of region or regions"),
+	// 	})
+	// }
 
 	return len(n.Errors) == 0
 }
