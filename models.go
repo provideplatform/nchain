@@ -350,13 +350,14 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 
 // resolveAndBalanceExplorerUrls updates the network's configured block
 // explorer urls (i.e. web-based IDE), and enriches the network cfg
-func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
+func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) {
 	ticker := time.NewTicker(hostReachabilityInterval)
 	startedAt := time.Now()
 	for {
 		select {
 		case <-ticker.C:
 			cfg := n.ParseConfig()
+			nodeCfg := node.ParseConfig()
 
 			isLoadBalanced := false
 			if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
@@ -391,7 +392,13 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 							cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
 							cfgJSON, _ := json.Marshal(cfg)
 							*n.Config = json.RawMessage(cfgJSON)
+
+							nodeCfg["url"] = cfg["block_explorer_url"]
+							nodeCfgJSON, _ := json.Marshal(nodeCfg)
+							*node.Config = json.RawMessage(nodeCfgJSON)
+
 							db.Save(n)
+							db.Save(node)
 							ticker.Stop()
 							return
 						} else {
@@ -412,13 +419,14 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB) {
 
 // resolveAndBalanceStudioUrls updates the network's configured studio url
 // (i.e. web-based IDE), and enriches the network cfg
-func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
+func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 	ticker := time.NewTicker(hostReachabilityInterval)
 	startedAt := time.Now()
 	for {
 		select {
 		case <-ticker.C:
 			cfg := n.ParseConfig()
+			nodeCfg := node.ParseConfig()
 
 			isLoadBalanced := false
 			if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
@@ -452,7 +460,12 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB) {
 							cfgJSON, _ := json.Marshal(cfg)
 							*n.Config = json.RawMessage(cfgJSON)
 
+							nodeCfg["url"] = cfg["studio_url"]
+							nodeCfgJSON, _ := json.Marshal(nodeCfg)
+							*node.Config = json.RawMessage(nodeCfgJSON)
+
 							db.Save(n)
+							db.Save(node)
 							ticker.Stop()
 							return
 						} else {
@@ -1301,9 +1314,9 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 				role, roleOk := cfg["role"].(string)
 				if roleOk {
 					if role == "explorer" {
-						go network.resolveAndBalanceExplorerUrls(db)
+						go network.resolveAndBalanceExplorerUrls(db, n)
 					} else if role == "studio" {
-						go network.resolveAndBalanceStudioUrls(db)
+						go network.resolveAndBalanceStudioUrls(db, n)
 					}
 				}
 
@@ -1480,9 +1493,9 @@ func (n *NetworkNode) undeploy() error {
 			if role == "peer" || role == "full" {
 				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 			} else if role == "explorer" {
-				go network.resolveAndBalanceExplorerUrls(db)
+				go network.resolveAndBalanceExplorerUrls(db, n)
 			} else if role == "studio" {
-				go network.resolveAndBalanceStudioUrls(db)
+				go network.resolveAndBalanceStudioUrls(db, n)
 			}
 		}
 	}

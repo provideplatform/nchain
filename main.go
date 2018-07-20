@@ -212,20 +212,26 @@ func updateNetworkHandler(c *gin.Context) {
 
 func networksListHandler(c *gin.Context) {
 	var networks []Network
-	query := DatabaseConnection().Where("networks.enabled = true AND networks.application_id IS NULL AND networks.user_id IS NULL")
+	query := DatabaseConnection().Where("networks.enabled = true")
+
+	if strings.ToLower(c.Query("cloneable")) == "true" {
+		query = query.Where("networks.cloneable = true")
+	} else if strings.ToLower(c.Query("cloneable")) == "false" {
+		query = query.Where("networks.cloneable = false")
+	}
 
 	appID := authorizedSubjectId(c, "application")
 	if appID != nil {
-		query = query.Or("networks.enabled = true AND networks.application_id = ?", appID)
+		query = query.Where("networks.application_id = ?", appID)
+	} else {
+		query = query.Where("networks.application_id IS NULL")
 	}
 
 	userID := authorizedSubjectId(c, "user")
 	if userID != nil {
-		query = query.Or("networks.enabled = true AND networks.user_id = ?", userID)
-	}
-
-	if strings.ToLower(c.Query("cloneable")) == "true" {
-		query = query.Where("networks.cloneable = true")
+		query = query.Where("networks.user_id = ?", userID)
+	} else {
+		query = query.Where("networks.user_id IS NULL")
 	}
 
 	query.Order("networks.created_at ASC").Find(&networks)
