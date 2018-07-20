@@ -220,18 +220,22 @@ func networksListHandler(c *gin.Context) {
 		query = query.Where("networks.cloneable = false")
 	}
 
-	appID := authorizedSubjectId(c, "application")
-	if appID != nil {
-		query = query.Where("networks.application_id = ?", appID)
+	if strings.ToLower(c.Query("public")) == "true" {
+		query = query.Where("networks.application_id IS NULL AND networks.user_id IS NULL")
 	} else {
-		query = query.Where("networks.application_id IS NULL")
-	}
+		appID := authorizedSubjectId(c, "application")
+		if appID != nil {
+			query = query.Where("networks.application_id = ?", appID)
+		} else {
+			query = query.Where("networks.application_id IS NULL")
+		}
 
-	userID := authorizedSubjectId(c, "user")
-	if userID != nil {
-		query = query.Where("networks.user_id = ?", userID)
-	} else {
-		query = query.Where("networks.user_id IS NULL")
+		userID := authorizedSubjectId(c, "user")
+		if userID != nil {
+			query = query.Where("networks.user_id = ?", userID)
+		} else {
+			query = query.Where("networks.user_id IS NULL")
+		}
 	}
 
 	query.Order("networks.created_at ASC").Find(&networks)
