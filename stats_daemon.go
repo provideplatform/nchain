@@ -319,9 +319,11 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 		return daemon
 	}
 
+	currentNetworkStatsMutex.Lock()
 	Log.Infof("Initializing new stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
 	daemon = NewNetworkStatsDaemon(Log, network)
 	currentNetworkStats[network.ID.String()] = daemon
+	currentNetworkStatsMutex.Unlock()
 
 	go daemon.run()
 
