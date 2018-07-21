@@ -344,6 +344,10 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 			*n.Config = json.RawMessage(cfgJSON)
 
 			db.Save(n)
+
+			if n.AvailablePeerCount() == 0 {
+				EvictNetworkStatsDaemon(n)
+			}
 		}
 	}
 }
@@ -542,9 +546,11 @@ func (n *Network) NodeCount() (count *uint64) {
 	return count
 }
 
-// RunningPeers retrieves a count of platform-managed network nodes which also have the 'peer' or 'full' role
-func (n *Network) RunningPeerNodeCount() (count *uint64) {
-	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.role IN ('peer', 'full')", n.ID).Count(&count)
+// AvailablePeerCount retrieves a count of platform-managed network nodes which also have the 'peer' or 'full' role
+// and currently are listed with a status of 'running'; this method does not currently check real-time availability
+// of these peers-- it is assumed the are still available. FIXME?
+func (n *Network) AvailablePeerCount() (count uint64) {
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full')", n.ID).Count(&count)
 	return count
 }
 
@@ -684,6 +690,16 @@ func (n *NetworkNode) reachableOnPort(port uint) bool {
 	}
 	Log.Debugf("%s:%v is unreachable", *n.Host, port)
 	return false
+}
+
+func (n *NetworkNode) relatedNetwork() *Network {
+	var network = &Network{}
+	DatabaseConnection().Model(n).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		Log.Warningf("Failed to retrieve network for network node: %s", n.ID)
+		return nil
+	}
+	return network
 }
 
 func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
@@ -1418,6 +1434,7 @@ func (n *NetworkNode) undeploy() error {
 	Log.Debugf("Attempting to undeploy network node with id: %s", n.ID, n)
 
 	db := DatabaseConnection()
+	n.updateStatus(db, "deprovisioning")
 
 	cfg := n.ParseConfig()
 	targetID, targetOk := cfg["target_id"].(string)
@@ -1486,10 +1503,9 @@ func (n *NetworkNode) undeploy() error {
 			}()
 		}
 
-		var network = &Network{}
-		db.Where("id = ?", n.NetworkID).Find(&network)
-
 		if roleOk {
+			network := n.relatedNetwork()
+
 			if role == "peer" || role == "full" {
 				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 			} else if role == "explorer" {

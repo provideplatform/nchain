@@ -382,7 +382,7 @@ func deleteNetworkNodeHandler(c *gin.Context) {
 
 	var node = &NetworkNode{}
 	DatabaseConnection().Where("network_id = ? AND id = ?", c.Param("id"), c.Param("nodeId")).Find(&node)
-	if node.ID == uuid.Nil {
+	if node == nil || node.ID == uuid.Nil {
 		renderError("network node not found", 404, c)
 		return
 	}
@@ -391,7 +391,7 @@ func deleteNetworkNodeHandler(c *gin.Context) {
 		return
 	}
 	if !node.Delete() {
-		renderError("token not deleted", 500, c)
+		renderError("network node not deleted", 500, c)
 		return
 	}
 	render(nil, 204, c)

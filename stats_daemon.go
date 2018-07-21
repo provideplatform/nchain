@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -27,6 +29,7 @@ const networkStatsMinimumRecentBlockCacheSize = 3
 const statsDaemonMaximumBackoffMillis = 12800
 
 var currentNetworkStats = map[string]*StatsDaemon{}
+var currentNetworkStatsMutex = &sync.Mutex{}
 
 type NetworkStatsDataSource struct {
 	Network *Network
@@ -288,10 +291,28 @@ func (sd *StatsDaemon) loop() error {
 	}
 }
 
+// EvictNetworkStatsDaemon evicts a single, previously-initialized stats daemon instance {
+func EvictNetworkStatsDaemon(network *Network) error {
+	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
+		Log.Debugf("Evicting stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
+		daemon.shutdown()
+		currentNetworkStatsMutex.Lock()
+		delete(currentNetworkStats, network.ID.String())
+		currentNetworkStatsMutex.Unlock()
+		return nil
+	}
+	return fmt.Errorf("Unable to evict stats daemon instance for network: %s; id; %s", *network.Name, network.ID)
+}
+
 // RequireNetworkStatsDaemon ensures a single stats daemon instance is running for
 // the given network; if no stats daemon instance has been started for the network,
 // the instance is configured and started immediately, caching real-time network stats.
 func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
+	if network.AvailablePeerCount() == 0 {
+		Log.Debugf("Stats daemon instance not initialized for network: %s; no available peers", *network.Name)
+		return nil
+	}
+
 	var daemon *StatsDaemon
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
 		Log.Debugf("Cached stats daemon instance found for network: %s; id: %s", *network.Name, network.ID)
@@ -389,7 +410,7 @@ func (sd *StatsDaemon) handleSignals() {
 
 func (sd *StatsDaemon) shutdown() {
 	if atomic.AddUint32(&sd.closing, 1) == 1 {
-		Log.Debug("Shutdown broadcast")
+		Log.Debugf("Shutting down stats daemon instance for network: %s", *sd.dataSource.Network.Name)
 		sd.cancelF()
 	}
 }
