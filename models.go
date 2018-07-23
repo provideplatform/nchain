@@ -43,7 +43,7 @@ const resolveGenesisTickerInterval = time.Millisecond * 10000
 const resolveGenesisTickerTimeout = time.Minute * 20
 const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
-const resolvePeerUrlTickerInterval = time.Millisecond * 5000
+const resolvePeerTickerInterval = time.Millisecond * 5000
 const resolvePeerTickerTimeout = time.Minute * 10
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
@@ -574,7 +574,6 @@ func (n *Network) BootnodesTxt() (*string, error) {
 	}
 
 	Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, txt)
-
 	return stringOrNil(txt), err
 }
 
@@ -901,7 +900,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 		clone.Create()
 
 		Log.Debugf("Initial bootnodes initializing for network with id: %s", n.ID)
-		ticker := time.NewTicker(resolveHostTickerInterval)
+		ticker := time.NewTicker(resolvePeerTickerInterval)
 		startedAt := time.Now()
 		var peerURL *string
 		for peerURL == nil {
@@ -929,7 +928,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 						clone.updateStatus(db, "pending")
 						cloneCfg := clone.ParseConfig()
 						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = *peerURL
-						cloneCfg["env"].(map[string]interface{})["PEER_SET"] = strings.Replace(*peerURL, "enode://", "required:", -1)
+						cloneCfg["env"].(map[string]interface{})["PEER_SET"] = strings.Replace(strings.Replace(*peerURL, "enode://", "required:", -1), ",", " ", -1)
 						delete(cloneCfg, "regions")
 						clone.setConfig(cloneCfg)
 
@@ -943,7 +942,58 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 			}
 		}
 	} else {
-		clone.Create()
+		bootnodes, err := network.Bootnodes()
+		if err == nil {
+			genesisBootnode := bootnodes[0]
+			if len(bootnodes) == 1 && genesisBootnode.peerURL() == nil {
+				clone.Config = nil
+				clone.Status = stringOrNil("awaiting_peers")
+				clone.Create()
+
+				ticker := time.NewTicker(resolvePeerTickerInterval)
+				startedAt := time.Now()
+				var peerURL *string
+				for peerURL == nil {
+					select {
+					case <-ticker.C:
+						if peerURL == nil {
+							if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
+								Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", genesisBootnode.ID.String(), resolvePeerTickerTimeout)
+								ticker.Stop()
+								break
+							}
+
+							genesisBootnode.Reload()
+							peerURL = genesisBootnode.peerURL()
+							if peerURL == nil {
+								Log.Debugf("Genesis bootnode has not yet resolved peer information; network node id: %s", genesisBootnode.ID.String())
+							} else {
+								Log.Debugf("Genesis bootnode resolved peer information; network node id: %s; peer: %s", genesisBootnode.ID.String(), *peerURL)
+
+								cfg := genesisBootnode.ParseConfig()
+								cfg["peer_url"] = *peerURL
+
+								db := DatabaseConnection()
+								clone.setConfig(cfg)
+								clone.updateStatus(db, "pending")
+								cloneCfg := clone.ParseConfig()
+								cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = *peerURL
+								cloneCfg["env"].(map[string]interface{})["PEER_SET"] = strings.Replace(strings.Replace(*peerURL, "enode://", "required:", -1), ",", " ", -1)
+								delete(cloneCfg, "regions")
+								clone.setConfig(cloneCfg)
+
+								clone.deploy(db)
+
+								ticker.Stop()
+								break
+							}
+						}
+					}
+				}
+			} else {
+				clone.Create()
+			}
+		}
 	}
 
 	return clone
@@ -1248,8 +1298,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 							}
 						}
 
-						if bootnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-							envOverrides["BOOTNODES"] = bootnodes
+						if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+							envOverrides["BOOTNODES"] = bnodes
 						} else {
 							bootnodesTxt, err := network.BootnodesTxt()
 							if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
@@ -1257,7 +1307,11 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 							}
 						}
 						if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
-							envOverrides["PEER_SET"] = envOverrides["BOOTNODES"]
+							if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+								envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
+							} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
+								envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
+							}
 						}
 
 						if chain, chainOk := networkCfg["chain"].(string); chainOk {
@@ -1266,6 +1320,9 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						overrides := map[string]interface{}{
 							"environment": envOverrides,
 						}
+						cfg["env"] = envOverrides
+						n.setConfig(cfg)
+						db.Save(n)
 
 						taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
 
@@ -1384,7 +1441,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 
 	Log.Debugf("Attempting to resolve peer url for network node: %s", n.ID.String())
 
-	ticker := time.NewTicker(resolvePeerUrlTickerInterval)
+	ticker := time.NewTicker(resolvePeerTickerInterval)
 	startedAt := time.Now()
 	var peerURL *string
 	for {
