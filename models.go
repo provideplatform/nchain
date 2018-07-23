@@ -31,7 +31,7 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
-var defaultNetworkNodeCloneConfigWhitelist = []string{"cloneable_cfg", "is_ethereum_network", "protocol_id", "engine_id", "chainspec_url"}
+var defaultNetworkNodeCloneConfigWhitelist = []string{"cloneable_cfg", "is_ethereum_network", "protocol_id", "engine_id", "target_id", "provider_id", "region", "chainspec_url"}
 var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
 
 const hostReachabilityTimeout = time.Minute * 5
@@ -1118,9 +1118,9 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	}
 
 	providerCfgByRegion, providerCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
-	if !providerCfgByRegionOk {
+	if !providerCfgByRegionOk && !regionOk {
 		n.updateStatus(db, "failed")
-		Log.Warningf("Failed to parse cloneable provider configuration by region for network node: %s", n.ID)
+		Log.Warningf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
 		return
 	}
 
