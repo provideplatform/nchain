@@ -895,7 +895,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 		Config:      n.cloneConfig(),
 	}
 
-	if (n.Bootnode && n.Status != nil && *n.Status == "genesis") || n.peerURL() == nil {
+	if n.Bootnode && n.Status != nil && *n.Status == "genesis" {
 		clone.Config = nil
 		clone.Status = stringOrNil("awaiting_peers")
 		clone.Create()
