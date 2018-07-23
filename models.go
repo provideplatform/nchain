@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -48,6 +49,8 @@ const securityGroupTerminationTickerTimeout = time.Minute * 10
 const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
+
+var networkGenesisMutex = map[string]*sync.Mutex{}
 
 // Network represents a blockchain network; the network could fall at any level of
 // a heirarchy of blockchain networks
@@ -857,6 +860,15 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 }
 
 func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*NetworkNode, error) {
+	mutex, mutexOk := networkGenesisMutex[pending.NetworkID.String()]
+	if !mutexOk {
+		mutex = &sync.Mutex{}
+		networkGenesisMutex[pending.NetworkID.String()] = mutex
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	count := n.BootnodesCount()
 	bootnodes := make([]*NetworkNode, 0)
 
