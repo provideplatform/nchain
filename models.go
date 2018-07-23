@@ -929,6 +929,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 						clone.updateStatus(db, "pending")
 						cloneCfg := clone.ParseConfig()
 						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = *peerURL
+						cloneCfg["env"].(map[string]interface{})["PEER_SET"] = strings.Replace(*peerURL, "enode://", "required:", -1)
 						delete(cloneCfg, "regions")
 						clone.setConfig(cloneCfg)
 
@@ -1248,8 +1249,6 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						}
 
 						if bootnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-							envOverrides["BOOTNODES"] = bootnodes
-						} else if bootnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
 							envOverrides["BOOTNODES"] = bootnodes
 						} else {
 							bootnodesTxt, err := network.BootnodesTxt()
