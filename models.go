@@ -552,7 +552,15 @@ func (n *Network) NodeCount() (count *uint64) {
 // and currently are listed with a status of 'running'; this method does not currently check real-time availability
 // of these peers-- it is assumed the are still available. FIXME?
 func (n *Network) AvailablePeerCount() (count uint64) {
-	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full')", n.ID).Count(&count)
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer')", n.ID).Count(&count)
+	return count
+}
+
+// FullNodeCount retrieves a count of platform-managed network nodes which also have the 'full'
+// and currently are listed with a status of 'running'; this method does not currently check real-time availability
+// of these peers-- it is assumed the are still available. FIXME?
+func (n *Network) FullNodeCount() (count uint64) {
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('full')", n.ID).Count(&count)
 	return count
 }
 
@@ -932,7 +940,7 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 
 			if daemon, daemonOk := currentNetworkStats[network.ID.String()]; daemonOk {
 				if daemon.stats != nil {
-					if daemon.stats.Block > 0 {
+					if daemon.stats.Block > 0 || *n.Role == "peer" || (*n.Role == "full" && network.FullNodeCount() == 0) {
 						n._deploy(network, bootnodes, db)
 						ticker.Stop()
 						return
