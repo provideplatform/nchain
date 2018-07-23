@@ -39,6 +39,8 @@ const hostReachabilityInterval = time.Millisecond * 2500
 const reachabilityTimeout = time.Millisecond * 2500
 const receiptTickerInterval = time.Millisecond * 2500
 const receiptTickerTimeout = time.Minute * 1
+const resolveGenesisTickerInterval = time.Millisecond * 10000
+const resolveGenesisTickerTimeout = time.Minute * 20
 const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
 const resolvePeerUrlTickerInterval = time.Millisecond * 5000
@@ -584,10 +586,10 @@ func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
 }
 
 // BootnodesCount returns a count of the number of bootnodes on the network
-func (n *Network) BootnodesCount() (count *uint64, err error) {
+func (n *Network) BootnodesCount() (count uint64) {
 	db := DatabaseConnection()
 	db.Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
-	return count, err
+	return count
 }
 
 // Nodes retrieves a list of network nodes
@@ -947,14 +949,10 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 }
 
 func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*NetworkNode, error) {
-	count, err := n.BootnodesCount()
-	if err != nil {
-		return nil, err
-	}
-
+	count := n.BootnodesCount()
 	bootnodes := make([]*NetworkNode, 0)
 
-	if count == nil || *count == 0 {
+	if count == 0 {
 		pending.Bootnode = true
 		pending.updateStatus(db, "genesis")
 		bootnodes = append(bootnodes, pending)
@@ -963,7 +961,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*Networ
 		return bootnodes, *err
 	}
 
-	bootnodes, err = n.Bootnodes()
+	bootnodes, err := n.Bootnodes()
 	Log.Debugf("Resolved %d initial bootnode(s) for network with id: %s", len(bootnodes), n.ID)
 
 	return bootnodes, err
@@ -986,9 +984,43 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 			return
 		}
 
-		bootnodes, _ := network.requireBootnodes(db, n) // error is of type bootnodesInitialized if the bootstrapping of network bootnodes is occuring for the first time
-		n._deploy(network, bootnodes, db)
+		bootnodes, err := network.requireBootnodes(db, n)
+		if err != nil {
+			switch err.(type) {
+			case bootnodesInitialized:
+				Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
+				n._deploy(network, bootnodes, db)
+			}
+		} else {
+			n.requireGenesis(network, bootnodes, db)
+		}
 	}()
+}
+
+func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode, db *gorm.DB) {
+	ticker := time.NewTicker(resolveGenesisTickerInterval)
+	startedAt := time.Now()
+	for {
+		select {
+		case <-ticker.C:
+			if time.Now().Sub(startedAt) >= resolveGenesisTickerTimeout {
+				Log.Warningf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTickerTimeout)
+				n.updateStatus(db, "failed")
+				ticker.Stop()
+				return
+			}
+
+			if daemon, daemonOk := currentNetworkStats[network.ID.String()]; daemonOk {
+				if daemon.stats != nil {
+					if daemon.stats.Block > 0 {
+						n._deploy(network, bootnodes, db)
+						ticker.Stop()
+						return
+					}
+				}
+			}
+		}
+	}
 }
 
 func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *gorm.DB) {
@@ -1095,67 +1127,67 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
 				n.updateStatus(db, "failed")
 				return
-			} else {
-				if egress, egressOk := securityCfg["egress"]; egressOk {
-					switch egress.(type) {
-					case string:
-						if egress.(string) == "*" {
-							_, err := AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
-							if err != nil {
-								Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+			}
+
+			if egress, egressOk := securityCfg["egress"]; egressOk {
+				switch egress.(type) {
+				case string:
+					if egress.(string) == "*" {
+						_, err := AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+						if err != nil {
+							Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+						}
+					}
+				case map[string]interface{}:
+					egressCfg := egress.(map[string]interface{})
+					for cidr := range egressCfg {
+						tcp := make([]int64, 0)
+						udp := make([]int64, 0)
+						if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+							for i := range _tcp {
+								tcp = append(tcp, int64(_tcp[i].(float64)))
 							}
 						}
-					case map[string]interface{}:
-						egressCfg := egress.(map[string]interface{})
-						for cidr := range egressCfg {
-							tcp := make([]int64, 0)
-							udp := make([]int64, 0)
-							if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-								for i := range _tcp {
-									tcp = append(tcp, int64(_tcp[i].(float64)))
-								}
+						if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+							for i := range _udp {
+								udp = append(udp, int64(_udp[i].(float64)))
 							}
-							if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-								for i := range _udp {
-									udp = append(udp, int64(_udp[i].(float64)))
-								}
-							}
-							_, err := AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
-							if err != nil {
-								Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-							}
+						}
+						_, err := AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						if err != nil {
+							Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
 					}
 				}
+			}
 
-				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-					switch ingress.(type) {
-					case string:
-						if ingress.(string) == "*" {
-							_, err := AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
-							if err != nil {
-								Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+			if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+				switch ingress.(type) {
+				case string:
+					if ingress.(string) == "*" {
+						_, err := AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+						if err != nil {
+							Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+						}
+					}
+				case map[string]interface{}:
+					ingressCfg := ingress.(map[string]interface{})
+					for cidr := range ingressCfg {
+						tcp := make([]int64, 0)
+						udp := make([]int64, 0)
+						if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+							for i := range _tcp {
+								tcp = append(tcp, int64(_tcp[i].(float64)))
 							}
 						}
-					case map[string]interface{}:
-						ingressCfg := ingress.(map[string]interface{})
-						for cidr := range ingressCfg {
-							tcp := make([]int64, 0)
-							udp := make([]int64, 0)
-							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-								for i := range _tcp {
-									tcp = append(tcp, int64(_tcp[i].(float64)))
-								}
+						if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+							for i := range _udp {
+								udp = append(udp, int64(_udp[i].(float64)))
 							}
-							if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-								for i := range _udp {
-									udp = append(udp, int64(_udp[i].(float64)))
-								}
-							}
-							_, err := AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
-							if err != nil {
-								Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-							}
+						}
+						_, err := AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						if err != nil {
+							Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
 					}
 				}
