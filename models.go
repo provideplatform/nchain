@@ -42,7 +42,7 @@ const receiptTickerTimeout = time.Minute * 1
 const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
 const resolvePeerUrlTickerInterval = time.Millisecond * 5000
-const resolvePeerTickerTimeout = time.Minute * 5
+const resolvePeerTickerTimeout = time.Minute * 10
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
