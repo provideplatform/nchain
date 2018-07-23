@@ -31,7 +31,7 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
-var defaultNetworkNodeCloneConfigWhitelist = []string{"credentials", "default_json_rpc_port", "default_websocket_port", "rc.d", "env", "protocol_id", "engine_id", "target_id", "provider_id", "role", "region"}
+var defaultNetworkNodeCloneConfigWhitelist = []string{"credentials", "rc.d", "env", "protocol_id", "engine_id", "target_id", "provider_id", "role", "region"}
 var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
 
 const hostReachabilityTimeout = time.Minute * 5
@@ -894,7 +894,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 		Config:      n.cloneConfig(),
 	}
 
-	if n.Bootnode && n.Status != nil && *n.Status == "genesis" {
+	if (n.Bootnode && n.Status != nil && *n.Status == "genesis") || n.peerURL() == nil {
 		clone.Config = nil
 		clone.Status = stringOrNil("awaiting_peers")
 		clone.Create()
@@ -942,58 +942,7 @@ func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode 
 			}
 		}
 	} else {
-		bootnodes, err := network.Bootnodes()
-		if err == nil {
-			genesisBootnode := bootnodes[0]
-			if len(bootnodes) == 1 && genesisBootnode.peerURL() == nil {
-				clone.Config = nil
-				clone.Status = stringOrNil("awaiting_peers")
-				clone.Create()
-
-				ticker := time.NewTicker(resolvePeerTickerInterval)
-				startedAt := time.Now()
-				var peerURL *string
-				for peerURL == nil {
-					select {
-					case <-ticker.C:
-						if peerURL == nil {
-							if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
-								Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", genesisBootnode.ID.String(), resolvePeerTickerTimeout)
-								ticker.Stop()
-								break
-							}
-
-							genesisBootnode.Reload()
-							peerURL = genesisBootnode.peerURL()
-							if peerURL == nil {
-								Log.Debugf("Genesis bootnode has not yet resolved peer information; network node id: %s", genesisBootnode.ID.String())
-							} else {
-								Log.Debugf("Genesis bootnode resolved peer information; network node id: %s; peer: %s", genesisBootnode.ID.String(), *peerURL)
-
-								cfg := genesisBootnode.ParseConfig()
-								cfg["peer_url"] = *peerURL
-
-								db := DatabaseConnection()
-								clone.setConfig(cfg)
-								clone.updateStatus(db, "pending")
-								cloneCfg := clone.ParseConfig()
-								cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = *peerURL
-								cloneCfg["env"].(map[string]interface{})["PEER_SET"] = strings.Replace(strings.Replace(*peerURL, "enode://", "required:", -1), ",", " ", -1)
-								delete(cloneCfg, "regions")
-								clone.setConfig(cloneCfg)
-
-								clone.deploy(db)
-
-								ticker.Stop()
-								break
-							}
-						}
-					}
-				}
-			} else {
-				clone.Create()
-			}
-		}
+		clone.Create()
 	}
 
 	return clone
