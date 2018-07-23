@@ -31,7 +31,7 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
-var defaultNetworkNodeCloneConfigWhitelist = []string{"cloneable_cfg", "credentials", "default_json_rpc_port", "default_websocket_port", "rc.d", "env", "is_ethereum_network", "protocol_id", "engine_id", "target_id", "provider_id", "role", "region", "chainspec_url"}
+var defaultNetworkNodeCloneConfigWhitelist = []string{"credentials", "default_json_rpc_port", "default_websocket_port", "rc.d", "env", "protocol_id", "engine_id", "target_id", "provider_id", "role", "region"}
 var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
 
 const hostReachabilityTimeout = time.Minute * 5
