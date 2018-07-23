@@ -1249,6 +1249,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 
 						if bootnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
 							envOverrides["BOOTNODES"] = bootnodes
+						} else if bootnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
+							envOverrides["BOOTNODES"] = bootnodes
 						} else {
 							bootnodesTxt, err := network.BootnodesTxt()
 							if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
