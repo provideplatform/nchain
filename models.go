@@ -1105,7 +1105,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
 							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
 							instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
-							if err != nil {
+							if err != nil || len(instanceIds) == 0 {
 								n.updateStatus(db, "failed")
 								n.unregisterSecurityGroups()
 								Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
@@ -1166,7 +1166,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 
 						taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
 
-						if err != nil {
+						if err != nil || len(taskIds) == 0 {
 							n.updateStatus(db, "failed")
 							n.unregisterSecurityGroups()
 							Log.Warningf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())
