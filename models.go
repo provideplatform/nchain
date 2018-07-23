@@ -31,9 +31,6 @@ import (
 	"github.com/kthomas/go.uuid"
 )
 
-var defaultNetworkNodeCloneConfigWhitelist = []string{"credentials", "rc.d", "env", "protocol_id", "engine_id", "target_id", "provider_id", "role", "region"}
-var defaultNetworkNodeConfigMarshalingBlacklist = []string{"credentials"}
-
 const hostReachabilityTimeout = time.Minute * 5
 const hostReachabilityInterval = time.Millisecond * 2500
 const reachabilityTimeout = time.Millisecond * 2500
@@ -44,7 +41,7 @@ const resolveGenesisTickerTimeout = time.Minute * 20
 const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
 const resolvePeerTickerInterval = time.Millisecond * 5000
-const resolvePeerTickerTimeout = time.Minute * 10
+const resolvePeerTickerTimeout = time.Minute * 20
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
@@ -769,17 +766,6 @@ func (n *NetworkNode) Validate() bool {
 	// 		Message: stringOrNil("Failed to parse role in network node configuration"),
 	// 	})
 	// }
-	// if _, regionOk := cfg["region"].(string); regionOk {
-	// 	if _, regionsOk := cfg["regions"].(map[string]interface{}); regionsOk {
-	// 		n.Errors = append(n.Errors, &gocore.Error{
-	// 			Message: stringOrNil("Parsed both region and regions in network node configuration; specify only one of region or regions"),
-	// 		})
-	// 	}
-	// } else if _, regionsOk := cfg["regions"].(map[string]interface{}); !regionsOk {
-	// 	n.Errors = append(n.Errors, &gocore.Error{
-	// 		Message: stringOrNil("Failed to parse region or regions in network node configuration; specify one of region or regions"),
-	// 	})
-	// }
 
 	return len(n.Errors) == 0
 }
@@ -868,84 +854,6 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 	}
 
 	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
-}
-
-// cloneConfig returns a new config object in memory, derived from a
-// calling prototype node
-func (n *NetworkNode) cloneConfig() *json.RawMessage {
-	prototypeCfg := n.ParseConfig()
-	clonedCfg := map[string]interface{}{}
-	for i := range defaultNetworkNodeCloneConfigWhitelist {
-		key := defaultNetworkNodeCloneConfigWhitelist[i]
-		clonedCfg[key] = prototypeCfg[key]
-	}
-	cfgJSON, _ := json.Marshal(clonedCfg)
-	msg := json.RawMessage(cfgJSON)
-	return &msg
-}
-
-// clone a network node given its configuration; does not inherit 'bootnode' property from cloned node
-func (n *NetworkNode) clone(network *Network, cfg json.RawMessage) *NetworkNode {
-	clone := &NetworkNode{
-		NetworkID:   n.NetworkID,
-		UserID:      n.UserID,
-		Description: n.Description,
-		Status:      n.Status,
-		Config:      n.cloneConfig(),
-	}
-
-	if (n.Bootnode && n.Status != nil && *n.Status == "genesis") || n.peerURL() == nil {
-		clone.Config = nil
-		clone.Status = stringOrNil("awaiting_peers")
-		clone.Create()
-
-		Log.Debugf("Initial bootnodes initializing for network with id: %s", n.ID)
-		ticker := time.NewTicker(resolvePeerTickerInterval)
-		startedAt := time.Now()
-		var peerURL *string
-		for peerURL == nil {
-			select {
-			case <-ticker.C:
-				if peerURL == nil {
-					if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
-						Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", n.ID.String(), resolvePeerTickerTimeout)
-						ticker.Stop()
-						break
-					}
-
-					n.Reload()
-					peerURL = n.peerURL()
-					if peerURL == nil {
-						Log.Debugf("Genesis bootnode has not yet resolved peer information; network node id: %s", n.ID.String())
-					} else {
-						Log.Debugf("Genesis bootnode resolved peer information; network node id: %s; peer: %s", n.ID.String(), *peerURL)
-
-						cfg := n.ParseConfig()
-						cfg["peer_url"] = *peerURL
-
-						db := DatabaseConnection()
-						clone.setConfig(cfg)
-						clone.updateStatus(db, "pending")
-						cloneCfg := clone.ParseConfig()
-						cloneCfg["env"].(map[string]interface{})["BOOTNODES"] = *peerURL
-						cloneCfg["env"].(map[string]interface{})["PEER_SET"] = strings.Replace(strings.Replace(*peerURL, "enode://", "required:", -1), ",", " ", -1)
-						delete(cloneCfg, "regions")
-						clone.setConfig(cloneCfg)
-
-						n.setConfig(cfg)
-						clone.deploy(db)
-
-						ticker.Stop()
-						break
-					}
-				}
-			}
-		}
-	} else {
-		clone.Create()
-	}
-
-	return clone
 }
 
 func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*NetworkNode, error) {
@@ -1071,35 +979,6 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 		n.updateStatus(db, "failed")
 		Log.Warningf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
 		return
-	}
-
-	regions, regionsOk := cfg["regions"].(map[string]interface{})
-	if regionsOk && !regionOk {
-		delete(cfg, "regions")
-		Log.Debugf("Handling multi-region deployment request for network node: %s", n.ID)
-		accountedForInitialDeploy := false
-		for _region := range regions {
-			deployCount, deployCountOk := regions[_region]
-			if deployCountOk && deployCount.(float64) > 0 {
-				Log.Debugf("Multi-region deployment request specified %v instances in %s region for network node: %s", deployCount, _region, n.ID)
-				for i := float64(0); i < deployCount.(float64); i++ {
-					if !accountedForInitialDeploy {
-						region = _region
-						regionOk = true
-						accountedForInitialDeploy = true
-						continue
-					}
-
-					_cfg := map[string]interface{}{}
-					for key, val := range cfg {
-						_cfg[key] = val
-					}
-					_cfg["region"] = _region
-					_cfgJSON, _ := json.Marshal(_cfg)
-					go n.clone(network, json.RawMessage(_cfgJSON))
-				}
-			}
-		}
 	}
 
 	Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable provider cfg: %s; network config: %s",
