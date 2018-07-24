@@ -447,14 +447,14 @@ func contractsListHandler(c *gin.Context) {
 		query = query.Joins("LEFT OUTER JOIN tokens ON tokens.contract_id = contracts.id").Where("symbol IS NULL")
 	}
 
-	var contracts []Contract
-
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
 		query = query.Order("contracts.accessed_at DESC NULLS LAST")
 	} else {
 		query = query.Order("contracts.created_at ASC")
 	}
+
+	var contracts []Contract
 	query.Find(&contracts)
 	render(contracts, 200, c)
 }
