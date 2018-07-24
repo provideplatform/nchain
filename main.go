@@ -274,7 +274,7 @@ func networkNodesListHandler(c *gin.Context) {
 	query := DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.user_id = ?", c.Param("id"), userID)
 
 	var nodes []NetworkNode
-	query.Order("created_at ASC").Find(&nodes)
+	query.Order("network_nodes.created_at ASC").Find(&nodes)
 	render(nodes, 200, c)
 }
 
@@ -448,7 +448,14 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	query.Order("contracts.created_at ASC").Find(&contracts)
+
+	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
+	if sortByMostRecent {
+		query = query.Order("contracts.accessed_at DESC")
+	} else {
+		query = query.Order("contracts.created_at ASC")
+	}
+	query.Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -680,8 +687,17 @@ func tokensListHandler(c *gin.Context) {
 		return
 	}
 
+	query := DatabaseConnection().Where("tokens.application_id = ?", appID)
+
+	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
+	if sortByMostRecent {
+		query = query.Order("tokens.accessed_at DESC")
+	} else {
+		query = query.Order("tokens.created_at ASC")
+	}
+
 	var tokens []Token
-	DatabaseConnection().Where("application_id = ?", appID).Order("created_at ASC").Find(&tokens)
+	query.Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -833,6 +849,13 @@ func walletsListHandler(c *gin.Context) {
 		query = query.Where("wallets.application_id = ?", appID).Find(&wallets)
 	} else if userID != nil {
 		query = query.Where("wallets.user_id = ?", userID).Find(&wallets)
+	}
+
+	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
+	if sortByMostRecent {
+		query = query.Order("wallets.accessed_at DESC")
+	} else {
+		query = query.Order("wallets.created_at DESC")
 	}
 
 	render(wallets, 200, c)

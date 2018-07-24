@@ -1685,6 +1685,12 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 		tx.Response.Transaction = tx
 	}
 
+	accessedAt := time.Now()
+	go func() {
+		c.AccessedAt = &accessedAt
+		db.Save(c)
+	}()
+
 	return tx.Response, nil
 }
 
@@ -1959,6 +1965,12 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 		})
 		t.updateStatus(db, "failed")
 	}
+
+	accessedAt := time.Now()
+	go func() {
+		wallet.AccessedAt = &accessedAt
+		db.Save(wallet)
+	}()
 
 	return err
 }
