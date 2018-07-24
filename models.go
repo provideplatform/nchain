@@ -101,6 +101,7 @@ type Contract struct {
 	Name          *string          `sql:"not null" json:"name"`
 	Address       *string          `sql:"not null" json:"address"`
 	Params        *json.RawMessage `sql:"type:json" json:"params"`
+	AccessedAt    *time.Time       `json:"accessed_at"`
 }
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
@@ -145,6 +146,7 @@ type Token struct {
 	Decimals       uint64     `sql:"not null" json:"decimals"`
 	Address        *string    `sql:"not null" json:"address"` // network-specific token contract address
 	SaleAddress    *string    `json:"sale_address"`           // non-null if token sale contract is specified
+	AccessedAt     *time.Time `json:"accessed_at"`
 }
 
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
@@ -174,6 +176,7 @@ type Wallet struct {
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 	Balance       *big.Int   `sql:"-" json:"balance"`
+	AccessedAt    *time.Time `json:"accessed_at"`
 }
 
 type TxValue struct {

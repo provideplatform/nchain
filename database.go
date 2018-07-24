@@ -40,6 +40,7 @@ func migrateSchema() {
 		db.AutoMigrate(&Wallet{})
 		db.Model(&Wallet{}).AddIndex("idx_wallets_application_id", "application_id")
 		db.Model(&Wallet{}).AddIndex("idx_wallets_user_id", "user_id")
+		db.Model(&Contract{}).AddIndex("idx_wallets_accessed_at", "accessed_at")
 		db.Model(&Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Transaction{})
@@ -52,6 +53,7 @@ func migrateSchema() {
 
 		db.AutoMigrate(&Contract{})
 		db.Model(&Contract{}).AddIndex("idx_contracts_application_id", "application_id")
+		db.Model(&Contract{}).AddIndex("idx_contracts_accessed_at", "accessed_at")
 		db.Model(&Contract{}).AddIndex("idx_contracts_address", "address")
 		db.Model(&Contract{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Contract{}).AddForeignKey("transaction_id", "transactions(id)", "SET NULL", "CASCADE")
@@ -63,6 +65,7 @@ func migrateSchema() {
 
 		db.AutoMigrate(&Token{})
 		db.Model(&Token{}).AddIndex("idx_tokens_application_id", "application_id")
+		db.Model(&Token{}).AddIndex("idx_tokens_accessed_at", "accessed_at")
 		db.Model(&Token{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Token{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
 		db.Model(&Token{}).AddForeignKey("sale_contract_id", "contracts(id)", "SET NULL", "CASCADE")
