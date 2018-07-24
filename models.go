@@ -1504,6 +1504,15 @@ func (c *Contract) ParseParams() map[string]interface{} {
 // Execute an ethereum contract; returns the tx receipt and retvals; if the method is constant, the receipt will be nil.
 // If the methid is non-constant, the retvals will be nil.
 func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, method string, params []interface{}) (*interface{}, *interface{}, error) { // given tx has been built but broadcast has not yet been attempted
+	defer func() {
+		go func() {
+			accessedAt := time.Now()
+			c.AccessedAt = &accessedAt
+			db := DatabaseConnection()
+			db.Save(c)
+		}()
+	}()
+
 	var err error
 	_abi, err := c.readEthereumContractAbi()
 	if err != nil {
@@ -1667,6 +1676,12 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 		err = fmt.Errorf("unsupported network: %s", *network.Name)
 	}
 
+	accessedAt := time.Now()
+	go func() {
+		c.AccessedAt = &accessedAt
+		db.Save(c)
+	}()
+
 	if err != nil {
 		tx.updateStatus(db, "failed")
 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
@@ -1684,12 +1699,6 @@ func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, p
 	} else if tx.Response.Transaction == nil {
 		tx.Response.Transaction = tx
 	}
-
-	accessedAt := time.Now()
-	go func() {
-		c.AccessedAt = &accessedAt
-		db.Save(c)
-	}()
 
 	return tx.Response, nil
 }
