@@ -451,7 +451,7 @@ func contractsListHandler(c *gin.Context) {
 
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
-		query = query.Order("contracts.accessed_at DESC")
+		query = query.Order("contracts.accessed_at DESC NULLS LAST")
 	} else {
 		query = query.Order("contracts.created_at ASC")
 	}
@@ -691,7 +691,7 @@ func tokensListHandler(c *gin.Context) {
 
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
-		query = query.Order("tokens.accessed_at DESC")
+		query = query.Order("tokens.accessed_at DESC NULLS LAST")
 	} else {
 		query = query.Order("tokens.created_at ASC")
 	}
@@ -853,7 +853,7 @@ func walletsListHandler(c *gin.Context) {
 
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
-		query = query.Order("wallets.accessed_at DESC")
+		query = query.Order("wallets.accessed_at DESC NULLS LAST")
 	} else {
 		query = query.Order("wallets.created_at DESC")
 	}
