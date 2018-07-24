@@ -844,11 +844,10 @@ func walletsListHandler(c *gin.Context) {
 		query = query.Where("wallets.network_id = ?", c.Query("network_id"))
 	}
 
-	var wallets []Wallet
 	if appID != nil {
-		query = query.Where("wallets.application_id = ?", appID).Find(&wallets)
+		query = query.Where("wallets.application_id = ?", appID)
 	} else if userID != nil {
-		query = query.Where("wallets.user_id = ?", userID).Find(&wallets)
+		query = query.Where("wallets.user_id = ?", userID)
 	}
 
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
@@ -858,6 +857,8 @@ func walletsListHandler(c *gin.Context) {
 		query = query.Order("wallets.created_at DESC")
 	}
 
+	var wallets []Wallet
+	query.Find(&wallets)
 	render(wallets, 200, c)
 }
 
