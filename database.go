@@ -40,7 +40,7 @@ func migrateSchema() {
 		db.AutoMigrate(&Wallet{})
 		db.Model(&Wallet{}).AddIndex("idx_wallets_application_id", "application_id")
 		db.Model(&Wallet{}).AddIndex("idx_wallets_user_id", "user_id")
-		db.Model(&Contract{}).AddIndex("idx_wallets_accessed_at", "accessed_at")
+		db.Model(&Wallet{}).AddIndex("idx_wallets_accessed_at", "accessed_at")
 		db.Model(&Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Transaction{})
