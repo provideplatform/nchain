@@ -311,7 +311,7 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 		Log.Debugf("Attempting to resolve and balance JSON-RPC and websocket urls for ethereum network with id: %s", n.ID)
 
 		var node = &NetworkNode{}
-		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full')", n.ID).First(&node)
+		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator')", n.ID).First(&node)
 
 		if node != nil && node.ID != uuid.Nil {
 			if isLoadBalanced {
@@ -555,7 +555,7 @@ func (n *Network) NodeCount() (count *uint64) {
 // and currently are listed with a status of 'running'; this method does not currently check real-time availability
 // of these peers-- it is assumed the are still available. FIXME?
 func (n *Network) AvailablePeerCount() (count uint64) {
-	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full')", n.ID).Count(&count)
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full', 'validator')", n.ID).Count(&count)
 	return count
 }
 
@@ -1278,7 +1278,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 
 func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) {
 	role, roleOk := cfg["role"].(string)
-	if !roleOk || role != "peer" && role != "full" {
+	if !roleOk || role != "peer" && role != "full" && role != "validator" {
 		return
 	}
 
@@ -1351,7 +1351,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 
 				role, roleOk := cfg["role"].(string)
 				if roleOk {
-					if role == "peer" || role == "full" {
+					if role == "peer" || role == "full" || role == "validator" {
 						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 					}
 				}
@@ -1439,7 +1439,7 @@ func (n *NetworkNode) undeploy() error {
 		if roleOk {
 			network := n.relatedNetwork()
 
-			if role == "peer" || role == "full" {
+			if role == "peer" || role == "full" || role == "validator" {
 				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 			} else if role == "explorer" {
 				go network.resolveAndBalanceExplorerUrls(db, n)
