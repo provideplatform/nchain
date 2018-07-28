@@ -912,6 +912,29 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 			switch err.(type) {
 			case bootnodesInitialized:
 				Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
+				cfg := n.ParseConfig()
+				if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
+					if strings.ToLower(protocol) == "poa" {
+						if env, envOk := cfg["env"].(map[string]interface{}); envOk {
+							if _, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); !masterOfCeremonyOk {
+								addr, privateKey, err := provide.GenerateKeyPair()
+								if err == nil {
+									keystoreJSON, err := provide.MarshalEncryptedKey(common.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+									if err == nil {
+										Log.Debugf("Generated master of ceremony: %s for network: %s", addr, *network.Name)
+										env["ENGINE_SIGNER"] = addr
+										env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+										env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
+									} else {
+										Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
+									}
+								} else {
+									Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
+								}
+							}
+						}
+					}
+				}
 				n._deploy(network, bootnodes, db)
 			}
 		} else {
