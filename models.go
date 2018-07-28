@@ -925,6 +925,8 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 										env["ENGINE_SIGNER"] = addr
 										env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
 										env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
+
+										n.setConfig(cfg)
 									} else {
 										Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
 									}
