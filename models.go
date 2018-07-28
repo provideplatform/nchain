@@ -1623,6 +1623,9 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				err = abiMethod.Outputs.Unpack(&vals, result)
 				out = vals
 				Log.Debugf("Unpacked %v returned values from read of constant %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
+				if vals != nil && len(vals) == abiMethod.Outputs.LengthNonIndexed() {
+					err = nil
+				}
 			}
 			if err != nil {
 				return nil, nil, fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
