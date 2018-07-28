@@ -330,7 +330,7 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 				}
 
 				if reachable, port := node.reachableViaWebsocket(); reachable {
-					cfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *node.Host, port)
+					cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *node.Host, port)
 				} else {
 					cfg["websocket_url"] = nil
 				}
@@ -1333,6 +1333,16 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 													ticker.Stop()
 													break
 												}
+											}
+										} else if err != nil {
+											enodeIndex := strings.LastIndex(msg, "enode://")
+											if enodeIndex != -1 {
+												enode := msg[enodeIndex:]
+												peerURL = stringOrNil(enode)
+												// FIXME? do we need this? cfg["peer"] = result
+												cfg["peer_url"] = enode
+												ticker.Stop()
+												break
 											}
 										}
 									}
