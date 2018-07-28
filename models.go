@@ -927,6 +927,32 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 										env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
 
 										n.setConfig(cfg)
+
+										networkCfg := network.ParseConfig()
+										if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
+											if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
+												nonSystemAccounts := make([]string, 0)
+												for account := range accounts {
+													if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
+														nonSystemAccounts = append(nonSystemAccounts, account)
+													}
+												}
+												if len(nonSystemAccounts) == 1 {
+													templateMasterOfCeremony := nonSystemAccounts[0]
+													chainspecJSON, err := json.Marshal(chainspec)
+													if err == nil {
+														chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
+														var newChainspec map[string]interface{}
+														err = json.Unmarshal(chainspecJSON, &newChainspec)
+														if err == nil {
+															networkCfg["chainspec"] = newChainspec
+															network.setConfig(networkCfg)
+															db.Save(network)
+														}
+													}
+												}
+											}
+										}
 									} else {
 										Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
 									}
