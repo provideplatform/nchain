@@ -916,45 +916,62 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 				if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
 					if strings.ToLower(protocol) == "poa" {
 						if env, envOk := cfg["env"].(map[string]interface{}); envOk {
-							if _, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); !masterOfCeremonyOk {
-								addr, privateKey, err := provide.GenerateKeyPair()
-								if err == nil {
-									keystoreJSON, err := provide.MarshalEncryptedKey(common.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+							var addr *string
+							var privateKey *ecdsa.PrivateKey
+							_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
+							if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
+								addr = stringOrNil(masterOfCeremony)
+
+								wallet := &Wallet{}
+								DatabaseConnection().Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Find(&wallet)
+								if wallet == nil || wallet.ID == uuid.Nil {
+									Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
+									addr, privateKey, err = provide.GenerateKeyPair()
+								} else {
+									privateKey, err = decryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 									if err == nil {
-										Log.Debugf("Generated master of ceremony: %s for network: %s", addr, *network.Name)
-										env["ENGINE_SIGNER"] = addr
-										env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-										env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
+										Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
+									}
+								}
+							} else if !masterOfCeremonyPrivateKeyOk {
+								Log.Debugf("Generating managed master of ceremony signing identity for network: %s", *network.Name)
+								addr, privateKey, err = provide.GenerateKeyPair()
+							}
 
-										n.setConfig(cfg)
+							if addr != nil && privateKey != nil {
+								keystoreJSON, err := provide.MarshalEncryptedKey(common.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+								if err == nil {
+									Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", addr, *network.Name)
+									env["ENGINE_SIGNER"] = addr
+									env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+									env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
 
-										networkCfg := network.ParseConfig()
-										if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
-											if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
-												nonSystemAccounts := make([]string, 0)
-												for account := range accounts {
-													if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
-														nonSystemAccounts = append(nonSystemAccounts, account)
-													}
+									n.setConfig(cfg)
+
+									networkCfg := network.ParseConfig()
+									if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
+										if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
+											nonSystemAccounts := make([]string, 0)
+											for account := range accounts {
+												if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
+													nonSystemAccounts = append(nonSystemAccounts, account)
 												}
-												if len(nonSystemAccounts) == 1 {
-													templateMasterOfCeremony := nonSystemAccounts[0]
-													chainspecJSON, err := json.Marshal(chainspec)
+											}
+											if len(nonSystemAccounts) == 1 {
+												templateMasterOfCeremony := nonSystemAccounts[0]
+												chainspecJSON, err := json.Marshal(chainspec)
+												if err == nil {
+													chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
+													var newChainspec map[string]interface{}
+													err = json.Unmarshal(chainspecJSON, &newChainspec)
 													if err == nil {
-														chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
-														var newChainspec map[string]interface{}
-														err = json.Unmarshal(chainspecJSON, &newChainspec)
-														if err == nil {
-															networkCfg["chainspec"] = newChainspec
-															network.setConfig(networkCfg)
-															db.Save(network)
-														}
+														networkCfg["chainspec"] = newChainspec
+														network.setConfig(networkCfg)
+														db.Save(network)
 													}
 												}
 											}
 										}
-									} else {
-										Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
 									}
 								} else {
 									Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
