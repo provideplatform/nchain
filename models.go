@@ -2040,7 +2040,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 		if wallet.PrivateKey != nil {
 			privateKey, _ := decryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-			t.SignedTx, t.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt())
+			t.SignedTx, t.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), 0)
 		} else {
 			err = fmt.Errorf("Unable to sign tx; no private key for wallet: %s", wallet.ID)
 		}
