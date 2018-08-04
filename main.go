@@ -41,6 +41,10 @@ func main() {
 
 	r.GET("/api/v1/prices", pricesHandler)
 
+	r.GET("/api/v1/connectors", connectorsListHandler)
+	r.POST("/api/v1/connectors", createConnectorHandler)
+	r.GET("/api/v1/connectors/:id", connectorDetailsHandler)
+
 	r.GET("/api/v1/contracts", contractsListHandler)
 	r.GET("/api/v1/contracts/:id", contractDetailsHandler)
 	r.POST("/api/v1/contracts", createContractHandler)
@@ -421,6 +425,56 @@ func networkTransactionsHandler(c *gin.Context) {
 
 func pricesHandler(c *gin.Context) {
 	render(CurrentPrices, 200, c)
+}
+
+// connectors
+
+func connectorsListHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	query := DatabaseConnection().Where("connectors.application_id = ?", appID)
+
+	var connectors []Connector
+	query.Order("created_at ASC").Find(&connectors)
+	render(connectors, 200, c)
+}
+
+func connectorDetailsHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func createConnectorHandler(c *gin.Context) {
+	appID := authorizedSubjectId(c, "application")
+	if appID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		renderError(err.Error(), 400, c)
+		return
+	}
+
+	connector := &Connector{}
+	err = json.Unmarshal(buf, connector)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	connector.ApplicationID = appID
+
+	if connector.Create() {
+		render(connector, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = connector.Errors
+		render(obj, 422, c)
+	}
 }
 
 // contracts
