@@ -99,6 +99,7 @@ type Connector struct {
 	ApplicationID *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	Name          *string          `sql:"not null" json:"name"`
+	Type          *string          `sql:"not null" json:"type"`
 	Config        *json.RawMessage `sql:"type:json" json:"config"`
 	AccessedAt    *time.Time       `json:"accessed_at"`
 }
@@ -1742,6 +1743,11 @@ func (c *Connector) Validate() bool {
 	if c.NetworkID == uuid.Nil {
 		c.Errors = append(c.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to deploy connector using unspecified network"),
+		})
+	}
+	if c.Type == nil || strings.ToLower(*c.Type) != "ipfs" {
+		c.Errors = append(c.Errors, &gocore.Error{
+			Message: stringOrNil("Unable to define connector of invalid type"),
 		})
 	}
 	return len(c.Errors) == 0
