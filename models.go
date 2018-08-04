@@ -1753,6 +1753,21 @@ func (c *Connector) Validate() bool {
 	return len(c.Errors) == 0
 }
 
+// Delete a connector
+func (c *Connector) Delete() bool {
+	db := DatabaseConnection()
+	result := db.Delete(c)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			c.Errors = append(c.Errors, &gocore.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
+	return len(c.Errors) == 0
+}
+
 func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
 	var _abi *abi.ABI
 	params := c.ParseParams()
