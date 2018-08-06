@@ -28,16 +28,21 @@ func main() {
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)
 	r.PUT("/api/v1/networks/:id", updateNetworkHandler)
 	r.POST("/api/v1/networks", createNetworkHandler)
-	r.GET("/api/v1/networks/:id/addresses", networkAddressesHandler)
-	r.GET("/api/v1/networks/:id/blocks", networkBlocksHandler)
-	r.GET("/api/v1/networks/:id/contracts", networkContractsHandler)
+	r.GET("/api/v1/networks/:id/addresses", networkAddressesListHandler)
+	r.GET("/api/v1/networks/:id/blocks", networkBlocksListHandler)
+	r.GET("/api/v1/networks/:id/bridges", networkBridgesListHandler)
+	r.GET("/api/v1/networks/:id/connectors", networkConnectorsListHandler)
+	r.GET("/api/v1/networks/:id/contracts", networkContractsListHandler)
+	r.GET("/api/v1/networks/:id/contracts/:contractId", networkContractDetailsHandler)
 	r.GET("/api/v1/networks/:id/nodes", networkNodesListHandler)
 	r.POST("/api/v1/networks/:id/nodes", createNetworkNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId", networkNodeDetailsHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", networkNodeLogsHandler)
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNetworkNodeHandler)
+	r.GET("/api/v1/networks/:id/oracles", networkOraclesListHandler)
 	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
-	r.GET("/api/v1/networks/:id/transactions", networkTransactionsHandler)
+	r.GET("/api/v1/networks/:id/tokens", networkTokensListHandler)
+	r.GET("/api/v1/networks/:id/transactions", networkTransactionsListHandler)
 
 	r.GET("/api/v1/prices", pricesHandler)
 
@@ -257,16 +262,77 @@ func networkDetailsHandler(c *gin.Context) {
 	render(network, 200, c)
 }
 
-func networkAddressesHandler(c *gin.Context) {
+func networkAddressesListHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
-func networkBlocksHandler(c *gin.Context) {
+func networkBlocksListHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
 }
 
-func networkContractsHandler(c *gin.Context) {
+func networkBridgesListHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
+}
+
+func networkConnectorsListHandler(c *gin.Context) {
+	renderError("not implemented", 501, c)
+}
+
+func networkContractsListHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	query := ContractListQuery()
+	query = query.Where("contracts.network_id = ? AND contracts.application_id IS NULL", c.Param("id"))
+
+	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
+	if filterTokens {
+		query = query.Joins("LEFT OUTER JOIN tokens ON tokens.contract_id = contracts.id").Where("symbol IS NULL")
+	}
+
+	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
+	if sortByMostRecent {
+		query = query.Order("contracts.accessed_at DESC NULLS LAST")
+	} else {
+		query = query.Order("contracts.created_at ASC")
+	}
+
+	var contracts []Contract
+	query.Order("contracts.created_at ASC").Find(&contracts)
+	render(contracts, 200, c)
+}
+
+// FIXME-- DRY this up
+func networkContractDetailsHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	db := DatabaseConnection()
+	var contract = &Contract{}
+
+	query := db.Where("contracts.network_id = ? AND contracts.id = ?", c.Param("id"), c.Param("contractId"))
+	if userID != nil {
+		query = query.Where("contracts.application_id IS NULL")
+	}
+
+	query.Find(&contract)
+
+	if contract == nil || contract.ID == uuid.Nil { // attempt to lookup the contract by address
+		db.Where("contracts.network_id = ? AND contracts.address = ?", c.Param("id"), c.Param("contractId")).Find(&contract)
+	}
+
+	if contract == nil || contract.ID == uuid.Nil {
+		renderError("contract not found", 404, c)
+		return
+	}
+
+	render(contract, 200, c)
 }
 
 func networkNodesListHandler(c *gin.Context) {
@@ -418,8 +484,52 @@ func networkStatusHandler(c *gin.Context) {
 	render(status, 200, c)
 }
 
-func networkTransactionsHandler(c *gin.Context) {
+func networkOraclesListHandler(c *gin.Context) {
 	renderError("not implemented", 501, c)
+}
+
+func networkTokensListHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	query := DatabaseConnection().Where("tokens.network_id = ?", c.Param("id"))
+
+	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
+	if sortByMostRecent {
+		query = query.Order("tokens.accessed_at DESC NULLS LAST")
+	} else {
+		query = query.Order("tokens.created_at ASC")
+	}
+
+	var tokens []Token
+	query.Find(&tokens)
+	render(tokens, 200, c)
+}
+
+func networkTransactionsListHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	query := DatabaseConnection().Where("transactions.network_id = ? AND transactions.application_id IS NULL", c.Param("id"))
+
+	filterContractCreationTx := strings.ToLower(c.Query("filter_contract_creations")) == "true"
+	if filterContractCreationTx {
+		query = query.Where("transactions.to IS NULL")
+	}
+
+	if c.Query("status") != "" {
+		query = query.Where("transactions.status IN ?", strings.Split(c.Query("status"), ","))
+	}
+
+	var txs []Transaction
+	query.Order("created_at DESC").Find(&txs)
+	render(txs, 200, c)
 }
 
 // prices
@@ -518,7 +628,7 @@ func contractsListHandler(c *gin.Context) {
 		query = query.Where("contracts.application_id = ?", appID)
 	}
 	if userID != nil {
-		query = query.Where("contracts.user_id = ? OR contracts.application_id IS NULL AND contracts.user_id IS NULL", userID)
+		query = query.Where("contracts.application_id IS NULL")
 	}
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
@@ -554,7 +664,7 @@ func contractDetailsHandler(c *gin.Context) {
 		query = query.Where("contracts.application_id = ?", appID)
 	}
 	if userID != nil {
-		query = query.Where("contracts.user_id = ? OR contracts.application_id IS NULL AND contracts.user_id IS NULL", userID)
+		query = query.Where("contracts.application_id IS NULL", userID)
 	}
 
 	query.Find(&contract)
