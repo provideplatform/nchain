@@ -123,6 +123,8 @@ type ContractExecution struct {
 	ABI       interface{}   `json:"abi"`
 	NetworkID *uuid.UUID    `json:"network_id"`
 	WalletID  *uuid.UUID    `json:"wallet_id"`
+	Wallet    *Wallet       `json:"wallet"`
+	Gas       *float64      `json:"gas"`
 	Method    string        `json:"method"`
 	Params    []interface{} `json:"params"`
 	Value     *big.Int      `json:"value"`
@@ -191,6 +193,14 @@ type Wallet struct {
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
 	Balance       *big.Int   `sql:"-" json:"balance"`
 	AccessedAt    *time.Time `json:"accessed_at"`
+}
+
+func (w *Wallet) setID(walletID uuid.UUID) {
+	if w.ID != uuid.Nil {
+		Log.Warningf("Attempted to change a wallet id in memory; wallet id not changed: %s", w.ID)
+		return
+	}
+	w.ID = walletID
 }
 
 type TxValue struct {
@@ -1720,39 +1730,72 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			}
 			return nil, &out, nil
 		}
+
+		var txResponse *ContractExecutionResponse
 		if tx.Create() {
-			Log.Debugf("Executed contract %s on contract: %s", methodDescriptor, c.ID)
-
+			Log.Debugf("Executed method %s on contract: %s", methodDescriptor, c.ID)
 			if tx.Response != nil {
-				Log.Debugf("Received response to tx broadcast attempt calling contract %s on contract: %s", methodDescriptor, c.ID)
-
-				var out interface{}
-				switch (tx.Response.Receipt).(type) {
-				case []byte:
-					out = (tx.Response.Receipt).([]byte)
-					Log.Debugf("Received response: %s", out)
-				case types.Receipt:
-					client, _ := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
-					receipt := tx.Response.Receipt.(*types.Receipt)
-					txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
-					if err != nil {
-						err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
-						Log.Warning(err.Error())
-						return nil, nil, err
-					}
-					out = txdeets
-				default:
-					// no-op
-					Log.Warningf("Unhandled transaction receipt type; %s", tx.Response.Receipt)
-				}
-				return &out, nil, nil
+				txResponse = tx.Response
 			}
 		} else {
-			err = fmt.Errorf("Failed to execute contract %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
-			Log.Warning(err.Error())
+			txParams := tx.ParseParams()
+			publicKey, publicKeyOk := txParams["public_key"].(interface{})
+			privateKey, privateKeyOk := txParams["private_key"].(interface{})
+			gas, gasOk := txParams["gas"].(float64)
+			if !gasOk {
+				gas = float64(0)
+			}
+			delete(txParams, "private_key")
+			tx.setParams(txParams)
+
+			if publicKeyOk && privateKeyOk {
+				Log.Debugf("Attempting to execute method %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
+				tx.SignedTx, tx.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), uint64(gas))
+				if err == nil {
+					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
+						err = provide.BroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
+					} else {
+						err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
+						Log.Warning(err.Error())
+					}
+				}
+
+				if err != nil {
+					err = fmt.Errorf("Failed to execute method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
+					Log.Warning(err.Error())
+				}
+			} else {
+				err = fmt.Errorf("Failed to execute method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
+				Log.Warning(err.Error())
+			}
+		}
+
+		if txResponse != nil {
+			Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
+
+			var out interface{}
+			switch (txResponse.Receipt).(type) {
+			case []byte:
+				out = (txResponse.Receipt).([]byte)
+				Log.Debugf("Received response: %s", out)
+			case types.Receipt:
+				client, _ := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
+				receipt := txResponse.Receipt.(*types.Receipt)
+				txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
+				if err != nil {
+					err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
+					Log.Warning(err.Error())
+					return nil, nil, err
+				}
+				out = txdeets
+			default:
+				// no-op
+				Log.Warningf("Unhandled transaction receipt type; %s", tx.Response.Receipt)
+			}
+			return &out, nil, nil
 		}
 	} else {
-		err = fmt.Errorf("Failed to execute contract %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)
+		err = fmt.Errorf("Failed to execute method %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)
 	}
 	return nil, nil, err
 }
@@ -1874,19 +1917,38 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 }
 
 // Execute a transaction on the contract instance using a specific signer, value, method and params
-func (c *Contract) Execute(walletID *uuid.UUID, value *big.Int, method string, params []interface{}) (*ContractExecutionResponse, error) {
+func (c *Contract) Execute(wallet *Wallet, value *big.Int, method string, params []interface{}, gas uint64) (*ContractExecutionResponse, error) {
 	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
 	db.Model(c).Related(&network)
 
+	txParams := map[string]interface{}{}
+
+	walletID := &uuid.Nil
+	if wallet != nil {
+		if wallet.ID != uuid.Nil {
+			walletID = &wallet.ID
+		}
+		if stringOrNil(wallet.Address) != nil && wallet.PrivateKey != nil {
+			txParams["public_key"] = wallet.Address
+			txParams["private_key"] = wallet.PrivateKey
+		}
+	}
+
+	txParams["gas"] = gas
+
+	txParamsJSON, _ := json.Marshal(txParams)
+	_txParamsJSON := json.RawMessage(txParamsJSON)
+
 	tx := &Transaction{
 		ApplicationID: c.ApplicationID,
 		UserID:        nil,
 		NetworkID:     c.NetworkID,
-		WalletID:      *walletID,
+		WalletID:      walletID,
 		To:            c.Address,
 		Value:         &TxValue{value: value},
+		Params:        &_txParamsJSON,
 	}
 
 	var receipt *interface{}
@@ -2433,8 +2495,11 @@ func (t *Transaction) Create() bool {
 // Validate a transaction for persistence
 func (t *Transaction) Validate() bool {
 	db := DatabaseConnection()
-	var wallet = &Wallet{}
-	db.Model(t).Related(&wallet)
+	var wallet *Wallet
+	if t.WalletID != nil {
+		wallet = &Wallet{}
+		db.Model(t).Related(&wallet)
+	}
 	t.Errors = make([]*gocore.Error, 0)
 	if t.ApplicationID == nil && t.UserID == nil {
 		t.Errors = append(t.Errors, &gocore.Error{
@@ -2444,11 +2509,11 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
-	} else if t.ApplicationID != nil && wallet.ApplicationID != nil && *t.ApplicationID != *wallet.ApplicationID {
+	} else if t.ApplicationID != nil && wallet != nil && wallet.ApplicationID != nil && *t.ApplicationID != *wallet.ApplicationID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing application"),
 		})
-	} else if t.UserID != nil && wallet.UserID != nil && *t.UserID != *wallet.UserID {
+	} else if t.UserID != nil && wallet != nil && wallet.UserID != nil && *t.UserID != *wallet.UserID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing user"),
 		})
@@ -2457,7 +2522,7 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to sign tx using unspecified network"),
 		})
-	} else if t.NetworkID != wallet.NetworkID {
+	} else if wallet != nil && t.NetworkID != wallet.NetworkID {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Transaction network did not match wallet network"),
 		})
@@ -2476,6 +2541,13 @@ func (t *Transaction) RefreshDetails() error {
 		return err
 	}
 	return nil
+}
+
+// setParams sets the tx params in-memory
+func (t *Transaction) setParams(params map[string]interface{}) {
+	paramsJSON, _ := json.Marshal(params)
+	_paramsJSON := json.RawMessage(paramsJSON)
+	t.Params = &_paramsJSON
 }
 
 func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {

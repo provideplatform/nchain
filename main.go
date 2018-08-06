@@ -721,11 +721,39 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		return
 	}
 
-	execution := &ContractExecution{}
-	err := json.Unmarshal(buf, execution)
+	wallet := &Wallet{} // signer for the tx
+
+	params := map[string]interface{}{}
+	err := json.Unmarshal(buf, &params)
 	if err != nil {
 		renderError(err.Error(), 422, c)
 		return
+	}
+	publicKey, publicKeyOk := params["public_key"].(string)
+	privateKey, privateKeyOk := params["private_key"].(string)
+	gas, gasOk := params["gas"].(float64)
+
+	execution := &ContractExecution{}
+	err = json.Unmarshal(buf, execution)
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
+		if execution.Wallet != nil {
+			err := fmt.Errorf("invalid request specifying a wallet_id and wallet")
+			renderError(err.Error(), 422, c)
+			return
+		}
+		wallet.setID(*execution.WalletID)
+	} else if publicKeyOk && privateKeyOk {
+		wallet.Address = publicKey
+		wallet.PrivateKey = stringOrNil(privateKey)
+	}
+	execution.Wallet = wallet
+
+	if gasOk {
+		execution.Gas = &gas
 	}
 
 	network := &Network{}
@@ -738,7 +766,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		return
 	}
 
-	params := map[string]interface{}{
+	params = map[string]interface{}{
 		"abi": execution.ABI,
 	}
 	paramsJSON, err := json.Marshal(params)
@@ -754,7 +782,8 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		Params:    &paramsMsg,
 	}
 
-	resp, err := ephemeralContract.Execute(execution.WalletID, execution.Value, execution.Method, execution.Params)
+	_gas, _ := big.NewFloat(gas).Uint64()
+	resp, err := ephemeralContract.Execute(execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err == nil {
 		render(resp, 202, c)
 	} else {
@@ -807,8 +836,24 @@ func contractExecutionHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
+	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
+		if execution.Wallet != nil {
+			err := fmt.Errorf("invalid request specifying a wallet_id and wallet")
+			renderError(err.Error(), 422, c)
+			return
+		}
+		wallet := &Wallet{}
+		wallet.setID(*execution.WalletID)
+		execution.Wallet = wallet
+	}
 
-	executionResponse, err := contract.Execute(execution.WalletID, execution.Value, execution.Method, execution.Params)
+	gas := execution.Gas
+	if gas == nil {
+		gas64 := float64(0)
+		gas = &gas64
+	}
+	_gas, _ := big.NewFloat(*gas).Uint64()
+	executionResponse, err := contract.Execute(execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err != nil {
 		renderError(err.Error(), 422, c)
 		return
