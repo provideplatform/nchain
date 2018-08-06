@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/provideapp/go-core"
 	provide "github.com/provideservices/provide-go"
@@ -96,7 +98,7 @@ type Bridge struct {
 // in the future it may represent a logical connection to services of other types
 type Connector struct {
 	gocore.Model
-	ApplicationID *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	Name          *string          `sql:"not null" json:"name"`
 	Type          *string          `sql:"not null" json:"type"`
@@ -107,7 +109,7 @@ type Connector struct {
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	gocore.Model
-	ApplicationID *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
@@ -137,7 +139,7 @@ type ContractExecutionResponse struct {
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
 type Oracle struct {
 	gocore.Model
-	ApplicationID *uuid.UUID       `sql:"not null;type:uuid" json:"-"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	ContractID    uuid.UUID        `sql:"not null;type:uuid" json:"contract_id"`
 	Name          *string          `sql:"not null" json:"name"`
@@ -149,7 +151,7 @@ type Oracle struct {
 // Token instances must be associated with an application identifier.
 type Token struct {
 	gocore.Model
-	ApplicationID  *uuid.UUID `sql:"not null;type:uuid" json:"-"`
+	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"-"`
 	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	ContractID     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
 	SaleContractID *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
@@ -167,7 +169,7 @@ type Transaction struct {
 	ApplicationID *uuid.UUID                 `sql:"type:uuid" json:"-"`
 	UserID        *uuid.UUID                 `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
-	WalletID      uuid.UUID                  `sql:"not null;type:uuid" json:"wallet_id"`
+	WalletID      *uuid.UUID                 `sql:"type:uuid" json:"wallet_id"`
 	To            *string                    `json:"to"`
 	Value         *TxValue                   `sql:"not null" json:"value"`
 	Data          *string                    `json:"data"`
@@ -248,10 +250,67 @@ func (n *Network) Create() bool {
 			}
 		}
 		if !db.NewRecord(n) {
-			return rowsAffected > 0
+			success := rowsAffected > 0
+			if success {
+				go n.resolveContracts(db)
+			}
+			return success
 		}
 	}
 	return false
+}
+
+func (n *Network) resolveContracts(db *gorm.DB) {
+	cfg := n.ParseConfig()
+	if n.isEthereumNetwork() {
+		chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{})
+		chainspecAbi, chainspecAbiOk := cfg["chainspec_abi"].(map[string]interface{})
+		if chainspecOk && chainspecAbiOk {
+			Log.Debugf("Resolved configuration for chainspec and ABI for network: %s; attempting to import contracts", n.ID)
+
+			if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
+				addrs := make([]string, 0)
+				for addr := range accounts {
+					addrs = append(addrs, addr)
+				}
+				sort.Strings(addrs)
+
+				for _, addr := range addrs {
+					Log.Debugf("Processing chainspec account %s for network: %s", addr, n.ID)
+					account := accounts[addr]
+
+					_, constructorOk := account.(map[string]interface{})["constructor"].(string)
+					abi, abiOk := chainspecAbi[addr].([]interface{})
+					if constructorOk && abiOk {
+						Log.Debugf("Chainspec account %s has a valid constructor and ABI for network: %s; attempting to import contract", addr, n.ID)
+
+						contractName := fmt.Sprintf("Network Contract %s", addr)
+						if name, ok := account.(map[string]interface{})["name"].(interface{}); ok {
+							contractName = name.(string)
+						}
+						params := map[string]interface{}{
+							"name": contractName,
+							"abi":  abi,
+						}
+						contract := &Contract{
+							ApplicationID: nil,
+							NetworkID:     n.ID,
+							TransactionID: nil,
+							Name:          stringOrNil(contractName),
+							Address:       stringOrNil(addr),
+							Params:        nil,
+						}
+						contract.setParams(params)
+						if contract.Create() {
+							Log.Debugf("Created contract %s for %s network chainspec account: %s", contract.ID, *n.Name, addr)
+						} else {
+							Log.Warningf("Failed to create contract for %s network chainspec account: %s; %s", *n.Name, addr, *contract.Errors[0].Message)
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 // Reload the underlying network instance
@@ -1617,10 +1676,10 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 		methodDescriptor = "constructor"
 	}
 	if abiMethod != nil {
-		Log.Debugf("Attempting to encode %d parameters [ %s ] prior to executing contract %s on contract: %s", len(params), params, methodDescriptor, c.ID)
+		Log.Debugf("Attempting to encode %d parameters %s prior to executing method %s on contract: %s", len(params), params, methodDescriptor, c.ID)
 		invocationSig, err := provide.EncodeABI(abiMethod, params...)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of contract %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
+			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of method %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 		}
 
 		data := common.Bytes2Hex(invocationSig)
@@ -1890,6 +1949,97 @@ func (c *Contract) Create() bool {
 		}
 	}
 	return false
+}
+
+func (c *Contract) resolveTokenContract(db *gorm.DB, network *Network, wallet *Wallet, client *ethclient.Client, receipt *types.Receipt) {
+	params := c.ParseParams()
+	if contractAbi, ok := params["abi"]; ok {
+		abistr, err := json.Marshal(contractAbi)
+		if err != nil {
+			Log.Warningf("Failed to marshal contract abi to json...  %s", err.Error())
+		}
+		_abi, err := abi.JSON(strings.NewReader(string(abistr)))
+		if err == nil {
+			msg := ethereum.CallMsg{
+				From:     common.HexToAddress(wallet.Address),
+				To:       &receipt.ContractAddress,
+				Gas:      0,
+				GasPrice: big.NewInt(0),
+				Value:    nil,
+				Data:     common.FromHex(provide.HashFunctionSelector("name()")),
+			}
+
+			result, _ := client.CallContract(context.TODO(), msg, nil)
+			var name string
+			if method, ok := _abi.Methods["name"]; ok {
+				err = method.Outputs.Unpack(&name, result)
+				if err != nil {
+					Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, c.ID, err.Error())
+				}
+			}
+
+			msg = ethereum.CallMsg{
+				From:     common.HexToAddress(wallet.Address),
+				To:       &receipt.ContractAddress,
+				Gas:      0,
+				GasPrice: big.NewInt(0),
+				Value:    nil,
+				Data:     common.FromHex(provide.HashFunctionSelector("decimals()")),
+			}
+			result, _ = client.CallContract(context.TODO(), msg, nil)
+			var decimals *big.Int
+			if method, ok := _abi.Methods["decimals"]; ok {
+				err = method.Outputs.Unpack(&decimals, result)
+				if err != nil {
+					Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, c.ID, err.Error())
+				}
+			}
+
+			msg = ethereum.CallMsg{
+				From:     common.HexToAddress(wallet.Address),
+				To:       &receipt.ContractAddress,
+				Gas:      0,
+				GasPrice: big.NewInt(0),
+				Value:    nil,
+				Data:     common.FromHex(provide.HashFunctionSelector("symbol()")),
+			}
+			result, _ = client.CallContract(context.TODO(), msg, nil)
+			var symbol string
+			if method, ok := _abi.Methods["symbol"]; ok {
+				err = method.Outputs.Unpack(&symbol, result)
+				if err != nil {
+					Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, c.ID, err.Error())
+				}
+			}
+
+			if name != "" && decimals != nil && symbol != "" { // isERC20Token
+				Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+				token := &Token{
+					ApplicationID: c.ApplicationID,
+					NetworkID:     c.NetworkID,
+					ContractID:    &c.ID,
+					Name:          stringOrNil(name),
+					Symbol:        stringOrNil(symbol),
+					Decimals:      decimals.Uint64(),
+					Address:       stringOrNil(receipt.ContractAddress.Hex()),
+				}
+				if token.Create() {
+					Log.Debugf("Created token %s for associated %s contract: %s", token.ID, *network.Name, c.ID)
+				} else {
+					Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
+				}
+			}
+		} else {
+			Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
+		}
+	}
+}
+
+// setParams sets the contract params in-memory
+func (c *Contract) setParams(params map[string]interface{}) {
+	paramsJSON, _ := json.Marshal(params)
+	_paramsJSON := json.RawMessage(paramsJSON)
+	c.Params = &_paramsJSON
 }
 
 // GetTransaction - retrieve the associated contract creation transaction
@@ -2222,87 +2372,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wal
 		}
 		if contract.Create() {
 			Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, *t.Hash)
-
-			if contractAbi, ok := params["abi"]; ok {
-				abistr, err := json.Marshal(contractAbi)
-				if err != nil {
-					Log.Warningf("failed to marshal abi to json...  %s", err.Error())
-				}
-				_abi, err := abi.JSON(strings.NewReader(string(abistr)))
-				if err == nil {
-					msg := ethereum.CallMsg{
-						From:     common.HexToAddress(wallet.Address),
-						To:       &receipt.ContractAddress,
-						Gas:      0,
-						GasPrice: big.NewInt(0),
-						Value:    nil,
-						Data:     common.FromHex(provide.HashFunctionSelector("name()")),
-					}
-
-					result, _ := client.CallContract(context.TODO(), msg, nil)
-					var name string
-					if method, ok := _abi.Methods["name"]; ok {
-						err = method.Outputs.Unpack(&name, result)
-						if err != nil {
-							Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-						}
-					}
-
-					msg = ethereum.CallMsg{
-						From:     common.HexToAddress(wallet.Address),
-						To:       &receipt.ContractAddress,
-						Gas:      0,
-						GasPrice: big.NewInt(0),
-						Value:    nil,
-						Data:     common.FromHex(provide.HashFunctionSelector("decimals()")),
-					}
-					result, _ = client.CallContract(context.TODO(), msg, nil)
-					var decimals *big.Int
-					if method, ok := _abi.Methods["decimals"]; ok {
-						err = method.Outputs.Unpack(&decimals, result)
-						if err != nil {
-							Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-						}
-					}
-
-					msg = ethereum.CallMsg{
-						From:     common.HexToAddress(wallet.Address),
-						To:       &receipt.ContractAddress,
-						Gas:      0,
-						GasPrice: big.NewInt(0),
-						Value:    nil,
-						Data:     common.FromHex(provide.HashFunctionSelector("symbol()")),
-					}
-					result, _ = client.CallContract(context.TODO(), msg, nil)
-					var symbol string
-					if method, ok := _abi.Methods["symbol"]; ok {
-						err = method.Outputs.Unpack(&symbol, result)
-						if err != nil {
-							Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, contract.ID, err.Error())
-						}
-					}
-
-					if name != "" && decimals != nil && symbol != "" { // isERC20Token
-						Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
-						token := &Token{
-							ApplicationID: contract.ApplicationID,
-							NetworkID:     contract.NetworkID,
-							ContractID:    &contract.ID,
-							Name:          stringOrNil(name),
-							Symbol:        stringOrNil(symbol),
-							Decimals:      decimals.Uint64(),
-							Address:       stringOrNil(receipt.ContractAddress.Hex()),
-						}
-						if token.Create() {
-							Log.Debugf("Created token %s for associated %s contract creation tx: %s", token.ID, *network.Name, *t.Hash)
-						} else {
-							Log.Warningf("Failed to create token for associated %s contract creation tx %s; %d errs: %s", *network.Name, *t.Hash, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
-						}
-					}
-				} else {
-					Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
-				}
-			}
+			contract.resolveTokenContract(db, network, wallet, client, receipt)
 		} else {
 			Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
 		}
