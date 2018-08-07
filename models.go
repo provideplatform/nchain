@@ -1693,7 +1693,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 		}
 
-		data := common.Bytes2Hex(invocationSig)
+		data := fmt.Sprintf("0x%s", common.Bytes2Hex(invocationSig))
 		tx.Data = &data
 
 		if abiMethod.Const {
