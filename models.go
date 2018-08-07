@@ -2501,11 +2501,7 @@ func (t *Transaction) Validate() bool {
 		db.Model(t).Related(&wallet)
 	}
 	t.Errors = make([]*gocore.Error, 0)
-	if t.ApplicationID == nil && t.UserID == nil {
-		t.Errors = append(t.Errors, &gocore.Error{
-			Message: stringOrNil("no application or user identifier provided"),
-		})
-	} else if t.ApplicationID != nil && t.UserID != nil {
+	if t.ApplicationID != nil && t.UserID != nil {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
@@ -2520,7 +2516,7 @@ func (t *Transaction) Validate() bool {
 	}
 	if t.NetworkID == uuid.Nil {
 		t.Errors = append(t.Errors, &gocore.Error{
-			Message: stringOrNil("Unable to sign tx using unspecified network"),
+			Message: stringOrNil("Unable to broadcast tx on unspecified network"),
 		})
 	} else if wallet != nil && t.NetworkID != wallet.NetworkID {
 		t.Errors = append(t.Errors, &gocore.Error{
