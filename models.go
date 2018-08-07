@@ -1689,7 +1689,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 		Log.Debugf("Attempting to encode %d parameters %s prior to executing method %s on contract: %s", len(params), params, methodDescriptor, c.ID)
 		invocationSig, err := provide.EncodeABI(abiMethod, params...)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of method %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
+			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 		}
 
 		data := common.Bytes2Hex(invocationSig)
@@ -1738,6 +1738,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				txResponse = tx.Response
 			}
 		} else {
+			Log.Debugf("Failed tx errors: %s", *tx.Errors[0].Message)
 			txParams := tx.ParseParams()
 			publicKey, publicKeyOk := txParams["public_key"].(interface{})
 			privateKey, privateKeyOk := txParams["private_key"].(interface{})
@@ -1749,7 +1750,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			tx.setParams(txParams)
 
 			if publicKeyOk && privateKeyOk {
-				Log.Debugf("Attempting to execute method %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
+				Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
 				tx.SignedTx, tx.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), uint64(gas))
 				if err == nil {
 					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
@@ -1761,11 +1762,11 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				}
 
 				if err != nil {
-					err = fmt.Errorf("Failed to execute method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
+					err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
 					Log.Warning(err.Error())
 				}
 			} else {
-				err = fmt.Errorf("Failed to execute method %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
+				err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
 				Log.Warning(err.Error())
 			}
 		}
@@ -2331,10 +2332,16 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 	var err error
 
 	if network.isEthereumNetwork() {
+		params := t.ParseParams()
+		gas, gasOk := params["gas"].(float64)
+		if !gasOk {
+			gas = float64(0)
+		}
+
 		if wallet.PrivateKey != nil {
 			privateKey, _ := decryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-			t.SignedTx, t.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), 0)
+			t.SignedTx, t.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), uint64(gas))
 		} else {
 			err = fmt.Errorf("Unable to sign tx; no private key for wallet: %s", wallet.ID)
 		}
@@ -2518,9 +2525,9 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &gocore.Error{
 			Message: stringOrNil("Unable to broadcast tx on unspecified network"),
 		})
-	} else if wallet != nil && t.NetworkID != wallet.NetworkID {
+	} else if wallet != nil && t.ApplicationID != nil && t.NetworkID != wallet.NetworkID {
 		t.Errors = append(t.Errors, &gocore.Error{
-			Message: stringOrNil("Transaction network did not match wallet network"),
+			Message: stringOrNil("Transaction network did not match wallet network in application context"),
 		})
 	}
 	return len(t.Errors) == 0

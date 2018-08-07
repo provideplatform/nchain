@@ -43,6 +43,7 @@ func main() {
 	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
 	r.GET("/api/v1/networks/:id/tokens", networkTokensListHandler)
 	r.GET("/api/v1/networks/:id/transactions", networkTransactionsListHandler)
+	r.GET("/api/v1/networks/:id/transactions/:transactionId", networkTransactionDetailsHandler)
 
 	r.GET("/api/v1/prices", pricesHandler)
 
@@ -530,6 +531,27 @@ func networkTransactionsListHandler(c *gin.Context) {
 	var txs []Transaction
 	query.Order("created_at DESC").Find(&txs)
 	render(txs, 200, c)
+}
+
+func networkTransactionDetailsHandler(c *gin.Context) {
+	userID := authorizedSubjectId(c, "user")
+	if userID == nil {
+		renderError("unauthorized", 401, c)
+		return
+	}
+
+	var tx = &Transaction{}
+	DatabaseConnection().Where("network_id = ? AND id = ?", c.Param("id"), c.Param("transactionId")).Find(&tx)
+	if tx == nil || tx.ID == uuid.Nil {
+		renderError("transaction not found", 404, c)
+		return
+	}
+	err := tx.RefreshDetails()
+	if err != nil {
+		renderError("internal server error", 500, c)
+		return
+	}
+	render(tx, 200, c)
 }
 
 // prices
