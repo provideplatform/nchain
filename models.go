@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1733,7 +1734,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 
 		var txResponse *ContractExecutionResponse
 		if tx.Create() {
-			Log.Debugf("Executed method %s on contract: %s", methodDescriptor, c.ID)
+			Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
 			if tx.Response != nil {
 				txResponse = tx.Response
 			}
@@ -2300,6 +2301,26 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string) {
 	}
 }
 
+func (t *Transaction) attemptGasEstimationRecovery(err error) error {
+	msg := err.Error()
+	gasFailureStr := "not enough gas to cover minimal cost of the transaction (minimal: "
+	if strings.Contains(msg, gasFailureStr) && strings.Contains(msg, "got: 0") { // HACK
+		Log.Debugf("Attempting to recover from gas estimation failure with supplied gas of 0 for tx id: %s", t.ID)
+		offset := strings.Index(msg, gasFailureStr) + len(gasFailureStr)
+		length := strings.Index(msg[offset:], ",")
+		minimalGas, err := strconv.ParseFloat(msg[offset:offset+length], 64)
+		if err == nil {
+			Log.Debugf("Resolved minimal gas of %v required to execute tx: %s", minimalGas, t.ID)
+			params := t.ParseParams()
+			params["gas"] = minimalGas
+			t.setParams(params)
+			return nil
+		}
+	}
+	Log.Debugf("Failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
+	return err
+}
+
 func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) error {
 	var err error
 
@@ -2312,6 +2333,19 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 			err = provide.BroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
 		} else {
 			err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
+		}
+
+		if err != nil {
+			if t.attemptGasEstimationRecovery(err) == nil {
+				err = t.sign(db, network, wallet)
+				if err == nil {
+					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
+						err = provide.BroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
+					} else {
+						err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
+					}
+				}
+			}
 		}
 	} else {
 		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
