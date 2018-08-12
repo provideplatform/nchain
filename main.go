@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -15,6 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 	gocore "github.com/provideapp/go-core"
 )
+
+const defaultResultsPerPage = 25
 
 func main() {
 	bootstrap()
@@ -147,6 +150,26 @@ func statusHandler(c *gin.Context) {
 	render(nil, 204, c)
 }
 
+func paginate(c *gin.Context, db *gorm.DB) *gorm.DB {
+	page := int64(1)
+	rpp := int64(defaultResultsPerPage)
+	if c.Query("page") != "" {
+		if _page, err := strconv.ParseInt(c.Query("page"), 10, 8); err == nil {
+			page = _page
+		}
+	}
+	if c.Query("rpp") != "" {
+		if _rpp, err := strconv.ParseInt(c.Query("rpp"), 10, 8); err == nil {
+			rpp = _rpp
+		}
+	}
+	query, totalResults := Paginate(db, page, rpp)
+	if totalResults != nil {
+		c.Header("X-Total-Results-Count", fmt.Sprintf("%d", *totalResults))
+	}
+	return query
+}
+
 // networks
 
 func createNetworkHandler(c *gin.Context) {
@@ -249,7 +272,8 @@ func networksListHandler(c *gin.Context) {
 		}
 	}
 
-	query.Order("networks.created_at ASC").Find(&networks)
+	query = query.Order("networks.created_at ASC")
+	paginate(c, query).Find(&networks)
 	render(networks, 200, c)
 }
 
@@ -302,7 +326,8 @@ func networkContractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	query.Order("contracts.created_at ASC").Find(&contracts)
+	query = query.Order("contracts.created_at ASC")
+	paginate(c, query).Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -346,7 +371,8 @@ func networkNodesListHandler(c *gin.Context) {
 	query := DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.user_id = ?", c.Param("id"), userID)
 
 	var nodes []NetworkNode
-	query.Order("network_nodes.created_at ASC").Find(&nodes)
+	query = query.Order("network_nodes.created_at ASC")
+	paginate(c, query).Find(&nodes)
 	render(nodes, 200, c)
 }
 
@@ -506,7 +532,7 @@ func networkTokensListHandler(c *gin.Context) {
 	}
 
 	var tokens []Token
-	query.Find(&tokens)
+	paginate(c, query).Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -529,7 +555,8 @@ func networkTransactionsListHandler(c *gin.Context) {
 	}
 
 	var txs []Transaction
-	query.Order("created_at DESC").Find(&txs)
+	query = query.Order("created_at DESC")
+	paginate(c, query).Find(&txs)
 	render(txs, 200, c)
 }
 
@@ -572,7 +599,8 @@ func connectorsListHandler(c *gin.Context) {
 	query := DatabaseConnection().Where("connectors.application_id = ?", appID)
 
 	var connectors []Connector
-	query.Order("created_at ASC").Find(&connectors)
+	query = query.Order("created_at ASC")
+	paginate(c, query).Find(&connectors)
 	render(connectors, 200, c)
 }
 
@@ -666,7 +694,7 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	query.Find(&contracts)
+	paginate(c, query).Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -896,7 +924,8 @@ func oraclesListHandler(c *gin.Context) {
 	query := DatabaseConnection().Where("oracles.application_id = ?", appID)
 
 	var oracles []Oracle
-	query.Order("created_at ASC").Find(&oracles)
+	query = query.Order("created_at ASC")
+	paginate(c, query).Find(&oracles)
 	render(oracles, 200, c)
 }
 
@@ -953,7 +982,7 @@ func tokensListHandler(c *gin.Context) {
 	}
 
 	var tokens []Token
-	query.Find(&tokens)
+	paginate(c, query).Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -1018,7 +1047,8 @@ func transactionsListHandler(c *gin.Context) {
 	}
 
 	var txs []Transaction
-	query.Order("created_at DESC").Find(&txs)
+	query = query.Order("created_at DESC")
+	paginate(c, query).Find(&txs)
 	render(txs, 200, c)
 }
 
@@ -1114,7 +1144,7 @@ func walletsListHandler(c *gin.Context) {
 	}
 
 	var wallets []Wallet
-	query.Find(&wallets)
+	paginate(c, query).Find(&wallets)
 	render(wallets, 200, c)
 }
 
