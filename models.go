@@ -210,8 +210,8 @@ type TxValue struct {
 
 // Paginate the given query given the page number and results per page;
 // returns the update query and total results
-func Paginate(db *gorm.DB, page, rpp int64) (query *gorm.DB, totalResults *uint64) {
-	db.Count(&totalResults)
+func Paginate(db *gorm.DB, model interface{}, page, rpp int64) (query *gorm.DB, totalResults *uint64) {
+	db.Model(model).Count(&totalResults)
 	query = db.Limit(rpp).Offset((page - 1) * rpp)
 	return query, totalResults
 }
