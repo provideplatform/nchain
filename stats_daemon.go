@@ -308,10 +308,10 @@ func EvictNetworkStatsDaemon(network *Network) error {
 // the given network; if no stats daemon instance has been started for the network,
 // the instance is configured and started immediately, caching real-time network stats.
 func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
-	if network.AvailablePeerCount() == 0 {
-		Log.Debugf("Stats daemon instance not initialized for network: %s; no available peers", *network.Name)
-		return nil
-	}
+	// if network.AvailablePeerCount() == 0 {
+	// 	Log.Debugf("Stats daemon instance not initialized for network: %s; no available peers", *network.Name)
+	// 	return nil
+	// }
 
 	var daemon *StatsDaemon
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
