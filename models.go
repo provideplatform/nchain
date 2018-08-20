@@ -1708,11 +1708,9 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 			network, _ := tx.GetNetwork()
 			client, err := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
-			gasPrice, _ := client.SuggestGasPrice(context.TODO())
-			msg := tx.asEthereumCallMsg(gasPrice.Uint64(), 0)
-			result, _ := client.CallContract(context.TODO(), msg, nil)
+			msg := tx.asEthereumCallMsg(0, 0)
+			result, err := client.CallContract(context.TODO(), msg, nil)
 			var out interface{}
-			err = abiMethod.Outputs.Unpack(&out, result)
 			if len(abiMethod.Outputs) == 1 {
 				err = abiMethod.Outputs.Unpack(&out, result)
 			} else if len(abiMethod.Outputs) > 1 {
@@ -2436,7 +2434,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 							return
 						}
 					} else {
-						Log.Debugf("Fetched ethereum tx receipt with tx hash: %s; receipt: %s", *t.Hash, receipt)
+						Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
 
 						traces, traceErr := provide.TraceTx(network.ID.String(), network.rpcURL(), t.Hash)
 						if traceErr != nil {
