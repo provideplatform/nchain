@@ -46,6 +46,8 @@ const resolveHostTickerInterval = time.Millisecond * 5000
 const resolveHostTickerTimeout = time.Minute * 5
 const resolvePeerTickerInterval = time.Millisecond * 5000
 const resolvePeerTickerTimeout = time.Minute * 20
+const resolveTokenTickerInterval = time.Millisecond * 5000
+const resolveTokenTickerTimeout = time.Minute * 1
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
@@ -2022,87 +2024,106 @@ func (c *Contract) Create() bool {
 }
 
 func (c *Contract) resolveTokenContract(db *gorm.DB, network *Network, wallet *Wallet, client *ethclient.Client, receipt *types.Receipt) {
-	params := c.ParseParams()
-	if contractAbi, ok := params["abi"]; ok {
-		abistr, err := json.Marshal(contractAbi)
-		if err != nil {
-			Log.Warningf("Failed to marshal contract abi to json...  %s", err.Error())
+	ticker := time.NewTicker(resolveTokenTickerInterval)
+	go func() {
+		startedAt := time.Now()
+		for {
+			select {
+			case <-ticker.C:
+				if time.Now().Sub(startedAt) >= resolveTokenTickerTimeout {
+					Log.Warningf("Failed to resolve ERC20 token for contract: %s; timing out after %v", c.ID, resolveTokenTickerTimeout)
+					ticker.Stop()
+					return
+				}
+
+				params := c.ParseParams()
+				if contractAbi, ok := params["abi"]; ok {
+					abistr, err := json.Marshal(contractAbi)
+					if err != nil {
+						Log.Warningf("Failed to marshal contract abi to json...  %s", err.Error())
+					}
+					_abi, err := abi.JSON(strings.NewReader(string(abistr)))
+					if err == nil {
+						msg := ethereum.CallMsg{
+							From:     common.HexToAddress(wallet.Address),
+							To:       &receipt.ContractAddress,
+							Gas:      0,
+							GasPrice: big.NewInt(0),
+							Value:    nil,
+							Data:     common.FromHex(provide.HashFunctionSelector("name()")),
+						}
+
+						result, _ := client.CallContract(context.TODO(), msg, nil)
+						var name string
+						if method, ok := _abi.Methods["name"]; ok {
+							err = method.Outputs.Unpack(&name, result)
+							if err != nil {
+								Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, c.ID, err.Error())
+							}
+						}
+
+						msg = ethereum.CallMsg{
+							From:     common.HexToAddress(wallet.Address),
+							To:       &receipt.ContractAddress,
+							Gas:      0,
+							GasPrice: big.NewInt(0),
+							Value:    nil,
+							Data:     common.FromHex(provide.HashFunctionSelector("decimals()")),
+						}
+						result, _ = client.CallContract(context.TODO(), msg, nil)
+						var decimals *big.Int
+						if method, ok := _abi.Methods["decimals"]; ok {
+							err = method.Outputs.Unpack(&decimals, result)
+							if err != nil {
+								Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, c.ID, err.Error())
+							}
+						}
+
+						msg = ethereum.CallMsg{
+							From:     common.HexToAddress(wallet.Address),
+							To:       &receipt.ContractAddress,
+							Gas:      0,
+							GasPrice: big.NewInt(0),
+							Value:    nil,
+							Data:     common.FromHex(provide.HashFunctionSelector("symbol()")),
+						}
+						result, _ = client.CallContract(context.TODO(), msg, nil)
+						var symbol string
+						if method, ok := _abi.Methods["symbol"]; ok {
+							err = method.Outputs.Unpack(&symbol, result)
+							if err != nil {
+								Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, c.ID, err.Error())
+							}
+						}
+
+						if name != "" && decimals != nil && symbol != "" { // isERC20Token
+							Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+							token := &Token{
+								ApplicationID: c.ApplicationID,
+								NetworkID:     c.NetworkID,
+								ContractID:    &c.ID,
+								Name:          stringOrNil(name),
+								Symbol:        stringOrNil(symbol),
+								Decimals:      decimals.Uint64(),
+								Address:       stringOrNil(receipt.ContractAddress.Hex()),
+							}
+							if token.Create() {
+								Log.Debugf("Created token %s for associated %s contract: %s", token.ID, *network.Name, c.ID)
+								ticker.Stop()
+								return
+							} else {
+								Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
+							}
+						}
+					} else {
+						Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
+						ticker.Stop()
+						return
+					}
+				}
+			}
 		}
-		_abi, err := abi.JSON(strings.NewReader(string(abistr)))
-		if err == nil {
-			msg := ethereum.CallMsg{
-				From:     common.HexToAddress(wallet.Address),
-				To:       &receipt.ContractAddress,
-				Gas:      0,
-				GasPrice: big.NewInt(0),
-				Value:    nil,
-				Data:     common.FromHex(provide.HashFunctionSelector("name()")),
-			}
-
-			result, _ := client.CallContract(context.TODO(), msg, nil)
-			var name string
-			if method, ok := _abi.Methods["name"]; ok {
-				err = method.Outputs.Unpack(&name, result)
-				if err != nil {
-					Log.Warningf("Failed to read %s, contract name from deployed contract %s; %s", *network.Name, c.ID, err.Error())
-				}
-			}
-
-			msg = ethereum.CallMsg{
-				From:     common.HexToAddress(wallet.Address),
-				To:       &receipt.ContractAddress,
-				Gas:      0,
-				GasPrice: big.NewInt(0),
-				Value:    nil,
-				Data:     common.FromHex(provide.HashFunctionSelector("decimals()")),
-			}
-			result, _ = client.CallContract(context.TODO(), msg, nil)
-			var decimals *big.Int
-			if method, ok := _abi.Methods["decimals"]; ok {
-				err = method.Outputs.Unpack(&decimals, result)
-				if err != nil {
-					Log.Warningf("Failed to read %s, contract decimals from deployed contract %s; %s", *network.Name, c.ID, err.Error())
-				}
-			}
-
-			msg = ethereum.CallMsg{
-				From:     common.HexToAddress(wallet.Address),
-				To:       &receipt.ContractAddress,
-				Gas:      0,
-				GasPrice: big.NewInt(0),
-				Value:    nil,
-				Data:     common.FromHex(provide.HashFunctionSelector("symbol()")),
-			}
-			result, _ = client.CallContract(context.TODO(), msg, nil)
-			var symbol string
-			if method, ok := _abi.Methods["symbol"]; ok {
-				err = method.Outputs.Unpack(&symbol, result)
-				if err != nil {
-					Log.Warningf("Failed to read %s, contract symbol from deployed contract %s; %s", *network.Name, c.ID, err.Error())
-				}
-			}
-
-			if name != "" && decimals != nil && symbol != "" { // isERC20Token
-				Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
-				token := &Token{
-					ApplicationID: c.ApplicationID,
-					NetworkID:     c.NetworkID,
-					ContractID:    &c.ID,
-					Name:          stringOrNil(name),
-					Symbol:        stringOrNil(symbol),
-					Decimals:      decimals.Uint64(),
-					Address:       stringOrNil(receipt.ContractAddress.Hex()),
-				}
-				if token.Create() {
-					Log.Debugf("Created token %s for associated %s contract: %s", token.ID, *network.Name, c.ID)
-				} else {
-					Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(token.Errors), *stringOrNil(*token.Errors[0].Message))
-				}
-			}
-		} else {
-			Log.Warningf("Failed to parse JSON ABI for %s contract; %s", *network.Name, err.Error())
-		}
-	}
+	}()
 }
 
 // setParams sets the contract params in-memory
