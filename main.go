@@ -96,7 +96,7 @@ func authorizedSubjectId(c *gin.Context, subject string) *uuid.UUID {
 					return nil, fmt.Errorf("JWT subject malformed; %s", sub)
 				}
 				if subprts[0] != subject {
-					return nil, fmt.Errorf("JWT claims specified non-application subject: %s", subprts[0])
+					return nil, fmt.Errorf("JWT claims specified non-%s subject: %s", subject, subprts[0])
 				}
 				id = subprts[1]
 			}
