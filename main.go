@@ -23,6 +23,7 @@ func main() {
 	RunConsumers()
 
 	r := gin.Default()
+	configureNewRelicTransactionMiddleware(r)
 
 	r.GET("/api/v1/networks", networksListHandler)
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)

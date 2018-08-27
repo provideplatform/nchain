@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kthomas/go-logger"
 	newrelic "github.com/newrelic/go-agent"
 )
@@ -19,6 +20,8 @@ var (
 	GpgPublicKey        string
 	GpgPrivateKey       string
 	WalletEncryptionKey string
+
+	newrelicLicenseKey string
 
 	bootstrapOnce sync.Once
 )
@@ -43,6 +46,10 @@ func bootstrap() {
 			lvl = "INFO"
 		}
 		Log = logger.NewLogger("goldmine", lvl, true)
+
+		if os.Getenv("NEW_RELIC_LICENSE_KEY") != "" {
+			newrelicLicenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
+		}
 
 		GpgPublicKey = `
 -----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -163,10 +170,27 @@ func shouldServeTLS() bool {
 	return tls
 }
 
+func configureNewRelicTransactionMiddleware(r *gin.Engine) {
+	newrelicApp := configureNewRelic("goldmine")
+	if newrelicApp == nil {
+		return
+	}
+
+	app := *newrelicApp
+	r.Use(func(c *gin.Context) {
+		app.StartTransaction(c.HandlerName(), c.Writer, c.Request)
+	})
+
+	Log.Debug("Configured newrelic transaction middleware")
+}
+
 // ConfigureNewRelic returns an initialized newrelic application instance,
 // or nil if it was unable to be initialized
-func configureNewRelic(appName, key string) *newrelic.Application {
-	config := newrelic.NewConfig(appName, key)
+func configureNewRelic(appName string) *newrelic.Application {
+	if newrelicLicenseKey == "" {
+		return nil
+	}
+	config := newrelic.NewConfig(appName, newrelicLicenseKey)
 	app, err := newrelic.NewApplication(config)
 	if err != nil {
 		return nil
