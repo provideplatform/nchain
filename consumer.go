@@ -11,11 +11,11 @@ var (
 	waitGroup sync.WaitGroup
 
 	currencyPairs = []string{
-		"BTC-USD",
-		"ETH-USD",
-		"LTC-USD",
+		// "BTC-USD",
+		// "ETH-USD",
+		// "LTC-USD",
 
-		"PRVD-USD", // FIXME-- pull from tokens database
+		// "PRVD-USD", // FIXME-- pull from tokens database
 	}
 )
 
