@@ -6,18 +6,15 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
+	provide "github.com/provideservices/provide-go"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	gocore "github.com/provideapp/go-core"
 )
-
-const defaultResultsPerPage = 25
 
 func main() {
 	bootstrap()
@@ -103,7 +100,7 @@ func authorizedSubjectId(c *gin.Context, subject string) *uuid.UUID {
 		}
 		return nil, nil
 	}
-	gocore.ParseBearerAuthorizationHeader(c, &keyfn)
+	provide.ParseBearerAuthorizationHeader(c, &keyfn)
 	uuidV4, err := uuid.FromString(id)
 	if err != nil {
 		return nil
@@ -148,26 +145,6 @@ func requireParams(requiredParams []string, c *gin.Context) error {
 
 func statusHandler(c *gin.Context) {
 	render(nil, 204, c)
-}
-
-func paginate(c *gin.Context, db *gorm.DB, model interface{}) *gorm.DB {
-	page := int64(1)
-	rpp := int64(defaultResultsPerPage)
-	if c.Query("page") != "" {
-		if _page, err := strconv.ParseInt(c.Query("page"), 10, 8); err == nil {
-			page = _page
-		}
-	}
-	if c.Query("rpp") != "" {
-		if _rpp, err := strconv.ParseInt(c.Query("rpp"), 10, 8); err == nil {
-			rpp = _rpp
-		}
-	}
-	query, totalResults := Paginate(db, model, page, rpp)
-	if totalResults != nil {
-		c.Header("X-Total-Results-Count", fmt.Sprintf("%d", *totalResults))
-	}
-	return query
 }
 
 // networks
@@ -273,7 +250,7 @@ func networksListHandler(c *gin.Context) {
 	}
 
 	query = query.Order("networks.created_at ASC")
-	paginate(c, query, &Network{}).Find(&networks)
+	provide.Paginate(c, query, &Network{}).Find(&networks)
 	render(networks, 200, c)
 }
 
@@ -327,7 +304,7 @@ func networkContractsListHandler(c *gin.Context) {
 
 	var contracts []Contract
 	query = query.Order("contracts.created_at ASC")
-	paginate(c, query, &Contract{}).Find(&contracts)
+	provide.Paginate(c, query, &Contract{}).Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -372,7 +349,7 @@ func networkNodesListHandler(c *gin.Context) {
 
 	var nodes []NetworkNode
 	query = query.Order("network_nodes.created_at ASC")
-	paginate(c, query, &NetworkNode{}).Find(&nodes)
+	provide.Paginate(c, query, &NetworkNode{}).Find(&nodes)
 	render(nodes, 200, c)
 }
 
@@ -532,7 +509,7 @@ func networkTokensListHandler(c *gin.Context) {
 	}
 
 	var tokens []Token
-	paginate(c, query, &Token{}).Find(&tokens)
+	provide.Paginate(c, query, &Token{}).Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -556,7 +533,7 @@ func networkTransactionsListHandler(c *gin.Context) {
 
 	var txs []Transaction
 	query = query.Order("created_at DESC")
-	paginate(c, query, &Transaction{}).Find(&txs)
+	provide.Paginate(c, query, &Transaction{}).Find(&txs)
 	render(txs, 200, c)
 }
 
@@ -600,7 +577,7 @@ func connectorsListHandler(c *gin.Context) {
 
 	var connectors []Connector
 	query = query.Order("created_at ASC")
-	paginate(c, query, &Connector{}).Find(&connectors)
+	provide.Paginate(c, query, &Connector{}).Find(&connectors)
 	render(connectors, 200, c)
 }
 
@@ -694,7 +671,7 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	var contracts []Contract
-	paginate(c, query, &Contract{}).Find(&contracts)
+	provide.Paginate(c, query, &Contract{}).Find(&contracts)
 	render(contracts, 200, c)
 }
 
@@ -925,7 +902,7 @@ func oraclesListHandler(c *gin.Context) {
 
 	var oracles []Oracle
 	query = query.Order("created_at ASC")
-	paginate(c, query, &Oracle{}).Find(&oracles)
+	provide.Paginate(c, query, &Oracle{}).Find(&oracles)
 	render(oracles, 200, c)
 }
 
@@ -982,7 +959,7 @@ func tokensListHandler(c *gin.Context) {
 	}
 
 	var tokens []Token
-	paginate(c, query, &Token{}).Find(&tokens)
+	provide.Paginate(c, query, &Token{}).Find(&tokens)
 	render(tokens, 200, c)
 }
 
@@ -1048,7 +1025,7 @@ func transactionsListHandler(c *gin.Context) {
 
 	var txs []Transaction
 	query = query.Order("created_at DESC")
-	paginate(c, query, &Transaction{}).Find(&txs)
+	provide.Paginate(c, query, &Transaction{}).Find(&txs)
 	render(txs, 200, c)
 }
 
@@ -1144,7 +1121,7 @@ func walletsListHandler(c *gin.Context) {
 	}
 
 	var wallets []Wallet
-	paginate(c, query, &Wallet{}).Find(&wallets)
+	provide.Paginate(c, query, &Wallet{}).Find(&wallets)
 	render(wallets, 200, c)
 }
 

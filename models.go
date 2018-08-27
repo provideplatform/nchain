@@ -28,7 +28,6 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/provideapp/go-core"
 	provide "github.com/provideservices/provide-go"
 
 	"github.com/jinzhu/gorm"
@@ -60,7 +59,7 @@ var networkGenesisMutex = map[string]*sync.Mutex{}
 // Network represents a blockchain network; the network could fall at any level of
 // a heirarchy of blockchain networks
 type Network struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID             `sql:"type:uuid" json:"application_id"`
 	UserID        *uuid.UUID             `sql:"type:uuid" json:"user_id"`
 	Name          *string                `sql:"not null" json:"name"`
@@ -79,7 +78,7 @@ type Network struct {
 // each NetworkNode may have a set or sets of deployed resources, such as application containers, VMs
 // or even phyiscal infrastructure
 type NetworkNode struct {
-	gocore.Model
+	provide.Model
 	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
 	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
@@ -92,7 +91,7 @@ type NetworkNode struct {
 
 // Bridge instances are still in the process of being defined.
 type Bridge struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 }
@@ -100,7 +99,7 @@ type Bridge struct {
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;
 // in the future it may represent a logical connection to services of other types
 type Connector struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	Name          *string          `sql:"not null" json:"name"`
@@ -111,7 +110,7 @@ type Connector struct {
 
 // Contract instances must be associated with an application identifier.
 type Contract struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
@@ -143,7 +142,7 @@ type ContractExecutionResponse struct {
 
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
 type Oracle struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	ContractID    uuid.UUID        `sql:"not null;type:uuid" json:"contract_id"`
@@ -155,7 +154,7 @@ type Oracle struct {
 
 // Token instances must be associated with an application identifier.
 type Token struct {
-	gocore.Model
+	provide.Model
 	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"-"`
 	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	ContractID     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
@@ -170,7 +169,7 @@ type Token struct {
 
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID                 `sql:"type:uuid" json:"-"`
 	UserID        *uuid.UUID                 `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
@@ -188,7 +187,7 @@ type Transaction struct {
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
 type Wallet struct {
-	gocore.Model
+	provide.Model
 	ApplicationID *uuid.UUID `sql:"type:uuid" json:"-"`
 	UserID        *uuid.UUID `sql:"type:uuid" json:"-"`
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
@@ -208,14 +207,6 @@ func (w *Wallet) setID(walletID uuid.UUID) {
 
 type TxValue struct {
 	value *big.Int
-}
-
-// Paginate the given query given the page number and results per page;
-// returns the update query and total results
-func Paginate(db *gorm.DB, model interface{}, page, rpp int64) (query *gorm.DB, totalResults *uint64) {
-	db.Model(model).Count(&totalResults)
-	query = db.Limit(rpp).Offset((page - 1) * rpp)
-	return query, totalResults
 }
 
 type bootnodesInitialized string
@@ -265,7 +256,7 @@ func (n *Network) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				n.Errors = append(n.Errors, &gocore.Error{
+				n.Errors = append(n.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -352,7 +343,7 @@ func (n *Network) Update() bool {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			n.Errors = append(n.Errors, &gocore.Error{
+			n.Errors = append(n.Errors, &provide.Error{
 				Message: stringOrNil(err.Error()),
 			})
 		}
@@ -586,7 +577,7 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 
 // Validate a network for persistence
 func (n *Network) Validate() bool {
-	n.Errors = make([]*gocore.Error, 0)
+	n.Errors = make([]*provide.Error, 0)
 	return len(n.Errors) == 0
 }
 
@@ -724,7 +715,7 @@ func (n *NetworkNode) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				n.Errors = append(n.Errors, &gocore.Error{
+				n.Errors = append(n.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -804,7 +795,7 @@ func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			n.Errors = append(n.Errors, &gocore.Error{
+			n.Errors = append(n.Errors, &provide.Error{
 				Message: stringOrNil(err.Error()),
 			})
 		}
@@ -815,12 +806,12 @@ func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
 func (n *NetworkNode) Validate() bool {
 	cfg := n.ParseConfig()
 	// if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
-	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 	n.Errors = append(n.Errors, &provide.Error{
 	// 		Message: stringOrNil("Failed to parse protocol_id in network node configuration"),
 	// 	})
 	// }
 	// if _, engineOk := cfg["engine_id"].(string); !engineOk {
-	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 	n.Errors = append(n.Errors, &provide.Error{
 	// 		Message: stringOrNil("Failed to parse engine_id in network node configuration"),
 	// 	})
 	// }
@@ -828,28 +819,28 @@ func (n *NetworkNode) Validate() bool {
 	// 	if creds, credsOk := cfg["credentials"].(map[string]interface{}); credsOk {
 	// 		if strings.ToLower(targetID) == "aws" {
 	// 			if _, accessKeyIdOk := creds["aws_access_key_id"].(string); !accessKeyIdOk {
-	// 				n.Errors = append(n.Errors, &gocore.Error{
+	// 				n.Errors = append(n.Errors, &provide.Error{
 	// 					Message: stringOrNil("Failed to parse aws_access_key_id in network node credentials configuration for AWS target"),
 	// 				})
 	// 			}
 	// 			if _, secretAccessKeyOk := creds["aws_secret_access_key"].(string); !secretAccessKeyOk {
-	// 				n.Errors = append(n.Errors, &gocore.Error{
+	// 				n.Errors = append(n.Errors, &provide.Error{
 	// 					Message: stringOrNil("Failed to parse aws_secret_access_key in network node credentials configuration for AWS target"),
 	// 				})
 	// 			}
 	// 		}
 	// 	} else {
-	// 		n.Errors = append(n.Errors, &gocore.Error{
+	// 		n.Errors = append(n.Errors, &provide.Error{
 	// 			Message: stringOrNil("Failed to parse credentials in network node configuration"),
 	// 		})
 	// 	}
 	// } else {
-	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 	n.Errors = append(n.Errors, &provide.Error{
 	// 		Message: stringOrNil("Failed to parse target_id in network node configuration"),
 	// 	})
 	// }
 	// if _, providerOk := cfg["provider_id"].(string); !providerOk {
-	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 	n.Errors = append(n.Errors, &provide.Error{
 	// 		Message: stringOrNil("Failed to parse provider_id in network node configuration"),
 	// 	})
 	// }
@@ -860,7 +851,7 @@ func (n *NetworkNode) Validate() bool {
 		}
 	}
 	// } else {
-	// 	n.Errors = append(n.Errors, &gocore.Error{
+	// 	n.Errors = append(n.Errors, &provide.Error{
 	// 		Message: stringOrNil("Failed to parse role in network node configuration"),
 	// 	})
 	// }
@@ -889,7 +880,7 @@ func (n *NetworkNode) Delete() bool {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			n.Errors = append(n.Errors, &gocore.Error{
+			n.Errors = append(n.Errors, &provide.Error{
 				Message: stringOrNil(err.Error()),
 			})
 		}
@@ -1837,7 +1828,7 @@ func (c *Connector) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				c.Errors = append(c.Errors, &gocore.Error{
+				c.Errors = append(c.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -1851,14 +1842,14 @@ func (c *Connector) Create() bool {
 
 // Validate an Connector for persistence
 func (c *Connector) Validate() bool {
-	c.Errors = make([]*gocore.Error, 0)
+	c.Errors = make([]*provide.Error, 0)
 	if c.NetworkID == uuid.Nil {
-		c.Errors = append(c.Errors, &gocore.Error{
+		c.Errors = append(c.Errors, &provide.Error{
 			Message: stringOrNil("Unable to deploy connector using unspecified network"),
 		})
 	}
 	if c.Type == nil || strings.ToLower(*c.Type) != "ipfs" {
-		c.Errors = append(c.Errors, &gocore.Error{
+		c.Errors = append(c.Errors, &provide.Error{
 			Message: stringOrNil("Unable to define connector of invalid type"),
 		})
 	}
@@ -1872,7 +1863,7 @@ func (c *Connector) Delete() bool {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			c.Errors = append(c.Errors, &gocore.Error{
+			c.Errors = append(c.Errors, &provide.Error{
 				Message: stringOrNil(err.Error()),
 			})
 		}
@@ -2011,7 +2002,7 @@ func (c *Contract) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				c.Errors = append(c.Errors, &gocore.Error{
+				c.Errors = append(c.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -2152,13 +2143,13 @@ func (c *Contract) Validate() bool {
 		transaction = &Transaction{}
 		db.Model(c).Related(&transaction)
 	}
-	c.Errors = make([]*gocore.Error, 0)
+	c.Errors = make([]*provide.Error, 0)
 	if c.NetworkID == uuid.Nil {
-		c.Errors = append(c.Errors, &gocore.Error{
+		c.Errors = append(c.Errors, &provide.Error{
 			Message: stringOrNil("Unable to associate contract with unspecified network"),
 		})
 	} else if transaction != nil && c.NetworkID != transaction.NetworkID {
-		c.Errors = append(c.Errors, &gocore.Error{
+		c.Errors = append(c.Errors, &provide.Error{
 			Message: stringOrNil("Contract network did not match transaction network"),
 		})
 	}
@@ -2192,7 +2183,7 @@ func (o *Oracle) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				o.Errors = append(o.Errors, &gocore.Error{
+				o.Errors = append(o.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -2206,9 +2197,9 @@ func (o *Oracle) Create() bool {
 
 // Validate an oracle for persistence
 func (o *Oracle) Validate() bool {
-	o.Errors = make([]*gocore.Error, 0)
+	o.Errors = make([]*provide.Error, 0)
 	if o.NetworkID == uuid.Nil {
-		o.Errors = append(o.Errors, &gocore.Error{
+		o.Errors = append(o.Errors, &provide.Error{
 			Message: stringOrNil("Unable to deploy oracle using unspecified network"),
 		})
 	}
@@ -2229,7 +2220,7 @@ func (t *Token) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				t.Errors = append(t.Errors, &gocore.Error{
+				t.Errors = append(t.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -2248,22 +2239,22 @@ func (t *Token) Validate() bool {
 	if t.NetworkID != uuid.Nil {
 		db.Model(t).Related(&contract)
 	}
-	t.Errors = make([]*gocore.Error, 0)
+	t.Errors = make([]*provide.Error, 0)
 	if t.NetworkID == uuid.Nil {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil("Unable to deploy token contract using unspecified network"),
 		})
 	} else {
 		if contract != nil {
 			if t.NetworkID != contract.NetworkID {
-				t.Errors = append(t.Errors, &gocore.Error{
+				t.Errors = append(t.Errors, &provide.Error{
 					Message: stringOrNil("Token network did not match token contract network"),
 				})
 			}
 			if t.Address == nil {
 				t.Address = contract.Address
 			} else if t.Address != nil && *t.Address != *contract.Address {
-				t.Errors = append(t.Errors, &gocore.Error{
+				t.Errors = append(t.Errors, &provide.Error{
 					Message: stringOrNil("Token contract address did not match referenced contract address"),
 				})
 			}
@@ -2321,7 +2312,7 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string) {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			t.Errors = append(t.Errors, &gocore.Error{
+			t.Errors = append(t.Errors, &provide.Error{
 				Message: stringOrNil(err.Error()),
 			})
 		}
@@ -2380,7 +2371,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 
 	if err != nil {
 		Log.Warningf("Failed to broadcast %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil(err.Error()),
 		})
 		t.updateStatus(db, "failed")
@@ -2412,7 +2403,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 
 	if err != nil {
 		Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil(err.Error()),
 		})
 		t.updateStatus(db, "failed")
@@ -2447,7 +2438,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 							}
 						} else {
 							Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
-							t.Errors = append(t.Errors, &gocore.Error{
+							t.Errors = append(t.Errors, &provide.Error{
 								Message: stringOrNil(err.Error()),
 							})
 							t.updateStatus(db, "failed")
@@ -2526,7 +2517,7 @@ func (t *Transaction) Create() bool {
 
 	err := t.sign(db, network, wallet)
 	if err != nil {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil(err.Error()),
 		})
 		return false
@@ -2538,7 +2529,7 @@ func (t *Transaction) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				t.Errors = append(t.Errors, &gocore.Error{
+				t.Errors = append(t.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -2568,26 +2559,26 @@ func (t *Transaction) Validate() bool {
 		wallet = &Wallet{}
 		db.Model(t).Related(&wallet)
 	}
-	t.Errors = make([]*gocore.Error, 0)
+	t.Errors = make([]*provide.Error, 0)
 	if t.ApplicationID != nil && t.UserID != nil {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
 	} else if t.ApplicationID != nil && wallet != nil && wallet.ApplicationID != nil && *t.ApplicationID != *wallet.ApplicationID {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing application"),
 		})
 	} else if t.UserID != nil && wallet != nil && wallet.UserID != nil && *t.UserID != *wallet.UserID {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil("Unable to sign tx due to mismatched signing user"),
 		})
 	}
 	if t.NetworkID == uuid.Nil {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil("Unable to broadcast tx on unspecified network"),
 		})
 	} else if wallet != nil && t.ApplicationID != nil && t.NetworkID != wallet.NetworkID {
-		t.Errors = append(t.Errors, &gocore.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil("Transaction network did not match wallet network in application context"),
 		})
 	}
@@ -2667,7 +2658,7 @@ func (w *Wallet) Create() bool {
 		errors := result.GetErrors()
 		if len(errors) > 0 {
 			for _, err := range errors {
-				w.Errors = append(w.Errors, &gocore.Error{
+				w.Errors = append(w.Errors, &provide.Error{
 					Message: stringOrNil(err.Error()),
 				})
 			}
@@ -2681,20 +2672,20 @@ func (w *Wallet) Create() bool {
 
 // Validate a wallet for persistence
 func (w *Wallet) Validate() bool {
-	w.Errors = make([]*gocore.Error, 0)
+	w.Errors = make([]*provide.Error, 0)
 	var network = &Network{}
 	DatabaseConnection().Model(w).Related(&network)
 	if network == nil || network.ID == uuid.Nil {
-		w.Errors = append(w.Errors, &gocore.Error{
+		w.Errors = append(w.Errors, &provide.Error{
 			Message: stringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", w.NetworkID.String())),
 		})
 	}
 	if w.ApplicationID == nil && w.UserID == nil {
-		w.Errors = append(w.Errors, &gocore.Error{
+		w.Errors = append(w.Errors, &provide.Error{
 			Message: stringOrNil("no application or user identifier provided"),
 		})
 	} else if w.ApplicationID != nil && w.UserID != nil {
-		w.Errors = append(w.Errors, &gocore.Error{
+		w.Errors = append(w.Errors, &provide.Error{
 			Message: stringOrNil("only an application OR user identifier should be provided"),
 		})
 	}
@@ -2704,14 +2695,14 @@ func (w *Wallet) Validate() bool {
 			_, err = decryptECDSAPrivateKey(*w.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 		}
 	} else {
-		w.Errors = append(w.Errors, &gocore.Error{
+		w.Errors = append(w.Errors, &provide.Error{
 			Message: stringOrNil("private key generation failed"),
 		})
 	}
 
 	if err != nil {
 		msg := err.Error()
-		w.Errors = append(w.Errors, &gocore.Error{
+		w.Errors = append(w.Errors, &provide.Error{
 			Message: &msg,
 		})
 	}

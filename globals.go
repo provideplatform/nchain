@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/kthomas/go-logger"
+	newrelic "github.com/newrelic/go-agent"
 )
 
 var (
@@ -160,6 +161,17 @@ func shouldServeTLS() bool {
 		}
 	}
 	return tls
+}
+
+// ConfigureNewRelic returns an initialized newrelic application instance,
+// or nil if it was unable to be initialized
+func configureNewRelic(appName, key string) *newrelic.Application {
+	config := newrelic.NewConfig(appName, key)
+	app, err := newrelic.NewApplication(config)
+	if err != nil {
+		return nil
+	}
+	return &app
 }
 
 func panicIfEmpty(val string, msg string) {
