@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
 rm ./goldmine
-go fmt
+go fmt .
 go build .
