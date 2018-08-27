@@ -5,7 +5,10 @@ import (
 	"sync"
 
 	exchangeConsumer "github.com/kthomas/exchange-consumer"
+	nats "github.com/nats-io/go-nats"
 )
+
+const natsTxSubject = "goldmine-tx"
 
 var (
 	waitGroup sync.WaitGroup
@@ -24,6 +27,7 @@ var (
 func RunConsumers() {
 	go func() {
 		waitGroup.Add(1)
+		subscribeNats()
 		for _, currencyPair := range currencyPairs {
 			runConsumer(currencyPair)
 		}
@@ -54,4 +58,22 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 		Log.Debugf("Dropping GDAX message; %s", msg)
 	}
 	return nil
+}
+
+func subscribeNats() {
+	natsConnection, err := nats.Connect("nats://18.214.173.29:4222")
+	if err != nil {
+		Log.Warningf("NATS connection failed; %s", err.Error())
+		return
+	}
+
+	waitGroup.Add(1)
+	go func() {
+		natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
+	}()
+}
+
+func consumeTxMsg(msg *nats.Msg) {
+	Log.Debugf("Consuming NATS tx message: %s", msg)
+
 }
