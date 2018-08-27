@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"sync"
 
-	. "github.com/kthomas/exchange-consumer"
+	exchangeConsumer "github.com/kthomas/exchange-consumer"
 )
 
 var (
@@ -19,6 +19,8 @@ var (
 	}
 )
 
+// RunConsumers launches a goroutine for each data feed
+// that has been configured to consume messages
 func RunConsumers() {
 	go func() {
 		waitGroup.Add(1)
@@ -32,7 +34,7 @@ func RunConsumers() {
 func runConsumer(currencyPair string) {
 	waitGroup.Add(1)
 	go func() {
-		consumer := GdaxMessageConsumerFactory(Log, priceTick, currencyPair)
+		consumer := exchangeConsumer.GdaxMessageConsumerFactory(Log, priceTick, currencyPair)
 		err := consumer.Run()
 		if err != nil {
 			Log.Warningf("Consumer exited unexpectedly; %s", err)
@@ -42,7 +44,7 @@ func runConsumer(currencyPair string) {
 	}()
 }
 
-func priceTick(msg *GdaxMessage) error {
+func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 	if msg.Type == "match" && msg.Price != "" {
 		price, err := strconv.ParseFloat(msg.Price, 64)
 		if err == nil {
