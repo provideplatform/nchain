@@ -23,7 +23,7 @@ func main() {
 	bootstrap()
 	migrateSchema()
 
-	RunConsumers()
+	// RunConsumers()
 
 	r := gin.Default()
 
