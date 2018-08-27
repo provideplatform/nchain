@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"math/big"
 	"strconv"
 	"sync"
 
 	exchangeConsumer "github.com/kthomas/exchange-consumer"
+	uuid "github.com/kthomas/go.uuid"
 	nats "github.com/nats-io/go-nats"
 )
 
@@ -27,7 +30,7 @@ var (
 func RunConsumers() {
 	go func() {
 		waitGroup.Add(1)
-		subscribeNats()
+		subscribeNats(natsToken)
 		for _, currencyPair := range currencyPairs {
 			runConsumer(currencyPair)
 		}
@@ -60,15 +63,23 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 	return nil
 }
 
-func subscribeNats() {
-	natsConnection, err := nats.Connect("nats://18.214.173.29:4222")
+func natsConnection(token string) *nats.Conn {
+	conn, err := nats.Connect(natsURL, nats.Token(token))
 	if err != nil {
 		Log.Warningf("NATS connection failed; %s", err.Error())
+	}
+	return conn
+}
+
+func subscribeNats(token string) {
+	natsConnection := natsConnection(token)
+	if natsConnection == nil {
 		return
 	}
 
 	waitGroup.Add(1)
 	go func() {
+		defer natsConnection.Close()
 		natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
 	}()
 }
@@ -76,4 +87,52 @@ func subscribeNats() {
 func consumeTxMsg(msg *nats.Msg) {
 	Log.Debugf("Consuming NATS tx message: %s", msg)
 
+	execution := &ContractExecution{}
+	err := json.Unmarshal(msg.Data, execution)
+	if err != nil {
+		Log.Warningf("Failed to unmarshal contract execution during NATS tx message handling")
+		return
+	}
+
+	if execution.ContractID == nil {
+		Log.Errorf("Invalid tx message; missing contract_id")
+		return
+	}
+
+	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
+		if execution.Wallet != nil {
+			Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
+			return
+		}
+		wallet := &Wallet{}
+		wallet.setID(*execution.WalletID)
+		execution.Wallet = wallet
+	}
+
+	contract := &Contract{}
+	DatabaseConnection().Where("id = ?", *execution.ContractID).Find(&contract)
+	if contract == nil || contract.ID == uuid.Nil {
+		Log.Errorf("Unable to execute contract; contract not found: %s", contract.ID)
+		return
+	}
+
+	gas := execution.Gas
+	if gas == nil {
+		gas64 := float64(0)
+		gas = &gas64
+	}
+	_gas, _ := big.NewFloat(*gas).Uint64()
+
+	executionResponse, err := contract.Execute(execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
+	if err != nil {
+		Log.Warningf("Failed to execute contract")
+		return
+		// natsConnection := natsConnection(natsToken)
+		// if natsConnection == nil {
+		// 	Log.Warningf("Unable to nack failed contract execution tx")
+		// 	return
+		// }
+	}
+
+	Log.Debugf("Executed contract; tx: %s", executionResponse)
 }

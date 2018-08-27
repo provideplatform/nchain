@@ -122,14 +122,15 @@ type Contract struct {
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
-	ABI       interface{}   `json:"abi"`
-	NetworkID *uuid.UUID    `json:"network_id"`
-	WalletID  *uuid.UUID    `json:"wallet_id"`
-	Wallet    *Wallet       `json:"wallet"`
-	Gas       *float64      `json:"gas"`
-	Method    string        `json:"method"`
-	Params    []interface{} `json:"params"`
-	Value     *big.Int      `json:"value"`
+	ABI        interface{}   `json:"abi"`
+	NetworkID  *uuid.UUID    `json:"network_id"`
+	ContractID *uuid.UUID    `json:"contract_id"`
+	WalletID   *uuid.UUID    `json:"wallet_id"`
+	Wallet     *Wallet       `json:"wallet"`
+	Gas        *float64      `json:"gas"`
+	Method     string        `json:"method"`
+	Params     []interface{} `json:"params"`
+	Value      *big.Int      `json:"value"`
 }
 
 // ContractExecutionResponse is returned upon successful contract execution

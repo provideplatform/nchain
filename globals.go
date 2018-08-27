@@ -21,6 +21,9 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
+	natsToken string
+	natsURL   string
+
 	newrelicLicenseKey string
 
 	bootstrapOnce sync.Once
@@ -46,6 +49,14 @@ func bootstrap() {
 			lvl = "INFO"
 		}
 		Log = logger.NewLogger("goldmine", lvl, true)
+
+		if os.Getenv("NATS_TOKEN") != "" {
+			natsToken = os.Getenv("NATS_TOKEN")
+		}
+
+		if os.Getenv("NATS_URL") != "" {
+			natsURL = os.Getenv("NATS_URL")
+		}
 
 		if os.Getenv("NEW_RELIC_LICENSE_KEY") != "" {
 			newrelicLicenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
