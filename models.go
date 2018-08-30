@@ -1943,7 +1943,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 
 	txMsg, _ := json.Marshal(e)
 	natsConnection := natsConnection(natsToken)
-	return txMsg, natsConnection.Publish(natsTxSubject, txMsg)
+	return e, natsConnection.Publish(natsTxSubject, txMsg)
 }
 
 // Execute a transaction on the contract instance using a specific signer, value, method and params
