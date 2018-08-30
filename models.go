@@ -2572,7 +2572,9 @@ func (t *Transaction) Create() bool {
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
-				t.fetchReceipt(db, network, wallet)
+				txReceiptMsg, _ := json.Marshal(t)
+				natsConnection := getNatsConnection()
+				natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0
 		}

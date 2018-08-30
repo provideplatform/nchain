@@ -12,6 +12,7 @@ import (
 )
 
 const natsTxSubject = "goldmine-tx"
+const natsTxReceiptSubject = "goldmine-tx-receipt"
 
 var (
 	waitGroup sync.WaitGroup
@@ -30,7 +31,7 @@ var (
 func RunConsumers() {
 	go func() {
 		waitGroup.Add(1)
-		subscribeNats(natsToken)
+		subscribeNats()
 		for _, currencyPair := range currencyPairs {
 			runConsumer(currencyPair)
 		}
@@ -76,7 +77,7 @@ func getNatsConnection() *nats.Conn {
 	return natsConnection
 }
 
-func subscribeNats(token string) {
+func subscribeNats() {
 	natsConnection := getNatsConnection()
 	if natsConnection == nil {
 		return
@@ -86,17 +87,29 @@ func subscribeNats(token string) {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
-			subscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg)
+
+			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg)
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				waitGroup.Done()
 				return
 			}
 			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+
+			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg)
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
+				waitGroup.Done()
+				return
+			}
+			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+
 			waitGroup.Wait()
 
-			subscription.Unsubscribe()
-			subscription.Drain()
+			txSubscription.Unsubscribe()
+			txSubscription.Drain()
+			txReceiptSubscription.Unsubscribe()
+			txReceiptSubscription.Drain()
 		}()
 	}
 }
@@ -152,4 +165,31 @@ func consumeTxMsg(msg *nats.Msg) {
 	}
 
 	Log.Debugf("Executed contract; tx: %s", executionResponse)
+}
+
+func consumeTxReceiptMsg(msg *nats.Msg) {
+	Log.Debugf("Consuming NATS tx receipt message: %s", msg)
+
+	db := DatabaseConnection()
+
+	var tx *Transaction
+	var wallet *Wallet
+
+	err := json.Unmarshal(msg.Data, &tx)
+	if err != nil {
+		Log.Warningf("Failed to umarshal tx receipt message; %s", err.Error())
+		return
+	}
+
+	network, err := tx.GetNetwork()
+	if err != nil {
+		Log.Warningf("Failed to resolve tx network; %s", err.Error())
+	}
+
+	db.Model(&Wallet{}).Where("id = ?", tx.WalletID).Find(&wallet)
+	if wallet != nil {
+		Log.Warningf("Failed to resolve tx wallet")
+	}
+
+	tx.fetchReceipt(db, network, wallet)
 }
