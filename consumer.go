@@ -86,7 +86,7 @@ func subscribeNats(token string) {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
-			_, err := natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
+			subscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg)
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				waitGroup.Done()
@@ -94,6 +94,9 @@ func subscribeNats(token string) {
 			}
 			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
 			waitGroup.Wait()
+
+			subscription.Unsubscribe()
+			subscription.Drain()
 		}()
 	}
 }
