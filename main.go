@@ -883,7 +883,6 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	Log.Debugf("resp: %s", executionResponse)
 	render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 }
 

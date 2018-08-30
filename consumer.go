@@ -80,7 +80,14 @@ func subscribeNats(token string) {
 	waitGroup.Add(1)
 	go func() {
 		defer natsConnection.Close()
-		natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
+		_, err := natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
+		if err != nil {
+			Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
+			waitGroup.Done()
+			return
+		}
+		Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+		waitGroup.Wait()
 	}()
 }
 
@@ -100,7 +107,7 @@ func consumeTxMsg(msg *nats.Msg) {
 	}
 
 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
-		if execution.Wallet != nil {
+		if execution.Wallet != nil && execution.Wallet.ID != execution.Wallet.ID {
 			Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
 			return
 		}
