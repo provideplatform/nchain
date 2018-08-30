@@ -82,18 +82,20 @@ func subscribeNats(token string) {
 		return
 	}
 
-	waitGroup.Add(1)
-	go func() {
-		defer natsConnection.Close()
-		_, err := natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
-		if err != nil {
-			Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
-			waitGroup.Done()
-			return
-		}
-		Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
-		waitGroup.Wait()
-	}()
+	for i := uint64(0); i < natsConsumerConcurrency; i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+			_, err := natsConnection.Subscribe(natsTxSubject, consumeTxMsg)
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
+				waitGroup.Done()
+				return
+			}
+			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+			waitGroup.Wait()
+		}()
+	}
 }
 
 func consumeTxMsg(msg *nats.Msg) {

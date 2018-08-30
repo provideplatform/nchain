@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/nats-io/go-nats"
@@ -23,9 +24,10 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
-	natsConnection *nats.Conn
-	natsToken      string
-	natsURL        string
+	natsConsumerConcurrency uint64
+	natsConnection          *nats.Conn
+	natsToken               string
+	natsURL                 string
 
 	newrelicLicenseKey string
 
@@ -67,6 +69,15 @@ func bootstrap() {
 				Log.Warningf("NATS connection failed; %s", err.Error())
 			} else {
 				natsConnection = conn
+			}
+		}
+
+		if os.Getenv("NATS_CONCURRENCY") != "" {
+			concurrency, err := strconv.ParseUint(os.Getenv("NATS_CONCURRENCY"), 10, 8)
+			if err == nil {
+				natsConsumerConcurrency = concurrency
+			} else {
+				natsConsumerConcurrency = 1
 			}
 		}
 
