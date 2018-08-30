@@ -124,6 +124,7 @@ type Contract struct {
 type ContractExecution struct {
 	ABI        interface{}   `json:"abi"`
 	NetworkID  *uuid.UUID    `json:"network_id"`
+	Contract   *Contract     `json:"-"`
 	ContractID *uuid.UUID    `json:"contract_id"`
 	WalletID   *uuid.UUID    `json:"wallet_id"`
 	Wallet     *Wallet       `json:"wallet"`
@@ -1916,6 +1917,33 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 		Value:    t.Value.BigInt(),
 		Data:     data,
 	}
+}
+
+// Execute an ephemeral ContractExecution
+func (e *ContractExecution) Execute() (interface{}, error) {
+	var _abi *abi.ABI
+	if __abi, abiOk := e.ABI.(abi.ABI); abiOk {
+		_abi = &__abi
+	} else if e.Contract != nil {
+		__abi, err := e.Contract.readEthereumContractAbi()
+		if err != nil {
+			Log.Warningf("Cannot attempt contract execution without ABI")
+			return nil, err
+		}
+		_abi = __abi
+	}
+
+	if _abi != nil {
+		if mthd, ok := _abi.Methods[e.Method]; ok {
+			if mthd.Const {
+				return e.Contract.Execute(e.Wallet, e.Value, e.Method, e.Params, 0)
+			}
+		}
+	}
+
+	txMsg, _ := json.Marshal(e)
+	natsConnection := natsConnection(natsToken)
+	return txMsg, natsConnection.Publish(natsTxSubject, txMsg)
 }
 
 // Execute a transaction on the contract instance using a specific signer, value, method and params

@@ -864,6 +864,7 @@ func contractExecutionHandler(c *gin.Context) {
 		renderError(err.Error(), 422, c)
 		return
 	}
+	execution.Contract = contract
 	execution.ContractID = &contract.ID
 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
 		if execution.Wallet != nil {
@@ -876,29 +877,14 @@ func contractExecutionHandler(c *gin.Context) {
 		execution.Wallet = wallet
 	}
 
-	// gas := execution.Gas
-	// if gas == nil {
-	// 	gas64 := float64(0)
-	// 	gas = &gas64
-	// }
-	// _gas, _ := big.NewFloat(*gas).Uint64()
-
-	txMsg, _ := json.Marshal(execution)
-
-	natsConnection := natsConnection(natsToken)
-	err = natsConnection.Publish(natsTxSubject, txMsg)
-	if err == nil {
-		renderError(err.Error(), 500, c)
+	executionResponse, err := execution.Execute()
+	if err != nil {
+		renderError(err.Error(), 422, c)
 		return
 	}
 
-	// executionResponse, err := contract.Execute(execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
-	// if err != nil {
-	// 	renderError(err.Error(), 422, c)
-	// 	return
-	// }
-
-	render(execution, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+	Log.Debugf("resp: %s", executionResponse)
+	render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 }
 
 // oracles
