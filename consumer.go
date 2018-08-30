@@ -63,16 +63,21 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 	return nil
 }
 
-func natsConnection(token string) *nats.Conn {
-	conn, err := nats.Connect(natsURL, nats.Token(token))
-	if err != nil {
-		Log.Warningf("NATS connection failed; %s", err.Error())
+func getNatsConnection() *nats.Conn {
+	if natsConnection == nil {
+		conn, err := nats.Connect(natsURL, nats.Token(natsToken))
+		if err == nil {
+			natsConnection = conn
+		} else {
+			Log.Warningf("NATS connection failed; %s", err.Error())
+		}
 	}
-	return conn
+
+	return natsConnection
 }
 
 func subscribeNats(token string) {
-	natsConnection := natsConnection(token)
+	natsConnection := getNatsConnection()
 	if natsConnection == nil {
 		return
 	}

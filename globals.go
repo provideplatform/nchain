@@ -5,6 +5,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/nats-io/go-nats"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kthomas/go-logger"
 	newrelic "github.com/newrelic/go-agent"
@@ -21,8 +23,9 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
-	natsToken string
-	natsURL   string
+	natsConnection *nats.Conn
+	natsToken      string
+	natsURL        string
 
 	newrelicLicenseKey string
 
@@ -56,6 +59,15 @@ func bootstrap() {
 
 		if os.Getenv("NATS_URL") != "" {
 			natsURL = os.Getenv("NATS_URL")
+		}
+
+		if natsURL != "" && natsToken != "" {
+			conn, err := nats.Connect(natsURL, nats.Token(natsToken))
+			if err != nil {
+				Log.Warningf("NATS connection failed; %s", err.Error())
+			} else {
+				natsConnection = conn
+			}
 		}
 
 		if os.Getenv("NEW_RELIC_LICENSE_KEY") != "" {

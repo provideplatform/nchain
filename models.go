@@ -1942,7 +1942,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 	}
 
 	txMsg, _ := json.Marshal(e)
-	natsConnection := natsConnection(natsToken)
+	natsConnection := getNatsConnection()
 	return e, natsConnection.Publish(natsTxSubject, txMsg)
 }
 
