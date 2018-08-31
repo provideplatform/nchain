@@ -132,6 +132,7 @@ type ContractExecution struct {
 	Method     string        `json:"method"`
 	Params     []interface{} `json:"params"`
 	Value      *big.Int      `json:"value"`
+	Ref        *string       `json:"ref"`
 }
 
 // ContractExecutionResponse is returned upon successful contract execution
@@ -140,6 +141,7 @@ type ContractExecutionResponse struct {
 	Receipt     interface{}  `json:"receipt"`
 	Traces      interface{}  `json:"traces"`
 	Transaction *Transaction `json:"transaction"`
+	Ref         *string      `json:"ref"`
 }
 
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
@@ -185,6 +187,7 @@ type Transaction struct {
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
 	SignedTx      interface{}                `sql:"-" json:"-"`
 	Traces        interface{}                `sql:"-" json:"traces"`
+	Ref           *string                    `json:"ref"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
@@ -1936,7 +1939,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 	if _abi != nil {
 		if mthd, ok := _abi.Methods[e.Method]; ok {
 			if mthd.Const {
-				return e.Contract.Execute(e.Wallet, e.Value, e.Method, e.Params, 0)
+				return e.Contract.Execute(e.Ref, e.Wallet, e.Value, e.Method, e.Params, 0)
 			}
 		}
 	}
@@ -1947,7 +1950,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 }
 
 // Execute a transaction on the contract instance using a specific signer, value, method and params
-func (c *Contract) Execute(wallet *Wallet, value *big.Int, method string, params []interface{}, gas uint64) (*ContractExecutionResponse, error) {
+func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method string, params []interface{}, gas uint64) (*ContractExecutionResponse, error) {
 	var err error
 	db := DatabaseConnection()
 	var network = &Network{}
@@ -1979,6 +1982,7 @@ func (c *Contract) Execute(wallet *Wallet, value *big.Int, method string, params
 		To:            c.Address,
 		Value:         &TxValue{value: value},
 		Params:        &_txParamsJSON,
+		Ref:           ref,
 	}
 
 	var receipt *interface{}

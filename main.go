@@ -761,7 +761,15 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	privateKey, privateKeyOk := params["private_key"].(string)
 	gas, gasOk := params["gas"].(float64)
 
-	execution := &ContractExecution{}
+	ref, err := uuid.NewV4()
+	if err != nil {
+		Log.Warningf("Failed to generate ref id; %s", err.Error())
+	}
+
+	execution := &ContractExecution{
+		Ref: stringOrNil(ref.String()),
+	}
+
 	err = json.Unmarshal(buf, execution)
 	if err != nil {
 		renderError(err.Error(), 422, c)
@@ -811,7 +819,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 
 	_gas, _ := big.NewFloat(gas).Uint64()
-	resp, err := ephemeralContract.Execute(execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
+	resp, err := ephemeralContract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err == nil {
 		render(resp, 202, c)
 	} else {
@@ -858,7 +866,15 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	execution := &ContractExecution{}
+	ref, err := uuid.NewV4()
+	if err != nil {
+		Log.Warningf("Failed to generate ref id; %s", err.Error())
+	}
+
+	execution := &ContractExecution{
+		Ref: stringOrNil(ref.String()),
+	}
+
 	err = json.Unmarshal(buf, execution)
 	if err != nil {
 		renderError(err.Error(), 422, c)

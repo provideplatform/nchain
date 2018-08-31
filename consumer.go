@@ -161,7 +161,7 @@ func consumeTxMsg(msg *nats.Msg) {
 	}
 	_gas, _ := big.NewFloat(*gas).Uint64()
 
-	executionResponse, err := contract.Execute(execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
+	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err != nil {
 		Log.Warningf("Failed to execute contract")
 		return
