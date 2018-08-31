@@ -2013,6 +2013,7 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 			Receipt:     receipt,
 			Traces:      tx.Traces,
 			Transaction: tx,
+			Ref:         ref,
 		}
 	} else if tx.Response.Transaction == nil {
 		tx.Response.Transaction = tx
