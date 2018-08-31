@@ -2326,6 +2326,17 @@ func (t *Transaction) GetNetwork() (*Network, error) {
 	return network, nil
 }
 
+// GetWallet - retrieve the associated transaction wallet
+func (t *Transaction) GetWallet() (*Wallet, error) {
+	db := DatabaseConnection()
+	var wallet = &Wallet{}
+	db.Model(t).Related(&wallet)
+	if wallet == nil {
+		return nil, fmt.Errorf("Failed to retrieve transaction wallet for tx: %s", t.ID)
+	}
+	return wallet, nil
+}
+
 // ParseParams - parse the original JSON params used when the tx was broadcast
 func (t *Transaction) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}

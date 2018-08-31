@@ -181,7 +181,6 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 	db := DatabaseConnection()
 
 	var tx *Transaction
-	var wallet *Wallet
 
 	err := json.Unmarshal(msg.Data, &tx)
 	if err != nil {
@@ -194,7 +193,7 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 		Log.Warningf("Failed to resolve tx network; %s", err.Error())
 	}
 
-	db.Model(&Wallet{}).Where("id = ?", tx.WalletID).Find(&wallet)
+	wallet, err := tx.GetWallet()
 	if wallet != nil {
 		Log.Warningf("Failed to resolve tx wallet")
 	}
