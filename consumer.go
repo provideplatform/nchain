@@ -194,7 +194,7 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 	}
 
 	wallet, err := tx.GetWallet()
-	if wallet != nil {
+	if err != nil {
 		Log.Warningf("Failed to resolve tx wallet")
 	}
 
