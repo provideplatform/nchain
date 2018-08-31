@@ -528,6 +528,10 @@ func networkTransactionsListHandler(c *gin.Context) {
 		query = query.Where("transactions.to IS NULL")
 	}
 
+	if c.Query("ref") != "" {
+		query = query.Where("transactions.ref = ?", c.Query("ref"))
+	}
+
 	if c.Query("status") != "" {
 		query = query.Where("transactions.status IN ?", strings.Split(c.Query("status"), ","))
 	}
@@ -1030,6 +1034,10 @@ func transactionsListHandler(c *gin.Context) {
 	filterContractCreationTx := strings.ToLower(c.Query("filter_contract_creations")) == "true"
 	if filterContractCreationTx {
 		query = query.Where("transactions.to IS NULL")
+	}
+
+	if c.Query("ref") != "" {
+		query = query.Where("transactions.ref = ?", c.Query("ref"))
 	}
 
 	if c.Query("status") != "" {
