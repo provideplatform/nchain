@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strconv"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 )
 
+const natsDefaultClusterID = "provide"
 const natsTxSubject = "goldmine-tx"
 const natsTxReceiptSubject = "goldmine-tx-receipt"
 
@@ -82,7 +84,12 @@ func getNatsConnection() *nats.Conn {
 
 func getNatsStreamingConnection() stan.Conn {
 	if natsStreamingConnection == nil {
-		conn, err := stan.Connect("provide", "goldmine", stan.NatsConn(getNatsConnection()))
+		clientID, err := uuid.NewV4()
+		if err != nil {
+			Log.Warningf("Failed to generate client id for NATS streaming connection; %s", err.Error())
+			return nil
+		}
+		conn, err := stan.Connect(natsDefaultClusterID, fmt.Sprintf("goldmine-%s", clientID.String()), stan.NatsConn(getNatsConnection()))
 		if err == nil {
 			natsStreamingConnection = conn
 		} else {
@@ -180,12 +187,8 @@ func consumeTxMsg(msg *stan.Msg) {
 	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err != nil {
 		Log.Warningf("Failed to execute contract")
+		// FIXME-- Augment NATS support and Nack?
 		return
-		// natsConnection := natsConnection(natsToken)
-		// if natsConnection == nil {
-		// 	Log.Warningf("Unable to nack failed contract execution tx")
-		// 	return
-		// }
 	}
 
 	Log.Debugf("Executed contract; tx: %s", executionResponse)
