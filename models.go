@@ -92,7 +92,7 @@ type NetworkNode struct {
 // Bridge instances are still in the process of being defined.
 type Bridge struct {
 	provide.Model
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"-"`
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id"`
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 }
 
@@ -100,7 +100,7 @@ type Bridge struct {
 // in the future it may represent a logical connection to services of other types
 type Connector struct {
 	provide.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	Name          *string          `sql:"not null" json:"name"`
 	Type          *string          `sql:"not null" json:"type"`
@@ -111,7 +111,7 @@ type Connector struct {
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	provide.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
@@ -147,7 +147,7 @@ type ContractExecutionResponse struct {
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
 type Oracle struct {
 	provide.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"-"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	ContractID    uuid.UUID        `sql:"not null;type:uuid" json:"contract_id"`
 	Name          *string          `sql:"not null" json:"name"`
@@ -159,7 +159,7 @@ type Oracle struct {
 // Token instances must be associated with an application identifier.
 type Token struct {
 	provide.Model
-	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"-"`
+	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"application_id"`
 	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	ContractID     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
 	SaleContractID *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
@@ -174,8 +174,8 @@ type Token struct {
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
 	provide.Model
-	ApplicationID *uuid.UUID                 `sql:"type:uuid" json:"-"`
-	UserID        *uuid.UUID                 `sql:"type:uuid" json:"-"`
+	ApplicationID *uuid.UUID                 `sql:"type:uuid" json:"application_id"`
+	UserID        *uuid.UUID                 `sql:"type:uuid" json:"user_id"`
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
 	WalletID      *uuid.UUID                 `sql:"type:uuid" json:"wallet_id"`
 	To            *string                    `json:"to"`
@@ -193,8 +193,8 @@ type Transaction struct {
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
 type Wallet struct {
 	provide.Model
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"-"`
-	UserID        *uuid.UUID `sql:"type:uuid" json:"-"`
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id"`
+	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id"`
 	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	Address       string     `sql:"not null" json:"address"`
 	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
