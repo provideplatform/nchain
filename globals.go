@@ -6,7 +6,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats-streaming"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kthomas/go-logger"
@@ -26,6 +27,7 @@ var (
 
 	natsConsumerConcurrency uint64
 	natsConnection          *nats.Conn
+	natsStreamingConnection stan.Conn
 	natsToken               string
 	natsURL                 string
 

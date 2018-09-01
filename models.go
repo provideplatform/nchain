@@ -1945,7 +1945,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 	}
 
 	txMsg, _ := json.Marshal(e)
-	natsConnection := getNatsConnection()
+	natsConnection := getNatsStreamingConnection()
 	return e, natsConnection.Publish(natsTxSubject, txMsg)
 }
 
@@ -2589,7 +2589,7 @@ func (t *Transaction) Create() bool {
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
 				txReceiptMsg, _ := json.Marshal(t)
-				natsConnection := getNatsConnection()
+				natsConnection := getNatsStreamingConnection()
 				natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0

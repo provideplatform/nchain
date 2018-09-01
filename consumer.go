@@ -5,10 +5,13 @@ import (
 	"math/big"
 	"strconv"
 	"sync"
+	"time"
+
+	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats-streaming"
 
 	exchangeConsumer "github.com/kthomas/exchange-consumer"
 	uuid "github.com/kthomas/go.uuid"
-	nats "github.com/nats-io/go-nats"
 )
 
 const natsTxSubject = "goldmine-tx"
@@ -77,8 +80,21 @@ func getNatsConnection() *nats.Conn {
 	return natsConnection
 }
 
+func getNatsStreamingConnection() stan.Conn {
+	if natsStreamingConnection == nil {
+		conn, err := stan.Connect("provide", "goldmine", stan.NatsConn(getNatsConnection()))
+		if err == nil {
+			natsStreamingConnection = conn
+		} else {
+			Log.Warningf("NATS streaming connection failed; %s", err.Error())
+		}
+	}
+
+	return natsStreamingConnection
+}
+
 func subscribeNats() {
-	natsConnection := getNatsConnection()
+	natsConnection := getNatsStreamingConnection()
 	if natsConnection == nil {
 		return
 	}
@@ -88,7 +104,7 @@ func subscribeNats() {
 		go func() {
 			defer natsConnection.Close()
 
-			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg)
+			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg, stan.SetManualAckMode(), stan.AckWait(time.Millisecond*5000))
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				waitGroup.Done()
@@ -99,14 +115,14 @@ func subscribeNats() {
 			waitGroup.Wait()
 
 			txSubscription.Unsubscribe()
-			txSubscription.Drain()
+			// txSubscription.Drain()
 		}()
 
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
 
-			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg)
+			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout))
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				waitGroup.Done()
@@ -117,12 +133,12 @@ func subscribeNats() {
 			waitGroup.Wait()
 
 			txReceiptSubscription.Unsubscribe()
-			txReceiptSubscription.Drain()
+			// txReceiptSubscription.Drain()
 		}()
 	}
 }
 
-func consumeTxMsg(msg *nats.Msg) {
+func consumeTxMsg(msg *stan.Msg) {
 	Log.Debugf("Consuming NATS tx message: %s", msg)
 
 	execution := &ContractExecution{}
@@ -173,9 +189,10 @@ func consumeTxMsg(msg *nats.Msg) {
 	}
 
 	Log.Debugf("Executed contract; tx: %s", executionResponse)
+	msg.Ack()
 }
 
-func consumeTxReceiptMsg(msg *nats.Msg) {
+func consumeTxReceiptMsg(msg *stan.Msg) {
 	Log.Debugf("Consuming NATS tx receipt message: %s", msg)
 
 	db := DatabaseConnection()
@@ -199,4 +216,5 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 	}
 
 	tx.fetchReceipt(db, network, wallet)
+	msg.Ack()
 }
