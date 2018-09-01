@@ -528,10 +528,6 @@ func networkTransactionsListHandler(c *gin.Context) {
 		query = query.Where("transactions.to IS NULL")
 	}
 
-	if c.Query("ref") != "" {
-		query = query.Where("transactions.ref = ?", c.Query("ref"))
-	}
-
 	if c.Query("status") != "" {
 		query = query.Where("transactions.status IN ?", strings.Split(c.Query("status"), ","))
 	}
@@ -1036,10 +1032,6 @@ func transactionsListHandler(c *gin.Context) {
 		query = query.Where("transactions.to IS NULL")
 	}
 
-	if c.Query("ref") != "" {
-		query = query.Where("transactions.ref = ?", c.Query("ref"))
-	}
-
 	if c.Query("status") != "" {
 		query = query.Where("transactions.status IN ?", strings.Split(c.Query("status"), ","))
 	}
@@ -1095,11 +1087,16 @@ func transactionDetailsHandler(c *gin.Context) {
 		return
 	}
 
+	db := DatabaseConnection()
+
 	var tx = &Transaction{}
-	DatabaseConnection().Where("id = ?", c.Param("id")).Find(&tx)
+	db.Where("id = ?", c.Param("id")).Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
-		renderError("transaction not found", 404, c)
-		return
+		db.Where("ref = ?", c.Param("id")).Find(&tx)
+		if tx == nil || tx.ID == uuid.Nil {
+			renderError("transaction not found", 404, c)
+			return
+		}
 	} else if appID != nil && tx.ApplicationID != nil && *tx.ApplicationID != *appID {
 		renderError("forbidden", 403, c)
 		return
