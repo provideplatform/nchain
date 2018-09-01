@@ -1100,7 +1100,7 @@ func transactionDetailsHandler(c *gin.Context) {
 	if tx == nil || tx.ID == uuid.Nil {
 		renderError("transaction not found", 404, c)
 		return
-	} else if appID != nil && *tx.ApplicationID != *appID {
+	} else if appID != nil && tx.ApplicationID != nil && *tx.ApplicationID != *appID {
 		renderError("forbidden", 403, c)
 		return
 	}
