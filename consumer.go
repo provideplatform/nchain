@@ -17,7 +17,9 @@ import (
 
 const natsDefaultClusterID = "provide"
 const natsTxSubject = "goldmine-tx"
+const natsTxMaxInFlight = 128
 const natsTxReceiptSubject = "goldmine-tx-receipt"
+const natsTxReceiptMaxInFlight = 64
 
 var (
 	waitGroup sync.WaitGroup
@@ -111,7 +113,7 @@ func subscribeNats() {
 		go func() {
 			defer natsConnection.Close()
 
-			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg, stan.SetManualAckMode(), stan.AckWait(time.Millisecond*5000))
+			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg, stan.SetManualAckMode(), stan.AckWait(time.Millisecond*10000), stan.MaxInflight(natsTxMaxInFlight), stan.DurableName(natsTxSubject))
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				waitGroup.Done()
@@ -122,14 +124,13 @@ func subscribeNats() {
 			waitGroup.Wait()
 
 			txSubscription.Unsubscribe()
-			// txSubscription.Drain()
 		}()
 
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
 
-			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout))
+			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout), stan.MaxInflight(natsTxReceiptMaxInFlight), stan.DurableName(natsTxReceiptSubject))
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				waitGroup.Done()
@@ -140,7 +141,6 @@ func subscribeNats() {
 			waitGroup.Wait()
 
 			txReceiptSubscription.Unsubscribe()
-			// txReceiptSubscription.Drain()
 		}()
 	}
 }

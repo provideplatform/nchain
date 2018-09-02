@@ -23,6 +23,7 @@ func main() {
 	RunConsumers()
 
 	r := gin.Default()
+	r.Use(gin.Recovery())
 	configureNewRelicTransactionMiddleware(r)
 
 	r.GET("/api/v1/networks", networksListHandler)
