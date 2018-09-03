@@ -91,7 +91,10 @@ func getNatsStreamingConnection() stan.Conn {
 			Log.Warningf("Failed to generate client id for NATS streaming connection; %s", err.Error())
 			return nil
 		}
-		conn, err := stan.Connect(natsDefaultClusterID, fmt.Sprintf("goldmine-%s", clientID.String()), stan.NatsConn(getNatsConnection()))
+		conn, err := stan.Connect(natsDefaultClusterID, fmt.Sprintf("goldmine-%s", clientID.String()), stan.NatsConn(getNatsConnection()), stan.SetConnectionLostHandler(func(_ stan.Conn, reason error) {
+			natsStreamingConnection = nil
+			subscribeNats()
+		}))
 		if err == nil {
 			natsStreamingConnection = conn
 		} else {
@@ -108,6 +111,11 @@ func subscribeNats() {
 		return
 	}
 
+	createNatsTxSubscriptions(natsConnection)
+	createNatsTxReceiptSubscriptions(natsConnection)
+}
+
+func createNatsTxSubscriptions(natsConnection stan.Conn) {
 	for i := uint64(0); i < natsConsumerConcurrency; i++ {
 		waitGroup.Add(1)
 		go func() {
@@ -125,7 +133,11 @@ func subscribeNats() {
 
 			txSubscription.Unsubscribe()
 		}()
+	}
+}
 
+func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsConsumerConcurrency; i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
