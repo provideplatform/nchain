@@ -198,7 +198,7 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err != nil {
-		Log.Warningf("Failed to execute contract")
+		Log.Warningf("Failed to execute contract; %s", err.Error())
 		// FIXME-- Augment NATS support and Nack?
 		return
 	}
