@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql/driver"
@@ -1711,6 +1712,11 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			var out interface{}
 			if len(abiMethod.Outputs) == 1 {
 				err = abiMethod.Outputs.Unpack(&out, result)
+				if err == nil {
+					if outbytes, outbytesOk := out.([][32]byte); outbytesOk {
+						out = []string{string(bytes.Trim(outbytes[0][:], "\x00"))}
+					}
+				}
 			} else if len(abiMethod.Outputs) > 1 {
 				// handle tuple
 				vals := make([]interface{}, len(abiMethod.Outputs))
