@@ -1713,8 +1713,21 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			if len(abiMethod.Outputs) == 1 {
 				err = abiMethod.Outputs.Unpack(&out, result)
 				if err == nil {
-					if outbytes, outbytesOk := out.([][32]byte); outbytesOk {
-						out = []string{string(bytes.Trim(outbytes[0][:], "\x00"))}
+					typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
+					Log.Debugf("Attempting to marshal %s result of constant contract execution of %s on contract: %s", typestr, methodDescriptor, c.ID)
+					switch out.(type) {
+					case [32]byte:
+						arrbytes, _ := out.([32]byte)
+						out = string(bytes.Trim(arrbytes[:], "\x00"))
+					case [][32]byte:
+						arrbytesarr, _ := out.([][32]byte)
+						vals := make([]string, len(arrbytesarr))
+						for i, item := range arrbytesarr {
+							vals[i] = string(bytes.Trim(item[:], "\x00"))
+						}
+						out = vals
+					default:
+						Log.Debugf("Noop during marshaling of constant contract execution of %s on contract: %s", methodDescriptor, c.ID)
 					}
 				}
 			} else if len(abiMethod.Outputs) > 1 {
