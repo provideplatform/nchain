@@ -199,8 +199,8 @@ func consumeTxMsg(msg *stan.Msg) {
 	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
 	if err != nil {
 		Log.Warningf("Failed to execute contract; %s", err.Error())
+		Log.Warningf("NATS message dropped: %s", msg)
 		// FIXME-- Augment NATS support and Nack?
-		return
 	}
 
 	Log.Debugf("Executed contract; tx: %s", executionResponse)
