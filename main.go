@@ -900,7 +900,12 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+	switch executionResponse.(type) {
+	case *ContractExecutionResponse:
+		render(executionResponse, 200, c) // returns 202 Accepted status to indicate the contract invocation was able to return a syncronous response
+	default:
+		render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+	}
 }
 
 // oracles
