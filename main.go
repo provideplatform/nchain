@@ -902,8 +902,14 @@ func contractExecutionHandler(c *gin.Context) {
 
 	switch executionResponse.(type) {
 	case *ContractExecutionResponse:
-		render(executionResponse, 200, c) // returns 202 Accepted status to indicate the contract invocation was able to return a syncronous response
+		executionResponse = map[string]interface{}{
+			"response": executionResponse.(*ContractExecutionResponse).Response,
+		}
+		render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
 	default:
+		executionResponse = map[string]interface{}{
+			"ref": executionResponse.(*ContractExecution).Ref,
+		}
 		render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 	}
 }
