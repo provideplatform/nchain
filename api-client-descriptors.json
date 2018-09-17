@@ -1,0 +1,45 @@
+[
+    {
+      "name": "curl",
+      "repository_url": null,
+      "setup_instructions": null,
+      "template": "curl -v -XPOST https://goldmine.provide.services/api/v1/contracts/{{ contractId }}/execution \\n-H 'content-type: application/json' \\-H 'authorization: bearer {{ apiToken }}' \\\n-d '{\"wallet_id\": \"{{ walletId }}\", \"method\": \"{{ method }}\", \"params\": {{ params }}, \"value\": {{ value }}}'"
+    },
+    {
+      "name": "golang",
+      "repository_url": "https://github.com/provideservices/provide-go",
+      "setup_instructions": "go get github.com/provideservices/provide-go",
+      "template": "import \"github.com/provideservices/provide-go\"\n\nparams := map[string]interface{}{\\n\\t\"wallet_id\": \"{{ walletId }}\",\\n\\t\"method\": \"{{ method }}\",\\n\\t\"params\": {{ params }},\\n\\t\"value\": {{ value }}\\n,}\\nstatus, resp, err := provide.ExecuteContract(\"{{ apiToken }}\", \"{{ contractId }}\", params)"
+    },
+    {
+      "name": "groovy",
+      "repository_url": "https://github.com/provideservices/provide-groovy",
+      "setup_instructions": null,
+      "template": null
+    },
+    {
+      "name": "js",
+      "repository_url": "https://github.com/provideservices/provide-js",
+      "setup_instructions": "npm install provide-js",
+      "template": null
+    },
+    {
+      "name": "python",
+      "repository_url": "https://github.com/provideservices/provide-python",
+      "setup_instructions": "pip install prvd",
+      "template": "from prvd.goldmine import Goldmine\\n\\nclient = Goldmine('{{ apiToken }}')\\nparams = { 'wallet_id': '{{ identityId }}', 'method': '{{ method }}', 'value': {{ value }}, 'params': {{ params }} }\\nclient.execute_contract('{{ contractId }}', params)"
+    },
+    {
+      "name": "ruby",
+      "repository_url": "https://github.com/provideservices/provide-ruby",
+      "setup_instructions": "gem install provide-ruby",
+      "template": "require 'provide-ruby'\n\nBlockchainService.execute_contract('{{ apiToken }}', '{{ contractId }}', { wallet_id: '{{ identityId }}', method: '{{ method }}', value: {{ value }}, params: {{ params }} })"
+    },
+    {
+      "name": "swift",
+      "repository_url": "https://github.com/provideservices/provide-swift",
+      "setup_instructions": "pod install provide",
+      "template": null
+    }
+  ]
+  
