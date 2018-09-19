@@ -110,11 +110,35 @@ func GetSecurityGroups(accessKeyID, secretAccessKey, region string) (response *e
 	return response, err
 }
 
-// GetSubnets retrieves EC2 subnet details for the given region
-func GetSubnets(accessKeyID, secretAccessKey, region string) (response *ec2.DescribeSubnetsOutput, err error) {
+// GetVPCs retrieves EC2 VPC details for the given region
+func GetVPCs(accessKeyID, secretAccessKey, region string, vpcID *string) (response *ec2.DescribeVpcsOutput, err error) {
 	client, err := NewEC2(accessKeyID, secretAccessKey, region)
 
-	response, err = client.DescribeSubnets(&ec2.DescribeSubnetsInput{})
+	response, err = client.DescribeVpcs(&ec2.DescribeVpcsInput{})
+
+	if err != nil {
+		Log.Warningf("EC2 VPC details retrieval failed for region: %s; %s", region, err.Error())
+		return nil, err
+	}
+
+	return response, err
+}
+
+// GetSubnets retrieves EC2 subnet details for the given region
+func GetSubnets(accessKeyID, secretAccessKey, region string, vpcID *string) (response *ec2.DescribeSubnetsOutput, err error) {
+	client, err := NewEC2(accessKeyID, secretAccessKey, region)
+
+	describeSubnetsInput := &ec2.DescribeSubnetsInput{}
+	subnetFilters := make([]*ec2.Filter, 0)
+	if vpcID != nil {
+		subnetFilters = append(subnetFilters, &ec2.Filter{
+			Name:   stringOrNil("DescribeSubnets"),
+			Values: []*string{vpcID},
+		})
+	}
+	describeSubnetsInput.SetFilters(subnetFilters)
+
+	response, err = client.DescribeSubnets(describeSubnetsInput)
 
 	if err != nil {
 		Log.Warningf("EC2 subnet details retrieval failed for region: %s; %s", region, err.Error())
@@ -378,7 +402,18 @@ func StartContainer(accessKeyID, secretAccessKey, region, taskDefinition string,
 			subnets = append(subnets, stringOrNil(subnetIds[i]))
 		}
 	} else {
-		availableSubnets, err := GetSubnets(accessKeyID, secretAccessKey, region)
+		vpcID := awsDefaultVpcID
+		if vpcID == "" {
+			vpcsResp, err := GetVPCs(accessKeyID, secretAccessKey, region, nil)
+			if err != nil {
+				return taskIds, fmt.Errorf("Failed to start container in region: %s; %s", region, err.Error())
+			}
+			if len(vpcsResp.Vpcs) > 0 {
+				Log.Warningf("No default AWS VPC id provided; attempt to start container in %s region will use arbitrary VPC", region)
+				vpcID = *vpcsResp.Vpcs[0].VpcId
+			}
+		}
+		availableSubnets, err := GetSubnets(accessKeyID, secretAccessKey, region, stringOrNil(vpcID))
 		if err == nil {
 			for i := range availableSubnets.Subnets {
 				subnets = append(subnets, availableSubnets.Subnets[i].SubnetId)

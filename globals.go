@@ -25,6 +25,8 @@ var (
 	GpgPrivateKey       string
 	WalletEncryptionKey string
 
+	awsDefaultVpcID string
+
 	natsConsumerConcurrency uint64
 	natsConnection          *nats.Conn
 	natsStreamingConnection stan.Conn
@@ -56,6 +58,10 @@ func bootstrap() {
 			lvl = "INFO"
 		}
 		Log = logger.NewLogger("goldmine", lvl, true)
+
+		if os.Getenv("AWS_DEFAULT_VPC_ID") != "" {
+			awsDefaultVpcID = os.Getenv("AWS_DEFAULT_VPC_ID")
+		}
 
 		if os.Getenv("NATS_TOKEN") != "" {
 			natsToken = os.Getenv("NATS_TOKEN")
