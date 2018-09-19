@@ -132,7 +132,7 @@ func GetSubnets(accessKeyID, secretAccessKey, region string, vpcID *string) (res
 	subnetFilters := make([]*ec2.Filter, 0)
 	if vpcID != nil {
 		subnetFilters = append(subnetFilters, &ec2.Filter{
-			Name:   stringOrNil("DescribeSubnets"),
+			Name:   stringOrNil("vpc-id"),
 			Values: []*string{vpcID},
 		})
 	}
