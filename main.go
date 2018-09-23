@@ -7,7 +7,9 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
 	provide "github.com/provideservices/provide-go"
@@ -24,6 +26,15 @@ func main() {
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	configureNewRelicTransactionMiddleware(r)
 
 	r.GET("/api/v1/networks", networksListHandler)
@@ -111,7 +122,6 @@ func authorizedSubjectId(c *gin.Context, subject string) *uuid.UUID {
 }
 
 func render(obj interface{}, status int, c *gin.Context) {
-	c.Header("access-control-allow-origin", "*")
 	c.Header("content-type", "application/json; charset=UTF-8")
 	c.Writer.WriteHeader(status)
 	if &obj != nil && status != http.StatusNoContent {
