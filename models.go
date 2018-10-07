@@ -114,6 +114,7 @@ type Contract struct {
 	provide.Model
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	ContractID    *uuid.UUID       `sql:"type:uuid" json:"contract_id"`    // id of the contract which created the contract (or null)
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
 	Address       *string          `sql:"not null" json:"address"`
@@ -1655,6 +1656,20 @@ func ContractListQuery() *gorm.DB {
 	return DatabaseConnection().Select("contracts.id, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.name, contracts.address")
 }
 
+// CompiledArtifact - parse the original JSON params used for contract creation and attempt to unmarshal to a provide.CompiledArtifact
+func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
+	artifact := &provide.CompiledArtifact{}
+	params := c.ParseParams()
+	if params != nil {
+		err := json.Unmarshal(*c.Params, &artifact)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal contract params to compiled artifact; %s", err.Error())
+			return nil
+		}
+	}
+	return artifact
+}
+
 // ParseParams - parse the original JSON params used for contract creation
 func (c *Contract) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}
@@ -2525,6 +2540,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 
 						t.updateStatus(db, "success")
 						t.handleEthereumTxReceipt(db, network, wallet, receipt)
+						t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
 						ticker.Stop()
 						return
 					}
@@ -2560,6 +2576,67 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wal
 			contract.resolveTokenContract(db, network, wallet, client, receipt)
 		} else {
 			Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
+		}
+	}
+}
+
+func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *Network, wallet *Wallet, traces *provide.EthereumTxTraceResponse) {
+	contract := t.GetContract(db)
+	if contract == nil {
+		Log.Warningf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")
+		return
+	}
+	artifact := contract.CompiledArtifact()
+	if artifact == nil {
+		Log.Warningf("Failed to resolve compiled contract artifact required for contract-internal opcode tracing functionality")
+		return
+	}
+
+	// client, err := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
+	// if err != nil {
+	// 	Log.Warningf("Unable to handle ethereum tx traces; %s", err.Error())
+	// 	return
+	// }
+
+	for _, result := range traces.Result {
+		if result.Type != nil && *result.Type == "create" {
+			contractAddr := result.Result.Address
+			contractCode := result.Result.Code
+
+			if contractAddr == nil || contractCode == nil {
+				Log.Warningf("No contract address or bytecode resolved for contract-internal CREATE opcode; tx hash: %s", *t.Hash)
+				continue
+			}
+
+			for name, dep := range artifact.Deps {
+				dependency := dep.(map[string]interface{})
+				fingerprint := dependency["fingerprint"].(string)
+				if fingerprint == "" {
+					continue
+				}
+
+				fingerprintSuffix := fmt.Sprintf("%s0029", fingerprint)
+				if strings.HasSuffix(*contractCode, fingerprintSuffix) {
+					params, _ := json.Marshal(dep)
+					rawParams := json.RawMessage(params)
+					internalContract := &Contract{
+						ApplicationID: t.ApplicationID,
+						NetworkID:     t.NetworkID,
+						ContractID:    &contract.ID,
+						TransactionID: &t.ID,
+						Name:          stringOrNil(name),
+						Address:       contractAddr,
+						Params:        &rawParams,
+					}
+					if internalContract.Create() {
+						Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
+						// FIXME-- contract.resolveTokenContract(db, network, wallet, client, receipt)
+					} else {
+						Log.Warningf("Failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
+					}
+					break
+				}
+			}
 		}
 	}
 }
@@ -2615,6 +2692,16 @@ func (t *Transaction) Create() bool {
 		}
 	}
 	return false
+}
+
+// GetContract - attempt to resolve the contract associated with the tx execution
+func (t *Transaction) GetContract(db *gorm.DB) *Contract {
+	var contract *Contract
+	if t.To != nil {
+		contract = &Contract{}
+		db.Model(&Contract{}).Where("network_id = ? AND address = ?", t.NetworkID, t.To).Find(&contract)
+	}
+	return contract
 }
 
 // Validate a transaction for persistence
