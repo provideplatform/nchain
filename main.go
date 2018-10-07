@@ -503,7 +503,7 @@ func networkTokensListHandler(c *gin.Context) {
 		return
 	}
 
-	query := DatabaseConnection().Where("tokens.network_id = ?", c.Param("id"))
+	query := DatabaseConnection().Where("tokens.network_id = ? AND tokens.application_id IS NULL", c.Param("id"))
 
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
