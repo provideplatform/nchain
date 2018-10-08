@@ -1794,7 +1794,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				tx.SignedTx, tx.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), uint64(gas))
 				isUnique, _ := tx.IsUnique()
 				if !isUnique {
-					tx.updateStatus(DatabaseConnection(), "failed", "duplicate tx hash")
+					tx.updateStatus(DatabaseConnection(), "duplicate tx hash", &desc)
 					return nil, nil, fmt.Errorf("Duplicate tx hash: %s", *tx.Hash)
 				}
 				if err == nil {
