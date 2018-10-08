@@ -1972,9 +1972,9 @@ func (t *Transaction) IsUnique() (bool, error) {
 	if t.Hash == nil {
 		return false, fmt.Errorf("Unable to determine if transaction hash is unique for null hash")
 	}
-	count := uint64(0)
+	var count *uint64
 	DatabaseConnection().Model(&Transaction{}).Where("hash = ?", *t.Hash).Count(&count)
-	isUnique := count == 0
+	isUnique := *count == 0
 	return isUnique, nil
 }
 
