@@ -2563,7 +2563,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 						t.updateStatus(db, "success", nil)
 						t.handleEthereumTxReceipt(db, network, wallet, receipt)
 						t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
-¡						return
+						return
 					}
 				}
 			}
