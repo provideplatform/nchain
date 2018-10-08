@@ -2547,6 +2547,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 						}
 					} else {
 						Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
+						ticker.Stop()
 
 						traces, traceErr := provide.TraceTx(network.ID.String(), network.rpcURL(), t.Hash)
 						if traceErr != nil {
@@ -2562,8 +2563,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 						t.updateStatus(db, "success", nil)
 						t.handleEthereumTxReceipt(db, network, wallet, receipt)
 						t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
-						ticker.Stop()
-						return
+¡						return
 					}
 				}
 			}
