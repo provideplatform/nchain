@@ -190,7 +190,7 @@ type Transaction struct {
 	SignedTx      interface{}                `sql:"-" json:"-"`
 	Traces        interface{}                `sql:"-" json:"traces"`
 	Ref           *string                    `json:"ref"`
-	Description   *string                    `json:"Description"`
+	Description   *string                    `json:"description"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
@@ -1792,6 +1792,11 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			if publicKeyOk && privateKeyOk {
 				Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
 				tx.SignedTx, tx.Hash, err = provide.SignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), uint64(gas))
+				isUnique, _ := tx.IsUnique()
+				if !isUnique {
+					tx.updateStatus(DatabaseConnection(), "duplicate tx hash", &desc)
+					return nil, nil, fmt.Errorf("Duplicate tx hash: %s", *tx.Hash)
+				}
 				if err == nil {
 					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
 						err = provide.BroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
@@ -1960,6 +1965,17 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 		Value:    t.Value.BigInt(),
 		Data:     data,
 	}
+}
+
+// IsUnique checks if the transaction hash exists in the database; returns true if the hash is nil or
+func (t *Transaction) IsUnique() (bool, error) {
+	if t.Hash == nil {
+		return false, fmt.Errorf("Unable to determine if transaction hash is unique for null hash")
+	}
+	count := uint64(0)
+	DatabaseConnection().Model(&Transaction{}).Where("hash = ?", *t.Hash).Count(&count)
+	isUnique := count == 0
+	return isUnique, nil
 }
 
 // Execute an ephemeral ContractExecution
