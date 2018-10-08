@@ -2721,9 +2721,12 @@ func (t *Transaction) Create() bool {
 					desc := err.Error()
 					t.updateStatus(db, "failed", &desc)
 				} else {
-					txReceiptMsg, _ := json.Marshal(t)
-					natsConnection := getNatsStreamingConnection()
-					natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
+					isUnique, _ := t.IsUnique()
+					if isUnique {
+						txReceiptMsg, _ := json.Marshal(t)
+						natsConnection := getNatsStreamingConnection()
+						natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
+					}
 				}
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0
