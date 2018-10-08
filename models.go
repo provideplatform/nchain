@@ -2528,8 +2528,8 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 				case <-ticker.C:
 					receipt, err := provide.GetTxReceipt(network.ID.String(), network.rpcURL(), *t.Hash, wallet.Address)
 					if err != nil {
+						Log.Debugf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
 						if err == ethereum.NotFound {
-							Log.Debugf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
 							if time.Now().Sub(startedAt) >= receiptTickerTimeout {
 								Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; timing out after %v", *t.Hash, receiptTickerTimeout)
 								t.updateStatus(db, "failed", stringOrNil("failed to fetch tx receipt"))
@@ -2537,13 +2537,15 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 								return
 							}
 						} else {
-							Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
-							t.Errors = append(t.Errors, &provide.Error{
-								Message: stringOrNil(err.Error()),
-							})
-							t.updateStatus(db, "failed", stringOrNil(err.Error()))
-							ticker.Stop()
-							return
+							if time.Now().Sub(startedAt) >= receiptTickerTimeout {
+								Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; timing out after %v", *t.Hash, receiptTickerTimeout)
+								t.Errors = append(t.Errors, &provide.Error{
+									Message: stringOrNil(err.Error()),
+								})
+								t.updateStatus(db, "failed", stringOrNil(err.Error()))
+								ticker.Stop()
+								return
+							}
 						}
 					} else {
 						Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
