@@ -1795,8 +1795,9 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				isUnique, _ := tx.IsUnique()
 				if !isUnique {
 					tx.updateStatus(DatabaseConnection(), "failed", stringOrNil("duplicate tx hash"))
-					return nil, nil, fmt.Errorf("Duplicate tx hash: %s", *tx.Hash)
+					err = fmt.Errorf("Duplicate tx hash: %s", *tx.Hash)
 				}
+
 				if err == nil {
 					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
 						err = provide.BroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
@@ -2501,6 +2502,7 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 
 			isUnique, _ := t.IsUnique()
 			if !isUnique {
+				t.updateStatus(db, "failed", stringOrNil("duplicate tx hash"))
 				err = fmt.Errorf("Duplicate tx hash: %s", *t.Hash)
 			}
 		} else {
