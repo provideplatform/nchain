@@ -2541,7 +2541,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 							t.Errors = append(t.Errors, &provide.Error{
 								Message: stringOrNil(err.Error()),
 							})
-							t.updateStatus(db, "failed", stringOrNil("failed to fetch tx receipt"))
+							t.updateStatus(db, "failed", stringOrNil(err.Error()))
 							ticker.Stop()
 							return
 						}
