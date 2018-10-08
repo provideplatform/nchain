@@ -2039,9 +2039,9 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 		desc := err.Error()
 		tx.updateStatus(db, "failed", &desc)
 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
-	} else {
-		tx.updateStatus(db, "success", nil)
 	}
+
+	tx.updateStatus(db, "success", nil)
 
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
@@ -2682,16 +2682,21 @@ func (t *Transaction) Create() bool {
 			return false
 		}
 
-		t.broadcast(db, network, wallet)
+		err = t.broadcast(db, network, wallet)
 		if len(t.Errors) > 0 {
 			return false
 		}
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
-				txReceiptMsg, _ := json.Marshal(t)
-				natsConnection := getNatsStreamingConnection()
-				natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
+				if err != nil {
+					desc := err.Error()
+					t.updateStatus(db, "failed", &desc)
+				} else {
+					txReceiptMsg, _ := json.Marshal(t)
+					natsConnection := getNatsStreamingConnection()
+					natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
+				}
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0
 		}
