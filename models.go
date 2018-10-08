@@ -1811,6 +1811,11 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			}
 		}
 
+		if err != nil {
+			desc := err.Error()
+			tx.updateStatus(DatabaseConnection(), "failed", &desc)
+		}
+
 		if txResponse != nil {
 			Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
 
