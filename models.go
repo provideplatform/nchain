@@ -190,6 +190,7 @@ type Transaction struct {
 	SignedTx      interface{}                `sql:"-" json:"-"`
 	Traces        interface{}                `sql:"-" json:"traces"`
 	Ref           *string                    `json:"ref"`
+	Description   *string                    `json:"Description"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
