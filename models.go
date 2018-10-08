@@ -2036,10 +2036,11 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 	}()
 
 	if err != nil {
-		tx.updateStatus(db, "failed")
+		desc := err.Error()
+		tx.updateStatus(db, "failed", &desc)
 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 	} else {
-		tx.updateStatus(db, "success")
+		tx.updateStatus(db, "success", nil)
 	}
 
 	if tx.Response == nil {
@@ -2386,8 +2387,9 @@ func (t *Transaction) ParseParams() map[string]interface{} {
 	return params
 }
 
-func (t *Transaction) updateStatus(db *gorm.DB, status string) {
+func (t *Transaction) updateStatus(db *gorm.DB, status string, description *string) {
 	t.Status = stringOrNil(status)
+	t.Description = description
 	result := db.Save(&t)
 	errors := result.GetErrors()
 	if len(errors) > 0 {
@@ -2454,7 +2456,8 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil(err.Error()),
 		})
-		t.updateStatus(db, "failed")
+		desc := err.Error()
+		t.updateStatus(db, "failed", &desc)
 	}
 
 	return err
@@ -2486,7 +2489,8 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil(err.Error()),
 		})
-		t.updateStatus(db, "failed")
+		desc := err.Error()
+		t.updateStatus(db, "failed", &desc)
 	}
 
 	accessedAt := time.Now()
@@ -2512,7 +2516,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 							Log.Debugf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
 							if time.Now().Sub(startedAt) >= receiptTickerTimeout {
 								Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; timing out after %v", *t.Hash, receiptTickerTimeout)
-								t.updateStatus(db, "failed")
+								t.updateStatus(db, "failed", stringOrNil("failed to fetch tx receipt"))
 								ticker.Stop()
 								return
 							}
@@ -2521,7 +2525,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 							t.Errors = append(t.Errors, &provide.Error{
 								Message: stringOrNil(err.Error()),
 							})
-							t.updateStatus(db, "failed")
+							t.updateStatus(db, "failed", stringOrNil("failed to fetch tx receipt"))
 							ticker.Stop()
 							return
 						}
@@ -2539,7 +2543,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 						}
 						t.Traces = traces
 
-						t.updateStatus(db, "success")
+						t.updateStatus(db, "success", nil)
 						t.handleEthereumTxReceipt(db, network, wallet, receipt)
 						t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
 						ticker.Stop()
