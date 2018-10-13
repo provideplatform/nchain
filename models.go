@@ -29,6 +29,8 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
+	"github.com/kthomas/go-aws-wrapper"
+
 	provide "github.com/provideservices/provide-go"
 
 	"github.com/jinzhu/gorm"
@@ -931,7 +933,7 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 					if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
 						logs := make([]string, 0)
 						for i := range ids {
-							logEvents, err := GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i].(string), nil)
+							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i].(string), nil)
 							if err == nil && logEvents != nil {
 								for i := range logEvents.Events {
 									event := logEvents.Events[i]
@@ -1165,7 +1167,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 
 			// start security group handling
 			securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-			securityGroup, err := CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, nil)
+			securityGroup, err := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, nil)
 			securityGroupIds := make([]string, 0)
 
 			if securityGroup != nil {
@@ -1186,7 +1188,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				switch egress.(type) {
 				case string:
 					if egress.(string) == "*" {
-						_, err := AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+						_, err := awswrapper.AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
 						if err != nil {
 							Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 						}
@@ -1206,7 +1208,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 								udp = append(udp, int64(_udp[i].(float64)))
 							}
 						}
-						_, err := AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						_, err := awswrapper.AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
 						if err != nil {
 							Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
@@ -1218,7 +1220,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				switch ingress.(type) {
 				case string:
 					if ingress.(string) == "*" {
-						_, err := AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+						_, err := awswrapper.AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
 						if err != nil {
 							Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 						}
@@ -1238,7 +1240,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 								udp = append(udp, int64(_udp[i].(float64)))
 							}
 						}
-						_, err := AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
 						if err != nil {
 							Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
@@ -1266,7 +1268,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						Log.Debugf("Attempting to lookup update for version: %s", version)
 						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
 							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-							instanceIds, err := LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
+							instanceIds, err := awswrapper.LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
 							if err != nil || len(instanceIds) == 0 {
 								n.updateStatus(db, "failed")
 								n.unregisterSecurityGroups()
@@ -1278,7 +1280,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 
 							Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroupIds), imageID, version, region, instanceIds)
 							for i := range instanceIds {
-								SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroupIds)
+								awswrapper.SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroupIds)
 							}
 
 							n.resolveHost(db, network, cfg, instanceIds)
@@ -1326,7 +1328,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						n.setConfig(cfg)
 						db.Save(n)
 
-						taskIds, err := StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
+						taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
 
 						if err != nil || len(taskIds) == 0 {
 							n.updateStatus(db, "failed")
@@ -1371,7 +1373,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 					secretAccessKey := credentials["aws_secret_access_key"].(string)
 
 					if strings.ToLower(providerID) == "ubuntu-vm" {
-						instanceDetails, err := GetInstanceDetails(accessKeyID, secretAccessKey, region, id)
+						instanceDetails, err := awswrapper.GetInstanceDetails(accessKeyID, secretAccessKey, region, id)
 						if err == nil {
 							if len(instanceDetails.Reservations) > 0 {
 								reservation := instanceDetails.Reservations[0]
@@ -1382,7 +1384,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 							}
 						}
 					} else if strings.ToLower(providerID) == "docker" {
-						containerDetails, err := GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
+						containerDetails, err := awswrapper.GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
 						if err == nil {
 							if len(containerDetails.Tasks) > 0 {
 								task := containerDetails.Tasks[0]
@@ -1392,7 +1394,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 										for i := range attachment.Details {
 											kvp := attachment.Details[i]
 											if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
-												interfaceDetails, err := GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, *kvp.Value)
+												interfaceDetails, err := awswrapper.GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, *kvp.Value)
 												if err == nil {
 													if len(interfaceDetails.NetworkInterfaces) > 0 {
 														Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
@@ -1474,7 +1476,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 						return
 					} else if strings.ToLower(providerID) == "docker" {
 						if network.isEthereumNetwork() {
-							logs, err := GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
+							logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
 							if err == nil {
 								for i := range logs.Events {
 									event := logs.Events[i]
@@ -1559,7 +1561,7 @@ func (n *NetworkNode) undeploy() error {
 				for i := range instanceIds {
 					instanceID := instanceIds[i].(string)
 
-					_, err := TerminateInstance(accessKeyID, secretAccessKey, region, instanceID)
+					_, err := awswrapper.TerminateInstance(accessKeyID, secretAccessKey, region, instanceID)
 					if err == nil {
 						Log.Debugf("Terminated EC2 instance with id: %s", instanceID)
 						n.Status = stringOrNil("terminated")
@@ -1572,7 +1574,7 @@ func (n *NetworkNode) undeploy() error {
 				for i := range taskIds {
 					taskID := taskIds[i].(string)
 
-					_, err := StopContainer(accessKeyID, secretAccessKey, region, taskID, nil)
+					_, err := awswrapper.StopContainer(accessKeyID, secretAccessKey, region, taskID, nil)
 					if err == nil {
 						Log.Debugf("Terminated ECS docker container with id: %s", taskID)
 						n.Status = stringOrNil("terminated")
@@ -1639,7 +1641,7 @@ func (n *NetworkNode) unregisterSecurityGroups() error {
 				securityGroupID := securityGroupIds[i].(string)
 
 				if strings.ToLower(targetID) == "aws" {
-					_, err := DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID)
+					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID)
 					if err != nil {
 						Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
 						return err
