@@ -21,20 +21,16 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-
-	"github.com/kthomas/go-aws-wrapper"
-
-	provide "github.com/provideservices/provide-go"
-
 	"github.com/jinzhu/gorm"
+	"github.com/kthomas/go-aws-wrapper"
 	"github.com/kthomas/go.uuid"
+	provide "github.com/provideservices/provide-go"
 )
 
 const hostReachabilityTimeout = time.Minute * 5
@@ -799,8 +795,9 @@ func (n *NetworkNode) relatedNetwork() *Network {
 	return network
 }
 
-func (n *NetworkNode) updateStatus(db *gorm.DB, status string) {
+func (n *NetworkNode) updateStatus(db *gorm.DB, status string, description *string) {
 	n.Status = stringOrNil(status)
+	n.Description = description
 	result := db.Save(&n)
 	errors := result.GetErrors()
 	if len(errors) > 0 {
@@ -970,7 +967,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*Networ
 
 	if count == 0 {
 		pending.Bootnode = true
-		pending.updateStatus(db, "genesis")
+		pending.updateStatus(db, "genesis", nil)
 		bootnodes = append(bootnodes, pending)
 		err := new(bootnodesInitialized)
 		Log.Debugf("Coerced network node into initial bootnode for network with id: %s", n.ID)
@@ -995,8 +992,9 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 		var network = &Network{}
 		db.Model(n).Related(&network)
 		if network == nil || network.ID == uuid.Nil {
-			n.updateStatus(db, "failed")
-			Log.Warningf("Failed to retrieve network for network node: %s", n.ID)
+			desc := fmt.Sprintf("Failed to retrieve network for network node: %s", n.ID)
+			n.updateStatus(db, "failed", &desc)
+			Log.Warning(desc)
 			return
 		}
 
@@ -1088,8 +1086,9 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 		select {
 		case <-ticker.C:
 			if time.Now().Sub(startedAt) >= resolveGenesisTickerTimeout {
-				Log.Warningf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTickerTimeout)
-				n.updateStatus(db, "failed")
+				desc := fmt.Sprintf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTickerTimeout)
+				n.updateStatus(db, "failed", &desc)
+				Log.Warning(desc)
 				ticker.Stop()
 				return
 			}
@@ -1124,36 +1123,41 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 
 	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
 	if !cloneableCfgOk {
-		n.updateStatus(db, "failed")
-		Log.Warningf("Failed to parse cloneable configuration for network node: %s", n.ID)
+		desc := fmt.Sprintf("Failed to parse cloneable configuration for network node: %s", n.ID)
+		n.updateStatus(db, "failed", &desc)
+		Log.Warning(desc)
 		return
 	}
 
 	securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{})
 	if !securityCfgOk {
-		n.updateStatus(db, "failed")
-		Log.Warningf("Failed to parse cloneable security configuration for network node: %s", n.ID)
+		desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
+		n.updateStatus(db, "failed", &desc)
+		Log.Warning(desc)
 		return
 	}
 
 	cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
 	if !cloneableTargetOk {
-		n.updateStatus(db, "failed")
-		Log.Warningf("Failed to parse cloneable target configuration for network node: %s", n.ID)
+		desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
+		n.updateStatus(db, "failed", &desc)
+		Log.Warning(desc)
 		return
 	}
 
 	cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
 	if !cloneableProviderOk {
-		n.updateStatus(db, "failed")
-		Log.Warningf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
+		desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
+		n.updateStatus(db, "failed", &desc)
+		Log.Warning(desc)
 		return
 	}
 
 	providerCfgByRegion, providerCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
 	if !providerCfgByRegionOk && !regionOk {
-		n.updateStatus(db, "failed")
-		Log.Warningf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
+		desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
+		n.updateStatus(db, "failed", &desc)
+		Log.Warningf(desc)
 		return
 	}
 
@@ -1179,8 +1183,9 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 			n.setConfig(cfg)
 
 			if err != nil {
-				Log.Warningf("Failed to create security group in EC2 %s region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
-				n.updateStatus(db, "failed")
+				desc := fmt.Sprintf("Failed to create security group in EC2 %s region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
+				n.updateStatus(db, "failed", &desc)
+				Log.Warning(desc)
 				return
 			}
 
@@ -1270,9 +1275,10 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 							Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
 							instanceIds, err := awswrapper.LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
 							if err != nil || len(instanceIds) == 0 {
-								n.updateStatus(db, "failed")
+								desc := fmt.Sprintf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
+								n.updateStatus(db, "failed", &desc)
 								n.unregisterSecurityGroups()
-								Log.Warningf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
+								Log.Warning(desc)
 								return
 							}
 							Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
@@ -1331,9 +1337,10 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
 
 						if err != nil || len(taskIds) == 0 {
-							n.updateStatus(db, "failed")
+							desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())
+							n.updateStatus(db, "failed", &desc)
 							n.unregisterSecurityGroups()
-							Log.Warningf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())
+							Log.Warning(desc)
 							return
 						}
 						Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", container, region, taskIds)
@@ -1356,9 +1363,10 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 		case <-ticker.C:
 			if n.Host == nil {
 				if time.Now().Sub(startedAt) >= resolveHostTickerTimeout {
-					Log.Warningf("Failed to resolve hostname for network node: %s; timing out after %v", n.ID.String(), resolveHostTickerTimeout)
-					n.updateStatus(db, "failed")
+					desc := fmt.Sprintf("Failed to resolve hostname for network node: %s; timing out after %v", n.ID.String(), resolveHostTickerTimeout)
+					n.updateStatus(db, "failed", &desc)
 					ticker.Stop()
+					Log.Warning(desc)
 					return
 				}
 
@@ -1538,7 +1546,7 @@ func (n *NetworkNode) undeploy() error {
 	Log.Debugf("Attempting to undeploy network node with id: %s", n.ID, n)
 
 	db := DatabaseConnection()
-	n.updateStatus(db, "deprovisioning")
+	n.updateStatus(db, "deprovisioning", nil)
 
 	cfg := n.ParseConfig()
 	targetID, targetOk := cfg["target_id"].(string)
