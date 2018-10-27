@@ -8,12 +8,11 @@ import (
 	"net/http"
 	"strings"
 
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go.uuid"
 	provide "github.com/provideservices/provide-go"
-
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -910,7 +909,8 @@ func contractExecutionHandler(c *gin.Context) {
 		render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
 	default:
 		executionResponse = map[string]interface{}{
-			"ref": executionResponse.(*ContractExecution).Ref,
+			"confidence": nil,
+			"ref":        executionResponse.(*ContractExecution).Ref,
 		}
 		render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 	}
