@@ -1183,7 +1183,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 			n.setConfig(cfg)
 
 			if err != nil {
-				desc := fmt.Sprintf("Failed to create security group in EC2 %s region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
+				desc := fmt.Sprintf("Failed to create security group in EC2 region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
 				n.updateStatus(db, "failed", &desc)
 				Log.Warning(desc)
 				return
