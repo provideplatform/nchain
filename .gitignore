@@ -28,3 +28,7 @@ _cgo_export.*
 
 run_local.sh
 goldmine
+
+# Items generated for CI
+src/
+

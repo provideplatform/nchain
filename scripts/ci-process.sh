@@ -22,14 +22,8 @@ die()
 }
 echo Executing $0 $*
 
-bootstrap_environment() 
+setup_go() 
 {
-    echo '....Setting up environment....'
-    mkdir -p reports/linters
-    export GOPATH=$HOME/go
-    export GOBIN=$GOPATH/bin
-    export PATH=~/.local/bin:$GOBIN:$PATH
-    echo "Path is now: '$PATH'"
     if hash go 2>/dev/null
     then
         echo 'Using' `go version`
@@ -38,9 +32,16 @@ bootstrap_environment()
         sudo apt-get update
         sudo apt-get -y install golang
     fi
+    # Set up Go environment to treat this workspace as within GOPATH. 
+    export GOPATH=`pwd`
+    export GOBIN=$GOPATH/bin
+    export PATH=~/.local/bin:$GOBIN:$PATH
+    echo "PATH is: '$PATH'"
+    mkdir -p $GOPATH/src/github.com/provideapp
+    ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
     echo "GOPATH is: $GOPATH"
     echo '....Go-Getting....'
-    go get -u -v ./...
+    go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
     if hash golint 2>/dev/null
     then
         echo 'Using golint...' # No version command or flag
@@ -48,8 +49,11 @@ bootstrap_environment()
         echo 'Installing golint'
         go get -u golang.org/x/lint/golint
     fi
-    # TODO: any dependency / package management we want to add here. 
-    # go env
+    go env
+}
+
+setup_deployment_tools() 
+{
     if hash python 2>/dev/null
     then
         echo 'Using: ' 
@@ -94,6 +98,14 @@ bootstrap_environment()
         sudo apt-get update
         sudo apt-get -y install jq
     fi
+}
+
+bootstrap_environment() 
+{
+    echo '....Setting up environment....'
+    setup_go
+    setup_deployment_tools
+    mkdir -p reports/linters
     echo '....Environment setup complete....'
 }
 
