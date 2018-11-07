@@ -40,7 +40,7 @@ bootstrap_environment()
     fi
     echo "GOPATH is: $GOPATH"
     echo '....Go-Getting....'
-    go get -v ./...
+    go get -u -v ./...
     if hash golint 2>/dev/null
     then
         echo 'Using golint...' # No version command or flag
