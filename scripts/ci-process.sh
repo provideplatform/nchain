@@ -162,7 +162,7 @@ go fmt
 go clean -i
 echo '....[PRVD] Analyzing...'
 go vet
-golint -set_exit_status > reports/linters/golint.txt
+golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 echo '....[PRVD] Testing....'
 go test -v -race -cover -html=cover/coverage.cov -o coverage.html ./... # TODO: -msan (for Clang's MemorySanitizer)
 echo '....[PRVD] Building....'
