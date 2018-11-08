@@ -1,4 +1,4 @@
-#1/bin/bash
+#!/bin/bash
 # Script for Continuous Integration
 # Example Jenkins usage: 
 #       /bin/bash -c \
