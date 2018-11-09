@@ -113,7 +113,7 @@ type Contract struct {
 	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	ContractID    *uuid.UUID       `sql:"type:uuid" json:"contract_id"`    // id of the contract which created the contract (or null)
-	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which created the contract (or null)
+	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which deployed the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
 	Address       *string          `sql:"not null" json:"address"`
 	Params        *json.RawMessage `sql:"type:json" json:"params"`
@@ -1709,8 +1709,15 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 	params := c.ParseParams()
 	rawSource, rawSourceOk := params["raw_source"].(string)
 	if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
+		db := DatabaseConnection()
+
+		var walletID *uuid.UUID
+		if _walletID, walletIdOk := params["wallet_id"].(string) {
+			walletID = _walletID
+		}
+
 		var network = &Network{}
-		DatabaseConnection().Model(c).Related(&network)
+		db.Model(c).Related(&network)
 
 		argv := make([]interface{}, 0)
 		if _argv, argvOk := params["argv"].([]interface{}); argvOk {
@@ -1736,13 +1743,15 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 			ApplicationID: c.ApplicationID,
 			Data:          &artifact.Bytecode,
 			NetworkID:     c.NetworkID,
-			WalletID:      nil,
+			WalletID:      walletID,
 			To:            nil,
 			Value:         &TxValue{value: big.NewInt(0)},
 			Params:        &deployableArtifactJSON,
 		}
 
 		if tx.Create() {
+			c.TransactionID = &tx.ID
+			db.Save(&c)
 			Log.Debugf("Contract compiled from source and deployed via tx: %s", *tx.Hash)
 		} else {
 			return nil, fmt.Errorf("Failed to deploy compiled contract; tx failed with %d error(s)", len(tx.Errors))
