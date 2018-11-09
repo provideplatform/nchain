@@ -691,10 +691,6 @@ func (n *Network) Nodes() (nodes []*NetworkNode, err error) {
 }
 
 func (n *Network) isEthereumNetwork() bool {
-	if n.Name != nil && strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
-		return true
-	}
-
 	cfg := n.ParseConfig()
 	if cfg != nil {
 		if isEthereumNetwork, ok := cfg["is_ethereum_network"].(bool); ok {
@@ -702,6 +698,30 @@ func (n *Network) isEthereumNetwork() bool {
 		}
 		if _, ok := cfg["parity_json_rpc_url"].(string); ok {
 			return true
+		}
+	}
+	return false
+}
+
+func (n *Network) isHandshakeNetwork() bool {
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isHandshakeNetwork, ok := cfg["is_handshake_network"].(bool); ok {
+			return isHandshakeNetwork
+		}
+	}
+	return false
+}
+
+func (n *Network) isQuorumNetwork() bool {
+	if n.Name != nil && strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
+		return true
+	}
+
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isQuorumNetwork, ok := cfg["is_quorum_network"].(bool); ok {
+			return isQuorumNetwork
 		}
 	}
 	return false
