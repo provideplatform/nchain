@@ -8,14 +8,15 @@ import (
 	"sync"
 	"time"
 
-	nats "github.com/nats-io/go-nats"
-	"github.com/nats-io/go-nats-streaming"
-
 	exchangeConsumer "github.com/kthomas/exchange-consumer"
 	uuid "github.com/kthomas/go.uuid"
+	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats-streaming"
 )
 
 const natsDefaultClusterID = "provide"
+const natsContractCompilerInvocationSubject = "goldmine-contract-compiler-invocation"
+const natsContractCompilerInvocationMaxInFlight = 32
 const natsTxSubject = "goldmine-tx"
 const natsTxMaxInFlight = 128
 const natsTxReceiptSubject = "goldmine-tx-receipt"
@@ -113,6 +114,7 @@ func subscribeNats() {
 
 	createNatsTxSubscriptions(natsConnection)
 	createNatsTxReceiptSubscriptions(natsConnection)
+	createNatsContractCompilerInvocationSubscriptions(natsConnection)
 }
 
 func createNatsTxSubscriptions(natsConnection stan.Conn) {
@@ -153,6 +155,27 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
 			waitGroup.Wait()
 
 			txReceiptSubscription.Unsubscribe()
+		}()
+	}
+}
+
+func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsConsumerConcurrency; i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			contractCompilerInvocationSubscription, err := natsConnection.QueueSubscribe(natsContractCompilerInvocationSubject, natsContractCompilerInvocationSubject, consumeContractCompilerInvocationMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout), stan.MaxInflight(natsContractCompilerInvocationMaxInFlight), stan.DurableName(natsContractCompilerInvocationSubject))
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
+				waitGroup.Done()
+				return
+			}
+			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+
+			waitGroup.Wait()
+
+			contractCompilerInvocationSubscription.Unsubscribe()
 		}()
 	}
 }
@@ -231,5 +254,23 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	}
 
 	tx.fetchReceipt(db, network, wallet)
+	msg.Ack()
+}
+
+func consumeContractCompilerInvocationMsg(msg *stan.Msg) {
+	Log.Debugf("Consuming NATS contract compiler invocation message: %s", msg)
+	var contract *Contract
+
+	err := json.Unmarshal(msg.Data, &contract)
+	if err != nil {
+		Log.Warningf("Failed to umarshal contract compiler invocation message; %s", err.Error())
+		return
+	}
+
+	_, err = contract.Compile()
+	if err != nil {
+		Log.Warningf("Failed to compile contract; %s", err.Error())
+	}
+
 	msg.Ack()
 }

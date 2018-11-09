@@ -1701,6 +1701,59 @@ func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
 	return artifact
 }
 
+// Compile the contract if possible
+func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
+	var artifact *provide.CompiledArtifact
+	var err error
+
+	params := c.ParseParams()
+	rawSource, rawSourceOk := params["raw_source"].(string)
+	if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
+		var network = &Network{}
+		DatabaseConnection().Model(c).Related(&network)
+
+		argv := make([]interface{}, 0)
+		if _argv, argvOk := params["argv"].([]interface{}); argvOk {
+			argv = _argv
+		}
+
+		if network.isEthereumNetwork() {
+			optimizerRuns := 200
+			if _optimizerRuns, optimizerRunsOk := params["optimizer_runs"].(int); optimizerRunsOk {
+				optimizerRuns = _optimizerRuns
+			}
+
+			artifact, err = compileSolidity(*c.Name, rawSource, argv, optimizerRuns)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to compile solidity source; %s", err.Error())
+			}
+		}
+
+		artifactJSON, _ := json.Marshal(artifact)
+		deployableArtifactJSON := json.RawMessage(artifactJSON)
+
+		tx := &Transaction{
+			ApplicationID: c.ApplicationID,
+			Data:          &artifact.Bytecode,
+			NetworkID:     c.NetworkID,
+			WalletID:      nil,
+			To:            nil,
+			Value:         &TxValue{value: big.NewInt(0)},
+			Params:        &deployableArtifactJSON,
+		}
+
+		if tx.Create() {
+			Log.Debugf("Contract compiled from source and deployed via tx: %s", *tx.Hash)
+		} else {
+			return nil, fmt.Errorf("Failed to deploy compiled contract; tx failed with %d error(s)", len(tx.Errors))
+		}
+	} else {
+		Log.Warningf("Failed to compile contract; no source code resolved")
+		return nil, nil
+	}
+	return artifact, nil
+}
+
 // ParseParams - parse the original JSON params used for contract creation
 func (c *Contract) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}
@@ -2124,7 +2177,17 @@ func (c *Contract) Create() bool {
 			}
 		}
 		if !db.NewRecord(c) {
-			return rowsAffected > 0
+			success := rowsAffected > 0
+			if success {
+				params := c.ParseParams()
+				_, rawSourceOk := params["raw_source"].(string)
+				if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
+					contractCompilerInvocationMsg, _ := json.Marshal(c)
+					natsConnection := getNatsStreamingConnection()
+					natsConnection.Publish(natsTxSubject, contractCompilerInvocationMsg)
+				}
+			}
+			return success
 		}
 	}
 	return false

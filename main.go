@@ -734,7 +734,13 @@ func createContractHandler(c *gin.Context) {
 	contract.ApplicationID = appID
 
 	if contract.Create() {
-		render(contract, 201, c)
+		params := contract.ParseParams()
+		_, rawSourceOk := params["raw_source"].(string)
+		if rawSourceOk && contract.Name != nil && len(*contract.Name) > 0 {
+			render(contract, 202, c)
+		} else {
+			render(contract, 201, c)
+		}
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = contract.Errors

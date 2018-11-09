@@ -6,11 +6,10 @@ import (
 	"strconv"
 	"sync"
 
-	nats "github.com/nats-io/go-nats"
-	"github.com/nats-io/go-nats-streaming"
-
 	"github.com/gin-gonic/gin"
 	"github.com/kthomas/go-logger"
+	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/go-nats-streaming"
 	newrelic "github.com/newrelic/go-agent"
 )
 
@@ -203,6 +202,7 @@ func shouldServeTLS() bool {
 			tls = true
 		}
 	}
+	// TODO: if FORCE_TLS, gen self-signed cert.
 	return tls
 }
 
