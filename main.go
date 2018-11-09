@@ -25,8 +25,6 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
 
-	configureNewRelicTransactionMiddleware(r)
-
 	r.GET("/api/v1/networks", networksListHandler)
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)
 	r.PUT("/api/v1/networks/:id", updateNetworkHandler)
