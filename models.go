@@ -2184,7 +2184,7 @@ func (c *Contract) Create() bool {
 				if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
 					contractCompilerInvocationMsg, _ := json.Marshal(c)
 					natsConnection := getNatsStreamingConnection()
-					natsConnection.Publish(natsTxSubject, contractCompilerInvocationMsg)
+					natsConnection.Publish(natsContractCompilerInvocationSubject, contractCompilerInvocationMsg)
 				}
 			}
 			return success
