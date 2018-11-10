@@ -144,6 +144,18 @@ type ContractExecutionResponse struct {
 	Ref         *string      `json:"ref"`
 }
 
+// Filter instances must be associated with an application identifier.
+type Filter struct {
+	provide.Model
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	Name          *string          `sql:"not null" json:"name"`
+	Priority      uint8            `sql:"not null;default:0" json:"priority"`
+	Lang          *string          `sql:"not null" json:"lang"`
+	Source        *string          `sql:"not null" json:"source"`
+	Params        *json.RawMessage `sql:"type:json" json:"params"`
+}
+
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
 type Oracle struct {
 	provide.Model
@@ -1712,8 +1724,12 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 		db := DatabaseConnection()
 
 		var walletID *uuid.UUID
-		if _walletID, walletIdOk := params["wallet_id"].(string) {
-			walletID = _walletID
+		if _walletID, walletIdOk := params["wallet_id"].(string); walletIdOk {
+			__walletID, err := uuid.FromString(_walletID)
+			walletID = &__walletID
+			if err != nil {
+				return nil, fmt.Errorf("Failed to parse wallet id for solidity source compile; %s", err.Error())
+			}
 		}
 
 		var network = &Network{}

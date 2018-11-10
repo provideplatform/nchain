@@ -70,6 +70,10 @@ func migrateSchema() {
 		db.Model(&Connector{}).AddIndex("idx_connectors_type", "type")
 		db.Model(&Connector{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
+		db.AutoMigrate(&Filter{})
+		db.Model(&Filter{}).AddIndex("idx_filters_application_id", "application_id")
+		db.Model(&Filter{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+
 		db.AutoMigrate(&Oracle{})
 		db.Model(&Oracle{}).AddIndex("idx_oracles_application_id", "application_id")
 		db.Model(&Oracle{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
