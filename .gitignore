@@ -29,6 +29,9 @@ _cgo_export.*
 run_local.sh
 goldmine
 
+# Miscellaneous
+.DS_Store
+
 # Items generated for CI
 src/
 
