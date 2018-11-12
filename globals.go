@@ -93,7 +93,7 @@ func bootstrap() {
 			if err == nil {
 				streamingTxFilterPoolMaxConnectionCount = connectionCount
 			} else {
-				streamingTxFilterPoolMaxConnectionCount = 0
+				streamingTxFilterPoolMaxConnectionCount = 1
 			}
 		}
 
