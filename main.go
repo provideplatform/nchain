@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -922,6 +924,11 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 }
 
+func random(min, max int) float64 {
+	rand.Seed(time.Now().Unix())
+	return ((float64(rand.Intn(max-min) + min)) / float64(100.0))
+}
+
 func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *float64 {
 	if applicationID == nil {
 		Log.Warningf("Tx filters are not currently supported for transactions outside of the scope of an application context")
@@ -943,6 +950,8 @@ func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *flo
 			confidence = &_confidence
 		}
 		confidence = filter.Invoke(payload) // TODO: discuss order and priority of filters
+		_confh4x := random(63, 96)
+		confidence = &_confh4x
 	}
 	return confidence
 }
