@@ -250,14 +250,14 @@ func (f *Filter) Create() bool {
 func (f *Filter) StartTxStreamingConnectionPool() {
 	params := f.ParseParams()
 	host, hostOk := params["host"].(string)
-	port, portOk := params["port"].(uint64)
+	port, portOk := params["port"].(float64)
 	if hostOk && portOk {
 		if _, filterPoolOk := txFilterConnectionPools[f.ID.String()]; filterPoolOk {
 			Log.Warningf("Attempting to start streaming tx filter pool that has already been allocated; filter id: %s", f.ID)
 			return
 		}
 
-		addr := fmt.Sprintf("%s:%v", host, port)
+		addr := fmt.Sprintf("%s:%d", host, uint64(port))
 		Log.Debugf("Attempting to start streaming tx filter pool: %s; filter id: %s", addr, f.ID)
 
 		txFilterConnectionPools[f.ID.String()] = &streamingConnPool{
