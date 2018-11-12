@@ -170,11 +170,11 @@ go build -v
 echo '....[PRVD] Docker Build....'
 sudo docker build -t provide/goldmine .
 echo '....[PRVD] Docker Tag....'
-sudo docker tag provide/goldmine:latest "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:latest"
 sudo docker tag provide/goldmine:latest "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
 echo '....[PRVD] Docker Push....'
 $(aws ecr get-login --no-include-email --region us-east-1)
 sudo docker push "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+sudo docker push "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:latest"
 echo '....[PRVD] AWS Deployment....'
 perform_deployment
 
