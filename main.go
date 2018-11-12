@@ -20,6 +20,7 @@ func main() {
 	migrateSchema()
 
 	RunConsumers()
+	RunStreamingTxFilterConnectionPools()
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
@@ -912,12 +913,33 @@ func contractExecutionHandler(c *gin.Context) {
 		}
 		render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
 	default:
+		confidence := invokeTxFilters(appID, buf, db)
 		executionResponse = map[string]interface{}{
-			"confidence": nil,
+			"confidence": confidence,
 			"ref":        executionResponse.(*ContractExecution).Ref,
 		}
 		render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 	}
+}
+
+func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *float64 {
+	if applicationID == nil {
+		Log.Warningf("Tx filters are not currently supported for transactions outside of the scope of an application context")
+		return nil
+	}
+
+	var confidence *float64
+	var filters []Filter
+	query := db.Where("application_id = ?", applicationID).Order("priority ASC") // TODO: load the filters into memory
+	query.Find(&filters)
+	for _, filter := range filters {
+		if confidence == nil {
+			_confidence := float64(0.0)
+			confidence = &_confidence
+		}
+		confidence = filter.Invoke(payload) // TODO: discuss order and priority of filters
+	}
+	return confidence
 }
 
 // oracles

@@ -32,6 +32,9 @@ var (
 
 	newrelicLicenseKey string
 
+	streamingTxFilterHost                   string
+	streamingTxFilterPoolMaxConnectionCount uint64
+
 	bootstrapOnce sync.Once
 )
 
@@ -84,6 +87,19 @@ func bootstrap() {
 
 		if os.Getenv("NEW_RELIC_LICENSE_KEY") != "" {
 			newrelicLicenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
+		}
+
+		if os.Getenv("STREAMING_TX_FILTER_HOST") != "" {
+			streamingTxFilterHost = os.Getenv("STREAMING_TX_FILTER_HOST")
+		}
+
+		if os.Getenv("STREAMING_TX_FILTER_POOL_MAX_CONNECTION_COUNT") != "" {
+			connectionCount, err := strconv.ParseUint(os.Getenv("STREAMING_TX_FILTER_POOL_MAX_CONNECTION_COUNT"), 10, 8)
+			if err == nil {
+				streamingTxFilterPoolMaxConnectionCount = connectionCount
+			} else {
+				streamingTxFilterPoolMaxConnectionCount = 0
+			}
 		}
 
 		GpgPublicKey = `

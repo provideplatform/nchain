@@ -215,6 +215,37 @@ type Wallet struct {
 	AccessedAt    *time.Time `json:"accessed_at"`
 }
 
+// ParseParams - parse the original JSON params used for filter creation
+func (f *Filter) ParseParams() map[string]interface{} {
+	params := map[string]interface{}{}
+	if f.Params != nil {
+		err := json.Unmarshal(*f.Params, &params)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal filter params; %s", err.Error())
+			return nil
+		}
+	}
+	return params
+}
+
+// Invoke a filter for the given tx payload
+func (f *Filter) Invoke(txPayload []byte) *float64 {
+	var confidence *float64
+	if connPool, connPoolOk := txFilterConnectionPools[f.ID.String()]; connPoolOk {
+		conn, err := connPool.leaseConnection()
+		if err == nil {
+			n, err := conn.Write(txPayload) // TODO: SetDeadline() to ensure poorly-written filters dont kill the service
+			if err != nil {
+				Log.Warningf("Failed to write %d-byte tx payload to configured filter", len(txPayload))
+				return nil
+			}
+			Log.Debugf("Wrote %d of %d bytes tx payload to configured filter", n, len(txPayload))
+
+		}
+	}
+	return confidence
+}
+
 func (w *Wallet) setID(walletID uuid.UUID) {
 	if w.ID != uuid.Nil {
 		Log.Warningf("Attempted to change a wallet id in memory; wallet id not changed: %s", w.ID)
