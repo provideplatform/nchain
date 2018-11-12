@@ -9,7 +9,7 @@ import (
 
 var (
 	streamingTxFilterPoolWaitGroup sync.WaitGroup
-	txFilterConnectionPools        map[string]*streamingConnPool
+	txFilterConnectionPools        = map[string]*streamingConnPool{}
 )
 
 type streamingConnPool struct {
