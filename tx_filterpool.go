@@ -41,6 +41,14 @@ func RunStreamingTxFilterConnectionPools() {
 	}
 }
 
+func (pool *streamingConnPool) Size() int {
+	return len(pool.conns)
+}
+
+func hasInMemoryStreamingTxConnectionPool(applicationID string) bool {
+	return txFilterConnectionPools[applicationID] != nil
+}
+
 // StartTxFilterPool launches a goroutine for the configured number of connections
 // for the given filter id
 func StartTxFilterPool(filterID string, host string, port uint64) { // FIXME: should this live as a member of *Filter?

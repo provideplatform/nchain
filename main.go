@@ -923,7 +923,7 @@ func contractExecutionHandler(c *gin.Context) {
 }
 
 func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *float64 {
-	if applicationID == nil {
+	if applicationID == nil || !hasInMemoryStreamingTxConnectionPool(applicationID.String()) {
 		Log.Warningf("Tx filters are not currently supported for transactions outside of the scope of an application context")
 		return nil
 	}
