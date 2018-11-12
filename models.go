@@ -49,6 +49,8 @@ const resolveTokenTickerTimeout = time.Minute * 1
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
+const txFilterConnectionPoolLeaseTimeout = time.Millisecond * 50
+
 const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
@@ -293,7 +295,7 @@ func (f *Filter) ParseParams() map[string]interface{} {
 func (f *Filter) Invoke(txPayload []byte) *float64 {
 	var confidence *float64
 	if connPool, connPoolOk := txFilterConnectionPools[f.ID.String()]; connPoolOk {
-		conn, err := connPool.leaseConnection()
+		conn, err := connPool.leaseConnection(txFilterConnectionPoolLeaseTimeout)
 		if err == nil {
 			n, err := conn.Write(txPayload) // TODO: SetDeadline() to ensure poorly-written filters dont kill the service
 			if err != nil {
