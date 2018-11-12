@@ -17,7 +17,6 @@ import (
 const natsDefaultClusterID = "provide"
 const natsContractCompilerInvocationSubject = "goldmine-contract-compiler-invocation"
 const natsContractCompilerInvocationMaxInFlight = 32
-const natsStreamingTxFilterSubject = "streaming-tx-filter"
 const natsTxSubject = "goldmine-tx"
 const natsTxMaxInFlight = 128
 const natsTxReceiptSubject = "goldmine-tx-receipt"
@@ -35,9 +34,9 @@ var (
 	}
 )
 
-// runConsumers launches a goroutine for each data feed
+// RunConsumers launches a goroutine for each data feed
 // that has been configured to consume messages
-func runConsumers() {
+func RunConsumers() {
 	go func() {
 		waitGroup.Add(1)
 		subscribeNats()
@@ -59,20 +58,6 @@ func runConsumer(currencyPair string) {
 			Log.Infof("Exiting consumer %s", consumer)
 		}
 	}()
-}
-
-func cacheTxFilters() {
-	db := DatabaseConnection()
-	var filters []Filter
-	db.Find(&filters)
-	for _, filter := range filters {
-		appFilters := txFilters[filter.ApplicationID.String()]
-		if appFilters == nil {
-			appFilters = make([]*Filter, 0)
-			txFilters[filter.ApplicationID.String()] = appFilters
-		}
-		appFilters = append(appFilters, &filter)
-	}
 }
 
 func priceTick(msg *exchangeConsumer.GdaxMessage) error {
