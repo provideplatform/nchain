@@ -48,15 +48,14 @@ const resolveTokenTickerInterval = time.Millisecond * 5000
 const resolveTokenTickerTimeout = time.Minute * 1
 const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
-
-const txFilterConnectionPoolLeaseTimeout = time.Millisecond * 50
-const txFilterConnectionPoolSocketReadDeadline = time.Millisecond * 1000
+const streamingTxFilterReturnTimeout = time.Millisecond * 50
 
 const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
 
 var networkGenesisMutex = map[string]*sync.Mutex{}
+var txFilters = map[string][]*Filter{}
 
 // Network represents a blockchain network; the network could fall at any level of
 // a heirarchy of blockchain networks
@@ -240,7 +239,7 @@ func (f *Filter) Create() bool {
 		if !db.NewRecord(f) {
 			success := rowsAffected > 0
 			if success {
-				go f.StartTxStreamingConnectionPool()
+				go f.cache()
 			}
 			return success
 		}
@@ -248,35 +247,14 @@ func (f *Filter) Create() bool {
 	return false
 }
 
-// StartTxStreamingConnectionPool sets up a connection pool for real-time
-// stream processing based on the filter configuration
-func (f *Filter) StartTxStreamingConnectionPool() {
-	params := f.ParseParams()
-	host, hostOk := params["host"].(string)
-	port, portOk := params["port"].(float64)
-	if hostOk && portOk {
-		if _, filterPoolOk := txFilterConnectionPools[f.ID.String()]; filterPoolOk {
-			Log.Warningf("Attempting to start streaming tx filter pool that has already been allocated; filter id: %s", f.ID)
-			return
-		}
-
-		addr := fmt.Sprintf("%s:%d", host, uint64(port))
-		Log.Debugf("Attempting to start streaming tx filter pool: %s; filter id: %s", addr, f.ID)
-
-		txFilterConnectionPools[f.ID.String()] = &streamingConnPool{
-			conns: make(chan net.Conn, streamingTxFilterPoolMaxConnectionCount),
-			factory: func() (net.Conn, error) {
-				txFilterConn, err := net.Dial("tcp", addr)
-				if err != nil {
-					Log.Warningf("Failed to establish streaming tx filter pool connection to %s; %s", addr, err.Error())
-					return nil, fmt.Errorf("Failed to establish streaming tx filter pool connection to %s; %s", addr, err.Error())
-				}
-				return txFilterConn, nil
-			},
-		}
-	} else {
-		Log.Warningf("No tx streaming connection pool was created for filter: %s", f.ID.String())
+// cache the filter in memory
+func (f *Filter) cache() {
+	appFilters := txFilters[f.ApplicationID.String()]
+	if appFilters == nil {
+		appFilters = make([]*Filter, 0)
+		txFilters[f.ApplicationID.String()] = appFilters
 	}
+	appFilters = append(appFilters, f)
 }
 
 // ParseParams - parse the original JSON params used for filter creation
@@ -294,32 +272,29 @@ func (f *Filter) ParseParams() map[string]interface{} {
 
 // Invoke a filter for the given tx payload
 func (f *Filter) Invoke(txPayload []byte) *float64 {
-	var confidence *float64
-	if connPool, connPoolOk := txFilterConnectionPools[f.ID.String()]; connPoolOk {
-		conn, err := connPool.leaseConnection(txFilterConnectionPoolLeaseTimeout)
-		if err == nil {
-			n, err := conn.Write(txPayload) // TODO: SetDeadline() to ensure poorly-written filters dont kill the service
-			if err != nil {
-				Log.Warningf("Failed to write %d-byte tx payload to configured filter", len(txPayload))
-				return nil
-			}
-			Log.Debugf("Wrote %d-byte transaction payload to configured streaming tx filter", n)
-			conn.SetReadDeadline(time.Now().Add(txFilterConnectionPoolSocketReadDeadline))
-			resp := []byte{}
-			size, err := conn.Read(resp)
-			if err != nil {
-				Log.Warningf("Failed to read response from streaming tx filter; %s", err.Error())
-				return nil
-			}
-			Log.Debugf("Read %d-byte response from streaming tx filter", size)
-			_confidence, err := strconv.ParseFloat(string(resp), 64)
-			if err != nil {
-				Log.Warningf("Failed to parse confidence float from streaming tx filter; %s", err.Error())
-				return nil
-			}
-			confidence = &_confidence
-		}
+	natsConnection := getNatsStreamingConnection()
+	natsConnection.Publish(natsStreamingTxFilterSubject, txPayload)
+
+	subjectUUID, _ := uuid.NewV4()
+	natsStreamingTxFilterReturnSubject := fmt.Sprintf("%s-%s", natsStreamingTxFilterSubject, subjectUUID.String())
+	sub, err := getNatsConnection().SubscribeSync(natsStreamingTxFilterReturnSubject)
+	if err != nil {
+		Log.Warningf("Failed to create a synchronous NATS subscription to subject: %s; %s", natsStreamingTxFilterReturnSubject, err.Error())
+		return nil
 	}
+
+	var confidence *float64
+	msg, err := sub.NextMsg(streamingTxFilterReturnTimeout)
+	if err != nil {
+		Log.Warningf("Failed to parse confidence from streaming tx filter; %s", err.Error())
+		return nil
+	}
+	_confidence, err := strconv.ParseFloat(string(msg.Data), 64)
+	if err != nil {
+		Log.Warningf("Failed to parse confidence from streaming tx filter; %s", err.Error())
+		return nil
+	}
+	confidence = &_confidence
 	return confidence
 }
 

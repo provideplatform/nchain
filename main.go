@@ -19,8 +19,8 @@ func main() {
 	bootstrap()
 	migrateSchema()
 
-	RunConsumers()
-	RunStreamingTxFilterConnectionPools()
+	runConsumers()
+	cacheTxFilters()
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
@@ -928,7 +928,7 @@ func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *flo
 		return nil
 	}
 
-	if !hasInMemoryStreamingTxConnectionPool(applicationID.String()) {
+	if _, hasConfiguredFilter := txFilters[applicationID.String()]; !hasConfiguredFilter {
 		Log.Debugf("No tx filters to invoke for application: %s", applicationID.String())
 		return nil
 	}
