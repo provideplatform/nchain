@@ -215,6 +215,67 @@ type Wallet struct {
 	AccessedAt    *time.Time `json:"accessed_at"`
 }
 
+// Create and persist a new filter
+func (f *Filter) Create() bool {
+	if !f.Validate() {
+		return false
+	}
+
+	db := DatabaseConnection()
+
+	if db.NewRecord(f) {
+		result := db.Create(&f)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				f.Errors = append(f.Errors, &provide.Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(f) {
+			success := rowsAffected > 0
+			if success {
+				go f.StartTxStreamingConnectionPool()
+			}
+			return success
+		}
+	}
+	return false
+}
+
+// StartTxStreamingConnectionPool sets up a connection pool for real-time
+// stream processing based on the filter configuration
+func (f *Filter) StartTxStreamingConnectionPool() {
+	params := f.ParseParams()
+	host, hostOk := params["host"].(string)
+	port, portOk := params["port"].(uint64)
+	if hostOk && portOk {
+		if _, filterPoolOk := txFilterConnectionPools[f.ID.String()]; filterPoolOk {
+			Log.Warningf("Attempting to start streaming tx filter pool that has already been allocated; filter id: %s", f.ID)
+			return
+		}
+
+		addr := fmt.Sprintf("%s:%v", host, port)
+		Log.Debugf("Attempting to start streaming tx filter pool: %s; filter id: %s", addr, f.ID)
+
+		txFilterConnectionPools[f.ID.String()] = &streamingConnPool{
+			conns: make(chan net.Conn, streamingTxFilterPoolMaxConnectionCount),
+			factory: func() (net.Conn, error) {
+				txFilterConn, err := net.Dial("tcp", addr)
+				if err != nil {
+					Log.Warningf("Failed to establish streaming tx filter pool connection to %s; %s", addr, err.Error())
+					return nil, fmt.Errorf("Failed to establish streaming tx filter pool connection to %s; %s", addr, err.Error())
+				}
+				return txFilterConn, nil
+			},
+		}
+	} else {
+		Log.Warningf("No tx streaming connection pool was created for filter: %s", f.ID.String())
+	}
+}
+
 // ParseParams - parse the original JSON params used for filter creation
 func (f *Filter) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}
@@ -244,6 +305,12 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 		}
 	}
 	return confidence
+}
+
+// Validate a filter for persistence
+func (f *Filter) Validate() bool {
+	f.Errors = make([]*provide.Error, 0)
+	return len(f.Errors) == 0
 }
 
 func (w *Wallet) setID(walletID uuid.UUID) {
