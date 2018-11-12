@@ -12,7 +12,6 @@ var (
 )
 
 type streamingConnPool struct {
-	// mu    sync.RWMutex
 	conns   chan net.Conn
 	factory func() (net.Conn, error)
 }

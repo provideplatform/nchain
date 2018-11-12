@@ -301,7 +301,7 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 				return nil
 			}
 			Log.Debugf("Wrote %d of %d bytes tx payload to configured filter", n, len(txPayload))
-
+			// FIXME-- read until \n
 		}
 	}
 	return confidence
