@@ -50,6 +50,7 @@ const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
 const txFilterConnectionPoolLeaseTimeout = time.Millisecond * 50
+const txFilterConnectionPoolSocketReadDeadline = time.Millisecond * 1000
 
 const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
@@ -302,8 +303,21 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 				Log.Warningf("Failed to write %d-byte tx payload to configured filter", len(txPayload))
 				return nil
 			}
-			Log.Debugf("Wrote %d of %d bytes tx payload to configured filter", n, len(txPayload))
-			// FIXME-- read until \n
+			Log.Debugf("Wrote %d-byte transaction payload to configured streaming tx filter", n)
+			conn.SetReadDeadline(time.Now().Add(txFilterConnectionPoolSocketReadDeadline))
+			resp := []byte{}
+			size, err := conn.Read(resp)
+			if err != nil {
+				Log.Warningf("Failed to read response from streaming tx filter; %s", err.Error())
+				return nil
+			}
+			Log.Debugf("Read %d-byte response from streaming tx filter", size)
+			_confidence, err := strconv.ParseFloat(string(resp), 64)
+			if err != nil {
+				Log.Warningf("Failed to parse confidence float from streaming tx filter; %s", err.Error())
+				return nil
+			}
+			confidence = &_confidence
 		}
 	}
 	return confidence
