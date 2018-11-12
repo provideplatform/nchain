@@ -272,22 +272,12 @@ func (f *Filter) ParseParams() map[string]interface{} {
 
 // Invoke a filter for the given tx payload
 func (f *Filter) Invoke(txPayload []byte) *float64 {
+	natsConnection := getNatsStreamingConnection()
+	natsConnection.Publish(natsStreamingTxFilterSubject, txPayload)
+
 	subjectUUID, _ := uuid.NewV4()
 	natsStreamingTxFilterReturnSubject := fmt.Sprintf("%s-%s", natsStreamingTxFilterSubject, subjectUUID.String())
-
-	natsMsg := map[string]interface{}{
-		"sub":     natsStreamingTxFilterReturnSubject,
-		"payload": txPayload,
-	}
-	natsPayload, _ := json.Marshal(natsMsg)
-
-	natsConnection := getNatsStreamingConnection()
-	natsConnection.Publish(natsStreamingTxFilterSubject, natsPayload)
-
-	natsConn := getNatsConnection()
-	defer natsConn.Close()
-
-	sub, err := natsConn.SubscribeSync(natsStreamingTxFilterReturnSubject)
+	sub, err := getNatsConnection().SubscribeSync(natsStreamingTxFilterReturnSubject)
 	if err != nil {
 		Log.Warningf("Failed to create a synchronous NATS subscription to subject: %s; %s", natsStreamingTxFilterReturnSubject, err.Error())
 		return nil
