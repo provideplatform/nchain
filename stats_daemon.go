@@ -11,15 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/provideservices/provide-go"
-
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
+	"github.com/provideservices/provide-go"
 )
 
 const defaultStatsDaemonQueueSize = 8
