@@ -40,7 +40,7 @@ var (
 func runConsumers() {
 	go func() {
 		waitGroup.Add(1)
-		subscribeNats()
+		subscribeNatsStreaming()
 		for _, currencyPair := range currencyPairs {
 			runConsumer(currencyPair)
 		}
@@ -100,19 +100,26 @@ func getNatsConnection() *nats.Conn {
 	return natsConnection
 }
 
-func getNatsStreamingConnection() stan.Conn {
+func getNatsStreamingConnection() *stan.Conn {
 	if natsStreamingConnection == nil {
 		clientID, err := uuid.NewV4()
 		if err != nil {
 			Log.Warningf("Failed to generate client id for NATS streaming connection; %s", err.Error())
 			return nil
 		}
-		conn, err := stan.Connect(natsDefaultClusterID, fmt.Sprintf("goldmine-%s", clientID.String()), stan.NatsConn(getNatsConnection()), stan.SetConnectionLostHandler(func(_ stan.Conn, reason error) {
+
+		natsConn, err := nats.Connect(natsURL, nats.Token(natsToken))
+		if err != nil {
+			Log.Warningf("NATS connection failed; %s", err.Error())
+			return nil
+		}
+
+		conn, err := stan.Connect(natsDefaultClusterID, fmt.Sprintf("goldmine-%s", clientID.String()), stan.NatsConn(natsConn), stan.SetConnectionLostHandler(func(_ stan.Conn, reason error) {
 			natsStreamingConnection = nil
-			subscribeNats()
+			subscribeNatsStreaming()
 		}))
 		if err == nil {
-			natsStreamingConnection = conn
+			natsStreamingConnection = &conn
 		} else {
 			Log.Warningf("NATS streaming connection failed; %s", err.Error())
 		}
@@ -121,15 +128,15 @@ func getNatsStreamingConnection() stan.Conn {
 	return natsStreamingConnection
 }
 
-func subscribeNats() {
+func subscribeNatsStreaming() {
 	natsConnection := getNatsStreamingConnection()
 	if natsConnection == nil {
 		return
 	}
 
-	createNatsTxSubscriptions(natsConnection)
-	createNatsTxReceiptSubscriptions(natsConnection)
-	createNatsContractCompilerInvocationSubscriptions(natsConnection)
+	createNatsTxSubscriptions(*natsConnection)
+	createNatsTxReceiptSubscriptions(*natsConnection)
+	createNatsContractCompilerInvocationSubscriptions(*natsConnection)
 }
 
 func createNatsTxSubscriptions(natsConnection stan.Conn) {

@@ -6,11 +6,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/gin-gonic/gin"
 	"github.com/kthomas/go-logger"
 	nats "github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
-	newrelic "github.com/newrelic/go-agent"
 )
 
 var (
@@ -26,13 +24,10 @@ var (
 
 	natsConsumerConcurrency uint64
 	natsConnection          *nats.Conn
-	natsStreamingConnection stan.Conn
+	natsStreamingConnection *stan.Conn
 	natsToken               string
 	natsURL                 string
-
-	newrelicLicenseKey string
-
-	streamingTxFilterPoolMaxConnectionCount uint64
+	natsStreamingURL        string
 
 	bootstrapOnce sync.Once
 )
@@ -64,36 +59,32 @@ func bootstrap() {
 
 		if os.Getenv("NATS_URL") != "" {
 			natsURL = os.Getenv("NATS_URL")
-		}
-
-		if natsURL != "" && natsToken != "" {
-			conn, err := nats.Connect(natsURL, nats.Token(natsToken))
-			if err != nil {
-				Log.Warningf("NATS connection failed; %s", err.Error())
-			} else {
+			if natsURL != "" && natsToken != "" {
+				conn := getNatsConnection()
+				if conn == nil {
+					Log.Panicf("Unable to establish NATS connection")
+				}
 				natsConnection = conn
 			}
 		}
 
-		if os.Getenv("NATS_CONCURRENCY") != "" {
-			concurrency, err := strconv.ParseUint(os.Getenv("NATS_CONCURRENCY"), 10, 8)
-			if err == nil {
-				natsConsumerConcurrency = concurrency
-			} else {
-				natsConsumerConcurrency = 1
+		if os.Getenv("NATS_STREAMING_URL") != "" {
+			natsStreamingURL = os.Getenv("NATS_STREAMING_URL")
+			if natsStreamingURL != "" && natsToken != "" {
+				streamingConn := getNatsStreamingConnection()
+				if streamingConn == nil {
+					Log.Panicf("Unable to establish NATS streaming connection")
+				}
+				natsStreamingConnection = streamingConn
 			}
-		}
 
-		if os.Getenv("NEW_RELIC_LICENSE_KEY") != "" {
-			newrelicLicenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
-		}
-
-		if os.Getenv("STREAMING_TX_FILTER_POOL_MAX_CONNECTION_COUNT") != "" {
-			connectionCount, err := strconv.ParseUint(os.Getenv("STREAMING_TX_FILTER_POOL_MAX_CONNECTION_COUNT"), 10, 8)
-			if err == nil {
-				streamingTxFilterPoolMaxConnectionCount = connectionCount
-			} else {
-				streamingTxFilterPoolMaxConnectionCount = 1
+			if os.Getenv("NATS_STREAMING_CONCURRENCY") != "" {
+				concurrency, err := strconv.ParseUint(os.Getenv("NATS_STREAMING_CONCURRENCY"), 10, 8)
+				if err == nil {
+					natsConsumerConcurrency = concurrency
+				} else {
+					natsConsumerConcurrency = 1
+				}
 			}
 		}
 
@@ -215,34 +206,6 @@ func shouldServeTLS() bool {
 	}
 	// TODO: if FORCE_TLS, gen self-signed cert.
 	return tls
-}
-
-func configureNewRelicTransactionMiddleware(r *gin.Engine) {
-	newrelicApp := configureNewRelic("goldmine")
-	if newrelicApp == nil {
-		return
-	}
-
-	app := *newrelicApp
-	r.Use(func(c *gin.Context) {
-		app.StartTransaction(c.HandlerName(), c.Writer, c.Request)
-	})
-
-	Log.Debug("Configured newrelic transaction middleware")
-}
-
-// ConfigureNewRelic returns an initialized newrelic application instance,
-// or nil if it was unable to be initialized
-func configureNewRelic(appName string) *newrelic.Application {
-	if newrelicLicenseKey == "" {
-		return nil
-	}
-	config := newrelic.NewConfig(appName, newrelicLicenseKey)
-	app, err := newrelic.NewApplication(config)
-	if err != nil {
-		return nil
-	}
-	return &app
 }
 
 func panicIfEmpty(val string, msg string) {

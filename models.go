@@ -281,7 +281,7 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 	}
 	natsPayload, _ := json.Marshal(natsMsg)
 
-	natsConnection := getNatsStreamingConnection()
+	natsConnection := *getNatsStreamingConnection()
 	natsConnection.Publish(natsStreamingTxFilterSubject, natsPayload)
 
 	natsConn := getNatsConnection()
@@ -2203,7 +2203,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 	}
 
 	txMsg, _ := json.Marshal(e)
-	natsConnection := getNatsStreamingConnection()
+	natsConnection := *getNatsStreamingConnection()
 	return e, natsConnection.Publish(natsTxSubject, txMsg)
 }
 
@@ -2307,7 +2307,7 @@ func (c *Contract) Create() bool {
 				_, rawSourceOk := params["raw_source"].(string)
 				if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
 					contractCompilerInvocationMsg, _ := json.Marshal(c)
-					natsConnection := getNatsStreamingConnection()
+					natsConnection := *getNatsStreamingConnection()
 					natsConnection.Publish(natsContractCompilerInvocationSubject, contractCompilerInvocationMsg)
 				}
 			}
@@ -2929,7 +2929,7 @@ func (t *Transaction) Create() bool {
 					t.updateStatus(db, "failed", &desc)
 				} else {
 					txReceiptMsg, _ := json.Marshal(t)
-					natsConnection := getNatsStreamingConnection()
+					natsConnection := *getNatsStreamingConnection()
 					natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
 				}
 			}
