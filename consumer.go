@@ -108,7 +108,7 @@ func getNatsStreamingConnection() *stan.Conn {
 			return nil
 		}
 
-		natsConn, err := nats.Connect(natsURL, nats.Token(natsToken))
+		natsConn, err := nats.Connect(natsStreamingURL, nats.Token(natsToken))
 		if err != nil {
 			Log.Warningf("NATS connection failed; %s", err.Error())
 			return nil
