@@ -6,8 +6,6 @@ import (
 	"sync"
 
 	"github.com/kthomas/go-logger"
-	nats "github.com/nats-io/go-nats"
-	"github.com/nats-io/go-nats-streaming"
 )
 
 var (
@@ -20,13 +18,6 @@ var (
 	GpgPublicKey        string
 	GpgPrivateKey       string
 	WalletEncryptionKey string
-
-	natsConsumerConcurrency uint64
-	natsConnection          *nats.Conn
-	natsStreamingConnection *stan.Conn
-	natsToken               string
-	natsURL                 string
-	natsStreamingURL        string
 
 	bootstrapOnce sync.Once
 )

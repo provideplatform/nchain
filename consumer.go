@@ -88,7 +88,6 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 
 func getNatsStreamingConnection() *stan.Conn {
 	return natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
-		natsStreamingConnection = nil
 		subscribeNatsStreaming()
 	})
 }
@@ -105,7 +104,7 @@ func subscribeNatsStreaming() {
 }
 
 func createNatsTxSubscriptions(natsConnection stan.Conn) {
-	for i := uint64(0); i < natsConsumerConcurrency; i++ {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency; i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
@@ -126,7 +125,7 @@ func createNatsTxSubscriptions(natsConnection stan.Conn) {
 }
 
 func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
-	for i := uint64(0); i < natsConsumerConcurrency; i++ {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency; i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
@@ -147,7 +146,7 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
 }
 
 func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn) {
-	for i := uint64(0); i < natsConsumerConcurrency; i++ {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency; i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
