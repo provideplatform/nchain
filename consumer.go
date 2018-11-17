@@ -2,15 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"strconv"
 	"sync"
 	"time"
 
 	exchangeConsumer "github.com/kthomas/exchange-consumer"
+	"github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	nats "github.com/nats-io/go-nats"
 	"github.com/nats-io/go-nats-streaming"
 )
 
@@ -87,45 +86,11 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 	return nil
 }
 
-func getNatsConnection() *nats.Conn {
-	if natsConnection == nil {
-		conn, err := nats.Connect(natsURL, nats.Token(natsToken))
-		if err == nil {
-			natsConnection = conn
-		} else {
-			Log.Warningf("NATS connection failed; %s", err.Error())
-		}
-	}
-
-	return natsConnection
-}
-
 func getNatsStreamingConnection() *stan.Conn {
-	if natsStreamingConnection == nil {
-		clientID, err := uuid.NewV4()
-		if err != nil {
-			Log.Warningf("Failed to generate client id for NATS streaming connection; %s", err.Error())
-			return nil
-		}
-
-		natsConn, err := nats.Connect(natsStreamingURL, nats.Token(natsToken))
-		if err != nil {
-			Log.Warningf("NATS connection failed; %s", err.Error())
-			return nil
-		}
-
-		conn, err := stan.Connect(natsDefaultClusterID, fmt.Sprintf("goldmine-%s", clientID.String()), stan.NatsConn(natsConn), stan.SetConnectionLostHandler(func(_ stan.Conn, reason error) {
-			natsStreamingConnection = nil
-			subscribeNatsStreaming()
-		}))
-		if err == nil {
-			natsStreamingConnection = &conn
-		} else {
-			Log.Warningf("NATS streaming connection failed; %s", err.Error())
-		}
-	}
-
-	return natsStreamingConnection
+	return natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
+		natsStreamingConnection = nil
+		subscribeNatsStreaming()
+	})
 }
 
 func subscribeNatsStreaming() {

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/kthomas/go-logger"
@@ -52,41 +51,6 @@ func bootstrap() {
 			lvl = "INFO"
 		}
 		Log = logger.NewLogger("goldmine", lvl, true)
-
-		if os.Getenv("NATS_TOKEN") != "" {
-			natsToken = os.Getenv("NATS_TOKEN")
-		}
-
-		if os.Getenv("NATS_URL") != "" {
-			natsURL = os.Getenv("NATS_URL")
-			if natsURL != "" && natsToken != "" {
-				conn := getNatsConnection()
-				if conn == nil {
-					Log.Panicf("Unable to establish NATS connection")
-				}
-				natsConnection = conn
-			}
-		}
-
-		if os.Getenv("NATS_STREAMING_URL") != "" {
-			natsStreamingURL = os.Getenv("NATS_STREAMING_URL")
-			if natsStreamingURL != "" && natsToken != "" {
-				streamingConn := getNatsStreamingConnection()
-				if streamingConn == nil {
-					Log.Panicf("Unable to establish NATS streaming connection")
-				}
-				natsStreamingConnection = streamingConn
-			}
-
-			if os.Getenv("NATS_STREAMING_CONCURRENCY") != "" {
-				concurrency, err := strconv.ParseUint(os.Getenv("NATS_STREAMING_CONCURRENCY"), 10, 8)
-				if err == nil {
-					natsConsumerConcurrency = concurrency
-				} else {
-					natsConsumerConcurrency = 1
-				}
-			}
-		}
 
 		GpgPublicKey = `
 -----BEGIN PGP PUBLIC KEY BLOCK-----

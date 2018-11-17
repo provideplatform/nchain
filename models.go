@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go-aws-wrapper"
+	"github.com/kthomas/go-natsutil"
 	"github.com/kthomas/go.uuid"
 	provide "github.com/provideservices/provide-go"
 )
@@ -284,7 +285,7 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 	natsConnection := *getNatsStreamingConnection()
 	natsConnection.Publish(natsStreamingTxFilterSubject, natsPayload)
 
-	natsConn := getNatsConnection()
+	natsConn := natsutil.GetNatsConnection()
 	defer natsConn.Close()
 
 	sub, err := natsConn.SubscribeSync(natsStreamingTxFilterReturnSubject)
