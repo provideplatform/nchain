@@ -104,7 +104,7 @@ func subscribeNatsStreaming() {
 }
 
 func createNatsTxSubscriptions(natsConnection stan.Conn) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency; i++ {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
@@ -125,7 +125,7 @@ func createNatsTxSubscriptions(natsConnection stan.Conn) {
 }
 
 func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency; i++ {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
@@ -146,7 +146,7 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
 }
 
 func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency; i++ {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		waitGroup.Add(1)
 		go func() {
 			defer natsConnection.Close()
