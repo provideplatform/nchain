@@ -90,6 +90,9 @@ func getNatsStreamingConnection() stan.Conn {
 	conn := natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
 		subscribeNatsStreaming()
 	})
+	if conn == nil {
+		return nil
+	}
 	return *conn
 }
 
