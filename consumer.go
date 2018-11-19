@@ -86,10 +86,11 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 	return nil
 }
 
-func getNatsStreamingConnection() *stan.Conn {
-	return natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
+func getNatsStreamingConnection() stan.Conn {
+	conn := natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
 		subscribeNatsStreaming()
 	})
+	return *conn
 }
 
 func subscribeNatsStreaming() {
@@ -98,9 +99,9 @@ func subscribeNatsStreaming() {
 		return
 	}
 
-	createNatsTxSubscriptions(*natsConnection)
-	createNatsTxReceiptSubscriptions(*natsConnection)
-	createNatsContractCompilerInvocationSubscriptions(*natsConnection)
+	createNatsTxSubscriptions(natsConnection)
+	createNatsTxReceiptSubscriptions(natsConnection)
+	createNatsContractCompilerInvocationSubscriptions(natsConnection)
 }
 
 func createNatsTxSubscriptions(natsConnection stan.Conn) {
