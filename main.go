@@ -17,7 +17,7 @@ import (
 
 func main() {
 	bootstrap()
-	migrateSchema()
+	//migrateSchema()
 
 	runConsumers()
 	cacheTxFilters()
@@ -734,8 +734,16 @@ func createContractHandler(c *gin.Context) {
 	}
 	contract.ApplicationID = appID
 
+	params := contract.ParseParams()
+	if contract.Name == nil {
+		if constructor, constructorOk := params["constructor"].(string); constructorOk {
+			contract.Name = &constructor
+		} else if name, nameOk := params["name"].(string); nameOk {
+			contract.Name = &name
+		}
+	}
+
 	if contract.Create() {
-		params := contract.ParseParams()
 		_, rawSourceOk := params["raw_source"].(string)
 		if rawSourceOk && contract.Name != nil && len(*contract.Name) > 0 {
 			render(contract, 202, c)
