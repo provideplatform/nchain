@@ -743,9 +743,13 @@ func createContractHandler(c *gin.Context) {
 		}
 	}
 
+	_, rawSourceOk := params["raw_source"].(string)
+	if rawSourceOk && contract.Address == nil {
+		contract.Address = stringOrNil("0x")
+	}
+
 	if contract.Create() {
-		_, rawSourceOk := params["raw_source"].(string)
-		if rawSourceOk && contract.Name != nil && len(*contract.Name) > 0 {
+		if rawSourceOk {
 			render(contract, 202, c)
 		} else {
 			render(contract, 201, c)
