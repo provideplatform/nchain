@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	//migrateSchema()
+	migrateSchema()
 
 	runConsumers()
 	cacheTxFilters()
