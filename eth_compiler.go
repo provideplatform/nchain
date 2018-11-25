@@ -204,6 +204,7 @@ func parseCompilerOutput(compilerOutputJSON []byte) (compiledContracts map[strin
 
 func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[string]interface{}, err error) {
 	combinedOutput, err := parseCompilerOutput(compilerOutputJSON)
+	Log.Debugf("%s", combinedOutput)
 	if err == nil {
 		compiledContracts = combinedOutput["contracts"].(map[string]interface{})
 		return compiledContracts, err
@@ -212,7 +213,7 @@ func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[st
 }
 
 func buildCompileCommand(source string, optimizerRuns int) string {
-	return fmt.Sprintf("echo -n \"%s\" | solc --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,clone-bin,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, optimizerRuns)
+	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF)\" | solc --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,clone-bin,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, optimizerRuns)
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
 }
 
@@ -220,18 +221,25 @@ func buildCompileCommand(source string, optimizerRuns int) string {
 func compileSolidity(name, source string, constructorParams []interface{}, compilerOptimizerRuns int) (*provide.CompiledArtifact, error) {
 	var err error
 
-	compilerVersion := "0.4.24" // FIXME
+	compilerVersion := "0.4.25" // FIXME
 
-	stdOut, err := shellOut(buildCompileCommand(source, compilerOptimizerRuns))
+	solcCmd := buildCompileCommand(source, compilerOptimizerRuns)
+	Log.Debugf("Built solc command: %s", solcCmd)
+
+	stdOut, err := shellOut(solcCmd)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to compile contract(s): %s; %s", name, err.Error())
 	}
+
+	Log.Debugf("Raw solc compiler output: %s", stdOut)
 
 	compilerOutput, err := parseCompilerOutput(stdOut)
 	contracts, err := parseCompiledContracts(stdOut)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to compile contract(s): %s; %s", name, err.Error())
 	}
+
+	Log.Debugf("Compiled %d solidity contract(s) from source: %s", len(contracts), contracts)
 
 	depGraph := map[string]interface{}{}
 	var topLevelConstructor *abi.Method

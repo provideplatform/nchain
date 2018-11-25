@@ -16,6 +16,7 @@ import (
 const natsDefaultClusterID = "provide"
 const natsContractCompilerInvocationSubject = "goldmine-contract-compiler-invocation"
 const natsContractCompilerInvocationMaxInFlight = 32
+const natsContractCompilerInvocationTimeout = time.Minute * 1
 const natsStreamingTxFilterSubject = "streaming-tx-filter"
 const natsTxSubject = "goldmine-tx"
 const natsTxMaxInFlight = 128
@@ -119,11 +120,10 @@ func createNatsTxSubscriptions(natsConnection stan.Conn) {
 				waitGroup.Done()
 				return
 			}
+			defer txSubscription.Unsubscribe()
 			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
 
 			waitGroup.Wait()
-
-			txSubscription.Unsubscribe()
 		}()
 	}
 }
@@ -136,15 +136,14 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
 
 			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout), stan.MaxInflight(natsTxReceiptMaxInFlight), stan.DurableName(natsTxReceiptSubject))
 			if err != nil {
-				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxReceiptSubject)
 				waitGroup.Done()
 				return
 			}
-			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+			defer txReceiptSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsTxReceiptSubject)
 
 			waitGroup.Wait()
-
-			txReceiptSubscription.Unsubscribe()
 		}()
 	}
 }
@@ -155,17 +154,16 @@ func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn)
 		go func() {
 			defer natsConnection.Close()
 
-			contractCompilerInvocationSubscription, err := natsConnection.QueueSubscribe(natsContractCompilerInvocationSubject, natsContractCompilerInvocationSubject, consumeContractCompilerInvocationMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout), stan.MaxInflight(natsContractCompilerInvocationMaxInFlight), stan.DurableName(natsContractCompilerInvocationSubject))
+			contractCompilerInvocationSubscription, err := natsConnection.QueueSubscribe(natsContractCompilerInvocationSubject, natsContractCompilerInvocationSubject, consumeContractCompilerInvocationMsg, stan.SetManualAckMode(), stan.AckWait(natsContractCompilerInvocationTimeout), stan.MaxInflight(natsContractCompilerInvocationMaxInFlight), stan.DurableName(natsContractCompilerInvocationSubject))
 			if err != nil {
-				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsContractCompilerInvocationSubject)
 				waitGroup.Done()
 				return
 			}
-			Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
+			defer contractCompilerInvocationSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsContractCompilerInvocationSubject)
 
 			waitGroup.Wait()
-
-			contractCompilerInvocationSubscription.Unsubscribe()
 		}()
 	}
 }
@@ -260,7 +258,8 @@ func consumeContractCompilerInvocationMsg(msg *stan.Msg) {
 	_, err = contract.Compile()
 	if err != nil {
 		Log.Warningf("Failed to compile contract; %s", err.Error())
+	} else {
+		Log.Debugf("Contract compiler invocation succeeded; ACKing NATS message for contract: %s", contract.ID)
+		msg.Ack()
 	}
-
-	msg.Ack()
 }

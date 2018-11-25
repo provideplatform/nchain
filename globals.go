@@ -22,7 +22,7 @@ var (
 	bootstrapOnce sync.Once
 )
 
-func bootstrap() {
+func init() {
 	bootstrapOnce.Do(func() {
 		ListenAddr = os.Getenv("LISTEN_ADDR")
 		if ListenAddr == "" {

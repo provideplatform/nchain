@@ -1819,62 +1819,65 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 	var err error
 
 	params := c.ParseParams()
+	lang, langOk := params["lang"].(string)
+	if !langOk {
+		return nil, fmt.Errorf("Failed to parse wallet id for solidity source compile; %s", err.Error())
+	}
 	rawSource, rawSourceOk := params["raw_source"].(string)
-	if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
-		db := DatabaseConnection()
+	if !rawSourceOk {
+		return nil, fmt.Errorf("Failed to compile contract; no source code resolved")
+	}
+	Log.Debugf("Attempting to compile %d-byte raw source code; lang: %s", len(rawSource), lang)
+	db := DatabaseConnection()
 
-		var walletID *uuid.UUID
-		if _walletID, walletIdOk := params["wallet_id"].(string); walletIdOk {
-			__walletID, err := uuid.FromString(_walletID)
-			walletID = &__walletID
-			if err != nil {
-				return nil, fmt.Errorf("Failed to parse wallet id for solidity source compile; %s", err.Error())
-			}
+	var walletID *uuid.UUID
+	if _walletID, walletIdOk := params["wallet_id"].(string); walletIdOk {
+		__walletID, err := uuid.FromString(_walletID)
+		walletID = &__walletID
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse wallet id for solidity source compile; %s", err.Error())
+		}
+	}
+
+	var network = &Network{}
+	db.Model(c).Related(&network)
+
+	argv := make([]interface{}, 0)
+	if _argv, argvOk := params["argv"].([]interface{}); argvOk {
+		argv = _argv
+	}
+
+	if network.isEthereumNetwork() {
+		optimizerRuns := 200
+		if _optimizerRuns, optimizerRunsOk := params["optimizer_runs"].(int); optimizerRunsOk {
+			optimizerRuns = _optimizerRuns
 		}
 
-		var network = &Network{}
-		db.Model(c).Related(&network)
-
-		argv := make([]interface{}, 0)
-		if _argv, argvOk := params["argv"].([]interface{}); argvOk {
-			argv = _argv
+		artifact, err = compileSolidity(*c.Name, rawSource, argv, optimizerRuns)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to compile solidity source; %s", err.Error())
 		}
+	}
 
-		if network.isEthereumNetwork() {
-			optimizerRuns := 200
-			if _optimizerRuns, optimizerRunsOk := params["optimizer_runs"].(int); optimizerRunsOk {
-				optimizerRuns = _optimizerRuns
-			}
+	artifactJSON, _ := json.Marshal(artifact)
+	deployableArtifactJSON := json.RawMessage(artifactJSON)
 
-			artifact, err = compileSolidity(*c.Name, rawSource, argv, optimizerRuns)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to compile solidity source; %s", err.Error())
-			}
-		}
+	tx := &Transaction{
+		ApplicationID: c.ApplicationID,
+		Data:          &artifact.Bytecode,
+		NetworkID:     c.NetworkID,
+		WalletID:      walletID,
+		To:            nil,
+		Value:         &TxValue{value: big.NewInt(0)},
+		Params:        &deployableArtifactJSON,
+	}
 
-		artifactJSON, _ := json.Marshal(artifact)
-		deployableArtifactJSON := json.RawMessage(artifactJSON)
-
-		tx := &Transaction{
-			ApplicationID: c.ApplicationID,
-			Data:          &artifact.Bytecode,
-			NetworkID:     c.NetworkID,
-			WalletID:      walletID,
-			To:            nil,
-			Value:         &TxValue{value: big.NewInt(0)},
-			Params:        &deployableArtifactJSON,
-		}
-
-		if tx.Create() {
-			c.TransactionID = &tx.ID
-			db.Save(&c)
-			Log.Debugf("Contract compiled from source and deployed via tx: %s", *tx.Hash)
-		} else {
-			return nil, fmt.Errorf("Failed to deploy compiled contract; tx failed with %d error(s)", len(tx.Errors))
-		}
+	if tx.Create() {
+		c.TransactionID = &tx.ID
+		db.Save(&c)
+		Log.Debugf("Contract compiled from source and deployed via tx: %s", *tx.Hash)
 	} else {
-		Log.Warningf("Failed to compile contract; no source code resolved")
-		return nil, nil
+		return nil, fmt.Errorf("Failed to deploy compiled contract; tx failed with %d error(s)", len(tx.Errors))
 	}
 	return artifact, nil
 }
@@ -2306,7 +2309,7 @@ func (c *Contract) Create() bool {
 			if success {
 				params := c.ParseParams()
 				_, rawSourceOk := params["raw_source"].(string)
-				if rawSourceOk && c.Name != nil && len(*c.Name) > 0 {
+				if rawSourceOk {
 					contractCompilerInvocationMsg, _ := json.Marshal(c)
 					natsConnection := getNatsStreamingConnection()
 					natsConnection.Publish(natsContractCompilerInvocationSubject, contractCompilerInvocationMsg)
