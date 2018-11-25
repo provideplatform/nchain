@@ -1,6 +1,6 @@
 FROM golang:1.9
 
-RUN apt-get update && apt-get install -y python-software-properties-common && add-apt-repository ppa:ethereum/ethereum && apt-get update && apt-get install -y solc
+RUN apt-get install -y python3-software-properties-common && add-apt-repository ppa:ethereum/ethereum && apt-get update && apt-get install -y solc
 
 RUN mkdir -p /go/src/github.com/provideapp
 ADD . /go/src/github.com/provideapp/goldmine
