@@ -19,11 +19,13 @@ func main() {
 	migrateSchema()
 
 	runConsumers()
+	runAPIUsageDaemon()
 	cacheTxFilters()
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
+	r.Use(provide.TrackAPICalls())
 
 	r.GET("/api/v1/networks", networksListHandler)
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)

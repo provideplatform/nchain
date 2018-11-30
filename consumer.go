@@ -11,9 +11,15 @@ import (
 	"github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/nats-io/go-nats-streaming"
+	provide "github.com/provideservices/provide-go"
 )
 
+const apiUsageDaemonBufferSize = 256
+const apiUsageDaemonFlushInterval = 30000
+
 const natsDefaultClusterID = "provide"
+const natsAPIUsageEventNotificationSubject = "api-usage-event"
+const natsAPIUsageEventNotificationMaxInFlight = 32
 const natsContractCompilerInvocationSubject = "goldmine-contract-compiler-invocation"
 const natsContractCompilerInvocationMaxInFlight = 32
 const natsContractCompilerInvocationTimeout = time.Minute * 1
@@ -34,6 +40,19 @@ var (
 		// "PRVD-USD", // FIXME-- pull from tokens database
 	}
 )
+
+type apiUsageDelegate struct{}
+
+func (d *apiUsageDelegate) Track(apiCall *provide.APICall) {
+	payload, _ := json.Marshal(apiCall)
+	natsConnection := getNatsStreamingConnection()
+	natsConnection.Publish(natsAPIUsageEventNotificationSubject, payload)
+}
+
+func runAPIUsageDaemon() {
+	delegate := new(apiUsageDelegate)
+	provide.RunAPIUsageDaemon(apiUsageDaemonBufferSize, apiUsageDaemonFlushInterval, delegate)
+}
 
 // runConsumers launches a goroutine for each data feed
 // that has been configured to consume messages
