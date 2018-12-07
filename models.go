@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jinzhu/gorm"
 	"github.com/kthomas/go-aws-wrapper"
-	"github.com/kthomas/go-natsutil"
+	natsutil "github.com/kthomas/go-natsutil"
 	"github.com/kthomas/go.uuid"
 	provide "github.com/provideservices/provide-go"
 )
@@ -274,7 +274,7 @@ func (f *Filter) ParseParams() map[string]interface{} {
 // Invoke a filter for the given tx payload
 func (f *Filter) Invoke(txPayload []byte) *float64 {
 	subjectUUID, _ := uuid.NewV4()
-	natsStreamingTxFilterReturnSubject := fmt.Sprintf("%s-%s", natsStreamingTxFilterSubject, subjectUUID.String())
+	natsStreamingTxFilterReturnSubject := fmt.Sprintf("%s.return.%s", natsStreamingTxFilterExecSubjectPrefix, subjectUUID.String())
 
 	natsMsg := map[string]interface{}{
 		"sub":     natsStreamingTxFilterReturnSubject,
@@ -283,7 +283,7 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 	natsPayload, _ := json.Marshal(natsMsg)
 
 	natsConnection := getNatsStreamingConnection()
-	natsConnection.Publish(natsStreamingTxFilterSubject, natsPayload)
+	natsConnection.Publish(natsStreamingTxFilterExecSubjectPrefix, natsPayload)
 
 	natsConn := natsutil.GetNatsConnection()
 	defer natsConn.Close()

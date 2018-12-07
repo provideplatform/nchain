@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
-	exchangeConsumer "github.com/kthomas/exchange-consumer"
-	"github.com/kthomas/go-natsutil"
-	uuid "github.com/kthomas/go.uuid"
 	"github.com/nats-io/go-nats-streaming"
+
+	exchangeConsumer "github.com/kthomas/exchange-consumer"
+	natsutil "github.com/kthomas/go-natsutil"
+	uuid "github.com/kthomas/go.uuid"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -18,15 +19,15 @@ const apiUsageDaemonBufferSize = 256
 const apiUsageDaemonFlushInterval = 30000
 
 const natsDefaultClusterID = "provide"
-const natsAPIUsageEventNotificationSubject = "api-usage-event"
+const natsAPIUsageEventNotificationSubject = "api.usage.event"
 const natsAPIUsageEventNotificationMaxInFlight = 32
-const natsContractCompilerInvocationSubject = "goldmine-contract-compiler-invocation"
+const natsContractCompilerInvocationSubject = "goldmine.contract.compiler-invocation"
 const natsContractCompilerInvocationMaxInFlight = 32
 const natsContractCompilerInvocationTimeout = time.Minute * 1
-const natsStreamingTxFilterSubject = "streaming-tx-filter"
-const natsTxSubject = "goldmine-tx"
+const natsStreamingTxFilterExecSubjectPrefix = "ml.filter.exec"
+const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 128
-const natsTxReceiptSubject = "goldmine-tx-receipt"
+const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 64
 
 var (
