@@ -52,6 +52,7 @@ const securityGroupTerminationTickerInterval = time.Millisecond * 10000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 const streamingTxFilterReturnTimeout = time.Millisecond * 50
 
+const defaultClient = "parity"
 const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
@@ -1582,6 +1583,12 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 							} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
 								envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
 							}
+						}
+
+						if client, clientOk := networkCfg["client"].(string); clientOk {
+							envOverrides["CLIENT"] = client
+						} else {
+							envOverrides["CLIENT"] = defaultClient
 						}
 
 						if chain, chainOk := networkCfg["chain"].(string); chainOk {
