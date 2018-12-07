@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -382,12 +383,139 @@ func (n *Network) Create() bool {
 		if !db.NewRecord(n) {
 			success := rowsAffected > 0
 			if success {
+				go n.provisionLoadBalancers(db)
 				go n.resolveContracts(db)
 			}
 			return success
 		}
 	}
 	return false
+}
+
+func (n *Network) provisionLoadBalancers(db *gorm.DB) {
+	cfg := n.ParseConfig()
+	if n.isEthereumNetwork() {
+		Log.Debugf("Attempting to provision JSON-RPC load balancer for EVM-based network: %s", n.ID)
+
+		lbUUID, _ := uuid.NewV4()
+		lbName := fmt.Sprintf("loadbalancer-%s", lbUUID)
+
+		jsonRpcPort := float64(defaultJsonRpcPort)
+		websocketPort := float64(defaultWebsocketPort)
+
+		securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
+		if !securityCfgOk {
+			Log.Warningf("Failed to parse cloneable security configuration for network: %s; attempting to create sane initial configuration", n.ID)
+
+			tcpIngressCfg := make([]float64, 0)
+			if _jsonRpcPort, jsonRpcPortOk := cfg["default_json_rpc_port"].(float64); jsonRpcPortOk {
+				jsonRpcPort = _jsonRpcPort
+			}
+			if _websocketPort, websocketPortOk := cfg["default_websocket_port"].(float64); websocketPortOk {
+				websocketPort = _websocketPort
+			}
+
+			tcpIngressCfg = append(tcpIngressCfg, float64(jsonRpcPort))
+			tcpIngressCfg = append(tcpIngressCfg, float64(websocketPort))
+			ingressCfg := map[string]interface{}{
+				"tcp": tcpIngressCfg,
+				"udp": make([]float64, 0),
+			}
+			securityCfg = map[string]interface{}{
+				"egress": map[string]interface{}{},
+				"ingress": map[string]interface{}{
+					"0.0.0.0/0": ingressCfg,
+				},
+			}
+			cfg["_security"] = securityCfg
+		}
+
+		accessKeyID := *DefaultAWSConfig.AccessKeyId
+		secretAccessKey := *DefaultAWSConfig.SecretAccessKey
+		region := *DefaultAWSConfig.DefaultRegion
+		vpcID := *DefaultAWSConfig.DefaultVpcID
+
+		// start security group handling
+		securityGroupDesc := fmt.Sprintf("security group for network load balancer: %s", n.ID.String())
+		securityGroup, err := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, DefaultAWSConfig.DefaultVpcID)
+		securityGroupIds := make([]string, 0)
+
+		if securityGroup != nil {
+			securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
+		}
+
+		cfg["region"] = region
+		cfg["target_security_group_ids"] = securityGroupIds
+		n.setConfig(cfg)
+
+		if err != nil {
+			Log.Warningf("Failed to create security group in EC2 region %s; network id: %s; %s", region, n.ID.String(), err.Error())
+			awswrapper.DeleteLoadBalancer(accessKeyID, secretAccessKey, region, &lbName)
+			return
+		}
+
+		listeners := make([]*elb.Listener, 0)
+
+		if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+			switch ingress.(type) {
+			case map[string]interface{}:
+				ingressCfg := ingress.(map[string]interface{})
+				for cidr := range ingressCfg {
+					tcp := make([]int64, 0)
+					udp := make([]int64, 0)
+					if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+						for i := range _tcp {
+							_port := int64(_tcp[i].(float64))
+							tcp = append(tcp, _port)
+							listeners = append(listeners, &elb.Listener{
+								InstancePort:     &_port,
+								InstanceProtocol: stringOrNil("TCP"),
+								LoadBalancerPort: &_port,
+								Protocol:         stringOrNil("TCP"),
+								SSLCertificateId: nil, // FIXME-- enable provisioning of SSL certificate for with dynamically created ELB
+							})
+						}
+					}
+
+					// UDP not currently supported by classic ELB API; UDP support is not needed here at this time...
+					// if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+					// 	for i := range _udp {
+					// 		_port := int64(_udp[i].(float64))
+					// 		udp = append(udp, _port)
+					// 		listeners = append(listeners, &elb.Listener{
+					// 			InstancePort:     &_port,
+					// 			InstanceProtocol: stringOrNil("TCP"),
+					// 			LoadBalancerPort: &_port,
+					// 			Protocol:         stringOrNil("TCP"),
+					// 			SSLCertificateId: nil, // FIXME-- enable provisioning of SSL certificate for with dynamically created ELB
+					// 		})
+					// 	}
+					// }
+
+					_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+					if err != nil {
+						Log.Warningf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+					}
+				}
+			}
+		}
+		// end security group handling
+
+		loadBalancer, err := awswrapper.CreateLoadBalancer(accessKeyID, secretAccessKey, region, &vpcID, &lbName, securityGroupIds, listeners)
+		if err != nil {
+			Log.Warningf("Failed to provision load balancer for network: %s", n.ID, err.Error())
+			return
+		}
+
+		cfg["load_balancer_name"] = lbName
+		cfg["load_balancer_url"] = loadBalancer.DNSName
+		cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", loadBalancer.DNSName, jsonRpcPort)
+		cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", loadBalancer.DNSName, jsonRpcPort) // deprecated
+		cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", loadBalancer.DNSName, websocketPort)
+
+		n.setConfig(cfg)
+		db.Save(n)
+	}
 }
 
 func (n *Network) resolveContracts(db *gorm.DB) {

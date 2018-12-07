@@ -5,11 +5,14 @@ import (
 	"os"
 	"sync"
 
+	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
 )
 
 var (
 	Log *logger.Logger
+
+	DefaultAWSConfig *awsconf.Config
 
 	ListenAddr      string
 	CertificatePath string
@@ -42,6 +45,8 @@ func init() {
 			lvl = "INFO"
 		}
 		Log = logger.NewLogger("goldmine", lvl, true)
+
+		DefaultAWSConfig = awsconf.GetConfig()
 
 		GpgPublicKey = `
 -----BEGIN PGP PUBLIC KEY BLOCK-----
