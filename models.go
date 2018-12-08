@@ -632,6 +632,11 @@ func (n *Network) setChainID() {
 func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	cfg := n.ParseConfig()
 
+	accessKeyID := *DefaultAWSConfig.AccessKeyId
+	secretAccessKey := *DefaultAWSConfig.SecretAccessKey
+	region := *DefaultAWSConfig.DefaultRegion
+	vpcID := *DefaultAWSConfig.DefaultVpcID
+
 	isLoadBalanced := false
 	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
 		isLoadBalanced = loadBalanced
@@ -647,6 +652,7 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 			if isLoadBalanced {
 				Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
 				// FIXME: stick the new node behind the loadbalancer...
+				// FIXME: if ubuntu vm, use elb classic
 				// awswrapper.RegisterInstanceWithLoadBalancer(accessKeyID, secretAccessKey, region, lbName)
 			} else {
 				if reachable, port := node.reachableViaJsonRpc(); reachable {
