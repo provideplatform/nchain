@@ -632,10 +632,10 @@ func (n *Network) setChainID() {
 func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	cfg := n.ParseConfig()
 
-	accessKeyID := *DefaultAWSConfig.AccessKeyId
-	secretAccessKey := *DefaultAWSConfig.SecretAccessKey
-	region := *DefaultAWSConfig.DefaultRegion
-	vpcID := *DefaultAWSConfig.DefaultVpcID
+	// accessKeyID := *DefaultAWSConfig.AccessKeyId
+	// secretAccessKey := *DefaultAWSConfig.SecretAccessKey
+	// region := *DefaultAWSConfig.DefaultRegion
+	// vpcID := *DefaultAWSConfig.DefaultVpcID
 
 	isLoadBalanced := false
 	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
