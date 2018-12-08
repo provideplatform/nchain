@@ -510,9 +510,9 @@ func (n *Network) provisionLoadBalancers(db *gorm.DB) {
 
 		cfg["load_balancer_name"] = lbName
 		cfg["load_balancer_url"] = loadBalancer.DNSName
-		cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", loadBalancer.DNSName, jsonRpcPort)
-		cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", loadBalancer.DNSName, jsonRpcPort) // deprecated
-		cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", loadBalancer.DNSName, websocketPort)
+		cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRpcPort)
+		cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRpcPort) // deprecated
+		cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
 
 		n.setConfig(cfg)
 		db.Save(n)
@@ -646,6 +646,8 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 		if node != nil && node.ID != uuid.Nil {
 			if isLoadBalanced {
 				Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
+				// FIXME: stick the new node behind the loadbalancer...
+				// awswrapper.RegisterInstanceWithLoadBalancer(accessKeyID, secretAccessKey, region, lbName)
 			} else {
 				if reachable, port := node.reachableViaJsonRpc(); reachable {
 					Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
