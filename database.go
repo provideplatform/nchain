@@ -45,6 +45,7 @@ func migrateSchema() {
 
 		db.AutoMigrate(&Transaction{})
 		db.Model(&Transaction{}).AddIndex("idx_transactions_application_id", "application_id")
+		db.Model(&Transaction{}).AddIndex("idx_transactions_created_at", "created_at")
 		db.Model(&Transaction{}).AddIndex("idx_transactions_status", "status")
 		db.Model(&Transaction{}).AddIndex("idx_transactions_user_id", "user_id")
 		db.Model(&Transaction{}).AddIndex("idx_transactions_hash", "hash")
