@@ -1210,7 +1210,7 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 		return nil, fmt.Errorf("Cannot retrieve logs for network node without a target and provider configuration; target id: %s; provider id: %s", targetID, providerID)
 	}
 
-	if network.isEthereumNetwork() && regionOk {
+	if regionOk {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
@@ -1235,7 +1235,7 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 				return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; unsupported AWS provider: %s", *network.Name, providerID)
 			}
 		}
-	} else if !regionOk {
+	} else {
 		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided: %s", *network.Name, providerID)
 	}
 
