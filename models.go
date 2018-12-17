@@ -1808,7 +1808,8 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 										externalAddrFoundIndex := strings.LastIndex(msg, bcoinExternalAddrSearchString)
 										if externalAddrFoundIndex != -1 {
 											defaultJSONRPCPort := engineToDefaultJSONRPCPortMapping[engineID]
-											node := fmt.Sprintf("%s://%s:%v", bcoinPeerScheme, strings.TrimSpace(msg[externalAddrFoundIndex+len(bcoinExternalAddrSearchString):]), defaultJSONRPCPort)
+											nodeAddr := strings.TrimSpace(msg[externalAddrFoundIndex+len(bcoinExternalAddrSearchString) : len(msg)-1])
+											node := fmt.Sprintf("%s://%s:%v", bcoinPeerScheme, nodeAddr, defaultJSONRPCPort)
 											peerURL = &node
 											cfg["peer_url"] = node
 											ticker.Stop()
