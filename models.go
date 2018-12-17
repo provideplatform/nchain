@@ -54,9 +54,9 @@ const streamingTxFilterReturnTimeout = time.Millisecond * 50
 
 const defaultClient = "parity"
 const defaultWebappPort = 3000
-const defaultJsonRpcPort = 8050
-const defaultWebsocketPort = 8051
 
+var engineToDefaultJSONRPCPortMapping = map[string]uint{"authorityRound": 8050, "handshake": 8332}
+var engineToDefaultWebsocketPortMapping = map[string]uint{"authorityRound": 8051}
 var engineToNetworkNodeClientEnvMapping = map[string]string{"authorityRound": "parity", "handshake": "handshake"}
 var networkGenesisMutex = map[string]*sync.Mutex{}
 var txFilters = map[string][]*Filter{}
@@ -396,13 +396,21 @@ func (n *Network) Create() bool {
 
 func (n *Network) provisionLoadBalancers(db *gorm.DB) {
 	cfg := n.ParseConfig()
+
+	defaultJSONRPCPort := uint(0)
+	defaultWebsocketPort := uint(0)
+	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
+		defaultJSONRPCPort = engineToDefaultJSONRPCPortMapping[engineID]
+		defaultWebsocketPort = engineToDefaultWebsocketPortMapping[engineID]
+	}
+
 	if n.isEthereumNetwork() {
 		Log.Debugf("Attempting to provision JSON-RPC load balancer for EVM-based network: %s", n.ID)
 
 		lbUUID, _ := uuid.NewV4()
 		lbName := fmt.Sprintf("loadbalancer-%s", lbUUID)
 
-		jsonRpcPort := float64(defaultJsonRpcPort)
+		jsonRPCPort := float64(defaultJSONRPCPort)
 		websocketPort := float64(defaultWebsocketPort)
 
 		securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
@@ -410,14 +418,14 @@ func (n *Network) provisionLoadBalancers(db *gorm.DB) {
 			Log.Warningf("Failed to parse cloneable security configuration for network: %s; attempting to create sane initial configuration", n.ID)
 
 			tcpIngressCfg := make([]float64, 0)
-			if _jsonRpcPort, jsonRpcPortOk := cfg["default_json_rpc_port"].(float64); jsonRpcPortOk {
-				jsonRpcPort = _jsonRpcPort
+			if _jsonRPCPort, jsonRPCPortOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOk {
+				jsonRPCPort = _jsonRPCPort
 			}
 			if _websocketPort, websocketPortOk := cfg["default_websocket_port"].(float64); websocketPortOk {
 				websocketPort = _websocketPort
 			}
 
-			tcpIngressCfg = append(tcpIngressCfg, float64(jsonRpcPort))
+			tcpIngressCfg = append(tcpIngressCfg, float64(jsonRPCPort))
 			tcpIngressCfg = append(tcpIngressCfg, float64(websocketPort))
 			ingressCfg := map[string]interface{}{
 				"tcp": tcpIngressCfg,
@@ -511,8 +519,7 @@ func (n *Network) provisionLoadBalancers(db *gorm.DB) {
 
 		cfg["load_balancer_name"] = lbName
 		cfg["load_balancer_url"] = loadBalancer.DNSName
-		cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRpcPort)
-		cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRpcPort) // deprecated
+		cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
 		cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
 
 		n.setConfig(cfg)
@@ -643,55 +650,48 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 		isLoadBalanced = loadBalanced
 	}
 
-	if n.isEthereumNetwork() {
-		Log.Debugf("Attempting to resolve and balance JSON-RPC and websocket urls for ethereum network with id: %s", n.ID)
+	Log.Debugf("Attempting to resolve and balance JSON-RPC and websocket urls for network with id: %s", n.ID)
 
-		var node = &NetworkNode{}
-		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator')", n.ID).First(&node)
+	var node = &NetworkNode{}
+	db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator', 'faucet')", n.ID).First(&node)
 
-		if node != nil && node.ID != uuid.Nil {
-			if isLoadBalanced {
-				Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
-				// FIXME: stick the new node behind the loadbalancer...
-				// FIXME: if ubuntu vm, use elb classic
-				// awswrapper.RegisterInstanceWithLoadBalancer(accessKeyID, secretAccessKey, region, lbName)
+	if node != nil && node.ID != uuid.Nil {
+		if isLoadBalanced {
+			Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
+			// FIXME: stick the new node behind the loadbalancer...
+			// FIXME: if ubuntu vm, use elb classic
+			// awswrapper.RegisterInstanceWithLoadBalancer(accessKeyID, secretAccessKey, region, lbName)
+		} else {
+			if reachable, port := node.reachableViaJSONRPC(); reachable {
+				Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
+				cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port)
 			} else {
-				if reachable, port := node.reachableViaJsonRpc(); reachable {
-					Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
-
-					cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port)
-					cfg["parity_json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port) // deprecated
-				} else {
-					Log.Debugf("Node unreachable via JSON-RPC port; node id: %s", n.ID)
-
-					cfg["json_rpc_url"] = nil
-					cfg["parity_json_rpc_url"] = nil // deprecated
-				}
-
-				if reachable, port := node.reachableViaWebsocket(); reachable {
-					cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *node.Host, port)
-				} else {
-					cfg["websocket_url"] = nil
-				}
-
-				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
-
-				db.Save(n)
+				Log.Debugf("Node unreachable via JSON-RPC port; node id: %s", n.ID)
+				cfg["json_rpc_url"] = nil
 			}
-		} else if !isLoadBalanced {
-			cfg["json_rpc_url"] = nil
-			cfg["parity_json_rpc_url"] = nil
-			cfg["websocket_url"] = nil
+
+			if reachable, port := node.reachableViaWebsocket(); reachable {
+				cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *node.Host, port)
+			} else {
+				cfg["websocket_url"] = nil
+			}
 
 			cfgJSON, _ := json.Marshal(cfg)
 			*n.Config = json.RawMessage(cfgJSON)
 
 			db.Save(n)
+		}
+	} else if !isLoadBalanced {
+		cfg["json_rpc_url"] = nil
+		cfg["websocket_url"] = nil
 
-			if n.AvailablePeerCount() == 0 {
-				EvictNetworkStatsDaemon(n)
-			}
+		cfgJSON, _ := json.Marshal(cfg)
+		*n.Config = json.RawMessage(cfgJSON)
+
+		db.Save(n)
+
+		if n.AvailablePeerCount() == 0 {
+			EvictNetworkStatsDaemon(n)
 		}
 	}
 }
@@ -724,42 +724,40 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) 
 				return
 			}
 
-			if n.isEthereumNetwork() {
-				Log.Debugf("Attempting to resolve and balance block explorer url for network node: %s", n.ID.String())
+			Log.Debugf("Attempting to resolve and balance block explorer url for network node: %s", n.ID.String())
 
-				var node = &NetworkNode{}
-				db.Where("network_id = ? AND status = 'running' AND role IN ('explorer')", n.ID).First(&node)
+			var node = &NetworkNode{}
+			db.Where("network_id = ? AND status = 'running' AND role IN ('explorer')", n.ID).First(&node)
 
-				if node != nil && node.ID != uuid.Nil {
-					if isLoadBalanced {
-						Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
+			if node != nil && node.ID != uuid.Nil {
+				if isLoadBalanced {
+					Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
+				} else {
+					if node.reachableOnPort(defaultWebappPort) {
+						Log.Debugf("Block explorer reachable via port %d; node id: %s", defaultWebappPort, n.ID)
+
+						cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
+						cfgJSON, _ := json.Marshal(cfg)
+						*n.Config = json.RawMessage(cfgJSON)
+
+						nodeCfg["url"] = cfg["block_explorer_url"]
+						nodeCfgJSON, _ := json.Marshal(nodeCfg)
+						*node.Config = json.RawMessage(nodeCfgJSON)
+
+						db.Save(n)
+						db.Save(node)
+						ticker.Stop()
+						return
 					} else {
-						if node.reachableOnPort(defaultWebappPort) {
-							Log.Debugf("Block explorer reachable via port %d; node id: %s", defaultWebappPort, n.ID)
-
-							cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
-							cfgJSON, _ := json.Marshal(cfg)
-							*n.Config = json.RawMessage(cfgJSON)
-
-							nodeCfg["url"] = cfg["block_explorer_url"]
-							nodeCfgJSON, _ := json.Marshal(nodeCfg)
-							*node.Config = json.RawMessage(nodeCfgJSON)
-
-							db.Save(n)
-							db.Save(node)
-							ticker.Stop()
-							return
-						} else {
-							Log.Debugf("Block explorer unreachable via webapp port; node id: %s", n.ID)
-							cfg["block_explorer_url"] = nil
-						}
+						Log.Debugf("Block explorer unreachable via webapp port; node id: %s", n.ID)
+						cfg["block_explorer_url"] = nil
 					}
-				} else if !isLoadBalanced {
-					cfg["block_explorer_url"] = nil
-					cfgJSON, _ := json.Marshal(cfg)
-					*n.Config = json.RawMessage(cfgJSON)
-					db.Save(n)
 				}
+			} else if !isLoadBalanced {
+				cfg["block_explorer_url"] = nil
+				cfgJSON, _ := json.Marshal(cfg)
+				*n.Config = json.RawMessage(cfgJSON)
+				db.Save(n)
 			}
 		}
 	}
@@ -854,8 +852,6 @@ func (n *Network) rpcURL() string {
 	cfg := n.ParseConfig()
 	if rpcURL, ok := cfg["json_rpc_url"].(string); ok {
 		return rpcURL
-	} else if rpcURL, ok := cfg["parity_json_rpc_url"].(string); ok {
-		return rpcURL
 	}
 	return ""
 }
@@ -894,7 +890,7 @@ func (n *Network) NodeCount() (count *uint64) {
 // and currently are listed with a status of 'running'; this method does not currently check real-time availability
 // of these peers-- it is assumed the are still available. FIXME?
 func (n *Network) AvailablePeerCount() (count uint64) {
-	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full', 'validator')", n.ID).Count(&count)
+	DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full', 'validator', 'faucet')", n.ID).Count(&count)
 	return count
 }
 
@@ -955,9 +951,6 @@ func (n *Network) isEthereumNetwork() bool {
 	if cfg != nil {
 		if isEthereumNetwork, ok := cfg["is_ethereum_network"].(bool); ok {
 			return isEthereumNetwork
-		}
-		if _, ok := cfg["parity_json_rpc_url"].(string); ok {
-			return true
 		}
 	}
 	return false
@@ -1043,11 +1036,15 @@ func (n *NetworkNode) peerURL() *string {
 	return nil
 }
 
-func (n *NetworkNode) reachableViaJsonRpc() (bool, uint) {
+func (n *NetworkNode) reachableViaJSONRPC() (bool, uint) {
 	cfg := n.ParseConfig()
-	port := uint(defaultJsonRpcPort)
-	if jsonRpcPortOverride, jsonRpcPortOverrideOk := cfg["default_json_rpc_port"].(float64); jsonRpcPortOverrideOk {
-		port = uint(jsonRpcPortOverride)
+	defaultJSONRPCPort := uint(0)
+	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
+		defaultJSONRPCPort = engineToDefaultJSONRPCPortMapping[engineID]
+	}
+	port := uint(defaultJSONRPCPort)
+	if jsonRPCPortOverride, jsonRPCPortOverrideOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOverrideOk {
+		port = uint(jsonRPCPortOverride)
 	}
 
 	return n.reachableOnPort(port), port
@@ -1055,6 +1052,10 @@ func (n *NetworkNode) reachableViaJsonRpc() (bool, uint) {
 
 func (n *NetworkNode) reachableViaWebsocket() (bool, uint) {
 	cfg := n.ParseConfig()
+	defaultWebsocketPort := uint(0)
+	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
+		defaultWebsocketPort = engineToDefaultWebsocketPortMapping[engineID]
+	}
 	port := uint(defaultWebsocketPort)
 	if websocketPortOverride, websocketPortOverrideOk := cfg["default_websocket_port"].(float64); websocketPortOverrideOk {
 		port = uint(websocketPortOverride)
@@ -1780,11 +1781,12 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 
 				id := identifiers[len(identifiers)-1]
 				targetID, targetOk := cfg["target_id"].(string)
+				engineID, engineOk := cfg["engine_id"].(string)
 				providerID, providerOk := cfg["provider_id"].(string)
 				region, regionOk := cfg["region"].(string)
 				credentials, credsOk := cfg["credentials"].(map[string]interface{})
 
-				if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk && credsOk {
+				if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk && credsOk {
 					accessKeyID := credentials["aws_access_key_id"].(string)
 					secretAccessKey := credentials["aws_secret_access_key"].(string)
 
@@ -1793,13 +1795,26 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 						ticker.Stop()
 						return
 					} else if strings.ToLower(providerID) == "docker" {
-						if network.isEthereumNetwork() {
-							logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
-							if err == nil {
-								for i := range logs.Events {
-									event := logs.Events[i]
-									if event.Message != nil {
-										msg := string(*event.Message)
+						logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
+						if err == nil {
+							for i := range logs.Events {
+								event := logs.Events[i]
+								if event.Message != nil {
+									msg := string(*event.Message)
+
+									if network.isBcoinNetwork() {
+										const bcoinPeerScheme = "http"
+										const bcoinExternalAddrSearchString = "External IPv4 found (dns):"
+										externalAddrFoundIndex := strings.LastIndex(msg, bcoinExternalAddrSearchString)
+										if externalAddrFoundIndex != -1 {
+											defaultJSONRPCPort := engineToDefaultJSONRPCPortMapping[engineID]
+											node := fmt.Sprintf("%s://%s:%v", bcoinPeerScheme, strings.TrimSpace(msg[externalAddrFoundIndex+len(bcoinExternalAddrSearchString):]), defaultJSONRPCPort)
+											peerURL = &node
+											cfg["peer_url"] = node
+											ticker.Stop()
+											break
+										}
+									} else if network.isEthereumNetwork() {
 										nodeInfo := &provide.EthereumJsonRpcResponse{}
 										err := json.Unmarshal([]byte(msg), &nodeInfo)
 										if err == nil && nodeInfo != nil {
