@@ -57,6 +57,7 @@ const defaultWebappPort = 3000
 const defaultJsonRpcPort = 8050
 const defaultWebsocketPort = 8051
 
+var engineToNetworkNodeClientEnvMapping = map[string]string{"authorityRound": "parity", "handshake": "handshake"}
 var networkGenesisMutex = map[string]*sync.Mutex{}
 var txFilters = map[string][]*Filter{}
 
@@ -939,6 +940,16 @@ func (n *Network) Nodes() (nodes []*NetworkNode, err error) {
 	return nodes, err
 }
 
+func (n *Network) isBcoinNetwork() bool {
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isBcoinNetwork, ok := cfg["is_bcoin_network"].(bool); ok {
+			return isBcoinNetwork
+		}
+	}
+	return false
+}
+
 func (n *Network) isEthereumNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
@@ -957,6 +968,16 @@ func (n *Network) isHandshakeNetwork() bool {
 	if cfg != nil {
 		if isHandshakeNetwork, ok := cfg["is_handshake_network"].(bool); ok {
 			return isHandshakeNetwork
+		}
+	}
+	return false
+}
+
+func (n *Network) isLcoinNetwork() bool {
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isLcoinNetwork, ok := cfg["is_lcoin_network"].(bool); ok {
+			return isLcoinNetwork
 		}
 	}
 	return false
@@ -1383,12 +1404,20 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
 
 	targetID, targetOk := cfg["target_id"].(string)
+	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	role, roleOk := cfg["role"].(string)
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 	rcd, rcdOk := cfg["rc.d"].(string)
 	region, regionOk := cfg["region"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
+
+	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
+		Log.Debugf("Applying environment overrides to network node per network env configuration")
+		for k := range networkEnv {
+			env[k] = networkEnv[k]
+		}
+	}
 
 	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
 	if !cloneableCfgOk {
@@ -1433,7 +1462,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable provider cfg: %s; network config: %s",
 		targetID, providerID, role, credentials, region, rcd, providerCfgByRegion, networkCfg)
 
-	if targetOk && providerOk && roleOk && credsOk && regionOk {
+	if targetOk && engineOk && providerOk && roleOk && credsOk && regionOk {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
@@ -1596,7 +1625,11 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						if client, clientOk := networkCfg["client"].(string); clientOk {
 							envOverrides["CLIENT"] = client
 						} else {
-							envOverrides["CLIENT"] = defaultClient
+							if defaultClientEnv, defaultClientEnvOk := engineToNetworkNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+								envOverrides["CLIENT"] = defaultClientEnv
+							} else {
+								envOverrides["CLIENT"] = defaultClient
+							}
 						}
 
 						if chain, chainOk := networkCfg["chain"].(string); chainOk {
@@ -1708,6 +1741,8 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 				if roleOk {
 					if role == "explorer" {
 						go network.resolveAndBalanceExplorerUrls(db, n)
+					} else if role == "faucet" {
+						Log.Warningf("Faucet role not yet supported")
 					} else if role == "studio" {
 						go network.resolveAndBalanceStudioUrls(db, n)
 					}
@@ -1805,7 +1840,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 
 				role, roleOk := cfg["role"].(string)
 				if roleOk {
-					if role == "peer" || role == "full" || role == "validator" {
+					if role == "peer" || role == "full" || role == "validator" || role == "faucet" {
 						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 					}
 				}
@@ -1897,6 +1932,8 @@ func (n *NetworkNode) undeploy() error {
 				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
 			} else if role == "explorer" {
 				go network.resolveAndBalanceExplorerUrls(db, n)
+			} else if role == "faucet" {
+				Log.Warningf("Faucet role not yet supported")
 			} else if role == "studio" {
 				go network.resolveAndBalanceStudioUrls(db, n)
 			}
