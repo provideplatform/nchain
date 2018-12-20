@@ -197,7 +197,7 @@ type Transaction struct {
 	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
 	WalletID      *uuid.UUID                 `sql:"type:uuid" json:"wallet_id"`
 	To            *string                    `json:"to"`
-	Value         *TxValue                   `sql:"not null" json:"value"`
+	Value         *TxValue                   `sql:"not null;type:text" json:"value"`
 	Data          *string                    `json:"data"`
 	Hash          *string                    `sql:"not null" json:"hash"`
 	Status        *string                    `sql:"not null;default:'pending'" json:"status"`
