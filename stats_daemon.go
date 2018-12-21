@@ -11,6 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -28,12 +31,15 @@ const statsDaemonMaximumBackoffMillis = 12800
 var currentNetworkStats = map[string]*StatsDaemon{}
 var currentNetworkStatsMutex = &sync.Mutex{}
 
+// NetworkStatsDataSource provides JSON-RPC polling (http) and streaming (websocket)
+// interfaces for a network
 type NetworkStatsDataSource struct {
 	Network *Network
-	Poll    func(chan *provide.NetworkStatus) error                         // JSON-RPC polling -- implementations should be blocking
-	Stream  func(chan *provide.EthereumWebsocketSubscriptionResponse) error // websocket -- implementations should be blocking
+	Poll    func(chan *provide.NetworkStatus) error // JSON-RPC polling -- implementations should be blocking
+	Stream  func(chan *provide.NetworkStatus) error // websocket -- implementations should be blocking
 }
 
+// StatsDaemon struct
 type StatsDaemon struct {
 	attempt    uint32
 	backoff    int64
@@ -45,8 +51,7 @@ type StatsDaemon struct {
 	closing     uint32
 	shutdownCtx context.Context
 
-	queue       chan *provide.EthereumWebsocketSubscriptionResponse
-	statusQueue chan *provide.NetworkStatus
+	queue chan *provide.NetworkStatus
 
 	recentBlocks          []interface{}
 	recentBlockTimestamps []uint64
@@ -64,9 +69,9 @@ func (err websocketNotSupported) Error() string {
 	return "Websocket not supported"
 }
 
-// NetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
-// data source which is used by stats daemon instances to consume network statistics
-func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
+// BcoinNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
+// data source which is used by stats daemon instances to consume bcoin network statistics
+func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 	return &NetworkStatsDataSource{
 		Network: network,
 
@@ -92,7 +97,89 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 			}
 		},
 
-		Stream: func(ch chan *provide.EthereumWebsocketSubscriptionResponse) error {
+		Stream: func(ch chan *provide.NetworkStatus) error {
+			websocketURL := network.websocketURL()
+			if websocketURL == "" {
+				err := new(websocketNotSupported)
+				return *err
+			}
+
+			networkCfg := network.ParseConfig()
+			var rpcAPIUser string
+			var rpcAPIKey string
+			if rpcUser, rpcUserOk := networkCfg["rpc_api_user"].(string); rpcUserOk {
+				rpcAPIUser = rpcUser
+			}
+			if rpcKey, rpcKeyOk := networkCfg["rpc_api_key"].(string); rpcKeyOk {
+				rpcAPIKey = rpcKey
+			}
+
+			cfg := &rpcclient.ConnConfig{
+				Host:     websocketURL,
+				Endpoint: "ws",
+				User:     rpcAPIUser,
+				Pass:     rpcAPIKey,
+			}
+
+			client, err := rpcclient.New(cfg, &rpcclient.NotificationHandlers{
+				OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*btcutil.Tx) {
+					Log.Debugf("Received message on network stats websocket; height: %d", height)
+					Log.Debugf("Block connected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+
+				},
+				OnFilteredBlockDisconnected: func(height int32, header *wire.BlockHeader) {
+					Log.Debugf("Received message on network stats websocket; height: %d", height)
+					Log.Debugf("Block disconnected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+				},
+			})
+
+			if err != nil {
+				Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
+				return err
+			}
+
+			// Register for block connect and disconnect notifications.
+			if err := client.NotifyBlocks(); err != nil {
+				Log.Errorf("Failed to write subscribe message to network stats websocket connection")
+				return err
+			} else {
+				Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
+			}
+			client.WaitForShutdown()
+			return nil
+		},
+	}
+}
+
+// EthereumNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
+// data source which is used by stats daemon instances to consume EVM-based network statistics
+func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
+	return &NetworkStatsDataSource{
+		Network: network,
+
+		Poll: func(ch chan *provide.NetworkStatus) error {
+			rpcURL := network.rpcURL()
+			if rpcURL == "" {
+				err := new(jsonRpcNotSupported)
+				return *err
+			}
+			ticker := time.NewTicker(networkStatsJsonRpcPollingTickerInterval)
+			for {
+				select {
+				case <-ticker.C:
+					status, err := network.Status(true)
+					if err != nil {
+						Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
+						ticker.Stop()
+						return nil
+					}
+
+					ch <- status
+				}
+			}
+		},
+
+		Stream: func(ch chan *provide.NetworkStatus) error {
 			websocketURL := network.websocketURL()
 			if websocketURL == "" {
 				err := new(websocketNotSupported)
@@ -131,7 +218,27 @@ func NetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
 							if err != nil {
 								Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
 							} else {
-								ch <- response
+								if result, ok := response.Params["result"].(map[string]interface{}); ok {
+									if _, mixHashOk := result["mixHash"]; !mixHashOk {
+										result["mixHash"] = common.HexToHash("0x")
+									}
+									if _, nonceOk := result["nonce"]; !nonceOk {
+										result["nonce"] = types.EncodeNonce(0)
+									}
+									if resultJSON, err := json.Marshal(result); err == nil {
+										header := &types.Header{}
+										err := json.Unmarshal(resultJSON, header)
+										if err != nil {
+											Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
+										} else if header != nil && header.Number != nil {
+											ch <- &provide.NetworkStatus{
+												Meta: map[string]interface{}{
+													"last_block_header": result,
+												},
+											}
+										}
+									}
+								}
 							}
 						}
 					}
@@ -159,7 +266,7 @@ func (sd *StatsDaemon) consume() []error {
 			}
 		case websocketNotSupported:
 			sd.log.Warningf("Configured stats daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon for network id: %s", sd.dataSource.Network.ID)
-			err := sd.dataSource.Poll(sd.statusQueue)
+			err := sd.dataSource.Poll(sd.queue)
 			if err != nil {
 				errs = append(errs, err)
 				sd.log.Warningf("Configured stats daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
@@ -169,51 +276,32 @@ func (sd *StatsDaemon) consume() []error {
 	return errs
 }
 
-func (sd *StatsDaemon) ingest(response interface{}, realtime bool) {
+func (sd *StatsDaemon) ingest(response interface{}) {
 	if sd.dataSource.Network.isBcoinNetwork() {
-		sd.ingestBcoin(response, realtime)
+		sd.ingestBcoin(response)
 	} else if sd.dataSource.Network.isLcoinNetwork() {
-		sd.ingestLcoin(response, realtime)
+		sd.ingestLcoin(response)
 	} else if sd.dataSource.Network.isEthereumNetwork() {
-		sd.ingestEthereum(response, realtime)
+		sd.ingestEthereum(response)
 	}
 }
 
-func (sd *StatsDaemon) ingestBcoin(response interface{}, realtime bool) {
+func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 	switch response.(type) {
 	default:
 		Log.Warningf("Bcoin ingest functionality not yet implemented in stats daemon")
 	}
 }
 
-func (sd *StatsDaemon) ingestLcoin(response interface{}, realtime bool) {
+func (sd *StatsDaemon) ingestLcoin(response interface{}) {
 	switch response.(type) {
 	default:
 		Log.Warningf("Lcoin ingest functionality not yet implemented in stats daemon")
 	}
 }
 
-func (sd *StatsDaemon) ingestEthereum(response interface{}, realtime bool) {
+func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 	switch response.(type) {
-	case *provide.EthereumWebsocketSubscriptionResponse:
-		resp := response.(*provide.EthereumWebsocketSubscriptionResponse)
-		if result, ok := resp.Params["result"].(map[string]interface{}); ok {
-			if _, mixHashOk := result["mixHash"]; !mixHashOk {
-				result["mixHash"] = common.HexToHash("0x")
-			}
-			if _, nonceOk := result["nonce"]; !nonceOk {
-				result["nonce"] = types.EncodeNonce(0)
-			}
-			if resultJSON, err := json.Marshal(result); err == nil {
-				header := &types.Header{}
-				err := json.Unmarshal(resultJSON, header)
-				if err != nil {
-					Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
-				} else if header != nil && header.Number != nil {
-					sd.ingest(header, realtime)
-				}
-			}
-		}
 	case *provide.NetworkStatus:
 		resp := response.(*provide.NetworkStatus)
 		if resp != nil && resp.Meta != nil {
@@ -231,7 +319,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}, realtime bool) {
 					if err != nil {
 						Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
 					} else if hdr != nil && hdr.Number != nil {
-						sd.ingest(hdr, realtime)
+						sd.ingest(hdr)
 					}
 				}
 			} else {
@@ -251,12 +339,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}, realtime bool) {
 			return
 		}
 
-		var lastBlockAt uint64
-		if realtime {
-			lastBlockAt = uint64(time.Now().UnixNano() / 1000000)
-		} else {
-			lastBlockAt = header.Time.Uint64() * 1000.0
-		}
+		lastBlockAt := header.Time.Uint64() * 1000.0
 		sd.stats.LastBlockAt = &lastBlockAt
 
 		sd.stats.Meta["last_block_header"] = header
@@ -298,10 +381,7 @@ func (sd *StatsDaemon) loop() error {
 	for {
 		select {
 		case msg := <-sd.queue:
-			sd.ingest(msg, true)
-
-		case msg := <-sd.statusQueue:
-			sd.ingest(msg, false)
+			sd.ingest(msg)
 
 		case <-sd.shutdownCtx.Done():
 			sd.log.Debugf("Closing stats daemon on shutdown")
@@ -356,14 +436,18 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.attempt = 0
 	sd.log = lg.Clone()
 	sd.shutdownCtx, sd.cancelF = context.WithCancel(context.Background())
-	sd.dataSource = NetworkStatsDataSourceFactory(network)
-	sd.queue = make(chan *provide.EthereumWebsocketSubscriptionResponse, defaultStatsDaemonQueueSize)
-	sd.statusQueue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
+	sd.queue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
+
+	if network.isBcoinNetwork() {
+		sd.dataSource = BcoinNetworkStatsDataSourceFactory(network)
+	} else if network.isEthereumNetwork() {
+		sd.dataSource = EthereumNetworkStatsDataSourceFactory(network)
+	}
 	//sd.handleSignals()
 
 	chainID := network.ChainID
 	if chainID == nil {
-		_chainID := hexutil.EncodeBig(provide.GetChainID(network.ID.String(), network.rpcURL()))
+		_chainID := hexutil.EncodeBig(provide.EVMGetChainID(network.ID.String(), network.rpcURL()))
 		chainID = &_chainID
 	}
 	sd.stats = &provide.NetworkStatus{

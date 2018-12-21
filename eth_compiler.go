@@ -300,7 +300,7 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 		return nil, fmt.Errorf("Constructor for %s contract requires %d parameters at compile-time; given: %d", name, argvLength, len(constructorParams))
 	}
 
-	encodedArgv, err := provide.EncodeABI(topLevelConstructor, constructorParams...)
+	encodedArgv, err := provide.EVMEncodeABI(topLevelConstructor, constructorParams...)
 	if err != nil {
 		return nil, fmt.Errorf("WARNING: failed to encode %d parameters prior to compiling contract: %s; %s", len(constructorParams), name, err.Error())
 	}
