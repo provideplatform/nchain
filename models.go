@@ -1804,14 +1804,11 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 
 									if network.isBcoinNetwork() {
 										const bcoinPeerScheme = "http"
-										const bcoinExternalAddrSearchString = "External IPv4 found (dns):"
 										const bcoinPoolIdentitySearchString = "Pool identity key:"
-										externalAddrFoundIndex := strings.LastIndex(msg, bcoinExternalAddrSearchString)
 										poolIdentityFoundIndex := strings.LastIndex(msg, bcoinPoolIdentitySearchString)
-										if externalAddrFoundIndex != -1 && poolIdentityFoundIndex != -1 {
+										if poolIdentityFoundIndex != -1 {
 											defaultJSONRPCPort := engineToDefaultJSONRPCPortMapping[engineID]
-											nodeAddr := strings.TrimSpace(msg[externalAddrFoundIndex+len(bcoinExternalAddrSearchString) : len(msg)-1])
-											node := fmt.Sprintf("%s://%s:%v", bcoinPeerScheme, nodeAddr, defaultJSONRPCPort)
+											node := fmt.Sprintf("%s://%s:%v", bcoinPeerScheme, n.Host, defaultJSONRPCPort)
 											peerURL = &node
 											poolIdentity := strings.TrimSpace(msg[poolIdentityFoundIndex+len(bcoinPoolIdentitySearchString) : len(msg)-1])
 											cfg["peer_url"] = node
