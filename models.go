@@ -55,7 +55,7 @@ const streamingTxFilterReturnTimeout = time.Millisecond * 50
 const defaultClient = "parity"
 const defaultWebappPort = 3000
 
-var engineToDefaultJSONRPCPortMapping = map[string]uint{"authorityRound": 8050, "handshake": 13037}
+var engineToDefaultJSONRPCPortMapping = map[string]uint{"authorityRound": 8050, "handshake": 12039}
 var engineToDefaultWebsocketPortMapping = map[string]uint{"authorityRound": 8051}
 var engineToNetworkNodeClientEnvMapping = map[string]string{"authorityRound": "parity", "handshake": "handshake"}
 var networkGenesisMutex = map[string]*sync.Mutex{}
