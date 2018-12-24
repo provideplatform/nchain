@@ -55,7 +55,7 @@ const streamingTxFilterReturnTimeout = time.Millisecond * 50
 const defaultClient = "parity"
 const defaultWebappPort = 3000
 
-var engineToDefaultJSONRPCPortMapping = map[string]uint{"authorityRound": 8050, "handshake": 12039}
+var engineToDefaultJSONRPCPortMapping = map[string]uint{"authorityRound": 8050, "handshake": 13037}
 var engineToDefaultWebsocketPortMapping = map[string]uint{"authorityRound": 8051}
 var engineToNetworkNodeClientEnvMapping = map[string]string{"authorityRound": "parity", "handshake": "handshake"}
 var networkGenesisMutex = map[string]*sync.Mutex{}
@@ -88,6 +88,8 @@ type NetworkNode struct {
 	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
 	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
 	Host        *string          `json:"host"`
+	IPv4        *string          `json:"ipv4"`
+	IPv6        *string          `json:"ipv6"`
 	Description *string          `json:"description"`
 	Role        *string          `sql:"not null;default:'peer'" json:"role"`
 	Status      *string          `sql:"not null;default:'pending'" json:"status"`
@@ -1699,6 +1701,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 								if len(reservation.Instances) > 0 {
 									instance := reservation.Instances[0]
 									n.Host = instance.PublicDnsName
+									n.IPv4 = instance.PublicIpAddress
 								}
 							}
 						}
@@ -1720,6 +1723,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 														interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
 														if interfaceAssociation != nil {
 															n.Host = interfaceAssociation.PublicDnsName
+															n.IPv4 = interfaceAssociation.PublicIp
 														}
 													}
 												}
@@ -1810,7 +1814,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 										if poolIdentityFoundIndex != -1 {
 											defaultJSONRPCPort := engineToDefaultJSONRPCPortMapping[engineID]
 											poolIdentity := strings.TrimSpace(msg[poolIdentityFoundIndex+len(bcoinPoolIdentitySearchString) : len(msg)-1])
-											node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.Host, defaultJSONRPCPort)
+											node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.IPv4, defaultJSONRPCPort)
 											peerURL = &node
 											cfg["peer_url"] = node
 											cfg["peer_identity"] = poolIdentity
