@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -253,7 +254,14 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 func (sd *StatsDaemon) consume() []error {
 	errs := make([]error, 0)
 	Log.Debugf("Attempting to consume configured stats daemon data source; attempt #%v", sd.attempt)
-	err := sd.dataSource.Stream(sd.queue)
+
+	var err error
+	if sd.dataSource != nil {
+		err = sd.dataSource.Stream(sd.queue)
+	} else {
+		err = errors.New("Configured stats daemon does not have a configured data source")
+	}
+
 	if err != nil {
 		errs = append(errs, err)
 		switch err.(type) {
@@ -485,10 +493,11 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 	currentNetworkStatsMutex.Lock()
 	Log.Infof("Initializing new stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
 	daemon = NewNetworkStatsDaemon(Log, network)
-	currentNetworkStats[network.ID.String()] = daemon
+	if daemon != nil {
+		currentNetworkStats[network.ID.String()] = daemon
+		go daemon.run()
+	}
 	currentNetworkStatsMutex.Unlock()
-
-	go daemon.run()
 
 	return daemon
 }
@@ -508,6 +517,10 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 		sd.dataSource = EthereumNetworkStatsDataSourceFactory(network)
 	}
 	//sd.handleSignals()
+
+	if sd.dataSource == nil {
+		return nil
+	}
 
 	chainID := network.ChainID
 	if chainID == nil {
