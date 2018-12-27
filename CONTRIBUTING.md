@@ -16,7 +16,7 @@ In addition to serving as an ABI translation layer as described above, Goldmine 
 * Exchange consumer: a per-instance goroutine that establishes a real-time socket connection to one or more exchanges to receive up-to-the-millsecond pricing details about a set of currency pairs. The data itself flows in via an AMQP connection which acts as a transceiver. *Note: this service is currently disabled as we are not yet utilizing real-time pricing within our infrastructure but will be useful and as such, has not been removed and should not be considered deprecated.*
 
 
-Goldmine, like all of our microservices, rely heavily on the use of [goroutines](https://gobyexample.com/goroutines) and [buffered channels](https://gobyexample.com/channel-buffering).
+Goldmine, like all of our microservices, relies heavily on the use of [goroutines](https://gobyexample.com/goroutines) and [buffered channels](https://gobyexample.com/channel-buffering).
 
 ---
 
