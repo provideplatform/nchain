@@ -288,8 +288,72 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 
 func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 	switch response.(type) {
-	default:
-		Log.Warningf("Bcoin ingest functionality not yet implemented in stats daemon")
+	case *provide.NetworkStatus:
+		resp := response.(*provide.NetworkStatus)
+		if resp != nil && resp.Meta != nil {
+			header, headerOk := resp.Meta["last_block_header"].(wire.BlockHeader)
+			chainInfo, chainInfoOk := resp.Meta["chain_info"].(map[string]interface{})
+			if headerOk && chainInfoOk {
+				if resp.Height != nil {
+					sd.stats.Block = *resp.Height
+
+					sd.stats.State = nil
+					sd.stats.Syncing = sd.stats.Block == 0
+
+					if sd.stats.Block == 0 {
+						Log.Debugf("Ignoring genesis header")
+						return
+					}
+				}
+
+				var lastBlockAt uint64
+				if resp.LastBlockAt != nil {
+					lastBlockAt = *resp.LastBlockAt * 1000.0
+					sd.stats.LastBlockAt = &lastBlockAt
+				}
+
+				sd.stats.Meta["last_block_header"] = header
+
+				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(wire.BlockHeader).MerkleRoot.String() != header.MerkleRoot.String() {
+					sd.recentBlocks = append(sd.recentBlocks, header)
+					sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
+				}
+
+				for len(sd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
+					i := len(sd.recentBlocks) - 1
+					sd.recentBlocks = append(sd.recentBlocks[:i], sd.recentBlocks[i+1:]...)
+				}
+
+				if len(sd.recentBlocks) >= networkStatsMinimumRecentBlockCacheSize {
+					blocktimes := make([]float64, 0)
+					timedelta := float64(0)
+					i := 0
+					for i < len(sd.recentBlocks)-1 {
+						currentBlocktime := sd.recentBlockTimestamps[i]
+						nextBlocktime := sd.recentBlockTimestamps[i+1]
+						blockDelta := float64(nextBlocktime-currentBlocktime) / 1000.0
+						if blockDelta != 0 {
+							blocktimes = append(blocktimes, blockDelta)
+							timedelta += blockDelta
+							i++
+						}
+					}
+
+					if len(blocktimes) > 0 {
+						sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
+						sd.stats.Meta["blocktimes"] = blocktimes
+						sd.stats.Meta["last_block_hash"] = header.MerkleRoot.String()
+					}
+				} else if medianTime, medianTimeOk := chainInfo["mediantime"].(float64); medianTimeOk {
+					// This is pretty naive but gives us an avg. time before we have >= 3 recent blocks; can take some time after statsdaemon starts monitoring a PoW network...
+					sd.stats.Meta["average_blocktime"] = (float64(time.Now().Unix()) - medianTime) / (11.0 / 2.0)
+				}
+			} else {
+				Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
+			}
+		} else {
+			Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
+		}
 	}
 }
 

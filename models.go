@@ -875,7 +875,16 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 	}
 	RequireNetworkStatsDaemon(n)
 	if n.isBcoinNetwork() {
-		status, err = provide.BcoinGetNetworkStatus(n.ID.String(), n.rpcURL())
+		networkCfg := n.ParseConfig()
+		var rpcAPIUser string
+		var rpcAPIKey string
+		if rpcUser, rpcUserOk := networkCfg["rpc_api_user"].(string); rpcUserOk {
+			rpcAPIUser = rpcUser
+		}
+		if rpcKey, rpcKeyOk := networkCfg["rpc_api_key"].(string); rpcKeyOk {
+			rpcAPIKey = rpcKey
+		}
+		status, err = provide.BcoinGetNetworkStatus(n.ID.String(), n.rpcURL(), rpcAPIUser, rpcAPIKey)
 	} else if n.isEthereumNetwork() {
 		status, err = provide.EVMGetNetworkStatus(n.ID.String(), n.rpcURL())
 	} else {
