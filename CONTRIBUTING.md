@@ -32,7 +32,7 @@ See installation instructions below for how to get Goldmine running locally on y
 
 2. Create a PostgreSQL database for the goldmine service. The following should work:
     `createuser goldmine -s` ## WARNING: this gives goldmine superuser access to your PostgreSQL installation; this is probably OK for convenience sake on your localhost. If this is not acceptable you will need to manually run the `CREATE EXTENSION IF NOT EXISTS` SQL statements found near the top of `database.go` on your `goldmine_dev` db as the superuser.
-    `createdb goldmine -O goldmine`
+    `createdb goldmine_dev -O goldmine`
 
 3. Create a file called `run_local.sh` (`touch run_local.sh && chmod +x run_local.sh`) for convenience inside the `goldmine` path where you cloned the repoistory and populate it with the following script (again, for convenience):
     ```
