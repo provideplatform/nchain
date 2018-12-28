@@ -20,7 +20,7 @@ Goldmine, like all of our microservices, relies heavily on the use of [goroutine
 
 ---
 
-![Goldmine Architecture](https://github.com/provideapp/goldmine/blob/dev/architecture.png?raw=true)
+![Goldmine Architecture](https://github.com/provideapp/goldmine/blob/dev/architecture.svg?raw=true)
 
 ---
 
