@@ -56,6 +56,7 @@ const defaultClient = "parity"
 const defaultWebappPort = 3000
 
 var engineToDefaultJSONRPCPortMapping = map[string]uint{"authorityRound": 8050, "handshake": 13037}
+var engineToDefaultPeerListenPortMapping = map[string]uint{"authorityRound": 30303, "handshake": 13038}
 var engineToDefaultWebsocketPortMapping = map[string]uint{"authorityRound": 8051}
 var engineToNetworkNodeClientEnvMapping = map[string]string{"authorityRound": "parity", "handshake": "handshake"}
 var networkGenesisMutex = map[string]*sync.Mutex{}
@@ -1821,9 +1822,9 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 										const bcoinPoolIdentitySearchString = "Pool identity key:"
 										poolIdentityFoundIndex := strings.LastIndex(msg, bcoinPoolIdentitySearchString)
 										if poolIdentityFoundIndex != -1 {
-											defaultJSONRPCPort := engineToDefaultJSONRPCPortMapping[engineID]
+											defaultPeerListenPort := engineToDefaultPeerListenPortMapping[engineID]
 											poolIdentity := strings.TrimSpace(msg[poolIdentityFoundIndex+len(bcoinPoolIdentitySearchString) : len(msg)-1])
-											node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.IPv4, defaultJSONRPCPort)
+											node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.IPv4, defaultPeerListenPort)
 											peerURL = &node
 											cfg["peer_url"] = node
 											cfg["peer_identity"] = poolIdentity
