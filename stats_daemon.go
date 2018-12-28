@@ -299,7 +299,7 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 	case *provide.NetworkStatus:
 		resp := response.(*provide.NetworkStatus)
 		if resp != nil && resp.Meta != nil {
-			header, headerOk := resp.Meta["last_block_header"].(wire.BlockHeader)
+			header, headerOk := resp.Meta["last_block_header"].(map[string]interface{})
 			chainInfo, chainInfoOk := resp.Meta["chain_info"].(map[string]interface{})
 			if headerOk && chainInfoOk {
 				if resp.Height != nil {
@@ -322,7 +322,9 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 
 				sd.stats.Meta["last_block_header"] = header
 
-				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(wire.BlockHeader).MerkleRoot.String() != header.MerkleRoot.String() {
+				merkleRoot, _ := header["merkleroot"].(string)
+
+				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["merkleroot"].(string) != merkleRoot {
 					sd.recentBlocks = append(sd.recentBlocks, header)
 					sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
 				}
@@ -350,7 +352,7 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 					if len(blocktimes) > 0 {
 						sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
 						sd.stats.Meta["blocktimes"] = blocktimes
-						sd.stats.Meta["last_block_hash"] = header.MerkleRoot.String()
+						sd.stats.Meta["last_block_hash"] = merkleRoot
 					}
 				} else if medianTime, medianTimeOk := chainInfo["mediantime"].(float64); medianTimeOk {
 					// This is pretty naive but gives us an avg. time before we have >= 3 recent blocks; can take some time after statsdaemon starts monitoring a PoW network...
