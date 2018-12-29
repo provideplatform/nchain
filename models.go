@@ -867,6 +867,25 @@ func (n *Network) websocketURL() string {
 	return ""
 }
 
+// InvokeJSONRPC method with given params
+func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string]interface{}, error) {
+	if n.isBcoinNetwork() {
+		cfg := n.ParseConfig()
+		rpcAPIUser := cfg["rpc_api_user"].(string)
+		rpcAPIKey := cfg["rpc_api_key"].(string)
+		var resp map[string]interface{}
+		err := provide.BcoinInvokeJsonRpcClient(n.ID.String(), n.rpcURL(), rpcAPIUser, rpcAPIKey, method, params, &resp)
+		if err != nil {
+			Log.Warningf("Failed to invoke JSON-RPC method %s with params: %s; %s", method, params, err.Error())
+			return nil, err
+		}
+		result, _ := resp["result"].(map[string]interface{})
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("JSON-RPC invocation not supported by network %s", n.ID)
+}
+
 // Status retrieves metadata and metrics specific to the given network;
 // when force is true, it forces a JSON-RPC request to be made to retrieve
 // the latest status; when false, cached network stats are returned if available

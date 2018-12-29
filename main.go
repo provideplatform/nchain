@@ -849,6 +849,38 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 }
 
+func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[string]interface{}, c *gin.Context) {
+	network := &Network{}
+	db.Where("id = ?", networkID).Find(&network)
+	if network == nil || network.ID == uuid.Nil {
+		renderError("not found", 404, c)
+		return
+	}
+	method := params["method"].(string)
+	authorizedMethod := false
+	cfg := network.ParseConfig()
+	if whitelist, whitelistOk := cfg["rpc_method_whitelist"].([]interface{}); whitelistOk {
+		for _, mthd := range whitelist {
+			mthdStr := mthd.(string)
+			authorizedMethod = mthdStr == method
+			if authorizedMethod {
+				break
+			}
+		}
+	}
+	if !authorizedMethod {
+		renderError(fmt.Sprintf("forbidden rpc method %s", method), 403, c)
+		return
+	}
+	Log.Debugf("%s", params)
+	resp, err := network.InvokeJSONRPC(method, params["params"].([]interface{}))
+	if err != nil {
+		renderError(err.Error(), 422, c)
+		return
+	}
+	render(resp, 200, c)
+}
+
 func contractExecutionHandler(c *gin.Context) {
 	appID := authorizedSubjectId(c, "application")
 	userID := authorizedSubjectId(c, "user")
@@ -864,9 +896,33 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	db := DatabaseConnection()
+
+	contractID := c.Param("id")
+	rpcHack := strings.Index(contractID, "rpc:") == 0
+	if rpcHack {
+		rpcNetworkIDStr := contractID[4:]
+		rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
+		if err != nil {
+			err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
+			renderError(err.Error(), 400, c)
+			return
+		}
+		params := map[string]interface{}{}
+		err = json.Unmarshal(buf, &params)
+		if err != nil {
+			err = fmt.Errorf("Failed to parse JSON-RPC params; %s", err.Error())
+			renderError(err.Error(), 400, c)
+			return
+		}
+		Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
+		arbitraryRPCExecutionHandler(db, &rpcNetworkID, params, c)
+		return
+	}
+	// HACK
+
 	var contract = &Contract{}
 
-	db.Where("id = ?", c.Param("id")).Find(&contract)
+	db.Where("id = ?", contractID).Find(&contract)
 
 	if contract == nil || contract.ID == uuid.Nil { // attempt to lookup the contract by address
 		db.Where("address = ?", c.Param("id")).Find(&contract)
