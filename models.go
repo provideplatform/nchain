@@ -1739,7 +1739,11 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 						if err == nil {
 							if len(containerDetails.Tasks) > 0 {
 								task := containerDetails.Tasks[0]
-								if len(task.Attachments) > 0 {
+								taskStatus := ""
+								if task.LastStatus != nil {
+									taskStatus = *task.LastStatus
+								}
+								if taskStatus == "running" && len(task.Attachments) > 0 {
 									attachment := task.Attachments[0]
 									if attachment.Type != nil && *attachment.Type == "ElasticNetworkInterface" {
 										for i := range attachment.Details {
