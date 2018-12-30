@@ -1741,7 +1741,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 								task := containerDetails.Tasks[0]
 								taskStatus := ""
 								if task.LastStatus != nil {
-									taskStatus = *task.LastStatus
+									taskStatus = strings.ToLower(*task.LastStatus)
 								}
 								if taskStatus == "running" && len(task.Attachments) > 0 {
 									attachment := task.Attachments[0]
