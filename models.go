@@ -177,6 +177,15 @@ type Oracle struct {
 	AttachmentIds []*uuid.UUID     `sql:"type:uuid[]" json:"attachment_ids"`
 }
 
+// LoadBalancer instances represent a physical or virtual load balancer of a specific type (i.e., JSON-RPC) which belongs to a network
+type LoadBalancer struct {
+	provide.Model
+	NetworkID uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	Name      *string          `sql:"not null" json:"name"`
+	Type      *string          `sql:"not null" json:"type"`
+	Config    *json.RawMessage `sql:"type:json" json:"config"`
+}
+
 // Token instances must be associated with an application identifier.
 type Token struct {
 	provide.Model
