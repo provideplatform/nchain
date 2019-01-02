@@ -180,10 +180,14 @@ type Oracle struct {
 // LoadBalancer instances represent a physical or virtual load balancer of a specific type (i.e., JSON-RPC) which belongs to a network
 type LoadBalancer struct {
 	provide.Model
-	NetworkID uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	Name      *string          `sql:"not null" json:"name"`
-	Type      *string          `sql:"not null" json:"type"`
-	Config    *json.RawMessage `sql:"type:json" json:"config"`
+	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	Name        *string          `sql:"not null" json:"name"`
+	Type        *string          `sql:"not null" json:"type"`
+	Host        *string          `json:"host"`
+	IPv4        *string          `json:"ipv4"`
+	IPv6        *string          `json:"ipv6"`
+	Description *string          `json:"description"`
+	Config      *json.RawMessage `sql:"type:json" json:"config"`
 }
 
 // Token instances must be associated with an application identifier.
@@ -657,15 +661,12 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	// region := *DefaultAWSConfig.DefaultRegion
 	// vpcID := *DefaultAWSConfig.DefaultVpcID
 
-	isLoadBalanced := false
-	if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
-		isLoadBalanced = loadBalanced
-	}
-
 	Log.Debugf("Attempting to resolve and balance JSON-RPC and websocket urls for network with id: %s", n.ID)
 
 	var node = &NetworkNode{}
 	db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator', 'faucet')", n.ID).First(&node)
+
+	isLoadBalanced := n.isLoadBalanced(db, "rpc")
 
 	if node != nil && node.ID != uuid.Nil {
 		if isLoadBalanced {
@@ -708,6 +709,26 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 	}
 }
 
+// LoadBalancers returns the Network load balancers
+func (n *Network) LoadBalancers(db *gorm.DB, balancerType *string) ([]*LoadBalancer, error) {
+	balancers := make([]*LoadBalancer, 0)
+	query := db.Where("network_id = ?", n.ID)
+	if balancerType != nil {
+		query = query.Where("type = ?", balancerType)
+	}
+	query.Find(&balancers)
+	return balancers, nil
+}
+
+func (n *Network) isLoadBalanced(db *gorm.DB, balancerType string) bool {
+	balancers, err := n.LoadBalancers(db, stringOrNil(balancerType))
+	if err != nil {
+		Log.Warningf("Failed to retrieve network load balancers; %s", err.Error())
+		return false
+	}
+	return len(balancers) > 0
+}
+
 // resolveAndBalanceExplorerUrls updates the network's configured block
 // explorer urls (i.e. web-based IDE), and enriches the network cfg
 func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) {
@@ -719,10 +740,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) 
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := false
-			if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
-				isLoadBalanced = loadBalanced
-			}
+			isLoadBalanced := n.isLoadBalanced(db, "explorer")
 
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				Log.Warningf("Failed to resolve and balance explorer urls for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
@@ -786,11 +804,6 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := false
-			if loadBalanced, loadBalancedOk := cfg["is_load_balanced"].(bool); loadBalancedOk {
-				isLoadBalanced = loadBalanced
-			}
-
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				Log.Warningf("Failed to resolve and balance studio (IDE) url for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
 				if !isLoadBalanced {
@@ -802,6 +815,8 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 				ticker.Stop()
 				return
 			}
+
+			isLoadBalanced := n.isLoadBalanced(db, "studio")
 
 			if n.isEthereumNetwork() {
 				Log.Debugf("Attempting to resolve and balance studio IDE url for network node: %s", n.ID.String())
