@@ -804,6 +804,8 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
+			isLoadBalanced := n.isLoadBalanced(db, "explorer")
+
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				Log.Warningf("Failed to resolve and balance studio (IDE) url for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
 				if !isLoadBalanced {
@@ -815,8 +817,6 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 				ticker.Stop()
 				return
 			}
-
-			isLoadBalanced := n.isLoadBalanced(db, "studio")
 
 			if n.isEthereumNetwork() {
 				Log.Debugf("Attempting to resolve and balance studio IDE url for network node: %s", n.ID.String())
