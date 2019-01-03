@@ -25,7 +25,7 @@ func main() {
 	r := gin.Default()
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
-	// r.Use(provide.TrackAPICalls())
+	r.Use(provide.TrackAPICalls())
 
 	r.GET("/api/v1/networks", networksListHandler)
 	r.GET("/api/v1/networks/:id", networkDetailsHandler)
