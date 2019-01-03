@@ -15,8 +15,8 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-const apiUsageDaemonBufferSize = 1024 * 10
-const apiUsageDaemonFlushInterval = 15000
+const apiUsageDaemonBufferSize = 1024 * 25
+const apiUsageDaemonFlushInterval = 10000
 
 const natsDefaultClusterID = "provide"
 const natsAPIUsageEventNotificationSubject = "api.usage.event"
