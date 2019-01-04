@@ -232,9 +232,10 @@ func consumeTxMsg(msg *stan.Msg) {
 		Log.Warningf("Failed to execute contract; %s", err.Error())
 		Log.Warningf("NATS message dropped: %s", msg)
 		// FIXME-- Augment NATS support and Nack?
+	} else {
+		Log.Debugf("Executed contract; tx: %s", executionResponse)
 	}
 
-	Log.Debugf("Executed contract; tx: %s", executionResponse)
 	msg.Ack()
 }
 
