@@ -2281,6 +2281,11 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			}
 		}
 
+		if err != nil {
+			desc := err.Error()
+			tx.updateStatus(DatabaseConnection(), "failed", &desc)
+		}
+
 		if txResponse != nil {
 			Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
 
@@ -2522,9 +2527,7 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 	}
 
-	if len(tx.Errors) == 0 {
-		tx.updateStatus(db, "success", nil)
-	}
+	tx.updateStatus(db, "success", nil)
 
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
@@ -2566,11 +2569,7 @@ func (c *Contract) Create() bool {
 				params := c.ParseParams()
 				_, rawSourceOk := params["raw_source"].(string)
 				if rawSourceOk {
-					Log.Debugf("Found raw source...")
-					contractCompilerInvocationMsg, err := json.Marshal(c)
-					if err != nil {
-						Log.Warningf("Failed to marshal contract for raw source compilation; %s", err.Error())
-					}
+					contractCompilerInvocationMsg, _ := json.Marshal(c)
 					natsConnection := getNatsStreamingConnection()
 					natsConnection.Publish(natsContractCompilerInvocationSubject, contractCompilerInvocationMsg)
 				}
@@ -3087,7 +3086,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wal
 func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *Network, wallet *Wallet, traces *provide.EthereumTxTraceResponse) {
 	contract := t.GetContract(db)
 	if contract == nil {
-		Log.Debugf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")
+		Log.Warningf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")
 		return
 	}
 	artifact := contract.CompiledArtifact()
@@ -3160,13 +3159,12 @@ func (t *Transaction) Create() bool {
 		db.Model(t).Related(&wallet)
 	}
 
-	var signingErr error
 	err := t.sign(db, network, wallet)
 	if err != nil {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: stringOrNil(err.Error()),
 		})
-		signingErr = err
+		return false
 	}
 
 	if db.NewRecord(t) {
@@ -3182,25 +3180,20 @@ func (t *Transaction) Create() bool {
 			return false
 		}
 
+		err = t.broadcast(db, network, wallet)
+		if len(t.Errors) > 0 {
+			return false
+		}
+
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
-				if signingErr != nil {
-					t.Errors = append(t.Errors, &provide.Error{
-						Message: stringOrNil(signingErr.Error()),
-					})
-
-					desc := signingErr.Error()
+				if err != nil {
+					desc := err.Error()
 					t.updateStatus(db, "failed", &desc)
 				} else {
-					err = t.broadcast(db, network, wallet)
-					if err == nil {
-						txReceiptMsg, _ := json.Marshal(t)
-						natsConnection := getNatsStreamingConnection()
-						natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
-					} else {
-						desc := err.Error()
-						t.updateStatus(db, "failed", &desc)
-					}
+					txReceiptMsg, _ := json.Marshal(t)
+					natsConnection := getNatsStreamingConnection()
+					natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
 				}
 			}
 			return rowsAffected > 0 && len(t.Errors) == 0
