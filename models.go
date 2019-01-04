@@ -215,7 +215,7 @@ type Transaction struct {
 	To            *string                    `json:"to"`
 	Value         *TxValue                   `sql:"not null;type:text" json:"value"`
 	Data          *string                    `json:"data"`
-	Hash          *string                    `sql:"not null" json:"hash"`
+	Hash          *string                    `json:"hash"`
 	Status        *string                    `sql:"not null;default:'pending'" json:"status"`
 	Params        *json.RawMessage           `sql:"-" json:"params"`
 	Response      *ContractExecutionResponse `sql:"-" json:"-"`
