@@ -30,14 +30,17 @@ func migrateSchema() {
 
 		db.AutoMigrate(&NetworkNode{})
 		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
+		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_region", "region")
 		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_role", "role")
 		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_status", "status")
 		db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
 		db.Model(&NetworkNode{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&LoadBalancer{})
-		db.Model(&LoadBalancer{}).AddIndex("idx_network_nodes_network_id", "network_id")
-		db.Model(&LoadBalancer{}).AddIndex("idx_network_nodes_type", "type")
+		db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_network_id", "network_id")
+		db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_region", "region")
+		db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_status", "status")
+		db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_type", "type")
 		db.Model(&LoadBalancer{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&Wallet{})
@@ -89,6 +92,9 @@ func migrateSchema() {
 		db.Model(&Token{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Token{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
 		db.Model(&Token{}).AddForeignKey("sale_contract_id", "contracts(id)", "SET NULL", "CASCADE")
+
+		db.Exec("ALTER TABLE load_balancers_network_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+		db.Exec("ALTER TABLE load_balancers_network_nodes ADD CONSTRAINT load_balancers_network_node_id_network_nodes_id_foreign FOREIGN KEY (network_node_id) REFERENCES network_nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 	})
 }
 

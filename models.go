@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,12 +42,12 @@ const receiptTickerTimeout = time.Minute * 1
 const resolveGenesisTickerInterval = time.Millisecond * 10000
 const resolveGenesisTickerTimeout = time.Minute * 20
 const resolveHostTickerInterval = time.Millisecond * 5000
-const resolveHostTickerTimeout = time.Minute * 5
+const resolveHostTickerTimeout = time.Minute * 10
 const resolvePeerTickerInterval = time.Millisecond * 5000
 const resolvePeerTickerTimeout = time.Minute * 20
 const resolveTokenTickerInterval = time.Millisecond * 5000
 const resolveTokenTickerTimeout = time.Minute * 1
-const securityGroupTerminationTickerInterval = time.Millisecond * 10000
+const securityGroupTerminationTickerInterval = time.Millisecond * 30000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 const streamingTxFilterReturnTimeout = time.Millisecond * 50
 
@@ -85,16 +84,19 @@ type Network struct {
 // or even phyiscal infrastructure
 type NetworkNode struct {
 	provide.Model
-	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	UserID      *uuid.UUID       `sql:"type:uuid" json:"user_id"`
-	Bootnode    bool             `sql:"not null;default:'false'" json:"is_bootnode"`
-	Host        *string          `json:"host"`
-	IPv4        *string          `json:"ipv4"`
-	IPv6        *string          `json:"ipv6"`
-	Description *string          `json:"description"`
-	Role        *string          `sql:"not null;default:'peer'" json:"role"`
-	Status      *string          `sql:"not null;default:'pending'" json:"status"`
-	Config      *json.RawMessage `sql:"type:json" json:"config"`
+	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	Bootnode      bool             `sql:"not null;default:'false'" json:"is_bootnode"`
+	Host          *string          `json:"host"`
+	IPv4          *string          `json:"ipv4"`
+	IPv6          *string          `json:"ipv6"`
+	PrivateIPv4   *string          `json:"private_ipv4"`
+	PrivateIPv6   *string          `json:"private_ipv6"`
+	Description   *string          `json:"description"`
+	Role          *string          `sql:"not null;default:'peer'" json:"role"`
+	Status        *string          `sql:"not null;default:'pending'" json:"status"`
+	LoadBalancers []LoadBalancer   `gorm:"many2many:load_balancers_network_nodes" json:"-"`
+	Config        *json.RawMessage `sql:"type:json" json:"config"`
 }
 
 // Bridge instances are still in the process of being defined.
@@ -187,6 +189,9 @@ type LoadBalancer struct {
 	IPv4        *string          `json:"ipv4"`
 	IPv6        *string          `json:"ipv6"`
 	Description *string          `json:"description"`
+	Region      *string          `json:"region"`
+	Status      *string          `sql:"not null;default:'provisioning'" json:"status"`
+	Nodes       []NetworkNode    `gorm:"many2many:load_balancers_network_nodes" json:"-"`
 	Config      *json.RawMessage `sql:"type:json" json:"config"`
 }
 
@@ -379,6 +384,535 @@ func (v *TxValue) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Create and persist a new load balancer
+func (l *LoadBalancer) Create() bool {
+	if !l.Validate() {
+		return false
+	}
+
+	db := DatabaseConnection()
+
+	if db.NewRecord(l) {
+		result := db.Create(&l)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				l.Errors = append(l.Errors, &provide.Error{
+					Message: stringOrNil(err.Error()),
+				})
+			}
+		}
+		if !db.NewRecord(l) {
+			success := rowsAffected > 0
+			if success {
+				msg, _ := json.Marshal(l)
+				natsConnection := getNatsStreamingConnection()
+				natsConnection.Publish(natsLoadBalancerProvisioningSubject, msg)
+			}
+			return success
+		}
+	}
+	return false
+}
+
+// Delete a load balancer
+func (l *LoadBalancer) Delete() bool {
+	db := DatabaseConnection()
+	result := db.Delete(l)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			l.Errors = append(l.Errors, &provide.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
+	return len(l.Errors) == 0
+}
+
+// Validate a load balancer for persistence
+func (l *LoadBalancer) Validate() bool {
+	l.Errors = make([]*provide.Error, 0)
+	return len(l.Errors) == 0
+}
+
+// ParseConfig - parse the persistent load balancer configuration JSON
+func (l *LoadBalancer) ParseConfig() map[string]interface{} {
+	config := map[string]interface{}{}
+	if l.Config != nil {
+		err := json.Unmarshal(*l.Config, &config)
+		if err != nil {
+			Log.Warningf("Failed to unmarshal load balancer config; %s", err.Error())
+			return nil
+		}
+	}
+	return config
+}
+
+func (l *LoadBalancer) deprovision(db *gorm.DB) error {
+	Log.Debugf("Attempting to deprovision infrastructure for load balancer with id: %s", l.ID)
+	cfg := l.ParseConfig()
+	l.updateStatus(db, "deprovisioning", l.Description)
+
+	targetID, targetIDOk := cfg["target_id"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	region, regionOk := cfg["region"].(string)
+	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
+
+	if !targetIDOk || !credsOk || !regionOk || !arnOk {
+		err := fmt.Errorf("Cannot deprovision load balancer for network node without target, region, credentials and target balancer id configuration; target: %s, region: %s, balancer: %s", targetID, region, targetBalancerArn)
+		Log.Warningf(err.Error())
+		return err
+	}
+
+	if region != "" {
+		if strings.ToLower(targetID) == "aws" {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+			if securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{}); securityGroupIdsOk {
+				for _, securityGroupID := range securityGroupIds {
+					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID.(string))
+					if err != nil {
+						Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
+						return err
+					}
+				}
+			}
+
+			targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string)
+			if targetGroupsOk {
+				for _, targetGroupArn := range targetGroups {
+					_, err := awswrapper.DeleteTargetGroup(accessKeyID, secretAccessKey, region, stringOrNil(targetGroupArn))
+					if err != nil {
+						Log.Warningf("Failed to delete load balanced target group: %s; %s", targetGroupArn, err.Error())
+						return err
+					}
+				}
+			}
+
+			_, err := awswrapper.DeleteLoadBalancerV2(accessKeyID, secretAccessKey, region, stringOrNil(targetBalancerArn))
+			if err != nil {
+				Log.Warningf("Failed to delete load balancer: %s; %s", *l.Name, err.Error())
+				return err
+			}
+
+			if l.Delete() {
+				Log.Debugf("Dropped load balancer: %s", l.ID)
+			} else {
+				Log.Warningf("Failed to drop load balancer: %s", l.ID)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (l *LoadBalancer) provision(db *gorm.DB) error {
+	Log.Debugf("Attempting to provision infrastructure for load balancer with id: %s", l.ID)
+	n := &Network{}
+	db.Model(&l).Related(&n)
+	cfg := n.ParseConfig()
+
+	balancerCfg := l.ParseConfig()
+	var balancerType string
+	if l.Type != nil {
+		balancerType = *l.Type
+	}
+
+	defaultJSONRPCPort := uint(0)
+	defaultWebsocketPort := uint(0)
+	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
+		defaultJSONRPCPort = engineToDefaultJSONRPCPortMapping[engineID]
+		defaultWebsocketPort = engineToDefaultWebsocketPortMapping[engineID]
+	}
+
+	jsonRPCPort := float64(defaultJSONRPCPort)
+	websocketPort := float64(defaultWebsocketPort)
+
+	var securityCfg map[string]interface{}
+	if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
+		securityCfg, _ = cloneableCfg["_security"].(map[string]interface{})
+	}
+	if securityCfg == nil || len(securityCfg) == 0 {
+		Log.Warningf("Failed to parse cloneable security configuration for load balancer: %s; attempting to create sane initial configuration", n.ID)
+
+		tcpIngressCfg := make([]float64, 0)
+		if _jsonRPCPort, jsonRPCPortOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOk {
+			jsonRPCPort = _jsonRPCPort
+		}
+		if _websocketPort, websocketPortOk := cfg["default_websocket_port"].(float64); websocketPortOk {
+			websocketPort = _websocketPort
+		}
+
+		tcpIngressCfg = append(tcpIngressCfg, float64(jsonRPCPort))
+		tcpIngressCfg = append(tcpIngressCfg, float64(websocketPort))
+		ingressCfg := map[string]interface{}{
+			"tcp": tcpIngressCfg,
+			"udp": make([]float64, 0),
+		}
+		securityCfg = map[string]interface{}{
+			"egress": map[string]interface{}{},
+			"ingress": map[string]interface{}{
+				"0.0.0.0/0": ingressCfg,
+			},
+		}
+		balancerCfg["_security"] = securityCfg
+	}
+
+	targetID, targetOk := balancerCfg["target_id"].(string)
+	providerID, providerOk := balancerCfg["provider_id"].(string)
+	credentials, credsOk := balancerCfg["credentials"].(map[string]interface{})
+	region, regionOk := balancerCfg["region"].(string)
+
+	l.Description = stringOrNil(fmt.Sprintf("%s - %s %s", *l.Name, targetID, region))
+	l.Region = stringOrNil(region)
+	db.Save(&l)
+
+	if !targetOk || !providerOk || !credsOk || !regionOk || balancerType == "" {
+		err := fmt.Errorf("Cannot provision load balancer for network node without credentials, a target, provider, region and type configuration; target id: %s; provider id: %s; region: %s, type: %s", targetID, providerID, region, balancerType)
+		Log.Warningf(err.Error())
+		return err
+	}
+
+	if region != "" {
+		if strings.ToLower(targetID) == "aws" {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
+			vpcID := *DefaultAWSConfig.DefaultVpcID // FIXME-- create and use managed vpc
+
+			// start security group handling
+			securityGroupIds := make([]string, 0)
+			securityGroupDesc := fmt.Sprintf("security group for load balancer: %s", l.ID.String())
+			securityGroup, _ := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, stringOrNil(vpcID))
+			if securityGroup != nil {
+				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
+			}
+			balancerCfg["target_security_group_ids"] = securityGroupIds
+
+			if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+				switch ingress.(type) {
+				case map[string]interface{}:
+					ingressCfg := ingress.(map[string]interface{})
+					for cidr := range ingressCfg {
+						tcp := make([]int64, 0)
+						udp := make([]int64, 0)
+						if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+							for i := range _tcp {
+								_port := int64(_tcp[i].(float64))
+								tcp = append(tcp, _port)
+							}
+						}
+
+						// UDP not currently supported by classic ELB API; UDP support is not needed here at this time...
+						// if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+						// 	for i := range _udp {
+						// 		_port := int64(_udp[i].(float64))
+						// 		udp = append(udp, _port)
+						// 	}
+						// }
+
+						_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						if err != nil {
+							err := fmt.Errorf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; %d tcp ports; %d udp ports: %s", region, *securityGroup.GroupId, len(tcp), len(udp), err.Error())
+							Log.Warningf(err.Error())
+							return err
+						}
+					}
+				}
+			}
+			// end security group handling
+
+			if providerID, providerIDOk := balancerCfg["provider_id"].(string); providerIDOk {
+				// TODO: for ubuntu-vm provider
+
+				if strings.ToLower(providerID) == "docker" {
+					loadBalancersResp, err := awswrapper.CreateLoadBalancerV2(accessKeyID, secretAccessKey, region, stringOrNil(vpcID), l.Name, stringOrNil("application"), securityGroupIds)
+					if err != nil {
+						err := fmt.Errorf("Failed to provision AWS load balancer (v2); %s", err.Error())
+						Log.Warningf(err.Error())
+						return err
+					}
+
+					for _, loadBalancer := range loadBalancersResp.LoadBalancers {
+						balancerCfg["load_balancer_name"] = l.Name
+						balancerCfg["load_balancer_url"] = loadBalancer.DNSName
+						balancerCfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
+						balancerCfg["json_rpc_port"] = jsonRPCPort
+						balancerCfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
+						balancerCfg["websocket_port"] = websocketPort
+						balancerCfg["target_balancer_id"] = loadBalancer.LoadBalancerArn
+
+						l.Host = loadBalancer.DNSName
+						l.setConfig(balancerCfg)
+						l.updateStatus(db, "active", l.Description)
+						db.Save(&l)
+						if len(l.Errors) == 0 {
+							return nil
+						}
+						return fmt.Errorf("%s", *l.Errors[0].Message)
+					}
+				}
+			} else {
+				err := fmt.Errorf("Failed to load balance node without provider_id")
+				Log.Warningf(err.Error())
+				return err
+			}
+		} else {
+			err := fmt.Errorf("Failed to load balance node without region")
+			Log.Warningf(err.Error())
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
+	db.Model(l).Association("Nodes").Append(node)
+
+	cfg := l.ParseConfig()
+
+	targetID, targetOk := cfg["target_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
+	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
+
+	if l.Host != nil {
+		Log.Debugf("Attempting to load balance network node %s on balancer: %s", node.ID, l.ID)
+
+		if !securityCfgOk {
+			desc := fmt.Sprintf("Failed to resolve _security configuration for lazy initialization of load balanced target group in region: %s", region)
+			Log.Warning(desc)
+			return fmt.Errorf(desc)
+		}
+
+		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && arnOk && securityCfgOk {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
+			vpcID := *DefaultAWSConfig.DefaultVpcID // FIXME-- create and use managed vpc
+
+			var targetGroups map[float64]string
+			targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string)
+			if !targetGroupsOk {
+				Log.Debugf("Attempting to lazily initialize load balanced target groups for network node %s on balancer: %s", node.ID, l.ID)
+				targetGroups = map[float64]string{}
+
+				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+					Log.Debugf("Found security group ingress rules to apply to load balanced target group for network node %s on balancer: %s", node.ID, l.ID)
+
+					switch ingress.(type) {
+					case map[string]interface{}:
+						ingressCfg := ingress.(map[string]interface{})
+						for cidr := range ingressCfg {
+							tcp := make([]int64, 0)
+							// udp := make([]int64, 0)
+							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+								for i := range _tcp {
+									_port := int64(_tcp[i].(float64))
+									tcp = append(tcp, _port)
+								}
+							}
+
+							for _, tcpPort := range tcp {
+								targetGroupName := fmt.Sprintf("port-%v", tcpPort)
+								targetGroup, err := awswrapper.CreateTargetGroup(accessKeyID, secretAccessKey, region, stringOrNil(vpcID), stringOrNil(targetGroupName), stringOrNil("HTTP"), tcpPort)
+								if err != nil {
+									desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
+									Log.Warning(desc)
+									l.updateStatus(db, "failed", &desc)
+									db.Save(l)
+									return fmt.Errorf(desc)
+								}
+								Log.Debugf("Upserted target group %s in region: %s", targetGroupName, region)
+								if len(targetGroup.TargetGroups) == 1 {
+									targetGroups[float64(tcpPort)] = *targetGroup.TargetGroups[0].TargetGroupArn
+								}
+							}
+
+							cfg["target_groups"] = targetGroups
+							l.setConfig(cfg)
+							db.Save(l)
+						}
+					}
+				} else {
+					desc := fmt.Sprintf("Failed to resolve security ingress rules for creation of load balanced target group in region: %s", region)
+					Log.Warning(desc)
+					return fmt.Errorf(desc)
+				}
+
+				if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
+					Log.Debugf("Found target groups for load balanced target registration for network node %s on balancer: %s", node.ID, l.ID)
+
+					for port, targetGroupArn := range targetGroups {
+						_port := int64(port)
+						target, err := awswrapper.RegisterTarget(accessKeyID, secretAccessKey, region, stringOrNil(targetGroupArn), node.PrivateIPv4, &_port)
+						if err != nil {
+							desc := fmt.Sprintf("Failed to add target to load balanced target group in region: %s; %s", region, err.Error())
+							Log.Warning(desc)
+							l.updateStatus(db, "failed", &desc)
+							db.Save(l)
+							return fmt.Errorf(desc)
+						}
+						Log.Debugf("Registered load balanced target: %s", target)
+
+						_, err = awswrapper.CreateListenerV2(accessKeyID, secretAccessKey, region, stringOrNil(targetBalancerArn), stringOrNil(targetGroupArn), stringOrNil("HTTP"), &_port)
+						if err != nil {
+							Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
+						}
+						Log.Debugf("Upserted listener for load balanced target group %s in region: %s", targetGroupArn, region)
+					}
+				} else {
+					desc := fmt.Sprintf("Failed to resolve load balanced target groups needed for listener creation in region: %s", region)
+					Log.Warning(desc)
+					return fmt.Errorf(desc)
+				}
+			}
+		}
+	} else {
+		desc := fmt.Sprintf("Failed to resolve host configuration for lazy initialization of load balanced target group in region: %s", region)
+		Log.Warning(desc)
+		return fmt.Errorf(desc)
+	}
+
+	return nil
+}
+
+func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
+	Log.Debugf("Attempting to unbalance network node %s from balancer: %s", node.ID, l.ID)
+	cfg := l.ParseConfig()
+
+	targetID, targetOk := cfg["target_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	// targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
+	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
+
+	if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && securityCfgOk {
+		accessKeyID := credentials["aws_access_key_id"].(string)
+		secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+		if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+			switch ingress.(type) {
+			case map[string]interface{}:
+				ingressCfg := ingress.(map[string]interface{})
+				for cidr := range ingressCfg {
+					tcp := make([]int64, 0)
+					// udp := make([]int64, 0)
+					if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+						for i := range _tcp {
+							_port := int64(_tcp[i].(float64))
+							tcp = append(tcp, _port)
+						}
+					}
+
+					if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
+						for port, targetGroupArn := range targetGroups {
+							_port := int64(port)
+							_, err := awswrapper.DeregisterTarget(accessKeyID, secretAccessKey, region, stringOrNil(targetGroupArn), node.IPv4, &_port)
+							if err != nil {
+								desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
+								Log.Warning(desc)
+								return err
+							}
+							Log.Debugf("Deregistered target: %s:%v", node.IPv4, port)
+						}
+					}
+				}
+			}
+		}
+	} else {
+		err := fmt.Errorf("Failed to unbalance network node %s from balancer: %s; invalid configuration", node.ID, l.ID)
+		Log.Warning(err.Error())
+		return err
+	}
+
+	db.Model(&l).Association("Nodes").Delete(node)
+	if db.Model(&l).Association("Nodes").Count() == 0 {
+		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && securityCfgOk {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+			if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
+				for _, targetGroupArn := range targetGroups {
+					_, err := awswrapper.DeleteTargetGroup(accessKeyID, secretAccessKey, region, stringOrNil(targetGroupArn))
+					if err != nil {
+						desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
+						Log.Warning(desc)
+						return err
+					}
+					Log.Debugf("Dropped target group %s in region: %s", targetGroupArn, region)
+				}
+			}
+		}
+
+		Log.Debugf("Attempting to deprovision load balancer %s in region: %s", l.ID, region)
+		msg, _ := json.Marshal(l)
+		natsConnection := getNatsStreamingConnection()
+		natsConnection.Publish(natsLoadBalancerDeprovisioningSubject, msg)
+	}
+
+	return nil
+}
+
+// setConfig sets the network config in-memory
+func (l *LoadBalancer) setConfig(cfg map[string]interface{}) {
+	cfgJSON, _ := json.Marshal(cfg)
+	_cfgJSON := json.RawMessage(cfgJSON)
+	l.Config = &_cfgJSON
+}
+
+func (l *LoadBalancer) updateStatus(db *gorm.DB, status string, description *string) {
+	l.Status = stringOrNil(status)
+	l.Description = description
+	result := db.Save(&l)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			l.Errors = append(l.Errors, &provide.Error{
+				Message: stringOrNil(err.Error()),
+			})
+		}
+	}
+}
+
+func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {
+	Log.Debugf("Attempting to unregister security groups for load balancer with id: %s", l.ID)
+
+	cfg := l.ParseConfig()
+	targetID, targetOk := cfg["target_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+
+	if targetOk && regionOk && credsOk && securityGroupIdsOk {
+		if strings.ToLower(targetID) == "aws" {
+			accessKeyID := credentials["aws_access_key_id"].(string)
+			secretAccessKey := credentials["aws_secret_access_key"].(string)
+
+			for i := range securityGroupIds {
+				securityGroupID := securityGroupIds[i].(string)
+
+				if strings.ToLower(targetID) == "aws" {
+					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID)
+					if err != nil {
+						Log.Warningf("Failed to unregister security group for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
+						return err
+					}
+				}
+			}
+		}
+
+		delete(cfg, "target_security_group_ids")
+		l.setConfig(cfg)
+		db.Save(l)
+	}
+
+	return nil
+}
+
 // Create and persist a new network
 func (n *Network) Create() bool {
 	if !n.Validate() {
@@ -402,146 +936,12 @@ func (n *Network) Create() bool {
 		if !db.NewRecord(n) {
 			success := rowsAffected > 0
 			if success {
-				go n.provisionLoadBalancers(db)
 				go n.resolveContracts(db)
 			}
 			return success
 		}
 	}
 	return false
-}
-
-func (n *Network) provisionLoadBalancers(db *gorm.DB) {
-	cfg := n.ParseConfig()
-
-	defaultJSONRPCPort := uint(0)
-	defaultWebsocketPort := uint(0)
-	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
-		defaultJSONRPCPort = engineToDefaultJSONRPCPortMapping[engineID]
-		defaultWebsocketPort = engineToDefaultWebsocketPortMapping[engineID]
-	}
-
-	if n.isEthereumNetwork() {
-		Log.Debugf("Attempting to provision JSON-RPC load balancer for EVM-based network: %s", n.ID)
-
-		lbUUID, _ := uuid.NewV4()
-		lbName := fmt.Sprintf("loadbalancer-%s", lbUUID)
-
-		jsonRPCPort := float64(defaultJSONRPCPort)
-		websocketPort := float64(defaultWebsocketPort)
-
-		securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
-		if !securityCfgOk {
-			Log.Warningf("Failed to parse cloneable security configuration for network: %s; attempting to create sane initial configuration", n.ID)
-
-			tcpIngressCfg := make([]float64, 0)
-			if _jsonRPCPort, jsonRPCPortOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOk {
-				jsonRPCPort = _jsonRPCPort
-			}
-			if _websocketPort, websocketPortOk := cfg["default_websocket_port"].(float64); websocketPortOk {
-				websocketPort = _websocketPort
-			}
-
-			tcpIngressCfg = append(tcpIngressCfg, float64(jsonRPCPort))
-			tcpIngressCfg = append(tcpIngressCfg, float64(websocketPort))
-			ingressCfg := map[string]interface{}{
-				"tcp": tcpIngressCfg,
-				"udp": make([]float64, 0),
-			}
-			securityCfg = map[string]interface{}{
-				"egress": map[string]interface{}{},
-				"ingress": map[string]interface{}{
-					"0.0.0.0/0": ingressCfg,
-				},
-			}
-			cfg["_security"] = securityCfg
-		}
-
-		accessKeyID := *DefaultAWSConfig.AccessKeyId
-		secretAccessKey := *DefaultAWSConfig.SecretAccessKey
-		region := *DefaultAWSConfig.DefaultRegion
-		vpcID := *DefaultAWSConfig.DefaultVpcID
-
-		// start security group handling
-		securityGroupDesc := fmt.Sprintf("security group for network load balancer: %s", n.ID.String())
-		securityGroup, err := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, DefaultAWSConfig.DefaultVpcID)
-		securityGroupIds := make([]string, 0)
-
-		if securityGroup != nil {
-			securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
-		}
-
-		cfg["region"] = region
-		cfg["target_security_group_ids"] = securityGroupIds
-		n.setConfig(cfg)
-
-		if err != nil {
-			Log.Warningf("Failed to create security group in EC2 region %s; network id: %s; %s", region, n.ID.String(), err.Error())
-			awswrapper.DeleteLoadBalancer(accessKeyID, secretAccessKey, region, &lbName)
-			return
-		}
-
-		listeners := make([]*elb.Listener, 0)
-
-		if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-			switch ingress.(type) {
-			case map[string]interface{}:
-				ingressCfg := ingress.(map[string]interface{})
-				for cidr := range ingressCfg {
-					tcp := make([]int64, 0)
-					udp := make([]int64, 0)
-					if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-						for i := range _tcp {
-							_port := int64(_tcp[i].(float64))
-							tcp = append(tcp, _port)
-							listeners = append(listeners, &elb.Listener{
-								InstancePort:     &_port,
-								InstanceProtocol: stringOrNil("TCP"),
-								LoadBalancerPort: &_port,
-								Protocol:         stringOrNil("TCP"),
-								SSLCertificateId: nil, // FIXME-- enable provisioning of SSL certificate for with dynamically created ELB
-							})
-						}
-					}
-
-					// UDP not currently supported by classic ELB API; UDP support is not needed here at this time...
-					// if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-					// 	for i := range _udp {
-					// 		_port := int64(_udp[i].(float64))
-					// 		udp = append(udp, _port)
-					// 		listeners = append(listeners, &elb.Listener{
-					// 			InstancePort:     &_port,
-					// 			InstanceProtocol: stringOrNil("TCP"),
-					// 			LoadBalancerPort: &_port,
-					// 			Protocol:         stringOrNil("TCP"),
-					// 			SSLCertificateId: nil, // FIXME-- enable provisioning of SSL certificate for with dynamically created ELB
-					// 		})
-					// 	}
-					// }
-
-					_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
-					if err != nil {
-						Log.Warningf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-					}
-				}
-			}
-		}
-		// end security group handling
-
-		loadBalancer, err := awswrapper.CreateLoadBalancer(accessKeyID, secretAccessKey, region, &vpcID, &lbName, securityGroupIds, listeners)
-		if err != nil {
-			Log.Warningf("Failed to provision load balancer for network: %s", n.ID, err.Error())
-			return
-		}
-
-		cfg["load_balancer_name"] = lbName
-		cfg["load_balancer_url"] = loadBalancer.DNSName
-		cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
-		cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
-
-		n.setConfig(cfg)
-		db.Save(n)
-	}
 }
 
 func (n *Network) resolveContracts(db *gorm.DB) {
@@ -652,29 +1052,79 @@ func (n *Network) setChainID() {
 	}
 }
 
-// resolveAndBalanceJsonRpcAndWebsocketUrls updates the network's configured block
-// JSON-RPC urls (i.e. web-based IDE), and enriches the network cfg
-func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
-	cfg := n.ParseConfig()
+func (n *Network) getSecurityConfiguration(db *gorm.DB) map[string]interface{} {
+	cloneableCfg, cloneableCfgOk := n.ParseConfig()["cloneable_cfg"].(map[string]interface{})
+	if !cloneableCfgOk {
+		return nil
+	}
+	securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{})
+	if !securityCfgOk {
+		return nil
+	}
+	return securityCfg
+}
 
-	// accessKeyID := *DefaultAWSConfig.AccessKeyId
-	// secretAccessKey := *DefaultAWSConfig.SecretAccessKey
-	// region := *DefaultAWSConfig.DefaultRegion
-	// vpcID := *DefaultAWSConfig.DefaultVpcID
+// resolveAndBalanceJsonRpcAndWebsocketUrls updates the network's configured block
+// JSON-RPC urls (i.e. web-based IDE), and enriches the network cfg; if no load
+// balancer is provisioned for the account-region-type, a load balancer is provisioned
+// prior to balancing the given node; FIXME-- refactor this
+func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *NetworkNode) {
+	cfg := n.ParseConfig()
+	nodeCfg := node.ParseConfig()
 
 	Log.Debugf("Attempting to resolve and balance JSON-RPC and websocket urls for network with id: %s", n.ID)
 
-	var node = &NetworkNode{}
-	db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator', 'faucet')", n.ID).First(&node)
+	if node == nil {
+		Log.Debugf("No network node provided to attempted resolution and load balancing of JSON-RPC/websocket URL for network with id: %s", n.ID)
+		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator', 'faucet')", n.ID).First(&node)
+	}
 
-	isLoadBalanced := n.isLoadBalanced(db, "rpc")
+	isLoadBalanced := n.isLoadBalanced(db, nodeCfg["region"].(string), "rpc")
 
 	if node != nil && node.ID != uuid.Nil {
+		var lb *LoadBalancer
+		var err error
+
+		balancerCfg := node.ParseConfig()
+		region, _ := balancerCfg["region"].(string)
+
+		if !isLoadBalanced {
+			lbUUID, _ := uuid.NewV4()
+			lbName := fmt.Sprintf("%s", lbUUID.String()[0:31])
+			lb = &LoadBalancer{
+				NetworkID: n.ID,
+				Name:      stringOrNil(lbName),
+				Region:    stringOrNil(region),
+				Type:      stringOrNil("rpc"),
+			}
+			lb.setConfig(balancerCfg)
+			if lb.Create() {
+				Log.Debugf("Provisioned load balancer in region: %s; attempting to balance node: %s", region, lb.ID)
+			} else {
+				err = fmt.Errorf("Failed to provision load balancer in region: %s; %s", region, *lb.Errors[0].Message)
+				Log.Warning(err.Error())
+			}
+			isLoadBalanced = n.isLoadBalanced(db, region, "rpc")
+		} else {
+			balancers, err := n.LoadBalancers(db, stringOrNil(region), stringOrNil("rpc"))
+			if err != nil {
+				Log.Warningf("Failed to retrieve rpc load balancers in region: %s; %s", region, err.Error())
+			} else {
+				if len(balancers) > 0 {
+					Log.Debugf("Resolved %v rpc load balancers in region: %s", len(balancers), region)
+					lb = balancers[0]
+					Log.Debugf("Resolved load balancer with id: %s", lb.ID)
+				}
+			}
+		}
+
 		if isLoadBalanced {
-			Log.Warningf("JSON-RPC/websocket load balancer may contain unhealthy or undeployed nodes")
-			// FIXME: stick the new node behind the loadbalancer...
-			// FIXME: if ubuntu vm, use elb classic
-			// awswrapper.RegisterInstanceWithLoadBalancer(accessKeyID, secretAccessKey, region, lbName)
+			msg, _ := json.Marshal(map[string]interface{}{
+				"load_balancer_id": lb.ID.String(),
+				"network_node_id":  node.ID.String(),
+			})
+			natsConnection := getNatsStreamingConnection()
+			natsConnection.Publish(natsLoadBalancerBalanceNodeSubject, msg)
 		} else {
 			if reachable, port := node.reachableViaJSONRPC(); reachable {
 				Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
@@ -711,9 +1161,12 @@ func (n *Network) resolveAndBalanceJsonRpcAndWebsocketUrls(db *gorm.DB) {
 }
 
 // LoadBalancers returns the Network load balancers
-func (n *Network) LoadBalancers(db *gorm.DB, balancerType *string) ([]*LoadBalancer, error) {
+func (n *Network) LoadBalancers(db *gorm.DB, region, balancerType *string) ([]*LoadBalancer, error) {
 	balancers := make([]*LoadBalancer, 0)
 	query := db.Where("network_id = ?", n.ID)
+	if region != nil {
+		query = query.Where("region = ?", region)
+	}
 	if balancerType != nil {
 		query = query.Where("type = ?", balancerType)
 	}
@@ -721,8 +1174,8 @@ func (n *Network) LoadBalancers(db *gorm.DB, balancerType *string) ([]*LoadBalan
 	return balancers, nil
 }
 
-func (n *Network) isLoadBalanced(db *gorm.DB, balancerType string) bool {
-	balancers, err := n.LoadBalancers(db, stringOrNil(balancerType))
+func (n *Network) isLoadBalanced(db *gorm.DB, region, balancerType string) bool {
+	balancers, err := n.LoadBalancers(db, stringOrNil(region), stringOrNil(balancerType))
 	if err != nil {
 		Log.Warningf("Failed to retrieve network load balancers; %s", err.Error())
 		return false
@@ -741,7 +1194,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) 
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := n.isLoadBalanced(db, "explorer")
+			isLoadBalanced := n.isLoadBalanced(db, nodeCfg["region"].(string), "explorer")
 
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				Log.Warningf("Failed to resolve and balance explorer urls for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
@@ -805,7 +1258,7 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := n.isLoadBalanced(db, "explorer")
+			isLoadBalanced := n.isLoadBalanced(db, nodeCfg["region"].(string), "explorer")
 
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				Log.Warningf("Failed to resolve and balance studio (IDE) url for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
@@ -878,6 +1331,15 @@ func (n *Network) ParseConfig() map[string]interface{} {
 
 func (n *Network) rpcURL() string {
 	cfg := n.ParseConfig()
+	balancers, _ := n.LoadBalancers(DatabaseConnection(), nil, stringOrNil("rpc"))
+	if balancers != nil && len(balancers) > 0 {
+		balancer := balancers[0] // FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
+		balancerCfg := balancer.ParseConfig()
+		if url, urlOk := balancerCfg["json_rpc_url"].(string); urlOk {
+			return url
+		}
+		// loadBalancedURL := fmt.Sprintf("wss://%s:%v", balancer.Host, balancer.Port)
+	}
 	if rpcURL, ok := cfg["json_rpc_url"].(string); ok {
 		return rpcURL
 	}
@@ -886,6 +1348,15 @@ func (n *Network) rpcURL() string {
 
 func (n *Network) websocketURL() string {
 	cfg := n.ParseConfig()
+	balancers, _ := n.LoadBalancers(DatabaseConnection(), nil, stringOrNil("websocket"))
+	if balancers != nil && len(balancers) > 0 {
+		balancer := balancers[0] // FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
+		balancerCfg := balancer.ParseConfig()
+		if url, urlOk := balancerCfg["websocket_url"].(string); urlOk {
+			return url
+		}
+		// loadBalancedURL := fmt.Sprintf("wss://%s:%v", balancer.Host, balancer.Port)
+	}
 	if websocketURL, ok := cfg["websocket_url"].(string); ok {
 		return websocketURL
 	}
@@ -1123,6 +1594,9 @@ func (n *NetworkNode) reachableViaWebsocket() (bool, uint) {
 }
 
 func (n *NetworkNode) reachableOnPort(port uint) bool {
+	if n.Host == nil {
+		return false
+	}
 	addr := fmt.Sprintf("%s:%v", *n.Host, port)
 	conn, err := net.DialTimeout("tcp", addr, reachabilityTimeout)
 	if err == nil {
@@ -1535,6 +2009,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
 			}
 
+			cfg["_security"] = securityCfg
 			cfg["region"] = region
 			cfg["target_security_group_ids"] = securityGroupIds
 			n.setConfig(cfg)
@@ -1756,6 +2231,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 									instance := reservation.Instances[0]
 									n.Host = instance.PublicDnsName
 									n.IPv4 = instance.PublicIpAddress
+									n.PrivateIPv4 = instance.PrivateIpAddress
 								}
 							}
 						}
@@ -1778,6 +2254,8 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 												if err == nil {
 													if len(interfaceDetails.NetworkInterfaces) > 0 {
 														Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
+														n.PrivateIPv4 = interfaceDetails.NetworkInterfaces[0].PrivateIpAddress
+
 														interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
 														if interfaceAssociation != nil {
 															n.Host = interfaceAssociation.PublicDnsName
@@ -1918,11 +2396,8 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 				*n.Config = json.RawMessage(cfgJSON)
 				db.Save(n)
 
-				role, roleOk := cfg["role"].(string)
-				if roleOk {
-					if role == "peer" || role == "full" || role == "validator" || role == "faucet" {
-						network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
-					}
+				if role == "peer" || role == "full" || role == "validator" || role == "faucet" {
+					go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
 				}
 
 				ticker.Stop()
@@ -1933,7 +2408,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 }
 
 func (n *NetworkNode) undeploy() error {
-	Log.Debugf("Attempting to undeploy network node with id: %s", n.ID, n)
+	Log.Debugf("Attempting to undeploy network node with id: %s", n.ID)
 
 	db := DatabaseConnection()
 	n.updateStatus(db, "deprovisioning", nil)
@@ -1942,7 +2417,6 @@ func (n *NetworkNode) undeploy() error {
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	role, roleOk := cfg["role"].(string)
 	instanceIds, instanceIdsOk := cfg["target_instance_ids"].([]interface{})
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
@@ -1965,7 +2439,9 @@ func (n *NetworkNode) undeploy() error {
 						n.Status = stringOrNil("terminated")
 						db.Save(n)
 					} else {
-						Log.Warningf("Failed to terminate EC2 instance with id: %s; %s", instanceID, err.Error())
+						err = fmt.Errorf("Failed to terminate EC2 instance with id: %s; %s", instanceID, err.Error())
+						Log.Warning(err.Error())
+						return err
 					}
 				}
 			} else if strings.ToLower(providerID) == "docker" && taskIdsOk {
@@ -1977,8 +2453,22 @@ func (n *NetworkNode) undeploy() error {
 						Log.Debugf("Terminated ECS docker container with id: %s", taskID)
 						n.Status = stringOrNil("terminated")
 						db.Save(n)
+
+						var loadBalancers []*LoadBalancer
+						db.Model(&n).Related(&loadBalancers)
+						for _, balancer := range loadBalancers {
+							Log.Debugf("Attempting to unbalance network node %s on load balancer: %s", n.ID, balancer.ID)
+							msg, _ := json.Marshal(map[string]interface{}{
+								"load_balancer_id": balancer.ID.String(),
+								"network_node_id":  n.ID.String(),
+							})
+							natsConnection := getNatsStreamingConnection()
+							natsConnection.Publish(natsLoadBalancerUnbalanceNodeSubject, msg)
+						}
 					} else {
-						Log.Warningf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
+						err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
+						Log.Warning(err.Error())
+						return err
 					}
 				}
 			}
@@ -2004,27 +2494,13 @@ func (n *NetworkNode) undeploy() error {
 				}
 			}()
 		}
-
-		if roleOk {
-			network := n.relatedNetwork()
-
-			if role == "peer" || role == "full" || role == "validator" {
-				go network.resolveAndBalanceJsonRpcAndWebsocketUrls(db)
-			} else if role == "explorer" {
-				go network.resolveAndBalanceExplorerUrls(db, n)
-			} else if role == "faucet" {
-				Log.Warningf("Faucet role not yet supported")
-			} else if role == "studio" {
-				go network.resolveAndBalanceStudioUrls(db, n)
-			}
-		}
 	}
 
 	return nil
 }
 
 func (n *NetworkNode) unregisterSecurityGroups() error {
-	Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID, n)
+	Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID)
 
 	cfg := n.ParseConfig()
 	targetID, targetOk := cfg["target_id"].(string)

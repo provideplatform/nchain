@@ -25,6 +25,15 @@ const natsContractCompilerInvocationSubject = "goldmine.contract.compiler-invoca
 const natsContractCompilerInvocationMaxInFlight = 32
 const natsContractCompilerInvocationTimeout = time.Minute * 1
 const natsStreamingTxFilterExecSubjectPrefix = "ml.filter.exec"
+const natsLoadBalancerInvocationTimeout = time.Second * 15
+const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
+const natsLoadBalancerDeprovisioningMaxInFlight = 64
+const natsLoadBalancerProvisioningSubject = "goldmine.loadbalancer.provision"
+const natsLoadBalancerProvisioningMaxInFlight = 64
+const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
+const natsLoadBalancerBalanceNodeMaxInFlight = 64
+const natsLoadBalancerUnbalanceNodeSubject = "goldmine.node.unbalance"
+const natsLoadBalancerUnbalanceNodeMaxInFlight = 64
 const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 128
 const natsTxReceiptSubject = "goldmine.tx.receipt"
@@ -126,6 +135,10 @@ func subscribeNatsStreaming() {
 	createNatsTxSubscriptions(natsConnection)
 	createNatsTxReceiptSubscriptions(natsConnection)
 	createNatsContractCompilerInvocationSubscriptions(natsConnection)
+	createNatsLoadBalancerProvisioningSubscriptions(natsConnection)
+	createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection)
+	createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection)
+	createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection)
 }
 
 func createNatsTxSubscriptions(natsConnection stan.Conn) {
@@ -188,6 +201,86 @@ func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn)
 	}
 }
 
+func createNatsLoadBalancerProvisioningSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			loadBalancerProvisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerProvisioningSubject, natsLoadBalancerProvisioningSubject, consumeLoadBalancerProvisioningMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerProvisioningMaxInFlight), stan.DurableName(natsLoadBalancerProvisioningSubject))
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerProvisioningSubject)
+				waitGroup.Done()
+				return
+			}
+			defer loadBalancerProvisioningSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerProvisioningSubject)
+
+			waitGroup.Wait()
+		}()
+	}
+}
+
+func createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			loadBalancerDeprovisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerDeprovisioningSubject, natsLoadBalancerDeprovisioningSubject, consumeLoadBalancerDeprovisioningMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerDeprovisioningMaxInFlight), stan.DurableName(natsLoadBalancerDeprovisioningSubject))
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerDeprovisioningSubject)
+				waitGroup.Done()
+				return
+			}
+			defer loadBalancerDeprovisioningSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerDeprovisioningSubject)
+
+			waitGroup.Wait()
+		}()
+	}
+}
+
+func createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			loadBalancerBalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerBalanceNodeSubject, natsLoadBalancerBalanceNodeSubject, consumeLoadBalancerBalanceNodeMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerBalanceNodeMaxInFlight), stan.DurableName(natsLoadBalancerBalanceNodeSubject))
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerBalanceNodeSubject)
+				waitGroup.Done()
+				return
+			}
+			defer loadBalancerBalanceNodeSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerBalanceNodeSubject)
+
+			waitGroup.Wait()
+		}()
+	}
+}
+
+func createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			loadBalancerUnbalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerUnbalanceNodeSubject, natsLoadBalancerUnbalanceNodeSubject, consumeLoadBalancerUnbalanceNodeMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerUnbalanceNodeMaxInFlight), stan.DurableName(natsLoadBalancerUnbalanceNodeSubject))
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerUnbalanceNodeSubject)
+				waitGroup.Done()
+				return
+			}
+			defer loadBalancerUnbalanceNodeSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerUnbalanceNodeSubject)
+
+			waitGroup.Wait()
+		}()
+	}
+}
+
 func consumeTxMsg(msg *stan.Msg) {
 	Log.Debugf("Consuming NATS tx message: %s", msg)
 
@@ -237,6 +330,138 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 
 	msg.Ack()
+}
+
+func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
+	Log.Debugf("Consuming NATS load balancer deprovisioning message: %s", msg)
+	var balancer *LoadBalancer
+
+	err := json.Unmarshal(msg.Data, &balancer)
+	if err != nil {
+		Log.Warningf("Failed to umarshal load balancer deprovisioning message; %s", err.Error())
+		return
+	}
+
+	err = balancer.deprovision(DatabaseConnection())
+	if err != nil {
+		Log.Warningf("Failed to deprovision load balancer; %s", err.Error())
+	} else {
+		Log.Debugf("Load balancer deprovisioning succeeded; ACKing NATS message for balancer: %s", balancer.ID)
+		msg.Ack()
+	}
+}
+
+func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
+	Log.Debugf("Consuming NATS load balancer provisioning message: %s", msg)
+	var balancer *LoadBalancer
+
+	err := json.Unmarshal(msg.Data, &balancer)
+	if err != nil {
+		Log.Warningf("Failed to umarshal load balancer provisioning message; %s", err.Error())
+		return
+	}
+
+	err = balancer.provision(DatabaseConnection())
+	if err != nil {
+		Log.Warningf("Failed to provision load balancer; %s", err.Error())
+	} else {
+		Log.Debugf("Load balancer provisioning succeeded; ACKing NATS message for balancer: %s", balancer.ID)
+		msg.Ack()
+	}
+}
+
+func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
+	Log.Debugf("Consuming NATS load balancer balance node message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		Log.Warningf("Failed to umarshal load balancer balance node message; %s", err.Error())
+		return
+	}
+
+	balancerID, balancerIDOk := params["load_balancer_id"].(string)
+	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+
+	if !balancerIDOk {
+		Log.Warningf("Failed to load balance network node; no load balancer id provided")
+		return
+	}
+	if !networkNodeIDOk {
+		Log.Warningf("Failed to load balance network node; no network node id provided")
+		return
+	}
+
+	db := DatabaseConnection()
+
+	balancer := &LoadBalancer{}
+	db.Where("id = ?", balancerID).Find(&balancer)
+	if balancer == nil || balancer.ID == uuid.Nil {
+		Log.Warningf("Failed to load balance network node; no load balancer resolved for id: %s", balancerID)
+		return
+	}
+
+	node := &NetworkNode{}
+	db.Where("id = ?", networkNodeID).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		Log.Warningf("Failed to load balance network node; no network node resolved for id: %s", networkNodeID)
+		msg.Ack() // FIXME: Nack to deadletter
+	}
+
+	err = balancer.balanceNode(db, node)
+	if err != nil {
+		Log.Warningf("Failed to balance node on load balancer; %s", err.Error())
+	} else {
+		Log.Debugf("Load balancer node balancing succeeded; ACKing NATS message: %s", balancer.ID)
+		msg.Ack()
+	}
+}
+
+func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
+	Log.Debugf("Consuming NATS load balancer unbalance node message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		Log.Warningf("Failed to umarshal load balancer unbalance node message; %s", err.Error())
+		return
+	}
+
+	balancerID, balancerIDOk := params["load_balancer_id"].(string)
+	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+
+	if !balancerIDOk {
+		Log.Warningf("Failed to unbalance network node; no load balancer id provided")
+		return
+	}
+	if !networkNodeIDOk {
+		Log.Warningf("Failed to load balance network node; no network node id provided")
+		return
+	}
+
+	db := DatabaseConnection()
+
+	balancer := &LoadBalancer{}
+	db.Where("id = ?", balancerID).Find(&balancer)
+	if balancer == nil || balancer.ID == uuid.Nil {
+		Log.Warningf("Failed to remove network node from load balancer; no load balancer resolved for id: %s", balancerID)
+		return
+	}
+
+	node := &NetworkNode{}
+	db.Where("id = ?", networkNodeID).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		Log.Warningf("Failed to removal network node from load balancer; no network node resolved for id: %s", networkNodeID)
+		return
+	}
+
+	err = balancer.unbalanceNode(db, node)
+	if err != nil {
+		Log.Warningf("Failed to remove node from load balancer; %s", err.Error())
+	} else {
+		Log.Debugf("Load balancer node removal succeeded; ACKing NATS message: %s", balancer.ID)
+		msg.Ack()
+	}
 }
 
 func consumeTxReceiptMsg(msg *stan.Msg) {
