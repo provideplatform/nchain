@@ -213,7 +213,7 @@ func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[st
 }
 
 func buildCompileCommand(source string, optimizerRuns int) string {
-	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF)\" | solc --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,clone-bin,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, optimizerRuns)
+	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF)\" | solc --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, optimizerRuns)
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
 }
 
