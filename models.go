@@ -223,6 +223,7 @@ type Transaction struct {
 	Traces        interface{}                `sql:"-" json:"traces"`
 	Ref           *string                    `json:"ref"`
 	Description   *string                    `json:"description"`
+	FinalizedAt   *time.Time                 `json:"finalized_at"`
 }
 
 // Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
