@@ -228,6 +228,7 @@ type Transaction struct {
 	Traces        interface{}                `sql:"-" json:"traces"`
 	Ref           *string                    `json:"ref"`
 	Description   *string                    `json:"description"`
+	Block         *uint64                    `json:"block"`
 	FinalizedAt   *time.Time                 `json:"finalized_at"`
 }
 

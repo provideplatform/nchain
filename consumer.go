@@ -350,14 +350,15 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
 							for _, _tx := range txs {
 								txHash := _tx.(map[string]interface{})["hash"].(string)
-								Log.Debugf("Setting tx finalized at timestamp %s on tx: %s", finalizedAt, txHash)
+								Log.Debugf("Setting tx block and finalized_at timestamp %s on tx: %s", finalizedAt, txHash)
 
 								tx := &Transaction{}
 								db.Where("hash = ?", txHash).Find(&tx)
 								if tx == nil || tx.ID == uuid.Nil {
-									Log.Warningf("Failed to set finalized_at timestamp on tx: %s", txHash)
+									Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s", txHash)
 									continue
 								}
+								tx.Block = &blockFinalizedMsg.Block
 								tx.FinalizedAt = &finalizedAt
 								result := db.Save(&tx)
 								errors := result.GetErrors()
@@ -369,7 +370,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 									}
 								}
 								if len(tx.Errors) > 0 {
-									Log.Warningf("Failed to set finalized_at timestamp on tx: %s; error: %s", txHash, tx.Errors[0].Message)
+									Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", txHash, tx.Errors[0].Message)
 								}
 							}
 						}
