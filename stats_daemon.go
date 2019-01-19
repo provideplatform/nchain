@@ -418,7 +418,9 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 
 		sd.stats.Meta["last_block_header"] = header
 
-		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != header.Hash().String() {
+		blockHash := header.Hash().String()
+
+		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
 			sd.recentBlocks = append(sd.recentBlocks, header)
 			sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
 		}
@@ -444,9 +446,19 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			if len(blocktimes) > 0 {
 				sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
 				sd.stats.Meta["blocktimes"] = blocktimes
-				sd.stats.Meta["last_block_hash"] = header.Hash().String()
+				sd.stats.Meta["last_block_hash"] = blockHash
 			}
 		}
+
+		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
+			NetworkID: stringOrNil(sd.dataSource.Network.ID.String()),
+			Block:     header.Number.Uint64(),
+			BlockHash: stringOrNil(blockHash),
+			Timestamp: lastBlockAt,
+		})
+
+		natsConnection := getNatsStreamingConnection()
+		natsConnection.Publish(natsBlockFinalizedSubject, natsPayload)
 	}
 }
 

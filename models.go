@@ -2904,17 +2904,6 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 	}
 }
 
-// IsUnique checks if the transaction hash exists in the database; returns true if the hash is nil or
-func (t *Transaction) IsUnique() (bool, error) {
-	if t.Hash == nil {
-		return false, fmt.Errorf("Unable to determine if transaction hash is unique for null hash")
-	}
-	var count *uint64
-	DatabaseConnection().Model(&Transaction{}).Where("hash = ?", *t.Hash).Count(&count)
-	isUnique := *count == 0
-	return isUnique, nil
-}
-
 // Execute an ephemeral ContractExecution
 func (e *ContractExecution) Execute() (interface{}, error) {
 	var _abi *abi.ABI

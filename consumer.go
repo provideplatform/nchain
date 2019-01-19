@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strconv"
 	"sync"
@@ -21,9 +22,12 @@ const apiUsageDaemonFlushInterval = 10000
 const natsDefaultClusterID = "provide"
 const natsAPIUsageEventNotificationSubject = "api.usage.event"
 const natsAPIUsageEventNotificationMaxInFlight = 32
+const natsBlockFinalizedSubject = "goldmine.block.finalized"
+const natsBlockFinalizedSubjectMaxInFlight = 64
+const natsBlockFinalizedSubjectTimeout = time.Minute * 1
+const natsContractCompilerInvocationTimeout = time.Minute * 1
 const natsContractCompilerInvocationSubject = "goldmine.contract.compiler-invocation"
 const natsContractCompilerInvocationMaxInFlight = 32
-const natsContractCompilerInvocationTimeout = time.Minute * 1
 const natsStreamingTxFilterExecSubjectPrefix = "ml.filter.exec"
 const natsLoadBalancerInvocationTimeout = time.Second * 15
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
@@ -52,6 +56,13 @@ var (
 )
 
 type apiUsageDelegate struct{}
+
+type natsBlockFinalizedMsg struct {
+	NetworkID *string `json:"network_id"`
+	Block     uint64  `json:"block"`
+	BlockHash *string `json:"blockhash"`
+	Timestamp uint64  `json:"timestamp"`
+}
 
 func (d *apiUsageDelegate) Track(apiCall *provide.APICall) {
 	payload, _ := json.Marshal(apiCall)
@@ -134,6 +145,7 @@ func subscribeNatsStreaming() {
 
 	createNatsTxSubscriptions(natsConnection)
 	createNatsTxReceiptSubscriptions(natsConnection)
+	createNatsBlockFinalizedSubscriptions(natsConnection)
 	createNatsContractCompilerInvocationSubscriptions(natsConnection)
 	createNatsLoadBalancerProvisioningSubscriptions(natsConnection)
 	createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection)
@@ -175,6 +187,26 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn) {
 			}
 			defer txReceiptSubscription.Unsubscribe()
 			Log.Debugf("Subscribed to NATS subject: %s", natsTxReceiptSubject)
+
+			waitGroup.Wait()
+		}()
+	}
+}
+
+func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		waitGroup.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			blockFinalizedSubscription, err := natsConnection.QueueSubscribe(natsBlockFinalizedSubject, natsBlockFinalizedSubject, consumeBlockFinalizedMsg, stan.SetManualAckMode(), stan.AckWait(natsBlockFinalizedSubjectTimeout), stan.MaxInflight(natsBlockFinalizedSubjectMaxInFlight), stan.DurableName(natsBlockFinalizedSubject))
+			if err != nil {
+				Log.Warningf("Failed to subscribe to NATS subject: %s", natsContractCompilerInvocationSubject)
+				waitGroup.Done()
+				return
+			}
+			defer blockFinalizedSubscription.Unsubscribe()
+			Log.Debugf("Subscribed to NATS subject: %s", natsContractCompilerInvocationSubject)
 
 			waitGroup.Wait()
 		}()
@@ -278,6 +310,83 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection stan.Conn) 
 
 			waitGroup.Wait()
 		}()
+	}
+}
+
+func consumeBlockFinalizedMsg(msg *stan.Msg) {
+	Log.Debugf("Consuming NATS block finalized message: %s", msg)
+	var err error
+
+	blockFinalizedMsg := &natsBlockFinalizedMsg{}
+	err = json.Unmarshal(msg.Data, &blockFinalizedMsg)
+	if err != nil {
+		Log.Warningf("Failed to unmarshal block finalized message; %s", err.Error())
+		return
+	}
+
+	if blockFinalizedMsg.NetworkID == nil {
+		err = fmt.Errorf("Parsed NATS block finalized message did not contain network id: %s", msg)
+	}
+
+	if err == nil {
+		db := DatabaseConnection()
+
+		network := &Network{}
+		db.Where("id = ?", blockFinalizedMsg.NetworkID).Find(&network)
+
+		if network == nil || network.ID == uuid.Nil {
+			err = fmt.Errorf("Failed to retrieve network by id: %s", *blockFinalizedMsg.NetworkID)
+		}
+
+		if err == nil {
+			if network.isEthereumNetwork() {
+				if err == nil {
+					block, err := provide.EVMGetBlockByNumber(network.ID.String(), network.rpcURL(), blockFinalizedMsg.Block)
+					if err != nil {
+						err = fmt.Errorf("Failed to fetch block; %s", err.Error())
+					} else if result, resultOk := block.Result.(map[string]interface{}); resultOk {
+						finalizedAt := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
+
+						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
+							for _, _tx := range txs {
+								txHash := _tx.(map[string]interface{})["hash"].(string)
+								Log.Debugf("Setting tx finalized at timestamp %s on tx: %s", finalizedAt, txHash)
+
+								tx := &Transaction{}
+								db.Where("hash = ?", txHash).Find(&tx)
+								if tx == nil || tx.ID == uuid.Nil {
+									Log.Warningf("Failed to set finalized_at timestamp on tx: %s", txHash)
+									continue
+								}
+								tx.FinalizedAt = &finalizedAt
+								result := db.Save(&tx)
+								errors := result.GetErrors()
+								if len(errors) > 0 {
+									for _, err := range errors {
+										tx.Errors = append(tx.Errors, &provide.Error{
+											Message: stringOrNil(err.Error()),
+										})
+									}
+								}
+								if len(tx.Errors) > 0 {
+									Log.Warningf("Failed to set finalized_at timestamp on tx: %s; error: %s", txHash, tx.Errors[0].Message)
+								}
+							}
+						}
+					}
+				} else {
+					err = fmt.Errorf("Failed to decode EVM block header; %s", err.Error())
+				}
+			} else {
+				Log.Debugf("Received unhandled finalized block header type: %s", blockFinalizedMsg.Block)
+			}
+		}
+	}
+
+	if err != nil {
+		Log.Warningf("Failed to handle block finalized message; %s", err.Error())
+	} else {
+		msg.Ack()
 	}
 }
 

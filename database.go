@@ -54,8 +54,8 @@ func migrateSchema() {
 		db.Model(&Transaction{}).AddIndex("idx_transactions_created_at", "created_at")
 		db.Model(&Transaction{}).AddIndex("idx_transactions_status", "status")
 		db.Model(&Transaction{}).AddIndex("idx_transactions_user_id", "user_id")
-		db.Model(&Transaction{}).AddIndex("idx_transactions_hash", "hash")
 		db.Model(&Transaction{}).AddIndex("idx_transactions_ref", "ref")
+		db.Model(&Transaction{}).AddUniqueIndex("idx_transactions_hash", "hash")
 		db.Model(&Transaction{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&Transaction{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
 
