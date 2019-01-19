@@ -2989,10 +2989,6 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 	}
 
-	if len(tx.Errors) == 0 {
-		tx.updateStatus(db, "success", nil)
-	}
-
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{
 			Response:    response,
@@ -3510,7 +3506,6 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet
 						}
 						t.Traces = traces
 
-						t.updateStatus(db, "success", nil)
 						t.handleEthereumTxReceipt(db, network, wallet, receipt)
 						t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
 						return

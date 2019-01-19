@@ -360,6 +360,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								}
 								tx.Block = &blockFinalizedMsg.Block
 								tx.FinalizedAt = &finalizedAt
+								tx.Status = stringOrNil("success")
 								result := db.Save(&tx)
 								errors := result.GetErrors()
 								if len(errors) > 0 {
