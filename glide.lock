@@ -1,5 +1,5 @@
-hash: 2ad8481d847a50ad31f4446e92c3a8e4d9375594992345ed4d9f52d58a838add
-updated: 2019-01-20T06:00:53.723057-05:00
+hash: 6d2542f0e924fdd32300db0ce915ce87783ca182dc4343940746d39135600bf0
+updated: 2019-01-20T06:09:02.819202-05:00
 imports:
 - name: github.com/ahl5esoft/golang-underscore
   version: c3155e69b3d23500032fb541a6e87b5360bdac18
@@ -184,7 +184,7 @@ imports:
   - encoders/builtin
   - util
 - name: github.com/nats-io/go-nats-streaming
-  version: e15a53f85e4932540600a16b56f6c4f65f58176f
+  version: a0e3aee6fce1a77efe4024df3280416e9d99bb98
   subpackages:
   - pb
 - name: github.com/nats-io/nkeys
