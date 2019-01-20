@@ -1,5 +1,5 @@
-hash: 6d2542f0e924fdd32300db0ce915ce87783ca182dc4343940746d39135600bf0
-updated: 2019-01-20T06:09:02.819202-05:00
+hash: 0288057bb04de02c2fa3848bccda7a44fde65a6cc1830a2bafe2b40c50b18101
+updated: 2019-01-20T06:20:35.186791-05:00
 imports:
 - name: github.com/ahl5esoft/golang-underscore
   version: c3155e69b3d23500032fb541a6e87b5360bdac18
@@ -164,7 +164,7 @@ imports:
 - name: github.com/kthomas/go-natsutil
   version: 92bf5442fc786a675a55e18cddb2e599ba63e47c
 - name: github.com/kthomas/go.uuid
-  version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
+  version: b6c5bb1eedd724fc13c44af34da224568529d0c0
 - name: github.com/lib/pq
   version: 9eb73efc1fcc404148b56765b0d3f61d9a5ef8ee
   subpackages:
