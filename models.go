@@ -2679,7 +2679,6 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			}
 			var out interface{}
 			if len(abiMethod.Outputs) == 1 {
-				Log.Debugf("MSG: %s; RESULT BYTES: %s", msg, result)
 				err = abiMethod.Outputs.Unpack(&out, result)
 				if err == nil {
 					typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
