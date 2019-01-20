@@ -33,14 +33,6 @@ setup_go()
         sudo apt-get -y install golang
     fi
 
-    if hash glide 2>/dev/null
-    then
-        echo 'Using glide...'
-    else 
-        echo 'Installing glide'
-        curl https://glide.sh/get | sh
-    fi
-
     # Set up Go environment to treat this workspace as within GOPATH. 
     export GOPATH=`pwd`
     export GOBIN=$GOPATH/bin
@@ -50,6 +42,14 @@ setup_go()
     ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
     echo "GOPATH is: $GOPATH"
     
+    if hash glide 2>/dev/null
+    then
+        echo 'Using glide...'
+    else 
+        echo 'Installing glide'
+        curl https://glide.sh/get | sh
+    fi
+
     echo '....Go-Getting....'
     #go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
     glide install
