@@ -34,14 +34,14 @@ setup_go()
     fi
 
     # Set up Go environment to treat this workspace as within GOPATH. 
-    # export GOPATH=`pwd`/vendor
+    export GOPATH=`pwd`
     export GOBIN=$GOPATH/bin
     export PATH=~/.local/bin:$GOBIN:$PATH
     echo "PATH is: '$PATH'"
     mkdir -p $GOPATH/src/github.com/provideapp
     ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
     echo "GOPATH is: $GOPATH"
-    mkdir -p $GOPATH/src/github.com/provideapp/goldmine/vendor/bin
+    mkdir -p $GOBIN
 
     if hash glide 2>/dev/null
     then
