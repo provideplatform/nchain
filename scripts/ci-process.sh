@@ -40,7 +40,6 @@ setup_go()
     echo "PATH is: '$PATH'"
     mkdir -p $GOPATH/src/github.com/provideapp
     ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
-    ln -f -s `pwd`/vendor $GOPATH/src/github.com/provideapp/goldmine/src
     echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 
@@ -54,7 +53,7 @@ setup_go()
 
     echo '....Go-Getting....'
     #go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
-    glide install
+
     if hash golint 2>/dev/null
     then
         echo 'Using golint...' # No version command or flag
