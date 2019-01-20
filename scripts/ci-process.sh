@@ -50,6 +50,14 @@ setup_go()
         go get -u golang.org/x/lint/golint
     fi
     go env
+
+    if hash glide 2>/dev/null
+    then
+        echo 'Using glide...'
+    else 
+        echo 'Installing glide'
+        curl https://glide.sh/get | sh
+    fi
 }
 
 setup_deployment_tools() 
