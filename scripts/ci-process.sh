@@ -34,7 +34,7 @@ setup_go()
     fi
 
     # Set up Go environment to treat this workspace as within GOPATH. 
-    export GOPATH=`pwd`/vendor
+    # export GOPATH=`pwd`/vendor
     export GOBIN=$GOPATH/bin
     export PATH=~/.local/bin:$GOBIN:$PATH
     echo "PATH is: '$PATH'"
