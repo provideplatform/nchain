@@ -168,6 +168,7 @@ rm ./goldmine 2>/dev/null || true # silence error if not present
 go fix .
 go fmt
 go clean -i
+glide install
 echo '....[PRVD] Analyzing...'
 go vet
 golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 

@@ -1,0 +1,38 @@
+package: github.com/provideapp/goldmine
+import:
+- package: github.com/btcsuite/btcd
+  subpackages:
+  - rpcclient
+  - wire
+- package: github.com/btcsuite/btcutil
+- package: github.com/dgrijalva/jwt-go
+  version: ~3.2.0
+- package: github.com/ethereum/go-ethereum
+  version: 428eabe28
+  subpackages:
+  - accounts/abi
+  - common
+  - common/hexutil
+  - core/types
+  - crypto
+  - ethclient
+- package: github.com/gin-gonic/gin
+  version: ~1.3.0
+- package: github.com/gorilla/websocket
+  version: ~1.4.0
+- package: github.com/jinzhu/gorm
+  version: ~1.9.2
+  subpackages:
+  - dialects/postgres
+- package: github.com/kthomas/exchange-consumer
+- package: github.com/kthomas/go-aws-config
+- package: github.com/kthomas/go-aws-wrapper
+- package: github.com/kthomas/go-db-config
+- package: github.com/kthomas/go-logger
+- package: github.com/kthomas/go-natsutil
+- package: github.com/kthomas/go.uuid
+  version: ~1.2.0
+- package: github.com/nats-io/go-nats-streaming
+  version: ~0.4.0
+- package: github.com/provideservices/provide-go
+  version: master
