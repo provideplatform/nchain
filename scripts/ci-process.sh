@@ -40,6 +40,7 @@ setup_go()
     echo "PATH is: '$PATH'"
     mkdir -p $GOPATH/src/github.com/provideapp
     ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
+    ln -f -s `pwd`/vendor $GOPATH/src/github.com/provideapp/goldmine/src
     echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 
