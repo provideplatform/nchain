@@ -1,0 +1,12 @@
+language: go
+
+go:
+        - 1.6
+        - tip
+
+install:
+        - go get github.com/jochasinga/gtime
+        - go get github.com/jochasinga/relay
+        - go get github.com/mattn/goveralls
+
+script: goveralls -service travis-ci -repotoken $COVERALLS_TOKEN

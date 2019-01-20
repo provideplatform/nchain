@@ -52,15 +52,15 @@ setup_go()
     fi
 
     echo '....Go-Getting....'
-    #go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
+    go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
 
-    if hash golint 2>/dev/null
-    then
-        echo 'Using golint...' # No version command or flag
-    else 
-        echo 'Installing golint'
-        go get -u golang.org/x/lint/golint
-    fi
+    # if hash golint 2>/dev/null
+    # then
+    #     echo 'Using golint...' # No version command or flag
+    # else 
+    #     echo 'Installing golint'
+    #     go get -u golang.org/x/lint/golint
+    # fi
     go env
 }
 
