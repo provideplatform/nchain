@@ -41,7 +41,8 @@ setup_go()
     mkdir -p $GOPATH/src/github.com/provideapp
     ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
     echo "GOPATH is: $GOPATH"
-    
+    mkdir -p $GOPATH/src/github.com/provideapp/goldmine/bin
+
     if hash glide 2>/dev/null
     then
         echo 'Using glide...'
