@@ -32,24 +32,6 @@ setup_go()
         sudo apt-get update
         sudo apt-get -y install golang
     fi
-    # Set up Go environment to treat this workspace as within GOPATH. 
-    export GOPATH=`pwd`
-    export GOBIN=$GOPATH/bin
-    export PATH=~/.local/bin:$GOBIN:$PATH
-    echo "PATH is: '$PATH'"
-    mkdir -p $GOPATH/src/github.com/provideapp
-    ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
-    echo "GOPATH is: $GOPATH"
-    echo '....Go-Getting....'
-    go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
-    if hash golint 2>/dev/null
-    then
-        echo 'Using golint...' # No version command or flag
-    else 
-        echo 'Installing golint'
-        go get -u golang.org/x/lint/golint
-    fi
-    go env
 
     if hash glide 2>/dev/null
     then
@@ -58,6 +40,27 @@ setup_go()
         echo 'Installing glide'
         curl https://glide.sh/get | sh
     fi
+
+    # Set up Go environment to treat this workspace as within GOPATH. 
+    export GOPATH=`pwd`
+    export GOBIN=$GOPATH/bin
+    export PATH=~/.local/bin:$GOBIN:$PATH
+    echo "PATH is: '$PATH'"
+    mkdir -p $GOPATH/src/github.com/provideapp
+    ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
+    echo "GOPATH is: $GOPATH"
+    
+    echo '....Go-Getting....'
+    #go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
+    glide install
+    if hash golint 2>/dev/null
+    then
+        echo 'Using golint...' # No version command or flag
+    else 
+        echo 'Installing golint'
+        go get -u golang.org/x/lint/golint
+    fi
+    go env
 }
 
 setup_deployment_tools() 
