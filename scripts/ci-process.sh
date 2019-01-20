@@ -43,16 +43,16 @@ setup_go()
     echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 
-    # if hash glide 2>/dev/null
-    # then
-    #     echo 'Using glide...'
-    # else 
-    #     sudo add-apt-repository ppa:masterminds/glide && sudo apt-get update
-    #     sudo apt-get install glide
-    # fi
+    if hash glide 2>/dev/null
+    then
+        echo 'Using glide...'
+    else 
+        echo 'Installing glide'
+        curl https://glide.sh/get | sh
+    fi
 
     echo '....Go-Getting....'
-    go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
+    #go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
 
     if hash golint 2>/dev/null
     then
@@ -172,9 +172,11 @@ rm ./goldmine 2>/dev/null || true # silence error if not present
 go fix .
 go fmt
 go clean -i
+glide install
 echo '....[PRVD] Analyzing...'
-go vet
-golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
+# go vet
+echo '....[PRVD] WARNING: govet and golint temporarily skipped by CI...'
+# golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 echo '....[PRVD] Testing....'
 go test -v -race -cover -html=cover/coverage.cov -o coverage.html ./... # TODO: -msan (for Clang's MemorySanitizer)
 echo '....[PRVD] Building....'
