@@ -2673,8 +2673,13 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			client, err := provide.EVMDialJsonRpc(network.ID.String(), network.rpcURL())
 			msg := tx.asEthereumCallMsg(0, 0)
 			result, err := client.CallContract(context.TODO(), msg, nil)
+			if err != nil {
+				err = fmt.Errorf("Failed to read constant method %s on contract: %s; %s", method, c.ID, err.Error())
+				return nil, nil, err
+			}
 			var out interface{}
 			if len(abiMethod.Outputs) == 1 {
+				Log.Debugf("MSG: %s; RESULT BYTES: %s", msg, result)
 				err = abiMethod.Outputs.Unpack(&out, result)
 				if err == nil {
 					typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
@@ -2700,7 +2705,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 				for i := range abiMethod.Outputs {
 					typestr := fmt.Sprintf("%s", abiMethod.Outputs[i].Type)
 					Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
-					typ, err := abi.NewType(typestr, []abi.ArgumentMarshaling{})
+					typ, err := abi.NewType(typestr)
 					if err != nil {
 						return nil, nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
 					}
