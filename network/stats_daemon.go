@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"context"
@@ -15,11 +15,12 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
+	"github.com/provideapp/goldmine/common"
 	"github.com/provideservices/provide-go"
 )
 
@@ -88,7 +89,7 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 				case <-ticker.C:
 					status, err := network.Status(true)
 					if err != nil {
-						Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
+						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
 						ticker.Stop()
 						return nil
 					}
@@ -124,27 +125,27 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 
 			client, err := rpcclient.New(cfg, &rpcclient.NotificationHandlers{
 				OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*btcutil.Tx) {
-					Log.Debugf("Received message on network stats websocket; height: %d", height)
-					Log.Debugf("Block connected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+					common.Log.Debugf("Received message on network stats websocket; height: %d", height)
+					common.Log.Debugf("Block connected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
 
 				},
 				OnFilteredBlockDisconnected: func(height int32, header *wire.BlockHeader) {
-					Log.Debugf("Received message on network stats websocket; height: %d", height)
-					Log.Debugf("Block disconnected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+					common.Log.Debugf("Received message on network stats websocket; height: %d", height)
+					common.Log.Debugf("Block disconnected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
 				},
 			})
 
 			if err != nil {
-				Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
+				common.Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
 				return err
 			}
 
 			// Register for block connect and disconnect notifications.
 			if err := client.NotifyBlocks(); err != nil {
-				Log.Errorf("Failed to write subscribe message to network stats websocket connection")
+				common.Log.Errorf("Failed to write subscribe message to network stats websocket connection")
 				return err
 			} else {
-				Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
+				common.Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
 			}
 			client.WaitForShutdown()
 			return nil
@@ -170,7 +171,7 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 				case <-ticker.C:
 					status, err := network.Status(true)
 					if err != nil {
-						Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
+						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
 						ticker.Stop()
 						return nil
 					}
@@ -189,7 +190,7 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 			var wsDialer websocket.Dialer
 			wsConn, _, err := wsDialer.Dial(websocketURL, nil)
 			if err != nil {
-				Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
+				common.Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
 			} else {
 				defer wsConn.Close()
 				var chainID string
@@ -203,25 +204,25 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 					"jsonrpc": "2.0",
 				}
 				if err := wsConn.WriteJSON(payload); err != nil {
-					Log.Errorf("Failed to write subscribe message to network stats websocket connection")
+					common.Log.Errorf("Failed to write subscribe message to network stats websocket connection")
 				} else {
-					Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
+					common.Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
 
 					for {
 						_, message, err := wsConn.ReadMessage()
 						if err != nil {
-							Log.Errorf("Failed to receive message on network stats websocket; %s", err)
+							common.Log.Errorf("Failed to receive message on network stats websocket; %s", err)
 							break
 						} else {
-							Log.Debugf("Received message on network stats websocket: %s", message)
+							common.Log.Debugf("Received message on network stats websocket: %s", message)
 							response := &provide.EthereumWebsocketSubscriptionResponse{}
 							err := json.Unmarshal(message, response)
 							if err != nil {
-								Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
+								common.Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
 							} else {
 								if result, ok := response.Params["result"].(map[string]interface{}); ok {
 									if _, mixHashOk := result["mixHash"]; !mixHashOk {
-										result["mixHash"] = common.HexToHash("0x")
+										result["mixHash"] = ethcommon.HexToHash("0x")
 									}
 									if _, nonceOk := result["nonce"]; !nonceOk {
 										result["nonce"] = types.EncodeNonce(0)
@@ -230,7 +231,7 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 										header := &types.Header{}
 										err := json.Unmarshal(resultJSON, header)
 										if err != nil {
-											Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
+											common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
 										} else if header != nil && header.Number != nil {
 											ch <- &provide.NetworkStatus{
 												Meta: map[string]interface{}{
@@ -253,7 +254,7 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
 func (sd *StatsDaemon) consume() []error {
 	errs := make([]error, 0)
-	Log.Debugf("Attempting to consume configured stats daemon data source; attempt #%v", sd.attempt)
+	common.Log.Debugf("Attempting to consume configured stats daemon data source; attempt #%v", sd.attempt)
 
 	var err error
 	if sd.dataSource != nil {
@@ -309,7 +310,7 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 					sd.stats.Syncing = sd.stats.Block == 0
 
 					if sd.stats.Block == 0 {
-						Log.Debugf("Ignoring genesis header")
+						common.Log.Debugf("Ignoring genesis header")
 						return
 					}
 				}
@@ -359,10 +360,10 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 					sd.stats.Meta["average_blocktime"] = (float64(time.Now().Unix()) - medianTime) / (11.0 / 2.0)
 				}
 			} else {
-				Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
+				common.Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
 			}
 		} else {
-			Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
+			common.Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
 		}
 	}
 }
@@ -370,7 +371,7 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 func (sd *StatsDaemon) ingestLcoin(response interface{}) {
 	switch response.(type) {
 	default:
-		Log.Warningf("Lcoin ingest functionality not yet implemented in stats daemon")
+		common.Log.Warningf("Lcoin ingest functionality not yet implemented in stats daemon")
 	}
 }
 
@@ -381,7 +382,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		if resp != nil && resp.Meta != nil {
 			if header, headerOk := resp.Meta["last_block_header"].(map[string]interface{}); headerOk {
 				if _, mixHashOk := header["mixHash"]; !mixHashOk {
-					header["mixHash"] = common.HexToHash("0x")
+					header["mixHash"] = ethcommon.HexToHash("0x")
 				}
 				if _, nonceOk := header["nonce"]; !nonceOk {
 					header["nonce"] = types.EncodeNonce(0)
@@ -391,16 +392,16 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 					hdr := &types.Header{}
 					err := json.Unmarshal(headerJSON, hdr)
 					if err != nil {
-						Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
+						common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
 					} else if hdr != nil && hdr.Number != nil {
 						sd.ingest(hdr)
 					}
 				}
 			} else {
-				Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
+				common.Log.Warningf("Failed to parse last_block_header from *provide.NetworkStats meta; dropping message...")
 			}
 		} else {
-			Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
+			common.Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
 		}
 	case *types.Header:
 		header := response.(*types.Header)
@@ -409,7 +410,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		sd.stats.Syncing = sd.stats.Block == 0
 
 		if sd.stats.Block == 0 {
-			Log.Debugf("Ignoring genesis header")
+			common.Log.Debugf("Ignoring genesis header")
 			return
 		}
 
@@ -451,13 +452,13 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		}
 
 		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
-			NetworkID: stringOrNil(sd.dataSource.Network.ID.String()),
+			NetworkID: common.StringOrNil(sd.dataSource.Network.ID.String()),
 			Block:     header.Number.Uint64(),
-			BlockHash: stringOrNil(blockHash),
+			BlockHash: common.StringOrNil(blockHash),
 			Timestamp: lastBlockAt,
 		})
 
-		natsConnection := getNatsStreamingConnection()
+		natsConnection := common.GetDefaultNatsStreamingConnection()
 		natsConnection.Publish(natsBlockFinalizedSubject, natsPayload)
 	}
 }
@@ -479,7 +480,7 @@ func (sd *StatsDaemon) loop() error {
 // EvictNetworkStatsDaemon evicts a single, previously-initialized stats daemon instance {
 func EvictNetworkStatsDaemon(network *Network) error {
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
-		Log.Debugf("Evicting stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
+		common.Log.Debugf("Evicting stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
 		daemon.shutdown()
 		currentNetworkStatsMutex.Lock()
 		delete(currentNetworkStats, network.ID.String())
@@ -494,19 +495,19 @@ func EvictNetworkStatsDaemon(network *Network) error {
 // the instance is configured and started immediately, caching real-time network stats.
 func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 	// if network.AvailablePeerCount() == 0 {
-	// 	Log.Debugf("Stats daemon instance not initialized for network: %s; no available peers", *network.Name)
+	// 	common.Log.Debugf("Stats daemon instance not initialized for network: %s; no available peers", *network.Name)
 	// 	return nil
 	// }
 
 	var daemon *StatsDaemon
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
-		Log.Debugf("Cached stats daemon instance found for network: %s; id: %s", *network.Name, network.ID)
+		common.Log.Debugf("Cached stats daemon instance found for network: %s; id: %s", *network.Name, network.ID)
 		return daemon
 	}
 
 	currentNetworkStatsMutex.Lock()
-	Log.Infof("Initializing new stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
-	daemon = NewNetworkStatsDaemon(Log, network)
+	common.Log.Infof("Initializing new stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
+	daemon = NewNetworkStatsDaemon(common.Log, network)
 	if daemon != nil {
 		currentNetworkStats[network.ID.String()] = daemon
 		go daemon.run()
@@ -544,7 +545,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.stats = &provide.NetworkStatus{
 		ChainID: chainID,
 		Meta:    map[string]interface{}{},
-		State:   stringOrNil("configuring"),
+		State:   common.StringOrNil("configuring"),
 	}
 
 	return sd
@@ -555,10 +556,10 @@ func (sd *StatsDaemon) run() error {
 	go func() {
 		for !sd.shuttingDown() {
 			sd.attempt++
-			Log.Debugf("Stepping into main runloop of stats daemon instance; attempt #%v", sd.attempt)
+			common.Log.Debugf("Stepping into main runloop of stats daemon instance; attempt #%v", sd.attempt)
 			errs := sd.consume()
 			if len(errs) > 0 {
-				Log.Warningf("Configured stats daemon data source returned %v error(s) while attempting to consume configured data source", len(errs))
+				common.Log.Warningf("Configured stats daemon data source returned %v error(s) while attempting to consume configured data source", len(errs))
 				if sd.backoff == 0 {
 					sd.backoff = 100
 				} else {
@@ -579,7 +580,7 @@ func (sd *StatsDaemon) run() error {
 		sd.log.Info("Stats daemon exited cleanly")
 	} else {
 		if !sd.shuttingDown() {
-			Log.Errorf("Forcing shutdown of stats daemon due to error; %s", err)
+			common.Log.Errorf("Forcing shutdown of stats daemon due to error; %s", err)
 			sd.shutdown()
 		}
 	}
@@ -588,14 +589,14 @@ func (sd *StatsDaemon) run() error {
 }
 
 func (sd *StatsDaemon) handleSignals() {
-	Log.Debug("Installing SIGINT and SIGTERM signal handlers")
+	common.Log.Debug("Installing SIGINT and SIGTERM signal handlers")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		select {
 		case sig := <-sigs:
-			Log.Infof("Received signal: %s", sig)
+			common.Log.Infof("Received signal: %s", sig)
 			sd.shutdown()
 		case <-sd.shutdownCtx.Done():
 			close(sigs)
@@ -605,7 +606,7 @@ func (sd *StatsDaemon) handleSignals() {
 
 func (sd *StatsDaemon) shutdown() {
 	if atomic.AddUint32(&sd.closing, 1) == 1 {
-		Log.Debugf("Shutting down stats daemon instance for network: %s", *sd.dataSource.Network.Name)
+		common.Log.Debugf("Shutting down stats daemon instance for network: %s", *sd.dataSource.Network.Name)
 		sd.cancelF()
 	}
 }

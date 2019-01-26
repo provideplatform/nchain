@@ -1,16 +1,15 @@
-package main
+package contract
 
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -103,7 +102,7 @@ func getContractSourceMeta(compilerOutput map[string]interface{}, contract strin
 func getContractDependencies(src, compilerVersion string, compilerOutput map[string]interface{}, contract string) (map[string]interface{}, error) {
 	source, err := getContractSourceMeta(compilerOutput, "<stdin>")
 	if err != nil {
-		log.Printf("Failed to retrieve contract sources from compiled contract")
+		common.Log.Printf("Failed to retrieve contract sources from compiled contract")
 		return nil, err
 	}
 	ast, ok := source["AST"].(map[string]interface{})
@@ -204,7 +203,7 @@ func parseCompilerOutput(compilerOutputJSON []byte) (compiledContracts map[strin
 
 func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[string]interface{}, err error) {
 	combinedOutput, err := parseCompilerOutput(compilerOutputJSON)
-	Log.Debugf("%s", combinedOutput)
+	common.Log.Debugf("%s", combinedOutput)
 	if err == nil {
 		compiledContracts = combinedOutput["contracts"].(map[string]interface{})
 		return compiledContracts, err
@@ -224,14 +223,14 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 	compilerVersion := "0.4.25" // FIXME
 
 	solcCmd := buildCompileCommand(source, compilerOptimizerRuns)
-	Log.Debugf("Built solc command: %s", solcCmd)
+	common.Log.Debugf("Built solc command: %s", solcCmd)
 
 	stdOut, err := shellOut(solcCmd)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to compile contract(s): %s; %s", name, err.Error())
 	}
 
-	Log.Debugf("Raw solc compiler output: %s", stdOut)
+	common.Log.Debugf("Raw solc compiler output: %s", stdOut)
 
 	compilerOutput, err := parseCompilerOutput(stdOut)
 	contracts, err := parseCompiledContracts(stdOut)
@@ -239,7 +238,7 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 		return nil, fmt.Errorf("Failed to compile contract(s): %s; %s", name, err.Error())
 	}
 
-	Log.Debugf("Compiled %d solidity contract(s) from source: %s", len(contracts), contracts)
+	common.Log.Debugf("Compiled %d solidity contract(s) from source: %s", len(contracts), contracts)
 
 	depGraph := map[string]interface{}{}
 	var topLevelConstructor *abi.Method

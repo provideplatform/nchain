@@ -1,8 +1,10 @@
-package main
+package prices
 
 import (
 	"errors"
 	"fmt"
+
+	"github.com/provideapp/goldmine/common"
 )
 
 var CurrentPrices = &Prices{}
@@ -37,7 +39,7 @@ func CurrentPrice(currencyPair string) (*float64, error) {
 		return &CurrentPrices.PrvdUsdPrice, nil
 	default:
 		msg := fmt.Sprintf("Attempted lookup for unsupported or invalid currency pair: %s", cp)
-		Log.Warning(msg)
+		common.Log.Warning(msg)
 		return nil, errors.New(msg)
 	}
 }
@@ -53,7 +55,7 @@ func CurrentPriceSeq(currencyPair string) (*uint64, error) {
 		return &CurrentPrices.LtcUsdPriceSeq, nil
 	default:
 		msg := fmt.Sprintf("Attempted lookup for unsupported or invalid currency pair: %s", cp)
-		Log.Warning(msg)
+		common.Log.Warning(msg)
 		return nil, errors.New(msg)
 	}
 }
@@ -67,7 +69,7 @@ func SetPrice(currencyPair string, seq uint64, price float64) error {
 
 	if seq < *_seq {
 		msg := fmt.Sprintf("Attempted to update price using stale message for currency pair: %s", currencyPair)
-		Log.Warning(msg)
+		common.Log.Warning(msg)
 		return errors.New(msg)
 	}
 
@@ -83,7 +85,7 @@ func SetPrice(currencyPair string, seq uint64, price float64) error {
 		CurrentPrices.LtcUsdPriceSeq = seq
 	default:
 		msg := fmt.Sprintf("Attempted lookup for unsupported or invalid currency pair: %s", cp)
-		Log.Warning(msg)
+		common.Log.Warning(msg)
 		return errors.New(msg)
 	}
 	return nil
