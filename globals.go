@@ -1,13 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
 )
+
+const reachabilityTimeout = time.Millisecond * 2500
+const receiptTickerTimeout = time.Minute * 1
 
 var (
 	Log *logger.Logger
@@ -23,6 +26,13 @@ var (
 	WalletEncryptionKey string
 
 	bootstrapOnce sync.Once
+
+	NatsDefaultConnectionLostHandler func()
+
+	EngineToDefaultJSONRPCPortMapping    = map[string]uint{"authorityRound": 8050, "handshake": 13037}
+	EngineToDefaultPeerListenPortMapping = map[string]uint{"authorityRound": 30303, "handshake": 13038}
+	EngineToDefaultWebsocketPortMapping  = map[string]uint{"authorityRound": 8051}
+	TxFilters                            = map[string][]interface{}{}
 )
 
 func init() {
@@ -147,36 +157,4 @@ eZ0L
 
 		WalletEncryptionKey = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 	})
-}
-
-func buildListenAddr() string {
-	listenPort := os.Getenv("PORT")
-	if listenPort == "" {
-		listenPort = "8080"
-	}
-	return fmt.Sprintf("0.0.0.0:%s", listenPort)
-}
-
-func shouldServeTLS() bool {
-	var tls = false
-	if _, err := os.Stat(CertificatePath); err == nil {
-		if _, err := os.Stat(PrivateKeyPath); err == nil {
-			tls = true
-		}
-	}
-	// TODO: if FORCE_TLS, gen self-signed cert.
-	return tls
-}
-
-func panicIfEmpty(val string, msg string) {
-	if val == "" {
-		panic(msg)
-	}
-}
-
-func stringOrNil(str string) *string {
-	if str == "" {
-		return nil
-	}
-	return &str
 }

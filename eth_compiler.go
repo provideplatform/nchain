@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -103,7 +102,7 @@ func getContractSourceMeta(compilerOutput map[string]interface{}, contract strin
 func getContractDependencies(src, compilerVersion string, compilerOutput map[string]interface{}, contract string) (map[string]interface{}, error) {
 	source, err := getContractSourceMeta(compilerOutput, "<stdin>")
 	if err != nil {
-		log.Printf("Failed to retrieve contract sources from compiled contract")
+		Log.Warningf("Failed to retrieve contract sources from compiled contract")
 		return nil, err
 	}
 	ast, ok := source["AST"].(map[string]interface{})

@@ -451,13 +451,13 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		}
 
 		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
-			NetworkID: stringOrNil(sd.dataSource.Network.ID.String()),
+			NetworkID: StringOrNil(sd.dataSource.Network.ID.String()),
 			Block:     header.Number.Uint64(),
-			BlockHash: stringOrNil(blockHash),
+			BlockHash: StringOrNil(blockHash),
 			Timestamp: lastBlockAt,
 		})
 
-		natsConnection := getNatsStreamingConnection()
+		natsConnection := GetDefaultNatsStreamingConnection()
 		natsConnection.Publish(natsBlockFinalizedSubject, natsPayload)
 	}
 }
@@ -544,7 +544,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.stats = &provide.NetworkStatus{
 		ChainID: chainID,
 		Meta:    map[string]interface{}{},
-		State:   stringOrNil("configuring"),
+		State:   StringOrNil("configuring"),
 	}
 
 	return sd
