@@ -13,7 +13,7 @@ const natsContractCompilerInvocationTimeout = time.Minute * 1
 const natsContractCompilerInvocationSubject = "goldmine.contract.compiler-invocation"
 const natsContractCompilerInvocationMaxInFlight = 32
 
-func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {

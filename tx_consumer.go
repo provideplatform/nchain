@@ -18,7 +18,7 @@ const natsTxMaxInFlight = 128
 const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 64
 
-func createNatsTxSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsTxSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
@@ -38,7 +38,7 @@ func createNatsTxSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
 	}
 }
 
-func createNatsTxReceiptSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsTxReceiptSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {

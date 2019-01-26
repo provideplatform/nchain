@@ -7,7 +7,7 @@ import (
 	exchangeConsumer "github.com/kthomas/exchange-consumer"
 )
 
-func RunExchangeConsumer(currencyPair string, wg sync.WaitGroup) {
+func RunExchangeConsumer(currencyPair string, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		consumer := exchangeConsumer.GdaxMessageConsumerFactory(Log, priceTick, currencyPair)

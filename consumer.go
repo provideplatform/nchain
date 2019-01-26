@@ -27,7 +27,7 @@ func RunConsumers() {
 		waitGroup.Add(1)
 		subscribeNatsStreaming()
 		for _, currencyPair := range currencyPairs {
-			RunExchangeConsumer(currencyPair, waitGroup)
+			RunExchangeConsumer(currencyPair, &waitGroup)
 		}
 		waitGroup.Wait()
 	}()
@@ -47,12 +47,12 @@ func subscribeNatsStreaming() {
 		return
 	}
 
-	createNatsTxSubscriptions(natsConnection, waitGroup)
-	createNatsTxReceiptSubscriptions(natsConnection, waitGroup)
-	createNatsBlockFinalizedSubscriptions(natsConnection, waitGroup)
-	createNatsContractCompilerInvocationSubscriptions(natsConnection, waitGroup)
-	createNatsLoadBalancerProvisioningSubscriptions(natsConnection, waitGroup)
-	createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection, waitGroup)
-	createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection, waitGroup)
-	createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection, waitGroup)
+	createNatsTxSubscriptions(natsConnection, &waitGroup)
+	createNatsTxReceiptSubscriptions(natsConnection, &waitGroup)
+	createNatsBlockFinalizedSubscriptions(natsConnection, &waitGroup)
+	createNatsContractCompilerInvocationSubscriptions(natsConnection, &waitGroup)
+	createNatsLoadBalancerProvisioningSubscriptions(natsConnection, &waitGroup)
+	createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection, &waitGroup)
+	createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection, &waitGroup)
+	createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection, &waitGroup)
 }

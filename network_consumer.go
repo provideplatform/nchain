@@ -35,7 +35,7 @@ type natsBlockFinalizedMsg struct {
 	Timestamp uint64  `json:"timestamp"`
 }
 
-func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
@@ -55,7 +55,7 @@ func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg sync.Wai
 	}
 }
 
-func createNatsLoadBalancerProvisioningSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsLoadBalancerProvisioningSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
@@ -75,7 +75,7 @@ func createNatsLoadBalancerProvisioningSubscriptions(natsConnection stan.Conn, w
 	}
 }
 
-func createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
@@ -95,7 +95,7 @@ func createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection stan.Conn,
 	}
 }
 
-func createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
@@ -115,7 +115,7 @@ func createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection stan.Conn, wg
 	}
 }
 
-func createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection stan.Conn, wg sync.WaitGroup) {
+func createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
