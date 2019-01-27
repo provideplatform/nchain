@@ -211,8 +211,8 @@ func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[st
 	return nil, err
 }
 
-func buildCompileCommand(source string, optimizerRuns int) string {
-	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF)\" | solc --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, optimizerRuns)
+func buildCompileCommand(source, compilerVersion string, optimizerRuns int) string {
+	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF)\" | /usr/local/bin/solc-v%s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, compilerVersion, optimizerRuns)
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
 }
 
@@ -220,9 +220,26 @@ func buildCompileCommand(source string, optimizerRuns int) string {
 func compileSolidity(name, source string, constructorParams []interface{}, compilerOptimizerRuns int) (*provide.CompiledArtifact, error) {
 	var err error
 
-	compilerVersion := "0.4.25" // FIXME
+	// FIXME-- make wrapper around regexp
+	// Log.Debugf("Compiled regex: %s", r)
+	// groups := r.FindAllString(source, 1)
+	// Log.Debugf("groups: %s", groups)
+	// if len(groups) != 1 {
+	// 	err = fmt.Errorf("Failed to find pragma directive for solidity contract compilation")
+	// 	Log.Warning(err.Error())
+	// 	return nil, err
+	// }
+	directiveParts := strings.Split(source, "pragma solidity ^")
+	if len(directiveParts) != 2 {
+		err = fmt.Errorf("Failed to find pragma directive for solidity contract compilation")
+		Log.Warning(err.Error())
+		return nil, err
+	}
 
-	solcCmd := buildCompileCommand(source, compilerOptimizerRuns)
+	compilerVersion := directiveParts[1][0 : len(directiveParts[1])-1]
+	Log.Debugf("Resolved compiler version: %s", compilerVersion)
+
+	solcCmd := buildCompileCommand(source, compilerVersion, compilerOptimizerRuns)
 	Log.Debugf("Built solc command: %s", solcCmd)
 
 	stdOut, err := shellOut(solcCmd)
