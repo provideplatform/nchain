@@ -174,27 +174,27 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								txHash := _tx.(map[string]interface{})["hash"].(string)
 								Log.Debugf("Setting tx block and finalized_at timestamp %s on tx: %s", finalizedAt, txHash)
 
-								// tx := &tx.Transaction{}
-								// db.Where("hash = ?", txHash).Find(&tx)
-								// if tx == nil || tx.ID == uuid.Nil {
-								// 	Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s", txHash)
-								// 	continue
-								// }
-								// tx.Block = &blockFinalizedMsg.Block
-								// tx.FinalizedAt = &finalizedAt
-								// tx.Status = StringOrNil("success")
-								// result := db.Save(&tx)
-								// errors := result.GetErrors()
-								// if len(errors) > 0 {
-								// 	for _, err := range errors {
-								// 		tx.Errors = append(tx.Errors, &provide.Error{
-								// 			Message: StringOrNil(err.Error()),
-								// 		})
-								// 	}
-								// }
-								// if len(tx.Errors) > 0 {
-								// 	Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", txHash, tx.Errors[0].Message)
-								// }
+								tx := &Transaction{}
+								db.Where("hash = ?", txHash).Find(&tx)
+								if tx == nil || tx.ID == uuid.Nil {
+									Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s", txHash)
+									continue
+								}
+								tx.Block = &blockFinalizedMsg.Block
+								tx.FinalizedAt = &finalizedAt
+								tx.Status = StringOrNil("success")
+								result := db.Save(&tx)
+								errors := result.GetErrors()
+								if len(errors) > 0 {
+									for _, err := range errors {
+										tx.Errors = append(tx.Errors, &provide.Error{
+											Message: StringOrNil(err.Error()),
+										})
+									}
+								}
+								if len(tx.Errors) > 0 {
+									Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", txHash, tx.Errors[0].Message)
+								}
 							}
 						}
 					}
