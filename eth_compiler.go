@@ -212,6 +212,9 @@ func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[st
 }
 
 func buildCompileCommand(source, compilerVersion string, optimizerRuns int) string {
+	Log.Debugf("COMPILER VERSION.......")
+	Log.Debugf("%s", compilerVersion)
+	Log.Debugf("WTFFf")
 	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF)\" | /usr/local/bin/solc-v%s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, compilerVersion, optimizerRuns)
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
 }
@@ -236,7 +239,8 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 		return nil, err
 	}
 
-	compilerVersion := directiveParts[1][0 : len(directiveParts[1])-2]
+	compilerVersion := strings.Replace(directiveParts[1][0:len(directiveParts[1])-2], ";", "", 1)
+	compilerVersion = strings.Split(compilerVersion, "\n")[0]
 	Log.Debugf("Resolved compiler version: %s", compilerVersion)
 
 	solcCmd := buildCompileCommand(source, compilerVersion, compilerOptimizerRuns)
