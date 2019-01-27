@@ -236,7 +236,7 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 		return nil, err
 	}
 
-	compilerVersion := directiveParts[1][0 : len(directiveParts[1])-1]
+	compilerVersion := directiveParts[1][0 : len(directiveParts[1])-2]
 	Log.Debugf("Resolved compiler version: %s", compilerVersion)
 
 	solcCmd := buildCompileCommand(source, compilerVersion, compilerOptimizerRuns)
