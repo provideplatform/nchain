@@ -354,19 +354,17 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
 							if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
 								addr = StringOrNil(masterOfCeremony)
-
-								// FIXME
-								// wallet := &Wallet{}
-								// dbconf.DatabaseConnection().Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Find(&wallet)
-								// if wallet == nil || wallet.ID == uuid.Nil {
-								// 	Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
-								// 	addr, privateKey, err = provide.EVMGenerateKeyPair()
-								// } else {
-								// 	privateKey, err = DecryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
-								// 	if err == nil {
-								// 		Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
-								// 	}
-								// }
+								wallet := &Wallet{}
+								dbconf.DatabaseConnection().Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Find(&wallet)
+								if wallet == nil || wallet.ID == uuid.Nil {
+									Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
+									addr, privateKey, err = provide.EVMGenerateKeyPair()
+								} else {
+									privateKey, err = DecryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
+									if err == nil {
+										Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
+									}
+								}
 							} else if !masterOfCeremonyPrivateKeyOk {
 								Log.Debugf("Generating managed master of ceremony signing identity for network: %s", *network.Name)
 								addr, privateKey, err = provide.EVMGenerateKeyPair()
@@ -896,7 +894,6 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 											if enodeIndex != -1 {
 												enode := msg[enodeIndex:]
 												peerURL = StringOrNil(enode)
-												// FIXME? do we need this? cfg["peer"] = result
 												cfg["peer_url"] = enode
 												ticker.Stop()
 												break

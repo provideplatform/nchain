@@ -150,22 +150,20 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 							"name": contractName,
 							"abi":  abi,
 						}
-						// FIXME-- send to NATS
-						Log.Debugf("Params: %s", params)
-						// contract := &contract.Contract{
-						// 	ApplicationID: nil,
-						// 	NetworkID:     n.ID,
-						// 	TransactionID: nil,
-						// 	Name:          StringOrNil(contractName),
-						// 	Address:       StringOrNil(addr),
-						// 	Params:        nil,
-						// }
-						// contract.setParams(params)
-						// if contract.Create() {
-						// 	Log.Debugf("Created contract %s for %s network chainspec account: %s", contract.ID, *n.Name, addr)
-						// } else {
-						// 	Log.Warningf("Failed to create contract for %s network chainspec account: %s; %s", *n.Name, addr, *contract.Errors[0].Message)
-						// }
+						contract := &Contract{
+							ApplicationID: nil,
+							NetworkID:     n.ID,
+							TransactionID: nil,
+							Name:          StringOrNil(contractName),
+							Address:       StringOrNil(addr),
+							Params:        nil,
+						}
+						contract.setParams(params)
+						if contract.Create() {
+							Log.Debugf("Created contract %s for %s network chainspec account: %s", contract.ID, *n.Name, addr)
+						} else {
+							Log.Warningf("Failed to create contract for %s network chainspec account: %s; %s", *n.Name, addr, *contract.Errors[0].Message)
+						}
 					}
 				}
 			}

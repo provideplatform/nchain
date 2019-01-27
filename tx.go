@@ -466,7 +466,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *Network, wall
 		return
 	}
 
-	// client, err := provide.DialJsonRpc(network.ID.String(), network.rpcURL())
+	// client, err := provide.EVMDialJsonRpc(network.ID.String(), network.rpcURL())
 	// if err != nil {
 	// 	Log.Warningf("Unable to handle ethereum tx traces; %s", err.Error())
 	// 	return
@@ -504,7 +504,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *Network, wall
 					}
 					if internalContract.Create() {
 						Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
-						// FIXME-- contract.resolveTokenContract(db, network, wallet, client, receipt)
+						// contract.resolveTokenContract(db, network, wallet, client, receipt)
 					} else {
 						Log.Warningf("Failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
 					}
