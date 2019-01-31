@@ -16,6 +16,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
+const balancerTimeout = time.Millisecond * 100
 const hostReachabilityTimeout = time.Minute * 5
 const hostReachabilityInterval = time.Millisecond * 2500
 
@@ -527,7 +528,16 @@ func (n *Network) websocketURL() string {
 	cfg := n.ParseConfig()
 	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil("websocket"))
 	if balancers != nil && len(balancers) > 0 {
-		balancer := balancers[0] // FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
+		if balancers != nil && len(balancers) > 0 {
+			for {
+				select {
+				case output := <-r.requestQ:
+					if r.current >= len(r.balancer) {
+						r.current = 0
+					}
+					output <- r.balancer[r.current]
+					r.current++
+		// balancer := balancers[0] FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
 		if url, urlOk := balancerCfg["websocket_url"].(string); urlOk {
 			return url
