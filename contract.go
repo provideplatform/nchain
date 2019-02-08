@@ -312,6 +312,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 	}
 	return nil, nil, err
 }
+
 func (c *Contract) readEthereumContractAbi() (*abi.ABI, error) {
 	var _abi *abi.ABI
 	params := c.ParseParams()
