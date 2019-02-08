@@ -263,7 +263,7 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 
 			if publicKeyOk && privateKeyOk {
 				Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
-				tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), uint64(gas))
+				tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nil, uint64(gas))
 				if err == nil {
 					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
 						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
