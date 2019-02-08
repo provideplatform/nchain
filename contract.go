@@ -389,6 +389,12 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 	if wallet != nil {
 		if wallet.ID != uuid.Nil {
 			walletID = &wallet.ID
+		} else if wallet.Address != "" {
+			tmpWallet := &Wallet{}
+			db.Where("address = ?", wallet.Address).Find(&tmpWallet)
+			if tmpWallet != nil && tmpWallet.ID != uuid.Nil {
+				walletID = &tmpWallet.ID
+			}
 		}
 		if StringOrNil(wallet.Address) != nil && wallet.PrivateKey != nil {
 			txParams["public_key"] = wallet.Address

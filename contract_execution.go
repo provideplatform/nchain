@@ -10,17 +10,18 @@ import (
 
 // ContractExecution represents a request payload used to execute functionality encapsulated by a contract.
 type ContractExecution struct {
-	ABI        interface{}   `json:"abi"`
-	NetworkID  *uuid.UUID    `json:"network_id"`
-	Contract   *Contract     `json:"-"`
-	ContractID *uuid.UUID    `json:"contract_id"`
-	WalletID   *uuid.UUID    `json:"wallet_id"`
-	Wallet     *Wallet       `json:"wallet"`
-	Gas        *float64      `json:"gas"`
-	Method     string        `json:"method"`
-	Params     []interface{} `json:"params"`
-	Value      *big.Int      `json:"value"`
-	Ref        *string       `json:"ref"`
+	ABI           interface{}   `json:"abi"`
+	NetworkID     *uuid.UUID    `json:"network_id"`
+	Contract      *Contract     `json:"-"`
+	ContractID    *uuid.UUID    `json:"contract_id"`
+	WalletID      *uuid.UUID    `json:"wallet_id"`
+	WalletAddress *string       `json:"wallet_address"`
+	Wallet        *Wallet       `json:"wallet"`
+	Gas           *float64      `json:"gas"`
+	Method        string        `json:"method"`
+	Params        []interface{} `json:"params"`
+	Value         *big.Int      `json:"value"`
+	Ref           *string       `json:"ref"`
 }
 
 // ContractExecutionResponse is returned upon successful contract execution

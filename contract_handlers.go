@@ -344,6 +344,15 @@ func contractExecutionHandler(c *gin.Context) {
 		wallet := &Wallet{}
 		wallet.setID(*execution.WalletID)
 		execution.Wallet = wallet
+	} else if StringOrNil(*execution.WalletAddress) != nil {
+		if execution.Wallet != nil {
+			err := fmt.Errorf("invalid request specifying a wallet_address and wallet")
+			renderError(err.Error(), 422, c)
+			return
+		}
+		wallet := &Wallet{}
+		wallet.Address = *execution.WalletAddress
+		execution.Wallet = wallet
 	}
 
 	executionResponse, err := execution.Execute()
