@@ -437,19 +437,28 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wal
 		if name, ok := params["name"].(string); ok {
 			contractName = name
 		}
-		contract := &Contract{
-			ApplicationID: t.ApplicationID,
-			NetworkID:     t.NetworkID,
-			TransactionID: &t.ID,
-			Name:          StringOrNil(contractName),
-			Address:       StringOrNil(receipt.ContractAddress.Hex()),
-			Params:        t.Params,
-		}
-		if contract.Create() {
-			Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, *t.Hash)
-			contract.resolveTokenContract(db, network, wallet, client, receipt)
+		contract := &Contract{}
+		db.Where("transaction_id = ?", t.ID).Find(&contract)
+		if contract == nil || contract.ID == uuid.Nil {
+			contract = &Contract{
+				ApplicationID: t.ApplicationID,
+				NetworkID:     t.NetworkID,
+				TransactionID: &t.ID,
+				Name:          StringOrNil(contractName),
+				Address:       StringOrNil(receipt.ContractAddress.Hex()),
+				Params:        t.Params,
+			}
+			if contract.Create() {
+				Log.Debugf("Created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, *t.Hash)
+				contract.resolveTokenContract(db, network, wallet, client, receipt)
+			} else {
+				Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
+			}
 		} else {
-			Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
+			Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, *t.Hash)
+			contract.Address = StringOrNil(receipt.ContractAddress.Hex())
+			db.Save(&contract)
+			contract.resolveTokenContract(db, network, wallet, client, receipt)
 		}
 	}
 }
