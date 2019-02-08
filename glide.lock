@@ -1,5 +1,5 @@
 hash: 0288057bb04de02c2fa3848bccda7a44fde65a6cc1830a2bafe2b40c50b18101
-updated: 2019-01-20T06:20:35.186791-05:00
+updated: 2019-02-08T02:38:07.307392-05:00
 imports:
 - name: github.com/ahl5esoft/golang-underscore
   version: c3155e69b3d23500032fb541a6e87b5360bdac18
@@ -196,7 +196,7 @@ imports:
 - name: github.com/pelletier/go-buffruneio
   version: 25c428535bd3f55a16f149a9daebd3fa4c5a562b
 - name: github.com/provideservices/provide-go
-  version: 2ab2a7c1c6b377482abf607ea0700ea1260b966e
+  version: dda4a0d8718b54cbb3ce85c3ca60f860c5d4f294
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/satori/go.uuid
