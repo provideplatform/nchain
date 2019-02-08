@@ -457,6 +457,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wal
 		} else {
 			Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", contract.ID, *network.Name, *t.Hash)
 			contract.Address = StringOrNil(receipt.ContractAddress.Hex())
+			contract.Params = t.Params
 			db.Save(&contract)
 			contract.resolveTokenContract(db, network, wallet, client, receipt)
 		}
