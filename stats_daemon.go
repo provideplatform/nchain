@@ -20,9 +20,12 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
+	providechainpoint "github.com/provideservices/provide-chainpoint"
 	"github.com/provideservices/provide-go"
 )
 
+const defaultChainpointBufferSize = 64
+const defaultChainpointFlushInterval = time.Millisecond * 60000
 const defaultStatsDaemonQueueSize = 8
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 32
@@ -68,6 +71,10 @@ func (err jsonRpcNotSupported) Error() string {
 
 func (err websocketNotSupported) Error() string {
 	return "Websocket not supported"
+}
+
+func init() {
+	providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval))
 }
 
 // BcoinNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
@@ -324,6 +331,10 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 
 				merkleRoot, _ := header["merkleroot"].(string)
 
+				chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+				chainptHash := []byte(merkleRoot)
+				providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
+
 				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["merkleroot"].(string) != merkleRoot {
 					sd.recentBlocks = append(sd.recentBlocks, header)
 					sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
@@ -419,6 +430,10 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		sd.stats.Meta["last_block_header"] = header
 
 		blockHash := header.Hash().String()
+
+		chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+		chainptHash := []byte(blockHash)
+		providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
 
 		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
 			sd.recentBlocks = append(sd.recentBlocks, header)
