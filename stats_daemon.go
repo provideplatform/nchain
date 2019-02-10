@@ -26,6 +26,7 @@ import (
 
 const defaultChainpointBufferSize = 64
 const defaultChainpointFlushInterval = time.Millisecond * 60000
+const defaultChainpointProofInterval = time.Millisecond * 60500
 const defaultStatsDaemonQueueSize = 8
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 32
@@ -74,7 +75,7 @@ func (err websocketNotSupported) Error() string {
 }
 
 func init() {
-	providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval))
+	providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval), uint(defaultChainpointProofInterval))
 }
 
 // BcoinNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
