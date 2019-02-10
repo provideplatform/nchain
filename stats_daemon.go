@@ -20,13 +20,12 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
-	providechainpoint "github.com/provideservices/provide-chainpoint"
 	"github.com/provideservices/provide-go"
 )
 
 const defaultChainpointBufferSize = 64
-const defaultChainpointFlushInterval = time.Millisecond * 60000
-const defaultChainpointProofInterval = time.Millisecond * 60500
+const defaultChainpointFlushInterval = 60000
+const defaultChainpointProofInterval = 60500
 const defaultStatsDaemonQueueSize = 8
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 32
@@ -75,7 +74,7 @@ func (err websocketNotSupported) Error() string {
 }
 
 func init() {
-	providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval), uint(defaultChainpointProofInterval))
+	//providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval), uint(defaultChainpointProofInterval))
 }
 
 // BcoinNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
@@ -332,9 +331,9 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 
 				merkleRoot, _ := header["merkleroot"].(string)
 
-				chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-				chainptHash := []byte(merkleRoot)
-				providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
+				// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+				// chainptHash := []byte(merkleRoot)
+				// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
 
 				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["merkleroot"].(string) != merkleRoot {
 					sd.recentBlocks = append(sd.recentBlocks, header)
@@ -432,9 +431,9 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 
 		blockHash := header.Hash().String()
 
-		chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-		chainptHash := []byte(blockHash)
-		providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
+		// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+		// chainptHash := []byte(blockHash)
+		// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
 
 		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
 			sd.recentBlocks = append(sd.recentBlocks, header)
