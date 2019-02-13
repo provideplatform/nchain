@@ -372,7 +372,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 							}
 
 							for _, tcpPort := range tcp {
-								targetGroupName := common.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), tcpPort)))
+								targetGroupName := common.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), tcpPort)))[0:31]
 								targetGroup, err := awswrapper.CreateTargetGroup(accessKeyID, secretAccessKey, region, StringOrNil(vpcID), StringOrNil(targetGroupName), StringOrNil("HTTP"), tcpPort)
 								if err != nil {
 									desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
