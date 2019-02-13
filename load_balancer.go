@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"
 	awswrapper "github.com/kthomas/go-aws-wrapper"
 	dbconf "github.com/kthomas/go-db-config"
@@ -371,7 +372,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 							}
 
 							for _, tcpPort := range tcp {
-								targetGroupName := fmt.Sprintf("port-%v", tcpPort)
+								targetGroupName := common.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), tcpPort)))
 								targetGroup, err := awswrapper.CreateTargetGroup(accessKeyID, secretAccessKey, region, StringOrNil(vpcID), StringOrNil(targetGroupName), StringOrNil("HTTP"), tcpPort)
 								if err != nil {
 									desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
