@@ -104,6 +104,15 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*Networ
 	bootnodes := make([]*NetworkNode, 0)
 
 	if count == 0 {
+		nodeCfg := pending.ParseConfig()
+		if env, envOk := nodeCfg["env"].(map[string]interface{}); envOk {
+			if _, bootnodesOk := env["BOOTNODES"].(string); bootnodesOk {
+				bootnodes = append(bootnodes, pending)
+				err := new(bootnodesInitialized)
+				return bootnodes, err
+			}
+		}
+
 		pending.Bootnode = true
 		pending.updateStatus(db, "genesis", nil)
 		bootnodes = append(bootnodes, pending)
