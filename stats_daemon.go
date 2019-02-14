@@ -332,9 +332,9 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 
 				merkleRoot, _ := header["merkleroot"].(string)
 
-				chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-				chainptHash := []byte(merkleRoot)
-				providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
+				// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+				// chainptHash := []byte(merkleRoot)
+				// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
 
 				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["merkleroot"].(string) != merkleRoot {
 					sd.recentBlocks = append(sd.recentBlocks, header)
@@ -432,9 +432,9 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 
 		blockHash := header.Hash().String()
 
-		chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-		chainptHash := []byte(blockHash)
-		providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
+		// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+		// chainptHash := []byte(blockHash)
+		// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
 
 		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
 			sd.recentBlocks = append(sd.recentBlocks, header)
