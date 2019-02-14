@@ -516,6 +516,9 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 	var daemon *StatsDaemon
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
 		Log.Debugf("Cached stats daemon instance found for network: %s; id: %s", *network.Name, network.ID)
+		if daemon.stats.State != nil && *daemon.stats.State == "configuring" {
+			network.Reload()
+		}
 		return daemon
 	}
 
