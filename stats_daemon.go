@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
-	providechainpoint "github.com/provideservices/provide-chainpoint"
 	"github.com/provideservices/provide-go"
 )
 
@@ -75,7 +74,7 @@ func (err websocketNotSupported) Error() string {
 }
 
 func init() {
-	providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval), uint(defaultChainpointProofInterval))
+	//providechainpoint.RunChainpointDaemon(defaultChainpointBufferSize, uint(defaultChainpointFlushInterval), uint(defaultChainpointProofInterval))
 }
 
 // BcoinNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
