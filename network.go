@@ -561,6 +561,11 @@ func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string
 // the latest status; when false, cached network stats are returned if available
 func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) {
 	if cachedStatus, ok := currentNetworkStats[n.ID.String()]; ok && !force {
+		if cachedStatus.stats.State != nil && *cachedStatus.stats.State == "configuring" {
+			defer func() {
+				go RequireNetworkStatsDaemon(n)
+			}()
+		}
 		return cachedStatus.stats, nil
 	}
 	RequireNetworkStatsDaemon(n)
