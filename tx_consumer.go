@@ -6,11 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nats-io/go-nats-streaming"
-
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/nats-io/go-nats-streaming"
 )
 
 const natsTxSubject = "goldmine.tx"
@@ -97,7 +96,7 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 	_gas, _ := big.NewFloat(*gas).Uint64()
 
-	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
+	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas, execution.Nonce)
 	if err != nil {
 		Log.Warningf("Failed to execute contract; %s", err.Error())
 		Log.Warningf("NATS message dropped: %s", msg)

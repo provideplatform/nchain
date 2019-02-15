@@ -258,12 +258,17 @@ func (c *Contract) executeEthereumContract(network *Network, tx *Transaction, me
 			if !gasOk {
 				gas = float64(0)
 			}
+			var nonce *uint64
+			if nonceFloat, nonceOk := txParams["nonce"].(float64); nonceOk {
+				nonceUint := uint64(nonceFloat)
+				nonce = &nonceUint
+			}
 			delete(txParams, "private_key")
 			tx.setParams(txParams)
 
 			if publicKeyOk && privateKeyOk {
 				Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
-				tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nil, uint64(gas))
+				tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.rpcURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas))
 				if err == nil {
 					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
 						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.rpcURL(), signedTx)
@@ -377,7 +382,7 @@ func (c *Contract) Create() bool {
 }
 
 // Execute a transaction on the contract instance using a specific signer, value, method and params
-func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method string, params []interface{}, gas uint64) (*ContractExecutionResponse, error) {
+func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method string, params []interface{}, gas uint64, nonce *uint64) (*ContractExecutionResponse, error) {
 	var err error
 	db := dbconf.DatabaseConnection()
 	var network = &Network{}
@@ -403,6 +408,10 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 	}
 
 	txParams["gas"] = gas
+
+	if nonce != nil {
+		txParams["nonce"] = nonce
+	}
 
 	txParamsJSON, _ := json.Marshal(txParams)
 	_txParamsJSON := json.RawMessage(txParamsJSON)

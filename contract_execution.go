@@ -18,6 +18,7 @@ type ContractExecution struct {
 	WalletAddress *string       `json:"wallet_address"`
 	Wallet        *Wallet       `json:"wallet"`
 	Gas           *float64      `json:"gas"`
+	Nonce         *uint64       `json:"nonce"`
 	Method        string        `json:"method"`
 	Params        []interface{} `json:"params"`
 	Value         *big.Int      `json:"value"`
@@ -50,7 +51,7 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 	if _abi != nil {
 		if mthd, ok := _abi.Methods[e.Method]; ok {
 			if mthd.Const {
-				return e.Contract.Execute(e.Ref, e.Wallet, e.Value, e.Method, e.Params, 0)
+				return e.Contract.Execute(e.Ref, e.Wallet, e.Value, e.Method, e.Params, 0, nil)
 			}
 		}
 	}

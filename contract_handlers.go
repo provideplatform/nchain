@@ -157,6 +157,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	publicKey, publicKeyOk := params["public_key"].(string)
 	privateKey, privateKeyOk := params["private_key"].(string)
 	gas, gasOk := params["gas"].(float64)
+	nonce, nonceOk := params["nonce"].(float64)
 
 	ref, err := uuid.NewV4()
 	if err != nil {
@@ -189,6 +190,11 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		execution.Gas = &gas
 	}
 
+	if nonceOk {
+		nonceUint := uint64(nonce)
+		execution.Nonce = &nonceUint
+	}
+
 	network := &Network{}
 	if execution.NetworkID != nil && *execution.NetworkID != uuid.Nil {
 		db.Where("id = ?", execution.NetworkID).Find(&network)
@@ -216,7 +222,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 
 	_gas, _ := big.NewFloat(gas).Uint64()
-	resp, err := ephemeralContract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas)
+	resp, err := ephemeralContract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas, execution.Nonce)
 	if err == nil {
 		render(resp, 202, c)
 	} else {
