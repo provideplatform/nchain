@@ -1,0 +1,10 @@
+#!/bin/bash
+
+DB_NAME=goldmine_test
+
+PGPASSWORD=goldmine dropdb -U goldmine goldmine_test
+PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test 
+
+rm goldmine
+go build .
+NATS_TOKEN=testtoken NATS_URL=nats://localhost:4221 NATS_STREAMING_URL=nats://localhost:4222 NATS_CLUSTER_ID=provide NATS_STREAMING_CONCURRENCY=2 GIN_MODE=release DATABASE_NAME=${DB_NAME} DATABASE_USER=goldmine DATABASE_PASSWORD=goldmine DATABASE_HOST=localhost AMQP_URL=amqp://ticker:ticker@10.0.0.126 AMQP_EXCHANGE=ticker LOG_LEVEL=DEBUG /usr/local/bin/go test -timeout 30s -run \^\(TestNetwork_Create\)\$

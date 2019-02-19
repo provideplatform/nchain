@@ -1,5 +1,7 @@
 hash: 79bf3b99bf30ceda6cee9500faf45b7d9eb2072eddf2842319cffaba59eeae14
 updated: 2019-03-23T05:41:30.182014-04:00
+hash: f0083f19e27e0e76fc85dc6dc900a15e9f013e7db4793108f0675963fd4db562
+updated: 2019-02-19T12:32:31.54295+02:00
 imports:
 - name: github.com/allegro/bigcache
   version: 84a0ff3f153cbd7e280a19029a864bb04b504e62
@@ -112,6 +114,8 @@ imports:
   - gogoproto
   - proto
   - protoc-gen-gogo/descriptor
+- name: github.com/golang/mock
+  version: 51421b967af1f557f93a59e0057aaf15ca02e29c
 - name: github.com/golang/protobuf
   version: 347cf4a86c1cb8d262994d8ef5924d4576c5b331
   subpackages:
