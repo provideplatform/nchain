@@ -4,6 +4,7 @@ DB_NAME=goldmine_test
 
 PGPASSWORD=goldmine dropdb -U goldmine goldmine_test
 PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test 
+PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql
 
 rm goldmine
 go build .
