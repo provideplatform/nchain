@@ -231,6 +231,9 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 	// }
 	directiveParts := strings.Split(source, "pragma solidity ^")
 	if len(directiveParts) != 2 {
+		directiveParts = strings.Split(source, "pragma solidity ")
+	}
+	if len(directiveParts) != 2 {
 		err = fmt.Errorf("Failed to find pragma directive for solidity contract compilation")
 		Log.Warning(err.Error())
 		return nil, err
