@@ -59,6 +59,9 @@ type Network struct {
 	Stats         *provide.NetworkStatus `sql:"-" json:"stats"`
 }
 
+// config["network_id"] is unique
+// config["protocol_id"] is "poa"
+
 // Create and persist a new network
 func (n *Network) Create() bool {
 	if !n.Validate() {
@@ -88,6 +91,21 @@ func (n *Network) Create() bool {
 		}
 	}
 	return false
+}
+
+func (n *Network) String() string {
+	str := ""
+	errors := n.Model.Errors
+	// move to Model.Errors interface
+	for _, e := range errors {
+		str = str + " " + *e.Message
+	}
+
+	chainID, _ := hexutil.DecodeBig(*n.ChainID)
+	errorsStr := str
+	name := *n.Name
+
+	return "network: name=" + name + " chainID=" + chainID.String() + " errors=" + errorsStr
 }
 
 func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*NetworkNode, error) {
@@ -209,9 +227,7 @@ func (n *Network) Update() bool {
 
 // setConfig sets the network config in-memory
 func (n *Network) setConfig(cfg map[string]interface{}) {
-	cfgJSON, _ := json.Marshal(cfg)
-	_cfgJSON := json.RawMessage(cfgJSON)
-	n.Config = &_cfgJSON
+	n.Config = marshalConfig(cfg)
 }
 
 // setChainID is an internal method used to set a unique chainID for the network prior to its creation
@@ -496,6 +512,10 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 // Validate a network for persistence
 func (n *Network) Validate() bool {
 	n.Errors = make([]*provide.Error, 0)
+
+	// add error if Config is empty
+	// add error if Clonable and Config[:_security] is empty
+	// add error if Config is nil
 	return len(n.Errors) == 0
 }
 
