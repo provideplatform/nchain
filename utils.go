@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 	selfsignedcert "github.com/kthomas/go-self-signed-cert"
 
 	natsutil "github.com/kthomas/go-natsutil"
-	"github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/go-nats-streaming"
 )
 
 func buildListenAddr() string {
@@ -96,4 +97,18 @@ func StringOrNil(str string) *string {
 		return nil
 	}
 	return &str
+}
+
+func boolOrNil(b bool) *bool {
+	return &b
+}
+
+func ptrToInt(i int) *int {
+	return &i
+}
+
+func marshalConfig(opts map[string]interface{}) *json.RawMessage {
+	cfgJSON, _ := json.Marshal(opts)
+	_cfgJSON := json.RawMessage(cfgJSON)
+	return &_cfgJSON
 }
