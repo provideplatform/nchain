@@ -34,6 +34,52 @@ func setupTestCase(t *testing.T) func(t *testing.T) {
 	}
 }
 
+type networkFields struct {
+	Model         provide.Model
+	ApplicationID *uuid.UUID
+	UserID        *uuid.UUID
+	Name          *string
+	Description   *string
+	IsProduction  *bool
+	Cloneable     *bool
+	Enabled       *bool
+	ChainID       *string
+	SidechainID   *uuid.UUID
+	NetworkID     *uuid.UUID
+	Config        *json.RawMessage
+	Stats         *provide.NetworkStatus
+}
+
+var validNetworkFields networkFields
+
+func init() {
+	validNetworkFields = networkFields{
+		ApplicationID: nil,
+		UserID:        nil,
+		Name:          ptrTo("Name ETH non-Cloneable Enabled"),
+		Description:   ptrTo("Ethereum Network"),
+		IsProduction:  ptrToBool(false),
+		Cloneable:     ptrToBool(false),
+		Enabled:       ptrToBool(true),
+		ChainID:       nil,
+		SidechainID:   nil,
+		NetworkID:     nil,
+		Config: marshalConfig(map[string]interface{}{
+			"block_explorer_url":  "https://unicorn-explorer.provide.network", // required
+			"chain":               "unicorn-v0",                               // required
+			"chainspec_abi_url":   "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
+			"chainspec_url":       "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
+			"cloneable_cfg":       map[string]interface{}{},
+			"engine_id":           "authorityRound", // required
+			"is_ethereum_network": true,             // required for ETH
+			"is_load_balanced":    true,             // implies network load balancer count > 0
+			"json_rpc_url":        nil,
+			"native_currency":     "PRVD", // required
+			"network_id":          22,     // required
+			"protocol_id":         "poa",  // required
+			"websocket_url":       nil}),
+		Stats: nil}
+}
 func TestNetwork_Create(t *testing.T) {
 
 	eth_chainspec_fileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn/spec.json"
@@ -68,28 +114,13 @@ func TestNetwork_Create(t *testing.T) {
 		chainspec_abi_text = string(contents)
 	}
 
-	type fields struct {
-		Model         provide.Model
-		ApplicationID *uuid.UUID
-		UserID        *uuid.UUID
-		Name          *string
-		Description   *string
-		IsProduction  *bool
-		Cloneable     *bool
-		Enabled       *bool
-		ChainID       *string
-		SidechainID   *uuid.UUID
-		NetworkID     *uuid.UUID
-		Config        *json.RawMessage
-		Stats         *provide.NetworkStatus
-	}
 	tests := []struct {
 		name   string
-		fields fields
+		fields networkFields
 		want   bool
 	}{
 		{"when ETH network is not clonable, enabled, and valid with chainspec url",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
 				Name:          ptrTo("Name ETH non-Cloneable Enabled"),
@@ -117,7 +148,7 @@ func TestNetwork_Create(t *testing.T) {
 				Stats: nil},
 			true},
 		{"when ETH network is not clonable, enabled, and valid with raw chainspec",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
 				Name:          ptrTo("Name ETH non-Cloneable Enabled"),
@@ -145,7 +176,7 @@ func TestNetwork_Create(t *testing.T) {
 				Stats: nil},
 			true},
 		{"when ETH network is clonable, enabled, and valid with chainspec url",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
 				Name:          ptrTo("Name ETH Cloneable Enabled"),
@@ -174,7 +205,7 @@ func TestNetwork_Create(t *testing.T) {
 				Stats: nil},
 			true},
 		{"when ETH network is clonable, enabled, and not valid because of missing security config",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
 				Name:          ptrTo("Name ETH Cloneable Enabled"),
@@ -202,7 +233,7 @@ func TestNetwork_Create(t *testing.T) {
 				Stats: nil},
 			false},
 		{"when ETH network is clonable, not enabled, and valid with chainspec url",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
 				Name:          ptrTo("Name ETH Cloneable Disabled"),
@@ -231,10 +262,10 @@ func TestNetwork_Create(t *testing.T) {
 				Stats: nil},
 			true},
 		{"when ETH network is not clonable, enabled, and not valid because of empty config",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
-				Name:          ptrTo("Name ETH non-Cloneable Enabled empty Config"),
+				Name:          ptrTo("ETH non-Cloneable Enabled empty Config"),
 				Description:   ptrTo("Ethereum Network"),
 				IsProduction:  ptrToBool(false),
 				Cloneable:     ptrToBool(false),
@@ -246,10 +277,10 @@ func TestNetwork_Create(t *testing.T) {
 				Stats:         nil},
 			false},
 		{"when ETH network is not clonable, disabled, and valid despite of empty config",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
-				Name:          ptrTo("Name ETH non-Cloneable Disabled"),
+				Name:          ptrTo("ETH non-Cloneable Disabled"),
 				Description:   ptrTo("Ethereum Network"),
 				IsProduction:  ptrToBool(false),
 				Cloneable:     ptrToBool(false),
@@ -259,12 +290,12 @@ func TestNetwork_Create(t *testing.T) {
 				NetworkID:     nil,
 				Config:        marshalConfig(map[string]interface{}{}),
 				Stats:         nil},
-			true},
+			false},
 		{"when BTC network is not valid",
-			fields{
+			networkFields{
 				ApplicationID: nil,
 				UserID:        nil,
-				Name:          ptrTo("Name BTC"),
+				Name:          ptrTo("BTC"),
 				Description:   ptrTo("Bitcoin Network"),
 				IsProduction:  ptrToBool(false),
 				Cloneable:     ptrToBool(false),
@@ -276,8 +307,8 @@ func TestNetwork_Create(t *testing.T) {
 				Stats:         nil},
 			false},
 		{"when clonable is nil is not valid",
-			fields{
-				Name:         ptrTo("Name Clonable nil"),
+			networkFields{
+				Name:         ptrTo("Clonable nil config nil"),
 				Description:  ptrTo("Description2"),
 				IsProduction: ptrToBool(false),
 				Cloneable:    nil,
@@ -285,9 +316,9 @@ func TestNetwork_Create(t *testing.T) {
 				Config:       nil,
 			},
 			false},
-		{"when clonable is nil is not valid",
-			fields{
-				Name:         ptrTo("Name Enabled nil"),
+		{"when enabled is nil is not valid",
+			networkFields{
+				Name:         ptrTo("Enabled nil config nil"),
 				Description:  ptrTo("Description2"),
 				IsProduction: ptrToBool(false),
 				Cloneable:    ptrToBool(false),
@@ -295,9 +326,9 @@ func TestNetwork_Create(t *testing.T) {
 				Config:       nil,
 			},
 			false},
-		{"when clonable is nil is not valid",
-			fields{
-				Name:         ptrTo("Name isProduction nil"),
+		{"when is_production is nil is not valid",
+			networkFields{
+				Name:         ptrTo("isProduction nil config nil"),
 				Description:  ptrTo("Description2"),
 				IsProduction: nil,
 				Cloneable:    ptrToBool(false),
@@ -306,8 +337,8 @@ func TestNetwork_Create(t *testing.T) {
 			},
 			false},
 		{"when config is nil is not valid",
-			fields{
-				Name:         ptrTo("Name2"),
+			networkFields{
+				Name:         ptrTo("config nil"),
 				Description:  ptrTo("Description2"),
 				IsProduction: ptrToBool(false),
 				Cloneable:    ptrToBool(false),
@@ -349,6 +380,77 @@ func TestNetwork_Create(t *testing.T) {
 					tt.want,
 					n)
 				// string(res2B))
+			}
+		})
+	}
+}
+
+func TestNetwork_Validate(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields networkFields
+		want   bool
+	}{
+		{"when network is valid",
+			validNetworkFields,
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &provideapp.Network{
+				Model:         tt.fields.Model,
+				ApplicationID: tt.fields.ApplicationID,
+				UserID:        tt.fields.UserID,
+				Name:          tt.fields.Name,
+				Description:   tt.fields.Description,
+				IsProduction:  tt.fields.IsProduction,
+				Cloneable:     tt.fields.Cloneable,
+				Enabled:       tt.fields.Enabled,
+				ChainID:       tt.fields.ChainID,
+				SidechainID:   tt.fields.SidechainID,
+				NetworkID:     tt.fields.NetworkID,
+				Config:        tt.fields.Config,
+				Stats:         tt.fields.Stats,
+			}
+			if got := n.Validate(); got != tt.want {
+				t.Errorf("Network.Validate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNetwork_CreateDuplicate(t *testing.T) {
+
+	tests := []struct {
+		name   string
+		fields networkFields
+		want   bool
+	}{
+		{"when duplication is not valid",
+			validNetworkFields,
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &provideapp.Network{
+				Model:         tt.fields.Model,
+				ApplicationID: tt.fields.ApplicationID,
+				UserID:        tt.fields.UserID,
+				Name:          tt.fields.Name,
+				Description:   tt.fields.Description,
+				IsProduction:  tt.fields.IsProduction,
+				Cloneable:     tt.fields.Cloneable,
+				Enabled:       tt.fields.Enabled,
+				ChainID:       tt.fields.ChainID,
+				SidechainID:   tt.fields.SidechainID,
+				NetworkID:     tt.fields.NetworkID,
+				Config:        tt.fields.Config,
+				Stats:         tt.fields.Stats,
+			}
+			n.Create()
+
+			if got := n.Create(); got != tt.want {
+				t.Errorf("Network.Validate() = %v, want %v", got, tt.want)
 			}
 		})
 	}

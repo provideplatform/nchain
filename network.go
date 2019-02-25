@@ -55,7 +55,7 @@ type Network struct {
 	ChainID       *string                `json:"chain_id"`                     // protocol-specific chain id
 	SidechainID   *uuid.UUID             `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
 	NetworkID     *uuid.UUID             `sql:"type:uuid" json:"network_id"`   // network id used as the parent
-	Config        *json.RawMessage       `sql:"type:json" json:"config"`
+	Config        *json.RawMessage       `sql:"type:json not null" json:"config"`
 	Stats         *provide.NetworkStatus `sql:"-" json:"stats"`
 }
 
@@ -513,6 +513,22 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 func (n *Network) Validate() bool {
 	n.Errors = make([]*provide.Error, 0)
 
+	if n.Config == nil {
+		n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config value should be present"), ptrToInt(10)})
+	}
+
+	config := map[string]interface{}{}
+	if n.Config != nil {
+		err := json.Unmarshal(*n.Config, &config)
+
+		if err == nil && len(config) == 0 {
+			n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config should not be empty"), ptrToInt(12)})
+		}
+
+		if err == nil && *n.Cloneable && config["cloneable_cfg"].(map[string]interface{})["_security"] == nil {
+			n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config _security value should be present for clonable network"), ptrToInt(11)})
+		}
+	}
 	// add error if Config is empty
 	// add error if Clonable and Config[:_security] is empty
 	// add error if Config is nil

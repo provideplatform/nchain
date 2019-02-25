@@ -36,7 +36,7 @@ CREATE TABLE public.networks (
     chain_id text,
     sidechain_id uuid,
     network_id uuid,
-    config json
+    config json NOT NULL
 );
 
 
