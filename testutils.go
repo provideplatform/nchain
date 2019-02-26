@@ -8,15 +8,7 @@ import (
 	stan "github.com/nats-io/go-nats-streaming"
 )
 
-// type promise interface {
-// 	resolve(msg *nats.Msg) (interface{}, error)
-// }
-
-const natsMsgTimeout = time.Millisecond * 4
-
-var (
-	deliveries = map[string][]*stan.Msg{}
-)
+const natsMsgTimeout = time.Millisecond * 100
 
 func natsGuaranteeDelivery(sub string) error {
 	RunConsumers()
@@ -24,7 +16,8 @@ func natsGuaranteeDelivery(sub string) error {
 	natsConn := getNatsStreamingConnection()
 
 	// TODO: use a mutex if we need to detect > 1 delivery on sub
-	// delivered := false
+
+	ch := make(chan *stan.Msg, 1)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -32,13 +25,8 @@ func natsGuaranteeDelivery(sub string) error {
 		defer natsConn.Close()
 
 		natsSub, err := natsConn.QueueSubscribe(sub, sub, func(msg *stan.Msg) {
-			// _msg = msg
-			Log.Debugf("GOT MESSAGE:::::%s", msg)
-			if _deliveries, deliveriesOk := deliveries[sub]; !deliveriesOk {
-				_deliveries = make([]*stan.Msg, 0)
-				deliveries[sub] = _deliveries
-			}
-			deliveries[sub] = append(deliveries[sub], msg)
+			ch <- msg
+			msg.Ack()
 		}, stan.DurableName(sub))
 
 		if err != nil {
@@ -54,29 +42,20 @@ func natsGuaranteeDelivery(sub string) error {
 
 	startedAt := time.Now().UnixNano()
 	ticker := time.NewTicker(natsMsgTimeout / 5)
-	select {
-	case <-ticker.C:
-		Log.Debugf("Failed to guarantee delivery of NATS message on subject: %s", sub)
-		break
-	default:
-		Log.Debugf("%d", time.Now().UnixNano()-startedAt)
-		if time.Now().UnixNano()-startedAt >= int64(natsMsgTimeout) {
+	for {
+		select {
+		case <-ticker.C:
+			elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
+			if elapsedMillis >= int64(natsMsgTimeout/1000000) {
+				ticker.Stop()
+				return fmt.Errorf("Failed to consume message on NATS subject: %s; timed out after %dms", sub, elapsedMillis)
+			}
+		case msg := <-ch:
+			Log.Debugf("Guaranteed delivery of NATS message on subject: %s; msg: %s", sub, msg)
 			ticker.Stop()
-			break
+			return nil
+		default:
+			// no-op
 		}
-
-		if len(deliveries[sub]) > 0 {
-			Log.Debugf("Guaranteed delivery of NATS message on subject: %s", sub)
-			ticker.Stop()
-			break
-		}
-
-		Log.Debugf("Attempting to guarantee delivery of NATS message on subject: %s", sub)
 	}
-
-	if len(deliveries[sub]) == 0 {
-		return fmt.Errorf("Failed to consume message on NATS subject: %s; timed out after %dms", sub, natsMsgTimeout)
-	}
-
-	return nil
 }
