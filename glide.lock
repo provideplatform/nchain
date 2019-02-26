@@ -1,7 +1,12 @@
+<<<<<<< 1a03caaef12ec108d59a705110d2ea537b857099
 hash: 79bf3b99bf30ceda6cee9500faf45b7d9eb2072eddf2842319cffaba59eeae14
 updated: 2019-03-23T05:41:30.182014-04:00
 hash: f0083f19e27e0e76fc85dc6dc900a15e9f013e7db4793108f0675963fd4db562
 updated: 2019-02-19T12:32:31.54295+02:00
+=======
+hash: 8986ec2cd54eea86cbae8066c4dd5194ae50929e7a9e24596c55d33958a3bd2f
+updated: 2019-02-26T04:25:38.492738-05:00
+>>>>>>> Update go-natsutil dependency
 imports:
 - name: github.com/allegro/bigcache
   version: 84a0ff3f153cbd7e280a19029a864bb04b504e62
@@ -150,6 +155,7 @@ imports:
   version: a16a55e7dc26f074c31eb9e6d7ae31da4458a124
 - name: github.com/kthomas/go-self-signed-cert
   version: 35b13d7369947616bd832487ce54c7b8d308fa75
+  version: e0626213f5151cf490c910e569ff8d6c883cb735
 - name: github.com/kthomas/go.uuid
   version: b6c5bb1eedd724fc13c44af34da224568529d0c0
 - name: github.com/lib/pq
@@ -181,7 +187,11 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
+<<<<<<< 1a03caaef12ec108d59a705110d2ea537b857099
   version: eac53f51f94ccc994a1237eea501c81480182019
+=======
+  version: b53fb36bc19d51889fde618bbf8bfec1a749c646
+>>>>>>> Update go-natsutil dependency
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/satori/go.uuid
