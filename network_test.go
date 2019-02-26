@@ -1,4 +1,4 @@
-package main_test
+package main
 
 import (
 	"encoding/json"
@@ -9,7 +9,6 @@ import (
 
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	provideapp "github.com/provideapp/goldmine"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -19,18 +18,13 @@ func ptrTo(s string) *string {
 func ptrToBool(s bool) *bool {
 	return &s
 }
-func marshalConfig(opts map[string]interface{}) *json.RawMessage {
-	cfgJSON, _ := json.Marshal(opts)
-	_cfgJSON := json.RawMessage(cfgJSON)
-	return &_cfgJSON
-}
 
 func setupTestCase(t *testing.T) func(t *testing.T) {
 	t.Log("setup test case")
 	return func(t *testing.T) {
 		t.Log("teardown test case: removing networks")
 		db := dbconf.DatabaseConnection()
-		db.Delete(provideapp.Network{})
+		db.Delete(Network{})
 	}
 }
 
@@ -356,7 +350,7 @@ func TestNetwork_Create(t *testing.T) {
 			teardownTestCase := setupTestCase(t)
 			defer teardownTestCase(t)
 
-			n := &provideapp.Network{
+			n := &Network{
 				Model:         tt.fields.Model,
 				ApplicationID: tt.fields.ApplicationID,
 				UserID:        tt.fields.UserID,
@@ -371,6 +365,8 @@ func TestNetwork_Create(t *testing.T) {
 				Config:        tt.fields.Config,
 				Stats:         tt.fields.Stats,
 			}
+			natsGuaranteeDelivery("network.create")
+
 			if got := n.Create(); got != tt.want {
 				// res2B, _ := json.Marshal(n)
 				// networkID, _ := hexutil.DecodeBig(*n.ChainID)
@@ -397,7 +393,7 @@ func TestNetwork_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n := &provideapp.Network{
+			n := &Network{
 				Model:         tt.fields.Model,
 				ApplicationID: tt.fields.ApplicationID,
 				UserID:        tt.fields.UserID,
@@ -432,7 +428,7 @@ func TestNetwork_CreateDuplicate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n := &provideapp.Network{
+			n := &Network{
 				Model:         tt.fields.Model,
 				ApplicationID: tt.fields.ApplicationID,
 				UserID:        tt.fields.UserID,
