@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+	"time"
 
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
@@ -20,6 +21,7 @@ func ptrToBool(s bool) *bool {
 }
 
 func setupTestCase(t *testing.T) func(t *testing.T) {
+	Log.Debugf("===================================")
 	t.Log("setup test case")
 	return func(t *testing.T) {
 		t.Log("teardown test case: removing networks")
@@ -347,8 +349,13 @@ func TestNetwork_Create(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			startedAt := time.Now().UnixNano()
+
 			teardownTestCase := setupTestCase(t)
 			defer teardownTestCase(t)
+			if tt.want { // network is supposed to be created
+				natsGuaranteeDelivery("network.create", t)
+			}
 
 			n := &Network{
 				Model:         tt.fields.Model,
@@ -365,8 +372,8 @@ func TestNetwork_Create(t *testing.T) {
 				Config:        tt.fields.Config,
 				Stats:         tt.fields.Stats,
 			}
-			natsGuaranteeDelivery("network.create")
 
+			Log.Debugf("Network is being created")
 			if got := n.Create(); got != tt.want {
 				// res2B, _ := json.Marshal(n)
 				// networkID, _ := hexutil.DecodeBig(*n.ChainID)
@@ -376,7 +383,16 @@ func TestNetwork_Create(t *testing.T) {
 					tt.want,
 					n)
 				// string(res2B))
+			} else {
+				Log.Debugf("created id: " + n.ID.String())
 			}
+
+			//time.Sleep(1000)
+
+			elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
+			Log.Debugf("elapsed %d ms", elapsedMillis)
+
+			//time.Sleep(1000)
 		})
 	}
 }
