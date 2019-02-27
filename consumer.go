@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	natsutil "github.com/kthomas/go-natsutil"
-	"github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/go-nats-streaming"
 )
 
 const natsDefaultClusterID = "provide"
@@ -24,8 +24,8 @@ var (
 // RunConsumers launches a goroutine for each data feed
 // that has been configured to consume messages
 func RunConsumers() {
+	waitGroup.Add(1)
 	go func() {
-		waitGroup.Add(1)
 		subscribeNatsStreaming()
 		for _, currencyPair := range currencyPairs {
 			RunExchangeConsumer(currencyPair, &waitGroup)
