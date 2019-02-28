@@ -109,7 +109,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*Networ
 			if _, bootnodesOk := env["BOOTNODES"].(string); bootnodesOk {
 				bootnodes = append(bootnodes, pending)
 				err := new(bootnodesInitialized)
-				return bootnodes, err
+				return bootnodes, *err
 			}
 		}
 
