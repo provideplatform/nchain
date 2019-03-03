@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -99,8 +101,8 @@ func getContractSourceMeta(compilerOutput map[string]interface{}, contract strin
 	return contractSource, nil
 }
 
-func getContractDependencies(src, compilerVersion string, compilerOutput map[string]interface{}, contract string) (map[string]interface{}, error) {
-	source, err := getContractSourceMeta(compilerOutput, "<stdin>")
+func getContractDependencies(src, compilerVersion string, compilerOutput map[string]interface{}, contract, keyPrefix string) (map[string]interface{}, error) {
+	source, err := getContractSourceMeta(compilerOutput, keyPrefix)
 	if err != nil {
 		Log.Warningf("Failed to retrieve contract sources from compiled contract")
 		return nil, err
@@ -113,7 +115,8 @@ func getContractDependencies(src, compilerVersion string, compilerOutput map[str
 	}
 
 	reentrant := false
-	if resolvedExports, ok := astExports[contract].([]interface{}); ok {
+	fullyQualifiedKey := fmt.Sprintf("%s:%s", keyPrefix, contract)
+	if resolvedExports, ok := astExports[fullyQualifiedKey].([]interface{}); ok {
 		reentrant = len(resolvedExports) > 1
 	}
 
@@ -145,7 +148,7 @@ func getContractDependencies(src, compilerVersion string, compilerOutput map[str
 		dependencyContractKeyParts := strings.Split(dependencyContractKey, ":")
 		dependencyContractName := dependencyContractKeyParts[len(dependencyContractKeyParts)-1]
 
-		_dependencyContractKey := fmt.Sprintf("<stdin>:%s", dependencyContractKey)
+		_dependencyContractKey := fmt.Sprintf("%s:%s", keyPrefix, dependencyContractKey)
 
 		dependencyContract := compilerOutput["contracts"].(map[string]interface{})[_dependencyContractKey].(map[string]interface{})
 		dependencyContractABI, _ := getContractABI(dependencyContract)
@@ -159,7 +162,7 @@ func getContractDependencies(src, compilerVersion string, compilerOutput map[str
 		var deps map[string]interface{}
 
 		if reentrant {
-			deps, _ = getContractDependencies(src, compilerVersion, compilerOutput, dependencyContractName)
+			deps, _ = getContractDependencies(src, compilerVersion, compilerOutput, dependencyContractName, keyPrefix)
 		}
 
 		dependencies[dependencyContractName] = &provide.CompiledArtifact{
@@ -216,6 +219,17 @@ func buildCompileCommand(source, compilerVersion string, optimizerRuns int) stri
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
 }
 
+// FIXME
+func buildShittyCompileCommand(source, compilerVersion string, optimizerRuns int) (*os.File, string) {
+	tmpFile, err := ioutil.TempFile("", "*")
+	i, err := tmpFile.WriteString(source)
+	Log.Warningf("Leaking %d-byte solidity source file written to tmpfile at: %s", i, tmpFile)
+	if err == nil {
+		return tmpFile, fmt.Sprintf("/usr/local/bin/solc-v%s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc %s", compilerVersion, optimizerRuns, tmpFile.Name())
+	}
+	return tmpFile, ""
+}
+
 // compileContract compiles a smart contract or truffle project from source.
 func compileSolidity(name, source string, constructorParams []interface{}, compilerOptimizerRuns int) (*provide.CompiledArtifact, error) {
 	var err error
@@ -246,9 +260,27 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 	solcCmd := buildCompileCommand(source, compilerVersion, compilerOptimizerRuns)
 	Log.Debugf("Built solc command: %s", solcCmd)
 
+	depsolvingKeyPrefix := "<stdin>"
+
 	stdOut, err := shellOut(solcCmd)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to compile contract(s): %s; %s", name, err.Error())
+		Log.Warningf("In-memory solc compilation failed; %s", err.Error())
+		tmpFile, solcCmd := buildShittyCompileCommand(source, compilerVersion, compilerOptimizerRuns) // HACK -- workaround for unknown in-memory contract compiler issue on certain contract
+		depsolvingKeyPrefix = tmpFile.Name()
+		Log.Debugf("Built on-disk solc compilation fallback command: %s", solcCmd)
+
+		defer func() {
+			tmpFile.Close()
+			err := os.Remove(tmpFile.Name())
+			if err == nil {
+				Log.Debugf("Removed temporary file: %s", tmpFile.Name())
+			}
+		}()
+
+		stdOut, err = shellOut(solcCmd)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to compile contract(s): %s; %s", name, err.Error())
+		}
 	}
 
 	Log.Debugf("Raw solc compiler output: %s", stdOut)
@@ -278,7 +310,7 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 		src, _ := getContractSource(source, compilerVersion, contract, contractName)
 		fingerprint, _ := getContractFingerprint(contract)
 
-		contractDependencies, err := getContractDependencies(source, compilerVersion, compilerOutput, contractName)
+		contractDependencies, err := getContractDependencies(source, compilerVersion, compilerOutput, contractName, depsolvingKeyPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("WARNING: failed to retrieve contract dependencies for contract: %s", contractName)
 		}
