@@ -525,8 +525,14 @@ func (n *Network) Validate() bool {
 			n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config should not be empty"), ptrToInt(12)})
 		}
 
-		if err == nil && *n.Cloneable && config["cloneable_cfg"].(map[string]interface{})["_security"] == nil {
-			n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config _security value should be present for clonable network"), ptrToInt(11)})
+		if err == nil && *n.Cloneable {
+			if cfg, found := config["cloneable_cfg"]; found {
+				if cfg_asserted, ok := cfg.(map[string]interface{}); ok {
+					if _, ok := cfg_asserted["_security"]; !ok {
+						n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config _security value should be present for clonable network"), ptrToInt(11)})
+					}
+				}
+			}
 		}
 	}
 	// add error if Config is empty
