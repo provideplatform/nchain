@@ -269,10 +269,13 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string, description *stri
 	}
 }
 
-func (t *Transaction) attemptGasEstimationRecovery(err error) error {
+func (t *Transaction) attemptTxBroadcastRecovery(err error) error {
 	msg := err.Error()
+	Log.Debugf("Attempting to recover from failed transaction broadcast (tx id: %s); %s", t.ID.String(), msg)
+
 	gasFailureStr := "not enough gas to cover minimal cost of the transaction (minimal: "
-	if strings.Contains(msg, gasFailureStr) && strings.Contains(msg, "got: 0") { // HACK
+	isGasEstimationRecovery := strings.Contains(msg, gasFailureStr) && strings.Contains(msg, "got: 0") // HACK
+	if isGasEstimationRecovery {
 		Log.Debugf("Attempting to recover from gas estimation failure with supplied gas of 0 for tx id: %s", t.ID)
 		offset := strings.Index(msg, gasFailureStr) + len(gasFailureStr)
 		length := strings.Index(msg[offset:], ",")
@@ -284,8 +287,9 @@ func (t *Transaction) attemptGasEstimationRecovery(err error) error {
 			t.setParams(params)
 			return nil
 		}
+		Log.Debugf("Failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
 	}
-	Log.Debugf("Failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
+
 	return err
 }
 
@@ -304,7 +308,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 		}
 
 		if err != nil {
-			if t.attemptGasEstimationRecovery(err) == nil {
+			if t.attemptTxBroadcastRecovery(err) == nil {
 				err = t.sign(db, network, wallet)
 				if err == nil {
 					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
