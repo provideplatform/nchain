@@ -207,9 +207,10 @@ func parseCompilerOutput(compilerOutputJSON []byte) (compiledContracts map[strin
 func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[string]interface{}, err error) {
 	combinedOutput, err := parseCompilerOutput(compilerOutputJSON)
 	Log.Debugf("%s", combinedOutput)
-	if err == nil {
-		compiledContracts = combinedOutput["contracts"].(map[string]interface{})
-		return compiledContracts, err
+	if err == nil && combinedOutput != nil {
+		if compiledContracts, compiledContractsOk := combinedOutput["contracts"].(map[string]interface{}); compiledContractsOk {
+			return compiledContracts, err
+		}
 	}
 	return nil, err
 }
