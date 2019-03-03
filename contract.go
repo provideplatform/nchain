@@ -410,7 +410,7 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 	txParams["gas"] = gas
 
 	if nonce != nil {
-		txParams["nonce"] = nonce
+		txParams["nonce"] = *nonce
 	}
 
 	txParamsJSON, _ := json.Marshal(txParams)
@@ -436,17 +436,17 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 		err = fmt.Errorf("unsupported network: %s", *network.Name)
 	}
 
-	accessedAt := time.Now()
-	go func() {
-		c.AccessedAt = &accessedAt
-		db.Save(c)
-	}()
-
 	if err != nil {
 		desc := err.Error()
 		tx.updateStatus(db, "failed", &desc)
 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
 	}
+
+	accessedAt := time.Now()
+	go func() {
+		c.AccessedAt = &accessedAt
+		db.Save(c)
+	}()
 
 	if tx.Response == nil {
 		tx.Response = &ContractExecutionResponse{

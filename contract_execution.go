@@ -36,22 +36,25 @@ type ContractExecutionResponse struct {
 
 // Execute an ephemeral ContractExecution
 func (e *ContractExecution) Execute() (interface{}, error) {
-	var _abi *abi.ABI
-	if __abi, abiOk := e.ABI.(abi.ABI); abiOk {
-		_abi = &__abi
-	} else if e.Contract != nil {
-		__abi, err := e.Contract.readEthereumContractAbi()
-		if err != nil {
-			Log.Warningf("Cannot attempt contract execution without ABI")
-			return nil, err
+	if e.ABI != nil {
+		// isEthereumContract = true
+		var _abi *abi.ABI
+		if __abi, abiOk := e.ABI.(abi.ABI); abiOk {
+			_abi = &__abi
+		} else if e.Contract != nil {
+			__abi, err := e.Contract.readEthereumContractAbi()
+			if err != nil {
+				Log.Warningf("Cannot attempt contract execution without ABI")
+				return nil, err
+			}
+			_abi = __abi
 		}
-		_abi = __abi
-	}
 
-	if _abi != nil {
-		if mthd, ok := _abi.Methods[e.Method]; ok {
-			if mthd.Const {
-				return e.Contract.Execute(e.Ref, e.Wallet, e.Value, e.Method, e.Params, 0, nil)
+		if _abi != nil {
+			if mthd, ok := _abi.Methods[e.Method]; ok {
+				if mthd.Const {
+					return e.Contract.Execute(e.Ref, e.Wallet, e.Value, e.Method, e.Params, 0, nil)
+				}
 			}
 		}
 	}

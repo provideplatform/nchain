@@ -341,10 +341,16 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 			gas = float64(0)
 		}
 
+		var nonce *uint64
+		if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
+			nonceUint := uint64(nonceFloat)
+			nonce = &nonceUint
+		}
+
 		if wallet.PrivateKey != nil {
 			privateKey, _ := DecryptECDSAPrivateKey(*wallet.PrivateKey, GpgPrivateKey, WalletEncryptionKey)
 			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-			t.SignedTx, t.Hash, err = provide.EVMSignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), nil, uint64(gas))
+			t.SignedTx, t.Hash, err = provide.EVMSignTx(network.ID.String(), network.rpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), nonce, uint64(gas))
 		} else {
 			err = fmt.Errorf("Unable to sign tx; no private key for wallet: %s", wallet.ID)
 		}

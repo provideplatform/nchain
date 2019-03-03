@@ -278,6 +278,14 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
+	params := map[string]interface{}{}
+	err = json.Unmarshal(buf, &params)
+	if err != nil {
+		err = fmt.Errorf("Failed to parse JSON-RPC params; %s", err.Error())
+		renderError(err.Error(), 400, c)
+		return
+	}
+
 	db := dbconf.DatabaseConnection()
 
 	contractID := c.Param("id")
@@ -287,13 +295,6 @@ func contractExecutionHandler(c *gin.Context) {
 		rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
 		if err != nil {
 			err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
-			renderError(err.Error(), 400, c)
-			return
-		}
-		params := map[string]interface{}{}
-		err = json.Unmarshal(buf, &params)
-		if err != nil {
-			err = fmt.Errorf("Failed to parse JSON-RPC params; %s", err.Error())
 			renderError(err.Error(), 400, c)
 			return
 		}
@@ -359,6 +360,18 @@ func contractExecutionHandler(c *gin.Context) {
 		wallet := &Wallet{}
 		wallet.Address = *execution.WalletAddress
 		execution.Wallet = wallet
+	}
+
+	gas, gasOk := params["gas"].(float64)
+	nonce, nonceOk := params["nonce"].(float64)
+
+	if gasOk {
+		execution.Gas = &gas
+	}
+
+	if nonceOk {
+		nonceUint := uint64(nonce)
+		execution.Nonce = &nonceUint
 	}
 
 	executionResponse, err := execution.Execute()
