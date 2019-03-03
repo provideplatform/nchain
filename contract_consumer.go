@@ -40,12 +40,14 @@ func consumeContractCompilerInvocationMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &contract)
 	if err != nil {
 		Log.Warningf("Failed to umarshal contract compiler invocation message; %s", err.Error())
+		nack(msg)
 		return
 	}
 
 	_, err = contract.Compile()
 	if err != nil {
 		Log.Warningf("Failed to compile contract; %s", err.Error())
+		nack(msg)
 	} else {
 		Log.Debugf("Contract compiler invocation succeeded; ACKing NATS message for contract: %s", contract.ID)
 		msg.Ack()

@@ -58,7 +58,7 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn, wg *sync.WaitGro
 }
 
 func consumeTxMsg(msg *stan.Msg) {
-	Log.Debugf("Consuming NATS tx message: %s", msg)
+	Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
 	execution := &ContractExecution{}
 	err := json.Unmarshal(msg.Data, execution)
@@ -99,13 +99,11 @@ func consumeTxMsg(msg *stan.Msg) {
 	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas, execution.Nonce)
 	if err != nil {
 		Log.Warningf("Failed to execute contract; %s", err.Error())
-		Log.Warningf("NATS message dropped: %s", msg)
-		// FIXME-- Augment NATS support and Nack?
+		nack(msg)
 	} else {
 		Log.Debugf("Executed contract; tx: %s", executionResponse)
+		msg.Ack()
 	}
-
-	msg.Ack()
 }
 
 func consumeTxReceiptMsg(msg *stan.Msg) {
@@ -118,17 +116,22 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &tx)
 	if err != nil {
 		Log.Warningf("Failed to umarshal tx receipt message; %s", err.Error())
+		nack(msg)
 		return
 	}
 
 	network, err := tx.GetNetwork()
 	if err != nil {
 		Log.Warningf("Failed to resolve tx network; %s", err.Error())
+		nack(msg)
+		return
 	}
 
 	wallet, err := tx.GetWallet()
 	if err != nil {
 		Log.Warningf("Failed to resolve tx wallet")
+		nack(msg)
+		return
 	}
 
 	tx.fetchReceipt(db, network, wallet)

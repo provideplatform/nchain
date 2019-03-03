@@ -6,11 +6,10 @@ import (
 	"sync"
 	"time"
 
-	natsutil "github.com/kthomas/go-natsutil"
-	"github.com/nats-io/go-nats-streaming"
-
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/nats-io/go-nats-streaming"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -209,6 +208,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 
 	if err != nil {
 		Log.Warningf("Failed to handle block finalized message; %s", err.Error())
+		nack(msg)
 	} else {
 		msg.Ack()
 	}
@@ -221,6 +221,7 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &balancer)
 	if err != nil {
 		Log.Warningf("Failed to umarshal load balancer provisioning message; %s", err.Error())
+		nack(msg)
 		return
 	}
 
@@ -240,6 +241,7 @@ func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &balancer)
 	if err != nil {
 		Log.Warningf("Failed to umarshal load balancer deprovisioning message; %s", err.Error())
+		nack(msg)
 		return
 	}
 
@@ -259,6 +261,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		Log.Warningf("Failed to umarshal load balancer balance node message; %s", err.Error())
+		nack(msg)
 		return
 	}
 
@@ -267,10 +270,12 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 
 	if !balancerIDOk {
 		Log.Warningf("Failed to load balance network node; no load balancer id provided")
+		nack(msg)
 		return
 	}
 	if !networkNodeIDOk {
 		Log.Warningf("Failed to load balance network node; no network node id provided")
+		nack(msg)
 		return
 	}
 
@@ -280,6 +285,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	db.Where("id = ?", balancerID).Find(&balancer)
 	if balancer == nil || balancer.ID == uuid.Nil {
 		Log.Warningf("Failed to load balance network node; no load balancer resolved for id: %s", balancerID)
+		nack(msg)
 		return
 	}
 
@@ -287,7 +293,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	db.Where("id = ?", networkNodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		Log.Warningf("Failed to load balance network node; no network node resolved for id: %s", networkNodeID)
-		msg.Ack() // FIXME: Nack to deadletter
+		nack(msg)
 	}
 
 	err = balancer.balanceNode(db, node)
@@ -306,6 +312,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		Log.Warningf("Failed to umarshal load balancer unbalance node message; %s", err.Error())
+		nack(msg)
 		return
 	}
 
@@ -314,10 +321,12 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 
 	if !balancerIDOk {
 		Log.Warningf("Failed to unbalance network node; no load balancer id provided")
+		nack(msg)
 		return
 	}
 	if !networkNodeIDOk {
 		Log.Warningf("Failed to load balance network node; no network node id provided")
+		nack(msg)
 		return
 	}
 
@@ -327,13 +336,15 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	db.Where("id = ?", balancerID).Find(&balancer)
 	if balancer == nil || balancer.ID == uuid.Nil {
 		Log.Warningf("Failed to remove network node from load balancer; no load balancer resolved for id: %s", balancerID)
+		nack(msg)
 		return
 	}
 
 	node := &NetworkNode{}
 	db.Where("id = ?", networkNodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		Log.Warningf("Failed to removal network node from load balancer; no network node resolved for id: %s", networkNodeID)
+		Log.Warningf("Failed to remove network node from load balancer; no network node resolved for id: %s", networkNodeID)
+		nack(msg)
 		return
 	}
 

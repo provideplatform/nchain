@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	natsutil "github.com/kthomas/go-natsutil"
 	"github.com/nats-io/go-nats-streaming"
 )
 
@@ -55,4 +56,14 @@ func subscribeNatsStreaming() {
 	createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection, &waitGroup)
 	createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection, &waitGroup)
 	createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection, &waitGroup)
+}
+
+func nack(msg *stan.Msg) {
+	if msg.Redelivered {
+		Log.Warningf("Nacking redelivered %d-byte message without checking subject-specific deadletter business logic on subject: %s", msg.Size(), msg.Subject)
+		natsConn := GetDefaultNatsStreamingConnection()
+		natsutil.Nack(&natsConn, msg)
+	} else {
+		Log.Debugf("nack() attempted but given NATS message has not yet been redelivered on subject: %s", msg.Subject)
+	}
 }
