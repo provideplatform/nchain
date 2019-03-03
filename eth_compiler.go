@@ -219,13 +219,16 @@ func buildCompileCommand(source, compilerVersion string, optimizerRuns int) stri
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
 }
 
-// FIXME
-func buildShittyCompileCommand(source, compilerVersion string, optimizerRuns int) (*os.File, string) {
+// FIXME-- This is a workaround... a bugfix for edge-cases which cause in-memory solc compilation to fail are being investigated and this will be removed.
+// In-memory compilation will be the only supported compiler method
+func buildFallbackCompileCommand(source, compilerVersion string, optimizerRuns int) (*os.File, string) {
 	tmpFile, err := ioutil.TempFile("", "*")
 	i, err := tmpFile.WriteString(source)
-	Log.Warningf("Leaking %d-byte solidity source file written to tmpfile at: %s", i, tmpFile)
 	if err == nil {
+		Log.Debugf("%d-byte solidity source file written to tmpfile: %s", i, tmpFile)
 		return tmpFile, fmt.Sprintf("/usr/local/bin/solc-v%s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc %s", compilerVersion, optimizerRuns, tmpFile.Name())
+	} else {
+		Log.Warningf("Failed to write %d-byte solidity source file to tempfile: %s", i, tmpFile)
 	}
 	return tmpFile, ""
 }
@@ -265,7 +268,7 @@ func compileSolidity(name, source string, constructorParams []interface{}, compi
 	stdOut, err := shellOut(solcCmd)
 	if err != nil {
 		Log.Warningf("In-memory solc compilation failed; %s", err.Error())
-		tmpFile, solcCmd := buildShittyCompileCommand(source, compilerVersion, compilerOptimizerRuns) // HACK -- workaround for unknown in-memory contract compiler issue on certain contract
+		tmpFile, solcCmd := buildFallbackCompileCommand(source, compilerVersion, compilerOptimizerRuns) // HACK -- workaround for unknown in-memory contract compiler issue on certain contract
 		depsolvingKeyPrefix = tmpFile.Name()
 		Log.Debugf("Built on-disk solc compilation fallback command: %s", solcCmd)
 
