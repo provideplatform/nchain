@@ -31,6 +31,7 @@ import:
 - package: github.com/kthomas/go-db-config
 - package: github.com/kthomas/go-logger
 - package: github.com/kthomas/go-natsutil
+  version: master
 - package: github.com/kthomas/go.uuid
   version: master
 - package: github.com/nats-io/go-nats-streaming
