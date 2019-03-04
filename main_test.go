@@ -114,6 +114,7 @@ var _ = Describe("Main", func() {
 	AfterEach(func() {
 		db := dbconf.DatabaseConnection()
 		db.Delete(Network{})
+		db.Delete(Contract{})
 
 		natsSub.Unsubscribe()
 	})
