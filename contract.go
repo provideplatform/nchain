@@ -139,6 +139,17 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 	return artifact, nil
 }
 
+// GetNetwork - retrieve the associated contract network
+func (c *Contract) GetNetwork() (*Network, error) {
+	db := dbconf.DatabaseConnection()
+	var network = &Network{}
+	db.Model(c).Related(&network)
+	if network == nil {
+		return nil, fmt.Errorf("Failed to retrieve contract network for contract: %s", c.ID)
+	}
+	return network, nil
+}
+
 // ParseParams - parse the original JSON params used for contract creation
 func (c *Contract) ParseParams() map[string]interface{} {
 	params := map[string]interface{}{}
