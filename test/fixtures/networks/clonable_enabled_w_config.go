@@ -1,0 +1,57 @@
+package networkfixtures
+
+import (
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
+	"github.com/provideapp/goldmine/test/fixtures"
+	"github.com/provideapp/goldmine/test/matchers"
+)
+
+func ethNonProdClonableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
+	mc := &matchers.MatcherCollection{}
+	mc.AddBehavior("Create", func() types.GomegaMatcher {
+		return BeTrue()
+	})
+	mc.AddBehavior("Validate", func() types.GomegaMatcher {
+		return BeTrue()
+	})
+	mc.AddBehavior("ParseConfig", func() types.GomegaMatcher {
+		return BeTrue()
+	})
+
+	name := "ETH NonProd Clonable Enabled Full Config"
+
+	n = &fixtures.FixtureMatcher{
+		Fixture: &NetworkFixture{
+			Fields: &NetworkFields{
+				ApplicationID: nil,
+				UserID:        nil,
+				Name:          ptrTo(name),
+				Description:   ptrTo("Ethereum Network"),
+				IsProduction:  ptrToBool(false),
+				Cloneable:     ptrToBool(true),
+				Enabled:       ptrToBool(true),
+				ChainID:       nil,
+				SidechainID:   nil,
+				NetworkID:     nil,
+				Config: marshalConfig(map[string]interface{}{
+					"block_explorer_url": "https://unicorn-explorer.provide.network", // required
+					"chain":              "unicorn-v0",                               // required
+					"chainspec_abi_url":  "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
+					"chainspec_url":      "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
+					"cloneable_cfg": map[string]interface{}{
+						"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security
+					"engine_id":           "authorityRound", // required
+					"is_ethereum_network": true,             // required for ETH
+					"is_load_balanced":    true,             // implies network load balancer count > 0
+					"json_rpc_url":        nil,
+					"native_currency":     "PRVD", // required
+					"network_id":          22,     // required
+					"protocol_id":         "poa",  // required
+					"websocket_url":       nil}),
+				Stats: nil},
+			Name: ptrTo(name)},
+		Matcher: mc}
+
+	return
+}

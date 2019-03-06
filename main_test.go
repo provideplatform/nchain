@@ -6,18 +6,31 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/provideapp/goldmine/test/matchers"
+
 	dbconf "github.com/kthomas/go-db-config"
 	stan "github.com/nats-io/go-nats-streaming"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	. "github.com/provideapp/goldmine/matchers"
+	// . "github.com/provideapp/goldmine/test/factories"
 	//. "github.com/onsi/gomega/types"
 	// provideapp "github.com/provideapp/goldmine"
 )
 
+func ptrTo(s string) *string {
+	return &s
+}
+
+func ptrToBool(b bool) *bool {
+	return &b
+}
+
+var networks = testNetworks()
+
 var _ = Describe("Main", func() {
-	var n Network
+	var n *Network
+	var mc *matchers.MatcherCollection
 	var ch chan *stan.Msg
 	// var chStr chan string
 	var natsConn stan.Conn
@@ -63,7 +76,7 @@ var _ = Describe("Main", func() {
 
 	BeforeEach(func() {
 
-		n = Network{
+		n = &Network{
 			ApplicationID: nil,
 			UserID:        nil,
 			Name:          ptrTo("Name ETH non-Cloneable Enabled"),
@@ -119,8 +132,54 @@ var _ = Describe("Main", func() {
 		natsSub.Unsubscribe()
 	})
 
-	Describe("network.Create()", func() {
+	Describe("Network", func() {
 		Context("production", func() {})
+
+		FContext("Dynamic", func() {
+
+			for i := 0; i < len(networks); i++ {
+
+				//for i, nn := range networks {
+				// nn := testNetworks()[0]
+				nn := networks[i]
+				name := *nn["name"].(*string)
+
+				// fmt.Println(name)
+				// fmt.Printf("config: %v", (nn["network"].(*Network)).Config)
+
+				Context(name, func() {
+
+					BeforeEach(func() {
+						//n = *(test_networks()[0]["network"].(*Network))
+						//Log.Debugf(" %+v", nn)
+						// fmt.Println
+						n = nn["network"].(*Network)
+						mc = nn["matchers"].(*matchers.MatcherCollection)
+						//Log.Debugf(n.String())
+					})
+
+					It("should be valid", func() {
+
+						// n.Validate()
+						// fmt.Printf("validation test: %s", n.String())
+						// Log.Debugf("validation test %v: %v", i, n.Config)
+
+						Expect(n.Validate()).To(mc.MatchBehaviorFor("Validate"))
+					})
+					It("should be created", func() {
+						Expect(n.Create()).To(mc.MatchBehaviorFor("Create"))
+						// Expect(n.Create()).To(NetworkCreateMatcher("network.create"))
+					})
+					It("should parse config", func() {
+						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
+					})
+					It("should not create second record", func() {
+						n.Create()
+						Expect(n.Create()).To(mc.MatchBehaviorFor("Double Create"))
+					})
+				})
+			}
+		})
 
 		Context("ETH", func() {
 
@@ -143,7 +202,7 @@ var _ = Describe("Main", func() {
 								Expect(n.Validate()).To(BeTrue())
 							})
 							It("should be created", func() {
-								Expect(n.Create()).To(NetworkCreateMatcher("network.create"))
+								//Expect(n.Create()).To(NetworkCreateMatcher("network.create"))
 							})
 						})
 						Context("with nil config", func() {
