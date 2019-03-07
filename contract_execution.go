@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	uuid "github.com/kthomas/go.uuid"
@@ -23,6 +24,7 @@ type ContractExecution struct {
 	Params        []interface{} `json:"params"`
 	Value         *big.Int      `json:"value"`
 	Ref           *string       `json:"ref"`
+	PublishedAt   *time.Time    `json:"published_at"`
 }
 
 // ContractExecutionResponse is returned upon successful contract execution
@@ -54,10 +56,13 @@ func (e *ContractExecution) Execute() (interface{}, error) {
 	if _abi != nil {
 		if mthd, ok := _abi.Methods[e.Method]; ok {
 			if mthd.Const {
-				return e.Contract.Execute(e.Ref, e.Wallet, e.Value, e.Method, e.Params, 0, nil)
+				return e.Contract.Execute(e)
 			}
 		}
 	}
+
+	publishedAt := time.Now()
+	e.PublishedAt = &publishedAt
 
 	txMsg, _ := json.Marshal(e)
 	natsConnection := getNatsStreamingConnection()

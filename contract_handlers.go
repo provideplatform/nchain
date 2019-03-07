@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -221,8 +220,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		Params:    &paramsMsg,
 	}
 
-	_gas, _ := big.NewFloat(gas).Uint64()
-	resp, err := ephemeralContract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas, execution.Nonce)
+	resp, err := ephemeralContract.Execute(execution)
 	if err == nil {
 		render(resp, 202, c)
 	} else {

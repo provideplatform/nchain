@@ -40,23 +40,28 @@ func init() {
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
 	provide.Model
-	ApplicationID *uuid.UUID                 `sql:"type:uuid" json:"application_id"`
-	UserID        *uuid.UUID                 `sql:"type:uuid" json:"user_id"`
-	NetworkID     uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
-	WalletID      *uuid.UUID                 `sql:"type:uuid" json:"wallet_id"`
-	To            *string                    `json:"to"`
-	Value         *TxValue                   `sql:"not null;type:text" json:"value"`
-	Data          *string                    `json:"data"`
-	Hash          *string                    `json:"hash"`
-	Status        *string                    `sql:"not null;default:'pending'" json:"status"`
-	Params        *json.RawMessage           `sql:"-" json:"params"`
-	Response      *ContractExecutionResponse `sql:"-" json:"-"`
-	SignedTx      interface{}                `sql:"-" json:"-"`
-	Traces        interface{}                `sql:"-" json:"traces"`
-	Ref           *string                    `json:"ref"`
-	Description   *string                    `json:"description"`
-	Block         *uint64                    `json:"block"`
-	FinalizedAt   *time.Time                 `json:"finalized_at"`
+	ApplicationID    *uuid.UUID                 `sql:"type:uuid" json:"application_id"`
+	UserID           *uuid.UUID                 `sql:"type:uuid" json:"user_id"`
+	NetworkID        uuid.UUID                  `sql:"not null;type:uuid" json:"network_id"`
+	WalletID         *uuid.UUID                 `sql:"type:uuid" json:"wallet_id"`
+	To               *string                    `json:"to"`
+	Value            *TxValue                   `sql:"not null;type:text" json:"value"`
+	Data             *string                    `json:"data"`
+	Hash             *string                    `json:"hash"`
+	Status           *string                    `sql:"not null;default:'pending'" json:"status"`
+	Params           *json.RawMessage           `sql:"-" json:"params"`
+	Response         *ContractExecutionResponse `sql:"-" json:"-"`
+	SignedTx         interface{}                `sql:"-" json:"-"`
+	Traces           interface{}                `sql:"-" json:"traces"`
+	Ref              *string                    `json:"ref"`
+	Description      *string                    `json:"description"`
+	Block            *uint64                    `json:"block"`
+	BroadcastAt      *time.Time                 `json:"broadcast_at"`      // timestamp when the tx was broadcast to the network
+	FinalizedAt      *time.Time                 `json:"finalized_at"`      // timestamp when the tx was finalized on-chain, according to its tx receipt
+	PublishedAt      *time.Time                 `json:"published_at"`      // timestamp when the tx was published to NATS cluster
+	PublishLatency   *uint64                    `json:"publish_latency"`   // broadcast_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is broadcast to the network
+	BroadcastLatency *uint64                    `json:"broadcast_latency"` // finalized_at - broadcast_at (in millis) -- the amount of time between when a message is broadcast to the network and when it is finalized on-chain
+	E2ELatency       *uint64                    `json:"e2e_latency"`       // finalized_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is finalized on-chain
 }
 
 type TxValue struct {
@@ -330,6 +335,10 @@ func (t *Transaction) broadcast(db *gorm.DB, network *Network, wallet *Wallet) e
 		})
 		desc := err.Error()
 		t.updateStatus(db, "failed", &desc)
+	} else {
+		broadcastAt := time.Now()
+		t.BroadcastAt = &broadcastAt
+		db.Save(&t)
 	}
 
 	return err

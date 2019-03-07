@@ -393,11 +393,20 @@ func (c *Contract) Create() bool {
 }
 
 // Execute a transaction on the contract instance using a specific signer, value, method and params
-func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method string, params []interface{}, gas uint64, nonce *uint64) (*ContractExecutionResponse, error) {
+func (c *Contract) Execute(execution *ContractExecution) (*ContractExecutionResponse, error) {
 	var err error
 	db := dbconf.DatabaseConnection()
 	var network = &Network{}
 	db.Model(c).Related(&network)
+
+	ref := execution.Ref
+	wallet := execution.Wallet
+	value := execution.Value
+	method := execution.Method
+	params := execution.Params
+	gas := execution.Gas
+	nonce := execution.Nonce
+	publishedAt := execution.PublishedAt
 
 	txParams := map[string]interface{}{}
 
@@ -418,6 +427,10 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 		}
 	}
 
+	if gas == nil {
+		gas64 := float64(0)
+		gas = &gas64
+	}
 	txParams["gas"] = gas
 
 	if nonce != nil {
@@ -436,6 +449,10 @@ func (c *Contract) Execute(ref *string, wallet *Wallet, value *big.Int, method s
 		Value:         &TxValue{value: value},
 		Params:        &_txParamsJSON,
 		Ref:           ref,
+	}
+
+	if publishedAt != nil {
+		tx.PublishedAt = publishedAt
 	}
 
 	var receipt *interface{}

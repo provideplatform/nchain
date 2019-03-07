@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"math/big"
 	"sync"
 	"time"
 
@@ -89,14 +88,8 @@ func consumeTxMsg(msg *stan.Msg) {
 		return
 	}
 
-	gas := execution.Gas
-	if gas == nil {
-		gas64 := float64(0)
-		gas = &gas64
-	}
-	_gas, _ := big.NewFloat(*gas).Uint64()
+	executionResponse, err := contract.Execute(execution)
 
-	executionResponse, err := contract.Execute(execution.Ref, execution.Wallet, execution.Value, execution.Method, execution.Params, _gas, execution.Nonce)
 	if err != nil {
 		Log.Warningf("Failed to execute contract; %s", err.Error())
 		nack(msg)
