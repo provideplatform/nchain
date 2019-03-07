@@ -1,5 +1,5 @@
 hash: e71caa74d9a5f771924c3abefa345a9fbee0453a5db58c91cc40c1dd9cb4b25d
-updated: 2019-03-03T16:19:29.960302-05:00
+updated: 2019-03-07T03:32:02.076524-05:00
 imports:
 - name: github.com/allegro/bigcache
   version: 84a0ff3f153cbd7e280a19029a864bb04b504e62
@@ -143,7 +143,7 @@ imports:
 - name: github.com/kthomas/go-logger
   version: 230b452f1919101d0b06c44ca727d78056983a8d
 - name: github.com/kthomas/go-natsutil
-  version: a16a55e7dc26f074c31eb9e6d7ae31da4458a124
+  version: e0626213f5151cf490c910e569ff8d6c883cb735
 - name: github.com/kthomas/go.uuid
   version: b6c5bb1eedd724fc13c44af34da224568529d0c0
 - name: github.com/lib/pq
@@ -175,7 +175,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: 78ea3d3618fdae0a6835a74fa1b2ec164d7b0b82
+  version: b53fb36bc19d51889fde618bbf8bfec1a749c646
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/satori/go.uuid
