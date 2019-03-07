@@ -183,14 +183,14 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								tx.FinalizedAt = &finalizedAt
 								if tx.BroadcastAt != nil {
 									if tx.PublishedAt != nil {
-										publishLatency := uint64(tx.BroadcastAt.Sub(*tx.PublishedAt) * time.Millisecond)
+										publishLatency := uint64(tx.BroadcastAt.Sub(*tx.PublishedAt)*time.Millisecond) / 1000000
 										tx.PublishLatency = &publishLatency
 
-										e2eLatency := uint64(tx.FinalizedAt.Sub(*tx.PublishedAt) * time.Millisecond)
+										e2eLatency := uint64(tx.FinalizedAt.Sub(*tx.PublishedAt)*time.Millisecond) / 1000000
 										tx.E2ELatency = &e2eLatency
 									}
 
-									broadcastLatency := uint64(tx.FinalizedAt.Sub(*tx.BroadcastAt) * time.Millisecond)
+									broadcastLatency := uint64(tx.FinalizedAt.Sub(*tx.BroadcastAt)*time.Millisecond) / 1000000
 									tx.BroadcastLatency = &broadcastLatency
 								}
 								tx.Status = StringOrNil("success")
