@@ -13,9 +13,9 @@ import (
 )
 
 const natsTxSubject = "goldmine.tx"
-const natsTxMaxInFlight = 128
+const natsTxMaxInFlight = 1024
 const natsTxReceiptSubject = "goldmine.tx.receipt"
-const natsTxReceiptMaxInFlight = 64
+const natsTxReceiptMaxInFlight = 1024
 
 func createNatsTxSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
