@@ -20,8 +20,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-const receiptTickerInterval = time.Millisecond * 2500
-
 func init() {
 	db := dbconf.DatabaseConnection()
 	db.AutoMigrate(&Transaction{})
@@ -390,65 +388,42 @@ func (t *Transaction) sign(db *gorm.DB, network *Network, wallet *Wallet) error 
 	return err
 }
 
-func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet) {
+func (t *Transaction) fetchReceipt(db *gorm.DB, network *Network, wallet *Wallet) error {
 	if network.isEthereumNetwork() {
-		ticker := time.NewTicker(receiptTickerInterval)
-		go func() {
-			startedAt := time.Now()
-			for {
-				select {
-				case <-ticker.C:
-					receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.rpcURL(), *t.Hash, wallet.Address)
-					if err != nil {
-						Log.Debugf("Failed to fetch ethereum tx receipt with tx hash: %s; %s", *t.Hash, err.Error())
-						if err == ethereum.NotFound {
-							if time.Now().Sub(startedAt) >= receiptTickerTimeout {
-								Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; timing out after %v", *t.Hash, receiptTickerTimeout)
-								t.updateStatus(db, "failed", StringOrNil("failed to fetch tx receipt"))
-								ticker.Stop()
-								return
-							}
-						} else {
-							if time.Now().Sub(startedAt) >= receiptTickerTimeout {
-								Log.Warningf("Failed to fetch ethereum tx receipt with tx hash: %s; timing out after %v", *t.Hash, receiptTickerTimeout)
-								t.Errors = append(t.Errors, &provide.Error{
-									Message: StringOrNil(err.Error()),
-								})
-								t.updateStatus(db, "failed", StringOrNil(err.Error()))
-								ticker.Stop()
-								return
-							}
-						}
-					} else {
-						Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
-						ticker.Stop()
+		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.rpcURL(), *t.Hash, wallet.Address)
+		if err != nil {
+			return err
+		}
 
-						traces, traceErr := provide.EVMTraceTx(network.ID.String(), network.rpcURL(), t.Hash)
-						if traceErr != nil {
-							Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
-						}
-						t.Response = &ContractExecutionResponse{
-							Receipt:     receipt,
-							Traces:      traces,
-							Transaction: t,
-						}
-						t.Traces = traces
+		Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
+		traces, traceErr := provide.EVMTraceTx(network.ID.String(), network.rpcURL(), t.Hash)
+		if traceErr != nil {
+			Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
+			return traceErr
+		}
+		t.Response = &ContractExecutionResponse{
+			Receipt:     receipt,
+			Traces:      traces,
+			Transaction: t,
+		}
+		t.Traces = traces
 
-						t.handleEthereumTxReceipt(db, network, wallet, receipt)
-						t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
-						return
-					}
-				}
-			}
-		}()
+		err = t.handleEthereumTxReceipt(db, network, wallet, receipt)
+		if err != nil {
+			Log.Warningf("Failed to handle fetched ethereum tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
+			return err
+		}
+		t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
 	}
+
+	return nil
 }
 
-func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wallet *Wallet, receipt *types.Receipt) {
+func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wallet *Wallet, receipt *types.Receipt) error {
 	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.rpcURL())
 	if err != nil {
 		Log.Warningf("Unable to handle ethereum tx receipt; %s", err.Error())
-		return
+		return err
 	}
 	if t.To == nil {
 		Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, receipt.ContractAddress.Hex())
@@ -482,6 +457,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *Network, wal
 			contract.resolveTokenContract(db, network, wallet, client, receipt)
 		}
 	}
+	return nil
 }
 
 func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *Network, wallet *Wallet, traces *provide.EthereumTxTraceResponse) {

@@ -127,6 +127,11 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	tx.fetchReceipt(db, network, wallet)
-	msg.Ack()
+	err = tx.fetchReceipt(db, network, wallet)
+	if err != nil {
+		Log.Warningf("Failed to exefetch tx receipt; %s", err.Error())
+		nack(msg)
+	} else {
+		msg.Ack()
+	}
 }
