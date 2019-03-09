@@ -166,7 +166,8 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 					if err != nil {
 						err = fmt.Errorf("Failed to fetch block; %s", err.Error())
 					} else if result, resultOk := block.Result.(map[string]interface{}); resultOk {
-						finalizedAt := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
+						blockTimestamp := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
+						finalizedAt := time.Now()
 
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
 							for _, _tx := range txs {
@@ -180,6 +181,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 									continue
 								}
 								tx.Block = &blockFinalizedMsg.Block
+								tx.BlockTimestamp = &blockTimestamp
 								tx.FinalizedAt = &finalizedAt
 								if tx.BroadcastAt != nil {
 									if tx.PublishedAt != nil {

@@ -56,8 +56,9 @@ type Transaction struct {
 	Ref              *string                    `json:"ref"`
 	Description      *string                    `json:"description"`
 	Block            *uint64                    `json:"block"`
+	BlockTimestamp   *time.Time                 `json:"block_timestamp"`   // timestamp when the tx was finalized on-chain, according to its tx receipt
 	BroadcastAt      *time.Time                 `json:"broadcast_at"`      // timestamp when the tx was broadcast to the network
-	FinalizedAt      *time.Time                 `json:"finalized_at"`      // timestamp when the tx was finalized on-chain, according to its tx receipt
+	FinalizedAt      *time.Time                 `json:"finalized_at"`      // timestamp when the tx was finalized on-platform
 	PublishedAt      *time.Time                 `json:"published_at"`      // timestamp when the tx was published to NATS cluster
 	PublishLatency   *uint64                    `json:"publish_latency"`   // broadcast_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is broadcast to the network
 	BroadcastLatency *uint64                    `json:"broadcast_latency"` // finalized_at - broadcast_at (in millis) -- the amount of time between when a message is broadcast to the network and when it is finalized on-chain
