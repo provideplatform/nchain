@@ -224,6 +224,12 @@ func (t *Transaction) Validate() bool {
 	return len(t.Errors) == 0
 }
 
+// Reload the underlying tx instance
+func (t *Transaction) Reload() {
+	db := dbconf.DatabaseConnection()
+	db.Model(&t).Find(t)
+}
+
 // GetNetwork - retrieve the associated transaction network
 func (t *Transaction) GetNetwork() (*Network, error) {
 	db := dbconf.DatabaseConnection()

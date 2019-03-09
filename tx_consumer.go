@@ -12,9 +12,9 @@ import (
 )
 
 const natsTxSubject = "goldmine.tx"
-const natsTxMaxInFlight = 1024
+const natsTxMaxInFlight = 2048
 const natsTxReceiptSubject = "goldmine.tx.receipt"
-const natsTxReceiptMaxInFlight = 1024
+const natsTxReceiptMaxInFlight = 2048
 
 func createNatsTxSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
@@ -113,6 +113,8 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
+	tx.Reload()
+
 	network, err := tx.GetNetwork()
 	if err != nil {
 		Log.Warningf("Failed to resolve tx network; %s", err.Error())
@@ -129,7 +131,8 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err = tx.fetchReceipt(db, network, wallet)
 	if err != nil {
-		Log.Warningf("Failed to exefetch tx receipt; %s", err.Error())
+		Log.Warningf("Failed to fetch tx receipt; %s", err.Error())
+		tx.updateStatus(db, "failed", StringOrNil("failed to fetch tx receipt"))
 		nack(msg)
 	} else {
 		msg.Ack()
