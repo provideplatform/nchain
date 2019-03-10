@@ -145,9 +145,12 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err = tx.fetchReceipt(db, network, wallet)
 	if err != nil {
-		desc := fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error())
-		Log.Warningf(desc)
-		tx.updateStatus(db, "failed", StringOrNil(desc))
+		if msg.Redelivered { // FIXME-- implement proper dead-letter logic; only set tx to failed upon deadletter
+			desc := fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error())
+			Log.Warningf(desc)
+			tx.updateStatus(db, "failed", StringOrNil(desc))
+		}
+
 		nack(msg)
 	} else {
 		msg.Ack()
