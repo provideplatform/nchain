@@ -119,6 +119,8 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 	artifactJSON, _ := json.Marshal(artifact)
 	deployableArtifactJSON := json.RawMessage(artifactJSON)
 
+	publishedAt := time.Now() // HACK-- is this a hack? we aren't actually publishing a goldmine.tx message but this still feels reasonable for e2e instrumentation...
+
 	tx := &Transaction{
 		ApplicationID: c.ApplicationID,
 		Data:          &artifact.Bytecode,
@@ -127,6 +129,7 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 		To:            nil,
 		Value:         &TxValue{value: big.NewInt(0)},
 		Params:        &deployableArtifactJSON,
+		PublishedAt:   &publishedAt,
 	}
 
 	if tx.Create() {
