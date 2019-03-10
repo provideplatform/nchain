@@ -10,7 +10,7 @@ import (
 )
 
 const reachabilityTimeout = time.Millisecond * 2500
-const receiptTickerTimeout = time.Minute * 1
+const receiptTickerTimeout = time.Second * 10
 
 var (
 	Log *logger.Logger
