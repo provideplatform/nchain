@@ -17,13 +17,16 @@ const natsTxMaxInFlight = 2048
 const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 
+const txAckWait = time.Second * 10
+const txReceiptAckWait = time.Second * 10
+
 func createNatsTxSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
 			defer natsConnection.Close()
 
-			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg, stan.SetManualAckMode(), stan.AckWait(time.Millisecond*10000), stan.MaxInflight(natsTxMaxInFlight), stan.DurableName(natsTxSubject))
+			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject, natsTxSubject, consumeTxMsg, stan.SetManualAckMode(), stan.AckWait(txAckWait), stan.MaxInflight(natsTxMaxInFlight), stan.DurableName(natsTxSubject))
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
 				wg.Done()
@@ -43,7 +46,7 @@ func createNatsTxReceiptSubscriptions(natsConnection stan.Conn, wg *sync.WaitGro
 		go func() {
 			defer natsConnection.Close()
 
-			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg, stan.SetManualAckMode(), stan.AckWait(receiptTickerTimeout), stan.MaxInflight(natsTxReceiptMaxInFlight), stan.DurableName(natsTxReceiptSubject))
+			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject, natsTxReceiptSubject, consumeTxReceiptMsg, stan.SetManualAckMode(), stan.AckWait(txReceiptAckWait), stan.MaxInflight(natsTxReceiptMaxInFlight), stan.DurableName(natsTxReceiptSubject))
 			if err != nil {
 				Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxReceiptSubject)
 				wg.Done()
