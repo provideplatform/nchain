@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -63,17 +64,20 @@ func consumeTxMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, execution)
 	if err != nil {
 		Log.Warningf("Failed to unmarshal contract execution during NATS tx message handling")
+		nack(msg)
 		return
 	}
 
 	if execution.ContractID == nil {
 		Log.Errorf("Invalid tx message; missing contract_id")
+		nack(msg)
 		return
 	}
 
 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
 		if execution.Wallet != nil && execution.Wallet.ID != execution.Wallet.ID {
 			Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
+			nack(msg)
 			return
 		}
 		wallet := &Wallet{}
@@ -85,6 +89,7 @@ func consumeTxMsg(msg *stan.Msg) {
 	dbconf.DatabaseConnection().Where("id = ?", *execution.ContractID).Find(&contract)
 	if contract == nil || contract.ID == uuid.Nil {
 		Log.Errorf("Unable to execute contract; contract not found: %s", contract.ID)
+		nack(msg)
 		return
 	}
 
@@ -108,7 +113,9 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err := json.Unmarshal(msg.Data, &tx)
 	if err != nil {
-		Log.Warningf("Failed to umarshal tx receipt message; %s", err.Error())
+		desc := fmt.Sprintf("Failed to umarshal tx receipt message; %s", err.Error())
+		Log.Warningf(desc)
+		tx.updateStatus(db, "failed", StringOrNil(desc))
 		nack(msg)
 		return
 	}
@@ -117,22 +124,27 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	network, err := tx.GetNetwork()
 	if err != nil {
-		Log.Warningf("Failed to resolve tx network; %s", err.Error())
+		desc := fmt.Sprintf("Failed to resolve tx network; %s", err.Error())
+		Log.Warningf(desc)
+		tx.updateStatus(db, "failed", StringOrNil(desc))
 		nack(msg)
 		return
 	}
 
 	wallet, err := tx.GetWallet()
 	if err != nil {
-		Log.Warningf("Failed to resolve tx wallet")
+		desc := fmt.Sprintf("Failed to resolve tx wallet; %s", err.Error())
+		Log.Warningf(desc)
+		tx.updateStatus(db, "failed", StringOrNil(desc))
 		nack(msg)
 		return
 	}
 
 	err = tx.fetchReceipt(db, network, wallet)
 	if err != nil {
-		Log.Warningf("Failed to fetch tx receipt; %s", err.Error())
-		tx.updateStatus(db, "failed", StringOrNil("failed to fetch tx receipt"))
+		desc := fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error())
+		Log.Warningf(desc)
+		tx.updateStatus(db, "failed", StringOrNil(desc))
 		nack(msg)
 	} else {
 		msg.Ack()
