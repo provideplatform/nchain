@@ -22,6 +22,21 @@ func marshalConfig(opts map[string]interface{}) *json.RawMessage {
 	return &_cfgJSON
 }
 
+func defaultMatcherOptions() map[string]interface{} {
+	return map[string]interface{}{
+		"channelPolling": false,
+		"natsPolling":    false,
+	}
+}
+
+func defaultNATSMatcherOptions(chNamePtr *string) map[string]interface{} {
+	return map[string]interface{}{
+		"channelPolling": false,
+		"natsPolling":    true,
+		"natsChannels":   []*string{chNamePtr},
+	}
+}
+
 // NetworkFields is a copy of goldmine Network struct
 type NetworkFields struct {
 	Model         provide.Model
@@ -53,6 +68,7 @@ func Networks() []*fixtures.FixtureMatcher {
 		ethNonCloneableEnabledFullConfigNetwork(), // default
 		ethNonProdClonableEnabledNilConfigNetwork(),
 		ethNonProdClonableEnabledFullConfigNetwork(),
+		ethNonCloneableEnabledChainspecNetwork(),
 	}
 }
 

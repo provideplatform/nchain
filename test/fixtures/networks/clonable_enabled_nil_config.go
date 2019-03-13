@@ -9,15 +9,43 @@ import (
 
 func ethNonProdClonableEnabledNilConfigNetwork() (n *fixtures.FixtureMatcher) {
 	mc := &matchers.MatcherCollection{}
-	mc.AddBehavior("Create", func() types.GomegaMatcher {
+	optsNATSCreate := defaultNATSMatcherOptions(ptrTo("network.create"))
+
+	mc.AddBehavior("Create", func(opts ...interface{}) types.GomegaMatcher {
+		expectedCreateResult := false
+		expectedContractCount := 0
+		return matchers.NetworkCreateMatcher(expectedCreateResult, expectedContractCount, opts...)
+	}, defaultMatcherOptions())
+	mc.AddBehavior("Double Create", func(opts ...interface{}) types.GomegaMatcher {
 		return BeFalse()
-	})
-	mc.AddBehavior("Validate", func() types.GomegaMatcher {
+	}, defaultMatcherOptions())
+	mc.AddBehavior("Create with NATS", func(opts ...interface{}) types.GomegaMatcher {
 		return BeFalse()
-	})
-	mc.AddBehavior("ParseConfig", func() types.GomegaMatcher {
-		return BeTrue()
-	})
+	}, optsNATSCreate)
+	mc.AddBehavior("Validate", func(opts ...interface{}) types.GomegaMatcher {
+		return BeFalse()
+	}, defaultMatcherOptions())
+	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
+		return satisfyAllConfigKeys()
+	}, defaultMatcherOptions())
+	mc.AddBehavior("Network type", func(opts ...interface{}) types.GomegaMatcher {
+		if opts[0] == "eth" {
+			return BeFalse()
+		}
+		if opts[0] == "btc" {
+			return BeFalse()
+		}
+		if opts[0] == "handshake" {
+			return BeFalse()
+		}
+		if opts[0] == "ltc" {
+			return BeFalse()
+		}
+		if opts[0] == "quorum" {
+			return BeTrue()
+		}
+		return BeNil()
+	}, defaultMatcherOptions())
 
 	namePtr := ptrTo("ETH NonProd Clonable Enabled Nil Config")
 

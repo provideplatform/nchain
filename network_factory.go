@@ -1,31 +1,48 @@
 package main
 
 import (
-	"fmt"
-
 	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
+	"github.com/provideapp/goldmine/test/matchers"
 )
 
-func testNetworks() (ns []map[string]interface{}) {
-	ns = make([]map[string]interface{}, 0)
-	for _, nf := range networkfixtures.Networks() {
-		n, s := networkFactory(nf.Fixture.(*networkfixtures.NetworkFixture))
-		fmt.Printf("%v", n)
-		// Log.Debugf("%s", n)
+func testNetworks() (nf []*networkFactory) {
+	// ns = make([]map[string]interface{}, 0)
+	// for _, nf := range networkfixtures.Networks() {
+	// 	n, s := networkFactory(nf.Fixture.(*networkfixtures.NetworkFixture))
+	// 	fmt.Printf("%v", n)
+	// 	// Log.Debugf("%s", n)
 
-		ns = append(ns, map[string]interface{}{
-			"matchers": nf.Matcher,
-			"network":  n,
-			"name":     s,
-		})
+	// 	ns = append(ns, map[string]interface{}{
+	// 		"matchers": nf.Matcher,
+	// 		"network":  n,
+	// 		"name":     s,
+	// 	})
+	// }
+	// return
+
+	networks := networkfixtures.Networks()
+	count := len(networks)
+	nf = make([]*networkFactory, count)
+
+	for i, n := range networks {
+		fixture := n.Fixture.(*networkfixtures.NetworkFixture)
+		nf[i] = &networkFactory{
+			fixture:  fixture,
+			name:     fixture.Name,
+			matchers: n.Matcher,
+		}
 	}
 	return
 }
 
-// NetworkFactory receiving set of fields and putting them to Network object
-func networkFactory(nfix *networkfixtures.NetworkFixture) (n *Network, s *string) {
-	nf := nfix.Fields
+type networkFactory struct {
+	fixture  *networkfixtures.NetworkFixture
+	name     *string
+	matchers *matchers.MatcherCollection
+}
 
+func (factory *networkFactory) network() (n *Network) {
+	nf := factory.fixture.Fields
 	n = &Network{
 		Model:         nf.Model,
 		ApplicationID: nf.ApplicationID,
@@ -41,6 +58,5 @@ func networkFactory(nfix *networkfixtures.NetworkFixture) (n *Network, s *string
 		Config:        nf.Config,
 		Stats:         nf.Stats,
 	}
-	s = nfix.Name
 	return
 }
