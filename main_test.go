@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 
+	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
 	"github.com/provideapp/goldmine/test/matchers"
 
 	dbconf "github.com/kthomas/go-db-config"
@@ -38,41 +36,6 @@ var _ = Describe("Main", func() {
 	var err error
 
 	var chPolling chan string
-	//type chFunc func(ch chan string) error
-
-	//var pollingFunc func(timeout int, model provide.IModel) error
-	//var pollingFunc func(timeout int, f chFunc) error
-	// pollingFunc := func(timeout time.Duration, chFunc func(ch chan string) error, pollingInterval ...time.Duration) error {
-	// 	startedAt := time.Now().UnixNano()
-	// 	interval := (time.Millisecond * 100)
-	// 	if len(pollingInterval) > 0 {
-	// 		interval = pollingInterval[0]
-	// 	}
-	// 	ticker := time.NewTicker(interval)
-	// 	timer := time.NewTimer(timeout)
-
-	// 	elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
-	// 	Log.Debugf("ticker: %d", elapsedMillis)
-	// 	go func() error {
-	// 		for {
-	// 			select {
-	// 			case <-ticker.C:
-	// 				elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
-	// 				Log.Debugf("ticker: %d", elapsedMillis)
-	// 				if elapsedMillis >= int64(timeout) {
-	// 					ticker.Stop()
-	// 				}
-
-	// 				return chFunc(chPolling)
-	// 			case <-timer.C:
-	// 				return nil
-	// 			default:
-	// 				// no-op
-	// 			}
-	// 		}
-	// 	}()
-	// 	return nil
-	// }
 
 	BeforeEach(func() {
 
@@ -104,79 +67,150 @@ var _ = Describe("Main", func() {
 				"websocket_url":       nil}),
 			Stats: nil}
 
-		sub := "network.create"
-		natsConn = getNatsStreamingConnection()
 		ch = make(chan *stan.Msg, 1)
-		natsSub, err = natsConn.QueueSubscribe(sub, sub, func(msg *stan.Msg) {
-			Log.Debugf("subject: " + msg.MsgProto.Subject)
-			data := string(msg.MsgProto.Data)
-			Log.Debugf("data: " + data)
-			Log.Debugf("data: " + string(msg.MsgProto.Data))
-			ch <- msg
-			// chStr <- string(msg.MsgProto.Data)
 
-			//wg.Done()
-		})
-		if err != nil {
-			Log.Debugf("conn failure")
-		}
-
-		//natsGuaranteeDelivery("network.create")
 	})
 
 	AfterEach(func() {
+
 		db := dbconf.DatabaseConnection()
 		db.Delete(Network{})
 		db.Delete(Contract{})
 
-		natsSub.Unsubscribe()
+		if natsSub != nil {
+			natsSub.Unsubscribe()
+		}
 	})
 
 	Describe("Network", func() {
 		Context("production", func() {})
 
-		FContext("Dynamic", func() {
+		Context("network fixtures", func() {
+			It("should cover all generator cases", func() {
+				g := networkfixtures.NewNetworkFixtureGenerator()
+				fixtures := g.Generate()
+				Expect(len(fixtures) - len(networks)).To(Equal(0))
+				// Expect(fixtures).To(HaveLen(8))
+			})
+		})
+
+		Context("Dynamic", func() {
 
 			for i := 0; i < len(networks); i++ {
 
-				//for i, nn := range networks {
-				// nn := testNetworks()[0]
-				nn := networks[i]
-				name := *nn["name"].(*string)
+				nn := networks[i] // current network being tested
+				name := *nn.name  // current network name
 
-				// fmt.Println(name)
-				// fmt.Printf("config: %v", (nn["network"].(*Network)).Config)
-
-				Context(name, func() {
+				Context(name, func() { // context for current network
 
 					BeforeEach(func() {
-						//n = *(test_networks()[0]["network"].(*Network))
-						//Log.Debugf(" %+v", nn)
-						// fmt.Println
-						n = nn["network"].(*Network)
-						mc = nn["matchers"].(*matchers.MatcherCollection)
-						//Log.Debugf(n.String())
+						n = nn.network() // creating new pointer with network data for each test
+						mc = nn.matchers // set of matchers for current network
+					})
+
+					Context("NATS", func() {
+						BeforeEach(func() {
+
+							matcherName := "Create with NATS"
+							var chName string
+							if opts, ok := mc.MatcherOptionsFor(matcherName); ok {
+								fmt.Printf("%v", opts)
+								chName = *opts.NATSChannels[0]
+							}
+
+							natsConn = getNatsStreamingConnection()
+							ch = make(chan *stan.Msg, 1)
+							natsSub, err = natsConn.QueueSubscribe(chName, chName, func(msg *stan.Msg) {
+								ch <- msg
+							})
+							if err != nil {
+								Log.Debugf("conn failure")
+							}
+
+							natsGuaranteeDelivery(chName)
+						})
+						It("should catch NATS message", func() {
+							chPolling = make(chan string, 1)
+							cf := func(ch chan string) error {
+								return nil
+							}
+							pollingToStrChFunc(chPolling, cf, nil)
+
+							matcherName := "Create with NATS"
+							Expect(n.Create()).To(mc.MatchBehaviorFor(matcherName, chPolling))
+							fmt.Printf("NATS test end HERE\n")
+						})
+					})
+
+					Context("channeling", func() {
+						It("should be created", func() {
+
+							fmt.Printf("channeling test start HERE\n")
+
+							chPolling = make(chan string, 1)
+
+							matcherName := "Create"
+							var funcAfter func() []interface{}
+
+							// if options, ok := mc.MatcherOptionsFor(matcherName); ok {
+							// 	if options.ChannelPolling {
+							cf := func(ch chan string) error {
+								db := dbconf.DatabaseConnection()
+								//db.Model( &(reflect.TypeOf(m)){} ).Count(&count)
+
+								objects := []Contract{}
+								db.Find(&objects)
+
+								for _, object := range objects {
+									fmt.Println(object.ID.String())
+									ch <- object.ID.String()
+								}
+
+								return nil
+							}
+
+							pollingToStrChFunc(chPolling, cf, nil) // last param nil to receive default message "timeout"
+							// 	}
+							// }
+
+							funcAfter = func() []interface{} {
+								objects := []Contract{}
+								ptrs := []interface{}{}
+								db := dbconf.DatabaseConnection()
+								db.Find(&objects)
+								for i, o := range objects {
+									fmt.Printf("object %v: %v\n", i, o)
+									ptrs = append(ptrs, &o)
+								}
+								return ptrs
+							}
+
+							Expect(n).To(mc.MatchBehaviorFor(matcherName, n, chPolling, funcAfter))
+
+							// created := n.Create()
+							// Expect(created).To(BeTrue())
+							// Expect(n.Errors).To(BeEmpty())
+						})
 					})
 
 					It("should be valid", func() {
-
-						// n.Validate()
-						// fmt.Printf("validation test: %s", n.String())
-						// Log.Debugf("validation test %v: %v", i, n.Config)
-
 						Expect(n.Validate()).To(mc.MatchBehaviorFor("Validate"))
-					})
-					It("should be created", func() {
-						Expect(n.Create()).To(mc.MatchBehaviorFor("Create"))
-						// Expect(n.Create()).To(NetworkCreateMatcher("network.create"))
 					})
 					It("should parse config", func() {
 						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
+					})
+					It("should return network type correctly", func() {
+						Expect(n.isEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
+						Expect(n.isBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
+						Expect(n.isHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))
+						Expect(n.isLcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "ltc"))
+						Expect(n.isQuorumNetwork()).To(mc.MatchBehaviorFor("Network type", "quorum"))
 					})
 					It("should not create second record", func() {
 						n.Create()
 						Expect(n.Create()).To(mc.MatchBehaviorFor("Double Create"))
 					})
+
 				})
 			}
 		})
@@ -202,7 +236,8 @@ var _ = Describe("Main", func() {
 								Expect(n.Validate()).To(BeTrue())
 							})
 							It("should be created", func() {
-								//Expect(n.Create()).To(NetworkCreateMatcher("network.create"))
+								Expect(n.Create()).To(BeTrue())
+								fmt.Printf("network: %#v", n.Model.ID)
 							})
 						})
 						Context("with nil config", func() {
@@ -258,122 +293,13 @@ var _ = Describe("Main", func() {
 						// n.Enabled set by default
 
 						Context("with chainspec and chainspec abi", func() {
-							BeforeEach(func() {
-								// TODO move parsing to functions
-								ethChainspecFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn/spec.json"
-								ethChainspecAbiFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json"
-								response, err := http.Get(ethChainspecFileurl)
-								//chainspec_text := ""
-								// chainspec_abi_text := ""
-								chainspecJSON := map[string]interface{}{}
-								chainspecABIJSON := map[string]interface{}{}
-
-								if err != nil {
-									fmt.Printf("%s\n", err)
-								} else {
-									defer response.Body.Close()
-									contents, err := ioutil.ReadAll(response.Body)
-									if err != nil {
-										fmt.Printf("%s\n", err)
-									}
-									// fmt.Printf("%s\n", string(contents))
-									//chainspec_text = string(contents)
-									errJSON := json.Unmarshal(contents, &chainspecJSON)
-									Log.Debugf("error parsing chainspec: %v", errJSON)
-
-								}
-
-								responseAbi, err := http.Get(ethChainspecAbiFileurl)
-
-								if err != nil {
-									fmt.Printf("%s\n", err)
-								} else {
-									defer responseAbi.Body.Close()
-									contents, err := ioutil.ReadAll(responseAbi.Body)
-									if err != nil {
-										fmt.Printf("%s\n", err)
-									}
-									// fmt.Printf("%s\n", string(contents))
-									// chainspec_abi_text = string(contents)
-									errJSON := json.Unmarshal(contents, &chainspecABIJSON)
-									Log.Debugf("error parsing chainspec: %v", errJSON)
-								}
-
-								n.Config = marshalConfig(map[string]interface{}{
-									"block_explorer_url":  "https://unicorn-explorer.provide.network",
-									"chain":               "unicorn-v0",
-									"chainspec":           chainspecJSON,
-									"chainspec_abi":       chainspecABIJSON,
-									"cloneable_cfg":       map[string]interface{}{},
-									"engine_id":           "authorityRound", // required
-									"is_ethereum_network": true,
-									"is_load_balanced":    false,
-									"json_rpc_url":        nil,
-									"native_currency":     "PRVD", // required
-									"network_id":          22,
-									"protocol_id":         "poa", // required
-									"websocket_url":       nil})
-
-								chPolling = make(chan string, 1)
-
-								cf := func(ch chan string) error {
-									db := dbconf.DatabaseConnection()
-									//db.Model( &(reflect.TypeOf(m)){} ).Count(&count)
-
-									objects := []Contract{}
-									db.Find(&objects)
-
-									for _, object := range objects {
-										ch <- object.ID.String()
-									}
-
-									return nil
-								}
-
-								pollingToStrChFunc(chPolling, cf, nil) // last param to receive default message "timeout"
-							})
 
 							It("shoud be valid", func() {
 								Expect(n.Validate()).To(BeTrue())
 							})
 
 							It("should create successfully and send message to NATS", func() {
-								Expect(n.Create()).To(BeTrue())
 
-								Eventually(chPolling).Should(Receive(Equal("timeout"))) // ending of Contracts processing and sending their IDs to pipe
-
-								// getting all contracts IDs from channel
-								// s := make([]string, 0)
-								// for i := range chPolling {
-								// 	s = append(s, i)
-								// }
-
-								objects := []Contract{}
-								db := dbconf.DatabaseConnection()
-								db.Find(&objects)
-
-								Expect(objects).To(HaveLen(1))
-								//Log.Debugf("%v", objects[0])
-								Expect(objects[0]).To(MatchFields(IgnoreExtras, Fields{
-									"Model": MatchFields(IgnoreExtras, Fields{
-										"ID":        Not(BeNil()),
-										"CreatedAt": Not(BeNil()),
-										"Errors":    BeEmpty(),
-									}),
-									"NetworkID":     Equal(n.ID),
-									"ApplicationID": Equal(n.ApplicationID),
-									"ContractID":    BeNil(),
-									"TransactionID": BeNil(),
-									"Name":          PointTo(Equal("Network Contract 0x0000000000000000000000000000000000000017")),
-									"Address":       PointTo(Equal("0x0000000000000000000000000000000000000017")),
-									// "Params":        PointTo(Equal("")), // TODO add params body
-									"AccessedAt": BeNil(),
-								}))
-
-								// count := 0
-								// db := dbconf.DatabaseConnection()
-								// db.Model(&Contract{}).Count(&count)
-								// Expect(count).To(Equal(1))
 							})
 						})
 

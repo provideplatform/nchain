@@ -2,6 +2,7 @@ package networkfixtures
 
 import (
 	"encoding/json"
+	"reflect"
 
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/test/fixtures"
@@ -70,6 +71,57 @@ func Networks() []*fixtures.FixtureMatcher {
 		ethNonProdClonableEnabledFullConfigNetwork(),
 		ethNonCloneableEnabledChainspecNetwork(),
 	}
+}
+
+func (nf *NetworkFields) clone() *NetworkFields {
+	nf2 := &NetworkFields{
+		Model:         nf.Model,
+		ApplicationID: nf.ApplicationID,
+		UserID:        nf.UserID,
+		Name:          ptrTo(*nf.Name),
+		Description:   nf.Description,
+		IsProduction:  nf.IsProduction,
+		Cloneable:     nf.Cloneable,
+		Enabled:       nf.Enabled,
+		ChainID:       nf.ChainID,
+		SidechainID:   nf.SidechainID,
+		NetworkID:     nf.NetworkID,
+		Config:        nf.Config,
+		Stats:         nf.Stats,
+	}
+	return nf2
+}
+
+func (nf *NetworkFields) genName(prefix *string) (name *string) {
+	production := "Production"
+	if !*(nf.IsProduction) {
+		production = "Non " + production
+	}
+	clonable := "Cloneable "
+	if !*(nf.Cloneable) {
+		clonable = "Non " + clonable
+	}
+
+	enabled := "Enabled "
+	if !*(nf.Enabled) {
+		enabled = "Disabled "
+	}
+
+	cfg := "cfg "
+	config := map[string]interface{}{}
+	if nf.Config != nil {
+		json.Unmarshal(*nf.Config, &config)
+	}
+	if config["cloneable_cfg"] == nil {
+		cfg = "nil " + cfg
+	} else {
+		if reflect.DeepEqual(config["cloneable_cfg"], map[string]interface{}{}) {
+			cfg = "empty " + cfg
+		}
+	}
+
+	name = ptrTo((*prefix) + " " + production + clonable + enabled + cfg)
+	return
 }
 
 func (nf *NetworkFields) String() string {
