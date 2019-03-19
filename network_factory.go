@@ -5,7 +5,7 @@ import (
 	"github.com/provideapp/goldmine/test/matchers"
 )
 
-func testNetworks() (nf []*networkFactory) {
+func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture) {
 	// ns = make([]map[string]interface{}, 0)
 	// for _, nf := range networkfixtures.Networks() {
 	// 	n, s := networkFactory(nf.Fixture.(*networkfixtures.NetworkFixture))
@@ -20,9 +20,13 @@ func testNetworks() (nf []*networkFactory) {
 	// }
 	// return
 
-	networks := networkfixtures.Networks()
+	networkFixtureGenerator := networkfixtures.NewNetworkFixtureGenerator()
+	dispatcher := networkfixtures.NewNetworkFixtureDispatcher(networkFixtureGenerator)
+
+	networks := dispatcher.Networks()
 	count := len(networks)
 	nf = make([]*networkFactory, count)
+	nc = dispatcher.NotCovered()
 
 	for i, n := range networks {
 		fixture := n.Fixture.(*networkfixtures.NetworkFixture)

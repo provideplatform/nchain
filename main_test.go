@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
 	"github.com/provideapp/goldmine/test/matchers"
 
 	dbconf "github.com/kthomas/go-db-config"
@@ -24,8 +23,6 @@ func ptrToBool(b bool) *bool {
 	return &b
 }
 
-var networks = testNetworks()
-
 var _ = Describe("Main", func() {
 	var n *Network
 	var mc *matchers.MatcherCollection
@@ -36,6 +33,9 @@ var _ = Describe("Main", func() {
 	var err error
 
 	var chPolling chan string
+
+	var networks, rest = testNetworks()
+	fmt.Printf("Networks being tested: %v\n", len(networks))
 
 	BeforeEach(func() {
 
@@ -85,12 +85,12 @@ var _ = Describe("Main", func() {
 	Describe("Network", func() {
 		Context("production", func() {})
 
-		Context("network fixtures", func() {
+		FContext("network fixtures", func() {
 			It("should cover all generator cases", func() {
-				g := networkfixtures.NewNetworkFixtureGenerator()
-				fixtures := g.Generate()
-				Expect(len(fixtures) - len(networks)).To(Equal(0))
+				// fixtures := networkFixtureGenerator.All()
+				// Expect(len(fixtures) - len(networks)).To(Equal(0))
 				// Expect(fixtures).To(HaveLen(8))
+				Expect(rest).To(HaveLen(0))
 			})
 		})
 
@@ -199,7 +199,7 @@ var _ = Describe("Main", func() {
 					It("should parse config", func() {
 						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
 					})
-					It("should return network type correctly", func() {
+					FIt("should return network type correctly", func() {
 						Expect(n.isEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
 						Expect(n.isBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
 						Expect(n.isHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))

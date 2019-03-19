@@ -2,26 +2,11 @@ package networkfixtures
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
+
+	"github.com/provideapp/goldmine/test/matchers"
 )
-
-// NetworkFixtureGenerator is a thing that generates test fixtures based on set of rules
-type NetworkFixtureGenerator struct {
-	fv []*networkFixtureFieldValues
-}
-
-// NewNetworkFixtureGenerator generates NetworkFixtureGenerator with default field-value pairs
-func NewNetworkFixtureGenerator() *NetworkFixtureGenerator {
-	fv := networkFixtureFieldValuesVariety()
-	return &NetworkFixtureGenerator{
-		fv: fv,
-	}
-}
-
-type networkFixtureFieldValues struct {
-	fieldName *string
-	values    []interface{}
-}
 
 func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*networkFixtureFieldValues) {
 	networkFixtureFieldValuesArray = []*networkFixtureFieldValues{
@@ -70,9 +55,55 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 	return
 }
 
+// NetworkFixtureGenerator is a thing that generates test fixtures based on set of rules
+type NetworkFixtureGenerator struct {
+	fieldValuesVariety []*networkFixtureFieldValues
+	fixtures           []*NetworkFields
+}
+
+// NewNetworkFixtureGenerator generates NetworkFixtureGenerator with default field-value pairs
+func NewNetworkFixtureGenerator() (nfg *NetworkFixtureGenerator) {
+	fieldValuesVariety := networkFixtureFieldValuesVariety()
+	nfg = &NetworkFixtureGenerator{
+		fieldValuesVariety: fieldValuesVariety,
+	}
+	nfg.fixtures = nfg.Generate()
+	return
+}
+
+// All function returns all fixtures from fixtures field
+func (generator *NetworkFixtureGenerator) All() []*NetworkFields {
+	return generator.fixtures
+}
+
+// AddMatcherCollection to add matcher collection
+func (generator *NetworkFixtureGenerator) AddMatcherCollection(mc *matchers.MatcherCollection) bool {
+
+	return true
+}
+
+// Select function returns fixtures specified by opts
+func (generator *NetworkFixtureGenerator) Select(fieldValues *NetworkFields) (nfs []*NetworkFields, pnfs []*NetworkFields) {
+	fmt.Printf("field values: %v\n", fieldValues)
+	for _, f := range generator.fixtures {
+		if valEqVal(f, fieldValues) {
+			nfs = append(nfs, f)
+		}
+		if valEqVal(f, fieldValues, "Name") {
+			pnfs = append(pnfs, f)
+		}
+	}
+	return
+}
+
+type networkFixtureFieldValues struct {
+	fieldName *string
+	values    []interface{}
+}
+
 // Generate takes default values
 func (generator *NetworkFixtureGenerator) Generate() (fields []*NetworkFields) {
-	return generator.generate(generator.fv)
+	return generator.generate(generator.fieldValuesVariety)
 }
 
 func (generator *NetworkFixtureGenerator) generate(fvs []*networkFixtureFieldValues) (fields []*NetworkFields) {
@@ -84,6 +115,11 @@ func (generator *NetworkFixtureGenerator) generate(fvs []*networkFixtureFieldVal
 	return
 }
 
+// addField function works recursively. First run each field is set to first value of range. With that set, struct is
+// cloned, added to list, and then one field is changed. Struct is cloned again, another field is changed and so on until
+// the end of each field range.
+// The name is generated out of the field values. Thus, the Name/Prefix is used as default value and other fields are added
+// as suffixes. The name is set after the last field value is set.
 func (generator *NetworkFixtureGenerator) addField(nf *NetworkFields, fvs []*networkFixtureFieldValues, fieldIndex int, fields *([]*NetworkFields)) error {
 	fv := fvs[fieldIndex]
 	for _, v := range fv.values {
@@ -107,10 +143,11 @@ func (generator *NetworkFixtureGenerator) addField(nf *NetworkFields, fvs []*net
 		}
 
 		if fieldIndex == len(fvs)-1 { // last index is 1 less
+			initialName := *nf.Name
 			nf.Name = nf.genName(nf.Name)
 			nf2 := nf.clone()
 			*fields = append(*fields, nf2)
-			nf.Name = ptrTo("")
+			nf.Name = ptrTo(initialName)
 		} else {
 			generator.addField(nf, fvs, fieldIndex+1, fields)
 		}

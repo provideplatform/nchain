@@ -33,7 +33,7 @@ func ethNonCloneableEnabledChainspecNetwork() (n *fixtures.FixtureMatcher) {
 		return BeTrue()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
-		return satisfyAllConfigKeys()
+		return satisfyAllConfigKeys(false)
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Network type", func(opts ...interface{}) types.GomegaMatcher {
 		if opts[0] == "eth" {

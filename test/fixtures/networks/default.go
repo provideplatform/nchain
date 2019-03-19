@@ -27,7 +27,7 @@ func ethNonCloneableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
 	}, defaultMatcherOptions())
 	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
 		// add keys and values
-		return satisfyAllConfigKeys()
+		return satisfyAllConfigKeys(true)
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Network type", func(opts ...interface{}) types.GomegaMatcher {
 		if opts[0] == "eth" {
@@ -48,7 +48,7 @@ func ethNonCloneableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
 		return BeNil()
 	}, defaultMatcherOptions())
 
-	name := "ETH NonProd NonClonable Enabled Full Config"
+	name := "ETH NonProduction NonCloneable Enabled Config w cloneable_cfg w chainspec_url "
 
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{
