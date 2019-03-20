@@ -169,14 +169,14 @@ func Networks() []*fixtures.FixtureMatcher {
 		// ethClonableDisabledNilConfigNetwork(), // TODO: support Config: nil
 		ethClonableDisabledConfigNetwork(),  // fixed
 		ethClonableDisabledConfigNetwork1(), // fixed
-		// ethClonableDisabledConfigNetwork2(),  // FIXME
-		// ethClonableDisabledConfigNetwork3(), // FIXME
+		ethClonableDisabledConfigNetwork2(), // fixed
+		ethClonableDisabledConfigNetwork3(), // fixed
 		// ethClonableEnabledEmptyConfigNetwork(), // TODO: support Config: {}
 		// ethClonableEnabledNilConfigNetwork(), // TODO: support Config: nil
 		ethClonableEnabledFullConfigNetwork(), // fixed
 		ethClonableEnabledConfigNetwork1(),    // fixed
-		// ethClonableEnabledConfigNetwork2(), // FIXME
-		ethClonableEnabledConfigNetwork3(), // fixed
+		ethClonableEnabledConfigNetwork2(),    // fixed
+		ethClonableEnabledConfigNetwork3(),    // fixed
 	}
 }
 
