@@ -7,7 +7,7 @@ import (
 	"github.com/provideapp/goldmine/test/matchers"
 )
 
-func ethNonProdClonableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
+func ethClonableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
 	mc := &matchers.MatcherCollection{}
 	optsNATSCreate := defaultNATSMatcherOptions(ptrTo("network.create"))
 
@@ -42,7 +42,7 @@ func ethNonProdClonableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
 			return BeFalse()
 		}
 		if opts[0] == "quorum" {
-			return BeTrue()
+			return BeFalse()
 		}
 		return BeNil()
 	}, defaultMatcherOptions())

@@ -224,8 +224,8 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 	} else {
 		res1, err1 = (&matchers.BeFalseMatcher{}).Match(nCreatedBool)
 	}
-	fmt.Printf("res1: %v\n", res1)
-	fmt.Printf("err1: %v\n", err1)
+	fmt.Printf("networkCreateMatcher step 1. network created: %v\n", res1)
+	// fmt.Printf("err1: %v\n", err1)
 
 	if !res1 || (err1 != nil) {
 		return res1, err1
@@ -233,7 +233,7 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 
 	var networkID uuid.UUID
 
-	fmt.Printf("BLACK MAGIC START\n")
+	// fmt.Printf("BLACK MAGIC START\n")
 	model := fieldFromPtr(n, "Model").(provide.Model)
 
 	networkID = fieldFromPtr(model, "ID").(uuid.UUID)
@@ -243,8 +243,8 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 	objects := matcher.fn()
 
 	res2, err2 := (&matchers.HaveLenMatcher{Count: matcher.expectedCount}).Match(objects)
-	fmt.Printf("res2: %v\n", res2)
-	fmt.Printf("err2: %v\n", err2)
+	fmt.Printf("networkCreateMatcher step 2. contracts created number match: %v\n", res2)
+	// fmt.Printf("err2: %v\n", err2)
 
 	if !res2 || (err2 != nil) {
 		return res2, err2
@@ -273,7 +273,7 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 			address := fieldFromPtr(contract, "Address").(*string)
 			fields.Address = address
 
-			fmt.Printf("fields: %#v\n", fields)
+			// fmt.Printf("fields: %#v\n", fields)
 			// fmt.Printf("fields Name: %v\n", *fields.Name)
 			res3, err3 := (&gstruct.FieldsMatcher{
 				Fields: gstruct.Fields{
@@ -295,8 +295,8 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 				IgnoreExtras: true,
 			}).Match(fields)
 
-			fmt.Printf("res3: %v\n", res3)
-			fmt.Printf("err3: %v\n", err3)
+			fmt.Printf("networkCreateMatcher step 3. contract created fields match: %v\n", res3)
+			// fmt.Printf("err3: %v\n", err3)
 			if !res3 || (err3 != nil) {
 				return res3, err3
 			}

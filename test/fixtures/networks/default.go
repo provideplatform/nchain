@@ -43,7 +43,7 @@ func ethNonCloneableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
 			return BeFalse()
 		}
 		if opts[0] == "quorum" {
-			return BeTrue()
+			return BeFalse()
 		}
 		return BeNil()
 	}, defaultMatcherOptions())
