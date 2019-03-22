@@ -6,6 +6,7 @@ import (
 )
 
 func satisfyAllConfigKeys(chainspec_url bool) types.GomegaMatcher {
+	// TODO: check values?
 	if chainspec_url {
 		return SatisfyAll(
 			HaveKey("block_explorer_url"),

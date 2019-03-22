@@ -163,40 +163,60 @@ func Networks() []*fixtures.FixtureMatcher {
 	//nf := defaultNetwork()
 	//fmt.Println("%v", *nf)
 	return []*fixtures.FixtureMatcher{
-		// ethNonCloneableEnabledFullConfigNetwork(), // default, fixed
+		ethNonCloneableEnabledFullConfigNetwork(), // default, fixed
 		// ethNonCloneableEnabledChainspecNetwork(), // TODO: support chainspec text
-		// ethClonableDisabledEmptyConfigNetwork(), // TODO: support Config: {}
-		// ethClonableDisabledNilConfigNetwork(), // TODO: support Config: nil
-		ethClonableDisabledConfigNetwork(),  // fixed
-		ethClonableDisabledConfigNetwork1(), // fixed
-		ethClonableDisabledConfigNetwork2(), // fixed
-		ethClonableDisabledConfigNetwork3(), // fixed
-		// ethClonableEnabledEmptyConfigNetwork(), // TODO: support Config: {}
-		// ethClonableEnabledNilConfigNetwork(), // TODO: support Config: nil
-		ethClonableEnabledFullConfigNetwork(), // fixed
-		ethClonableEnabledConfigNetwork1(),    // fixed
-		ethClonableEnabledConfigNetwork2(),    // fixed
-		ethClonableEnabledConfigNetwork3(),    // fixed
+		ethClonableDisabledEmptyConfigNetwork(), // fixed
+		ethClonableDisabledNilConfigNetwork(),   // fixed
+		ethClonableDisabledConfigNetwork(),      // fixed
+		ethClonableDisabledConfigNetwork1(),     // fixed
+		ethClonableDisabledConfigNetwork2(),     // fixed
+		ethClonableDisabledConfigNetwork3(),     // fixed
+		ethClonableEnabledEmptyConfigNetwork(),  // fixed
+		ethClonableEnabledNilConfigNetwork(),    // fixed
+		ethClonableEnabledFullConfigNetwork(),   // fixed
+		ethClonableEnabledConfigNetwork1(),      // fixed
+		ethClonableEnabledConfigNetwork2(),      // fixed
+		ethClonableEnabledConfigNetwork3(),      // fixed
 	}
 }
 
-func (nf *NetworkFields) clone() *NetworkFields {
-	nf2 := &NetworkFields{
-		Model:         nf.Model,
-		ApplicationID: nf.ApplicationID,
-		UserID:        nf.UserID,
-		Name:          ptrTo(*nf.Name),
-		Description:   nf.Description,
-		IsProduction:  nf.IsProduction,
-		Cloneable:     nf.Cloneable,
-		Enabled:       nf.Enabled,
-		ChainID:       nf.ChainID,
-		SidechainID:   nf.SidechainID,
-		NetworkID:     nf.NetworkID,
-		Config:        ptrToJRW(*nf.Config),
-		Stats:         nf.Stats,
+func (nf *NetworkFields) clone() (nf2 *NetworkFields) {
+	config := nf.Config
+	if config == nil {
+		nf2 = &NetworkFields{
+			Model:         nf.Model,
+			ApplicationID: nf.ApplicationID,
+			UserID:        nf.UserID,
+			Name:          ptrTo(*nf.Name),
+			Description:   nf.Description,
+			IsProduction:  nf.IsProduction,
+			Cloneable:     nf.Cloneable,
+			Enabled:       nf.Enabled,
+			ChainID:       nf.ChainID,
+			SidechainID:   nf.SidechainID,
+			NetworkID:     nf.NetworkID,
+			Config:        nil,
+			Stats:         nf.Stats,
+		}
+	} else {
+		nf2 = &NetworkFields{
+			Model:         nf.Model,
+			ApplicationID: nf.ApplicationID,
+			UserID:        nf.UserID,
+			Name:          ptrTo(*nf.Name),
+			Description:   nf.Description,
+			IsProduction:  nf.IsProduction,
+			Cloneable:     nf.Cloneable,
+			Enabled:       nf.Enabled,
+			ChainID:       nf.ChainID,
+			SidechainID:   nf.SidechainID,
+			NetworkID:     nf.NetworkID,
+			Config:        ptrToJRW(*nf.Config),
+			Stats:         nf.Stats,
+		}
 	}
-	return nf2
+
+	return
 }
 
 func (nf *NetworkFields) genName(prefix *string) (name *string) {
@@ -215,31 +235,44 @@ func (nf *NetworkFields) genName(prefix *string) (name *string) {
 	}
 
 	cfg := "Config "
-	config := map[string]interface{}{}
 	if nf.Config == nil {
 		cfg = "Nil " + cfg
 	} else {
+		config := map[string]interface{}{}
 		if nf.Config != nil {
 			json.Unmarshal(*nf.Config, &config)
 		}
-		if config["cloneable_cfg"] == nil {
-			cfg += "nil cloneable_cfg "
+		if len(config) == 0 {
+			cfg = "Empty " + cfg
 		} else {
-			if reflect.DeepEqual(config["cloneable_cfg"], map[string]interface{}{}) {
-				cfg += "empty cloneable_cfg "
+			if config["cloneable_cfg"] == nil {
+				cfg += "nil cloneable_cfg "
 			} else {
-				cfg += "w cloneable_cfg "
+				if reflect.DeepEqual(config["cloneable_cfg"], map[string]interface{}{}) {
+					cfg += "empty cloneable_cfg "
+				} else {
+					cfg += "w cloneable_cfg "
+				}
 			}
-		}
-		if config["chainspec"] == nil && config["chainspec_url"] == nil {
-			cfg += "nil chainspec "
-		} else {
-			if config["chainspec"] != nil {
-				cfg += "w chainspec "
+			if config["chainspec"] == nil && config["chainspec_url"] == nil {
+				cfg += "nil chainspec "
+			} else {
+				if config["chainspec"] != nil {
+					cfg += "w chainspec "
+				}
+				if config["chainspec_url"] != nil {
+					cfg += "w chainspec_url "
+				}
 			}
-			if config["chainspec_url"] != nil {
-				cfg += "w chainspec_url "
-			}
+			// if config["block_explorer_url"] == nil {
+			// 	cfg += "nil block_explorer_url "
+			// } else {
+			// 	if reflect.DeepEqual(config["block_explorer_url"], map[string]interface{}{}) {
+			// 		cfg += "empty block_explorer_url "
+			// 	} else {
+			// 		cfg += "w block_explorer_url "
+			// 	}
+			// }
 		}
 	}
 
@@ -248,19 +281,4 @@ func (nf *NetworkFields) genName(prefix *string) (name *string) {
 	return
 }
 
-func (nf *NetworkFields) String() string {
-	str := ""
-
-	if *nf.IsProduction {
-		str += " production: true"
-	}
-	if *nf.Cloneable {
-		str += " cloneable: true"
-	}
-	if *nf.Enabled {
-		str += " enabled: true"
-	}
-	name := *nf.Name
-
-	return "network: name=" + name + str
-}
+//

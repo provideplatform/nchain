@@ -26,7 +26,7 @@ func ethClonableEnabledNilConfigNetwork() (n *fixtures.FixtureMatcher) {
 		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
-		return satisfyAllConfigKeys(true)
+		return BeEmpty()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Network type", func(opts ...interface{}) types.GomegaMatcher {
 		if opts[0] == "eth" {
@@ -47,7 +47,7 @@ func ethClonableEnabledNilConfigNetwork() (n *fixtures.FixtureMatcher) {
 		return BeNil()
 	}, defaultMatcherOptions())
 
-	namePtr := ptrTo("ETH NonProduction Clonable Enabled Nil Config")
+	namePtr := ptrTo("ETH NonProduction Cloneable Enabled Nil Config ")
 
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{

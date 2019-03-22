@@ -13,7 +13,7 @@ func ethClonableEnabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {
 	optsNATSCreate := defaultNATSMatcherOptions(ptrTo("network.create"))
 
 	mc.AddBehavior("Create", func(opts ...interface{}) types.GomegaMatcher {
-		expectedCreateResult := true
+		expectedCreateResult := false
 		expectedContractCount := 0
 		return matchers.NetworkCreateMatcher(expectedCreateResult, expectedContractCount, opts...)
 	}, defaultMatcherOptions())
@@ -21,17 +21,17 @@ func ethClonableEnabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {
 		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Create with NATS", func(opts ...interface{}) types.GomegaMatcher {
-		return BeTrue()
+		return BeFalse()
 	}, optsNATSCreate)
 	mc.AddBehavior("Validate", func(opts ...interface{}) types.GomegaMatcher {
-		return BeTrue()
+		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
-		return satisfyAllConfigKeys(true)
+		return BeEmpty()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Network type", func(opts ...interface{}) types.GomegaMatcher {
 		if opts[0] == "eth" {
-			return BeTrue()
+			return BeFalse()
 		}
 		if opts[0] == "btc" {
 			return BeFalse()
@@ -48,7 +48,7 @@ func ethClonableEnabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {
 		return BeNil()
 	}, defaultMatcherOptions())
 
-	name := "ETH NonProduction Cloneable Enabled Config nil cloneable_cfg nil chainspec "
+	name := "ETH NonProduction Cloneable Enabled Empty Config "
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{
 			Fields: &NetworkFields{
@@ -57,7 +57,7 @@ func ethClonableEnabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {
 				Name:          ptrTo(name),
 				Description:   ptrTo("Ethereum Network"),
 				IsProduction:  ptrToBool(false),
-				Cloneable:     ptrToBool(false),
+				Cloneable:     ptrToBool(true),
 				Enabled:       ptrToBool(true),
 				ChainID:       nil,
 				SidechainID:   nil,

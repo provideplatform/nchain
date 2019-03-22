@@ -94,7 +94,11 @@ var _ = Describe("Main", func() {
 			})
 		})
 
-		Context("Dynamic", func() {
+		// TODO:
+		//   1. add mocks to check NATS and other calls (we can't just check all NATS channels to see nothing is written)
+		//   2. add behaviors for private methods
+		//   3. add config keys to generator
+		FContext("Dynamic", func() {
 
 			for i := 0; i < len(networks); i++ {
 
@@ -199,7 +203,7 @@ var _ = Describe("Main", func() {
 					It("should parse config", func() {
 						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
 					})
-					FIt("should return network type correctly", func() {
+					It("should return network type correctly", func() {
 						Expect(n.isEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
 						Expect(n.isBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
 						Expect(n.isHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))
@@ -209,6 +213,52 @@ var _ = Describe("Main", func() {
 					It("should not create second record", func() {
 						n.Create()
 						Expect(n.Create()).To(mc.MatchBehaviorFor("Double Create"))
+					})
+					It("should reload instance", func() {
+						// Expect(n.Reload()).To(mc.MatchBehaviorFor("Reload")) // FIXME
+					})
+					It("should update instance", func() {
+						// Expect(n.Update()).To(mc.MatchBehaviorFor("Update")) // FIXME
+					})
+					It("should set config", func() {
+						// private
+					})
+					It("should set chain id", func() {
+						// private
+					})
+					It("should get security configuration", func() {
+						// private
+						// Expect(n.getSecurityConfiguration()).To(mc.MatchBehaviorFor("securityConfiguration"))
+					})
+					It("should resolve and balance JSON RPC and Websocket", func() {
+						// Expect(n.resolveAndBalanceJSONRPCAndWebsocketURLs()).To(mc.MatchBehaviorFor("resolveAndBalanceJSONRPCAndWebsocketURLs"))
+					})
+					It("should return load balancers", func() {
+						// Expect(n.LoadBalancers()).To(mc.MatchBehaviorFor("LoadBalancers"))
+					})
+					It("should invoke JSON RPC", func() {
+						// Expect(n.InvokeJSONRPC()).To(mc.MatchBehaviorFor("InvokeJSONRPC"))
+					})
+					It("should return network status", func() {
+						// Expect(n.Status()).To(mc.MatchBehaviorFor("Status"))
+					})
+					It("should return NodeCount", func() {
+						// Expect(n.NodeCount()).To(mc.MatchBehaviorFor("NodeCount"))
+					})
+					It("should return AvailablePeerCount", func() {
+						// Expect(n.AvailablePeerCount()).To(mc.MatchBehaviorFor("AvailablePeerCount"))
+					})
+					It("should return bootnodes txt", func() {
+						// Expect(n.BootnodesTxt()).To(mc.MatchBehaviorFor("BootnodesTxt"))
+					})
+					It("should return bootnodes count", func() {
+						// Expect(n.BootnodesCount()).To(mc.MatchBehaviorFor("BootnodesCount"))
+					})
+					It("should return bootnodes", func() {
+						// Expect(n.Bootnodes()).To(mc.MatchBehaviorFor("Bootnodes"))
+					})
+					It("should return nodes", func() {
+						// Expect(n.Nodes()).To(mc.MatchBehaviorFor("Nodes"))
 					})
 
 				})
