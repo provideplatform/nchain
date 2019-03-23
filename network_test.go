@@ -13,12 +13,12 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-func ptrTo(s string) *string {
-	return &s
-}
-func ptrToBool(s bool) *bool {
-	return &s
-}
+// func ptrTo(s string) *string {
+// 	return &s
+// }
+// func ptrToBool(s bool) *bool {
+// 	return &s
+// }
 
 func setupTestCase(t *testing.T) func(t *testing.T) {
 	Log.Debugf("===================================")
@@ -354,7 +354,7 @@ func TestNetwork_Create(t *testing.T) {
 			teardownTestCase := setupTestCase(t)
 			defer teardownTestCase(t)
 			if tt.want { // network is supposed to be created
-				natsGuaranteeDelivery("network.create", t)
+				natsGuaranteeDelivery("network.create")
 			}
 
 			n := &Network{

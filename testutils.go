@@ -1,7 +1,6 @@
 package main
 
 import (
-	"testing"
 	"time"
 
 	stan "github.com/nats-io/go-nats-streaming"
@@ -59,7 +58,7 @@ var pollingToStrChFunc pollingToStrChFuncType = func(
 	return nil
 }
 
-func natsGuaranteeDelivery(sub string, t *testing.T) {
+func natsGuaranteeDelivery(sub string) {
 
 	go func() {
 
