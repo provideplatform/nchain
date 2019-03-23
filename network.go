@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -731,9 +730,9 @@ func (n *Network) isLcoinNetwork() bool {
 }
 
 func (n *Network) isQuorumNetwork() bool {
-	if n.Name != nil && strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
-		return true
-	}
+	// if n.Name != nil && strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
+	// 	return true
+	// }
 
 	cfg := n.ParseConfig()
 	if cfg != nil {

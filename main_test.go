@@ -85,7 +85,7 @@ var _ = Describe("Main", func() {
 	Describe("Network", func() {
 		Context("production", func() {})
 
-		FContext("network fixtures", func() {
+		Context("network fixtures", func() {
 			It("should cover all generator cases", func() {
 				// fixtures := networkFixtureGenerator.All()
 				// Expect(len(fixtures) - len(networks)).To(Equal(0))
