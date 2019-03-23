@@ -9,6 +9,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	dbconf "github.com/kthomas/go-db-config"
+	selfsignedcert "github.com/kthomas/go-self-signed-cert"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	"github.com/nats-io/go-nats-streaming"
@@ -69,16 +70,17 @@ func GetNatsStreamingConnection(connectionLostHandler func()) stan.Conn {
 	return *conn
 }
 
-// ShouldServeTLS returns true if https is to be used
-func ShouldServeTLS() bool {
-	var tls = false
-	if _, err := os.Stat(CertificatePath); err == nil {
-		if _, err := os.Stat(PrivateKeyPath); err == nil {
-			tls = true
+func shouldServeTLS() bool {
+	if requireTLS {
+		privKeyPath, certPath, err := selfsignedcert.GenerateToDisk()
+		if err != nil {
+			Log.Panicf("Failed to generate self-signed certificate; %s", err.Error())
 		}
+		privateKeyPath = *privKeyPath
+		certificatePath = *certPath
+		return true
 	}
-	// TODO: if FORCE_TLS, gen self-signed cert.
-	return tls
+	return false
 }
 
 // PanicIfEmpty panics if the given string is empty

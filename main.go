@@ -34,8 +34,8 @@ func main() {
 
 	r.GET("/status", statusHandler)
 
-	if ShouldServeTLS() {
-		r.RunTLS(ListenAddr, CertificatePath, PrivateKeyPath)
+	if shouldServeTLS() {
+		r.RunTLS(ListenAddr, certificatePath, privateKeyPath)
 	} else {
 		r.Run(ListenAddr)
 	}

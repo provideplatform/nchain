@@ -1,5 +1,5 @@
-hash: e71caa74d9a5f771924c3abefa345a9fbee0453a5db58c91cc40c1dd9cb4b25d
-updated: 2019-03-07T03:50:42.799324-05:00
+hash: 79bf3b99bf30ceda6cee9500faf45b7d9eb2072eddf2842319cffaba59eeae14
+updated: 2019-03-23T05:41:30.182014-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: 84a0ff3f153cbd7e280a19029a864bb04b504e62
@@ -144,6 +144,8 @@ imports:
   version: 230b452f1919101d0b06c44ca727d78056983a8d
 - name: github.com/kthomas/go-natsutil
   version: a16a55e7dc26f074c31eb9e6d7ae31da4458a124
+- name: github.com/kthomas/go-self-signed-cert
+  version: 35b13d7369947616bd832487ce54c7b8d308fa75
 - name: github.com/kthomas/go.uuid
   version: b6c5bb1eedd724fc13c44af34da224568529d0c0
 - name: github.com/lib/pq
@@ -163,7 +165,7 @@ imports:
   - encoders/builtin
   - util
 - name: github.com/nats-io/go-nats-streaming
-  version: 82824caf82d8e87d762226c5060006dfbd97107f
+  version: 6a8470f970a0f01992927611aed618e6c3f2cc57
   subpackages:
   - pb
 - name: github.com/nats-io/nkeys
@@ -175,7 +177,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: a1906ac333ac94d1e9c99bf4c50de6948b722461
+  version: eac53f51f94ccc994a1237eea501c81480182019
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/satori/go.uuid

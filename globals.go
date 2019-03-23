@@ -16,9 +16,11 @@ var (
 
 	DefaultAWSConfig *awsconf.Config
 
-	ListenAddr      string
-	CertificatePath string
-	PrivateKeyPath  string
+	ListenAddr string
+
+	certificatePath string
+	privateKeyPath  string
+	requireTLS      bool
 
 	GpgPublicKey        string
 	GpgPrivateKey       string
@@ -41,13 +43,7 @@ func init() {
 			ListenAddr = buildListenAddr()
 		}
 
-		if os.Getenv("CERTIFICATE_PATH") != "" {
-			CertificatePath = os.Getenv("CERTIFICATE_PATH")
-		}
-
-		if os.Getenv("PRIVATE_KEY_PATH") != "" {
-			PrivateKeyPath = os.Getenv("PRIVATE_KEY_PATH")
-		}
+		requireTLS = os.Getenv("REQUIRE_TLS") == "true"
 
 		lvl := os.Getenv("LOG_LEVEL")
 		if lvl == "" {

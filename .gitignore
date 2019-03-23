@@ -28,6 +28,8 @@ _cgo_export.*
 
 run_local.sh
 goldmine
+.server.crt
+.private.key
 
 # Miscellaneous
 .DS_Store
