@@ -101,12 +101,9 @@ func natsGuaranteeDelivery(sub string) {
 			select {
 			case <-ticker.C:
 				elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
-				Log.Debugf("ticker: %d", elapsedMillis)
 				if elapsedMillis >= int64(natsMsgTimeout/1000000) {
 					ticker.Stop()
-					Log.Debugf("test failure")
 					Log.Errorf("Failed to consume message on NATS subject: %s; timed out after %dms", sub, elapsedMillis)
-					// return fmt.Errorf("Failed to consume message on NATS subject: %s; timed out after %dms", sub, elapsedMillis)
 				}
 			case msg := <-ch:
 				Log.Debugf("Guaranteed delivery of NATS message on subject: %s; msg: %s", sub, msg)
