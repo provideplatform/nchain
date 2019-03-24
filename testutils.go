@@ -30,8 +30,6 @@ var pollingToStrChFunc pollingToStrChFuncType = func(
 	ticker := time.NewTicker(interval)
 	timer := time.NewTimer(timeout)
 
-	elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
-
 	go func() error {
 		for {
 			select {
