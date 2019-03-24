@@ -177,7 +177,7 @@ var _ = Describe("Main", func() {
 								ptrs := []interface{}{}
 								db := dbconf.DatabaseConnection()
 								db.Find(&objects)
-								for i, o := range objects {
+								for _, o := range objects {
 									ptrs = append(ptrs, &o)
 								}
 								return ptrs
