@@ -31,15 +31,12 @@ var pollingToStrChFunc pollingToStrChFuncType = func(
 	timer := time.NewTimer(timeout)
 
 	elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
-	Log.Debugf("ticker: %d", elapsedMillis)
 
-	// Log.Debugf("channel: %v", ch)
 	go func() error {
 		for {
 			select {
 			case <-ticker.C:
 				elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
-				Log.Debugf("ticker: %d", elapsedMillis)
 				if elapsedMillis >= int64(timeout) {
 					ticker.Stop()
 				}
