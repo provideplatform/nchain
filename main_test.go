@@ -35,7 +35,6 @@ var _ = Describe("Main", func() {
 	var chPolling chan string
 
 	var networks, rest = testNetworks()
-	Log.Debugf("Networks being tested: %v\n", len(networks))
 
 	BeforeEach(func() {
 
