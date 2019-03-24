@@ -35,7 +35,7 @@ var _ = Describe("Main", func() {
 	var chPolling chan string
 
 	var networks, rest = testNetworks()
-	fmt.Printf("Networks being tested: %v\n", len(networks))
+	Log.Debugf("Networks being tested: %v\n", len(networks))
 
 	BeforeEach(func() {
 
@@ -118,7 +118,6 @@ var _ = Describe("Main", func() {
 							matcherName := "Create with NATS"
 							var chName string
 							if opts, ok := mc.MatcherOptionsFor(matcherName); ok {
-								fmt.Printf("%v", opts)
 								chName = *opts.NATSChannels[0]
 							}
 
@@ -142,15 +141,11 @@ var _ = Describe("Main", func() {
 
 							matcherName := "Create with NATS"
 							Expect(n.Create()).To(mc.MatchBehaviorFor(matcherName, chPolling))
-							fmt.Printf("NATS test end HERE\n")
 						})
 					})
 
 					Context("channeling", func() {
 						It("should be created", func() {
-
-							fmt.Printf("channeling test start HERE\n")
-
 							chPolling = make(chan string, 1)
 
 							matcherName := "Create"
@@ -183,7 +178,6 @@ var _ = Describe("Main", func() {
 								db := dbconf.DatabaseConnection()
 								db.Find(&objects)
 								for i, o := range objects {
-									fmt.Printf("object %v: %v\n", i, o)
 									ptrs = append(ptrs, &o)
 								}
 								return ptrs
@@ -287,7 +281,6 @@ var _ = Describe("Main", func() {
 							})
 							It("should be created", func() {
 								Expect(n.Create()).To(BeTrue())
-								fmt.Printf("network: %#v", n.Model.ID)
 							})
 						})
 						Context("with nil config", func() {
