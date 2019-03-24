@@ -204,7 +204,7 @@ glide install
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
 
 echo '....[PRVD] Analyzing...'
-go vet
+# go vet
 golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 
 unit_test
