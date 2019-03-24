@@ -163,9 +163,9 @@ unit_test()
 {
     echo '....[PRVD] Setting up Prerequisites for Test Harness....'
     DB_NAME=goldmine_test
-    PGPASSWORD=goldmine dropdb -U goldmine goldmine_test
-    PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test 
-    PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql
+    PGPASSWORD=goldmine dropdb -U goldmine goldmine_test >/dev/null
+    PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test >/dev/null
+    PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql >/dev/null
 
     echo '....[PRVD] Testing....'
     NATS_TOKEN=testtoken \

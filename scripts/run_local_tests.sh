@@ -1,9 +1,9 @@
 #!/bin/bash
 
 DB_NAME=goldmine_test
-PGPASSWORD=goldmine dropdb -U goldmine goldmine_test
-PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test 
-PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql
+PGPASSWORD=goldmine dropdb -U goldmine goldmine_test >/dev/null
+PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test >/dev/null
+PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql >/dev/null
 
 rm goldmine > /dev/null
 go build .
