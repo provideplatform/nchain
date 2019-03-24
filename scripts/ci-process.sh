@@ -158,6 +158,33 @@ perform_deployment()
     fi
 }
 
+# FIXME-- this logic should be broken out into a Makefile
+unit_test()
+{
+    echo '....[PRVD] Setting up Prerequisites for Test Harness....'
+    DB_NAME=goldmine_test
+    PGPASSWORD=goldmine dropdb -U goldmine goldmine_test
+    PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test 
+    PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql
+
+    echo '....[PRVD] Testing....'
+    NATS_TOKEN=testtoken \
+    NATS_URL=nats://localhost:4221 \
+    NATS_STREAMING_URL=nats://localhost:4222 \
+    NATS_CLUSTER_ID=provide \
+    NATS_STREAMING_CONCURRENCY=1 \
+    GIN_MODE=release \
+    DATABASE_NAME=${DB_NAME} \
+    DATABASE_USER=goldmine \
+    DATABASE_PASSWORD=goldmine \
+    DATABASE_HOST=localhost \
+    AMQP_URL=amqp://ticker:ticker@10.0.0.126 \
+    AMQP_EXCHANGE=ticker \
+    LOG_LEVEL=DEBUG \
+    /usr/local/bin/go test -v -race -cover -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
+    # go test -v -race -cover -html=cover/coverage.cov -o coverage.html ./... # TODO: -msan (for Clang's MemorySanitizer)
+}
+
 # Preparation
 echo '....Running the full continuous integration process....'
 scriptDir=`dirname $0`
@@ -179,8 +206,9 @@ glide install
 echo '....[PRVD] Analyzing...'
 go vet
 golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
-echo '....[PRVD] Testing....'
-go test -v -race -cover -html=cover/coverage.cov -o coverage.html ./... # TODO: -msan (for Clang's MemorySanitizer)
+
+unit_test
+
 echo '....[PRVD] Building....'
 go build -v
 echo '....[PRVD] Docker Build....'
