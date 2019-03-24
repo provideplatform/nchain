@@ -137,7 +137,7 @@ func defaultNATSMatcherOptions(chNamePtr *string) map[string]interface{} {
 
 // NetworkFields is a copy of goldmine Network struct
 type NetworkFields struct {
-	Model         provide.Model
+	provide.Model
 	ApplicationID *uuid.UUID
 	UserID        *uuid.UUID
 	Name          *string

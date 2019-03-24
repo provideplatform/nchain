@@ -48,7 +48,6 @@ type networkFactory struct {
 func (factory *networkFactory) network() (n *Network) {
 	nf := factory.fixture.Fields
 	n = &Network{
-		Model:         nf.Model,
 		ApplicationID: nf.ApplicationID,
 		UserID:        nf.UserID,
 		Name:          nf.Name,
