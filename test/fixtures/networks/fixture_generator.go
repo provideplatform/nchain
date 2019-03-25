@@ -13,21 +13,6 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 	ptrTrue := ptrToBool(true)
 	ptrFalse := ptrToBool(false)
 
-	ptrConfigValue := &networkFixtureFieldValues{
-		fieldName: ptrTo("Config"),
-		values: []interface{}{
-			nil,
-			map[string]interface{}{},
-		},
-	}
-	ptrConfigEmptyValue := &networkFixtureFieldValues{
-		fieldName: ptrTo("Config/Skip"),
-		values: []interface{}{
-			ptrTrue,
-			ptrFalse,
-		},
-	}
-
 	networkFixtureFieldValuesArray = []*networkFixtureFieldValues{
 		&networkFixtureFieldValues{
 			fieldName: ptrTo("Name/Prefix"),
@@ -57,8 +42,20 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 				ptrFalse,
 			},
 		},
-		ptrConfigValue,
-		ptrConfigEmptyValue,
+		&networkFixtureFieldValues{
+			fieldName: ptrTo("Config"),
+			values: []interface{}{
+				nil,
+				map[string]interface{}{},
+			},
+		},
+		&networkFixtureFieldValues{
+			fieldName: ptrTo("Config/Skip"),
+			values: []interface{}{
+				ptrTrue,
+				ptrFalse,
+			},
+		},
 		&networkFixtureFieldValues{
 			fieldName: ptrTo("Config/cloneable_cfg"),
 			values: []interface{}{
@@ -147,6 +144,10 @@ func (generator *NetworkFixtureGenerator) generate(fvs []*networkFixtureFieldVal
 	generator.addField(&nf, fvs, 0, &fields, config)
 
 	fmt.Printf("Generated %v fixtures. Starting tests.\n", len(fields))
+	for _, f := range fields {
+		fmt.Printf("Generated fixture '%v'\n", *f.Name)
+		// fmt.Printf("  Fields: %v\n", f)
+	}
 	return
 }
 
@@ -189,30 +190,39 @@ func (generator *NetworkFixtureGenerator) addField(
 				config = v.(map[string]interface{}) // sets config accumulator to specified value
 			}
 		}
-		if *fv.fieldName == "Config/Skip" {
-			fmt.Printf("  - config skip v: %v\n", *v.(*bool))
-			fmt.Printf("config: %v\n", config)
-			fmt.Printf("  config len: %v\n", len(config))
-			if *v.(*bool) { // if config set to empty map, that means that nf.Config is expected to be nil
-				nf.Config = marshalConfig(map[string]interface{}{}) // sets Config explicitly.
-				//config = map[string]interface{}{}
-			} else {
-				// if Config isn't skipped we need to assign default value to `config` var
 
-				if n, ok := config["nil"]; ok && n.(bool) {
-					config = generator.defaultConfig()
-					fmt.Printf("    setting default config\n")
+		nilconfig, ok := config["nil"]
+		skipConfigSkip := (ok && nilconfig.(bool))
+		if skipConfigSkip {
+			if *fv.fieldName == "Config/Skip" {
+				fmt.Printf("  - config skip v: %v\n", *v.(*bool))
+				fmt.Printf("config: %v\n", config)
+				fmt.Printf("  config len: %v\n", len(config))
+				if *v.(*bool) { // if config set to empty map, that means that nf.Config is expected to be nil
+					nf.Config = marshalConfig(map[string]interface{}{}) // sets Config explicitly.
+					//config = map[string]interface{}{}
+				} else {
+					// if Config isn't skipped we need to assign default value to `config` var
+
+					if n, ok := config["nil"]; ok && n.(bool) {
+						config = generator.defaultConfig()
+						fmt.Printf("    setting default config\n")
+					}
 				}
+				// fmt.Printf("nf.Config: %v\n", nf.Config)
+				// fmt.Printf("config: %v\n", config)
 			}
-			// fmt.Printf("nf.Config: %v\n", nf.Config)
-			// fmt.Printf("config: %v\n", config)
 		}
 
-		// fmt.Printf("nf.Config: %v\n", nf.Config)
+		skipConfigKeys := skipConfigSkip || (nf.Config != nil && reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
+
+		fmt.Printf("skipConfigKeys: %t\n", skipConfigKeys)
+		fmt.Printf("nf.Config: %v\n", nf.Config)
 		if nf.Config != nil {
+			fmt.Printf("nf.Config eq {}: %v\n", reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
 			//fmt.Printf("%t\n", reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
 		}
-		if nf.Config == nil || !reflect.DeepEqual(*nf.Config, json.RawMessage("{}")) { // explicitly set to empty value
+		if !skipConfigKeys { // explicitly set to empty value
 			if *fv.fieldName == "Config/cloneable_cfg" {
 				config = generator.updConfig(config, ptrTo("cloneable_cfg"), v)
 				// nf.Config = generator.updateConfig(nf.Config, ptrTo("cloneable_cfg"), v)
@@ -243,7 +253,13 @@ func (generator *NetworkFixtureGenerator) addField(
 			nf.Name = nf.genName(nf.Name)
 			nfClone := nf.clone()
 
-			*fields = append(*fields, nfClone)
+			alreadyAdded := false
+			if nfClone.Config == nil {
+				alreadyAdded = generator.fieldsEqual(*fields, nfClone)
+			}
+			if !alreadyAdded {
+				*fields = append(*fields, nfClone)
+			}
 
 			// initialize compound values
 			nf.Name = ptrTo(initialName)
@@ -260,6 +276,15 @@ func (generator *NetworkFixtureGenerator) addField(
 	}
 
 	return nil
+}
+
+func (generator *NetworkFixtureGenerator) fieldsEqual(fields []*NetworkFields, nf *NetworkFields) bool {
+	for _, f := range fields {
+		if reflect.DeepEqual(f, nf) {
+			return true
+		}
+	}
+	return false
 }
 
 func (generator *NetworkFixtureGenerator) updConfig(c map[string]interface{}, key *string, value interface{}) map[string]interface{} {
