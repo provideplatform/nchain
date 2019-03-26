@@ -214,7 +214,7 @@ unit_test()
     AMQP_URL=amqp://ticker:ticker@10.0.0.126 \
     AMQP_EXCHANGE=ticker \
     LOG_LEVEL=DEBUG \
-    /usr/local/bin/go test -v -race -cover -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
+    go test -v -race -cover -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
     # go test -v -race -cover -html=cover/coverage.cov -o coverage.html ./... # TODO: -msan (for Clang's MemorySanitizer)
 }
 
