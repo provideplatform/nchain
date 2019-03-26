@@ -194,11 +194,9 @@ unit_test()
 {
     echo '....[PRVD] Setting up Prerequisites for Test Harness....'
     DB_NAME=goldmine_test
-    PGPASSWORD=postgres createuser -U postgres goldmine || true
-    PGPASSWORD=postgres createdb -U postgres  -O goldmine goldmine_test || true
-    PGPASSWORD=goldmine dropdb -U goldmine goldmine_test || true
-    PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test || true
-    PGPASSWORD=goldmine psql -U goldmine goldmine_test < db/networks_test.sql || true
+    PGPASSWORD=postgres dropdb -U postgres ${DB_NAME} || true
+    PGPASSWORD=postgres createdb -U postgres ${DB_NAME} || true
+    PGPASSWORD=postgres psql -U postgres ${DB_NAME} < db/networks_test.sql || true
 
     echo '....[PRVD] Testing....'
     NATS_TOKEN=testtoken \
@@ -208,8 +206,8 @@ unit_test()
     NATS_STREAMING_CONCURRENCY=1 \
     GIN_MODE=release \
     DATABASE_NAME=${DB_NAME} \
-    DATABASE_USER=goldmine \
-    DATABASE_PASSWORD=goldmine \
+    DATABASE_USER=postgres \
+    DATABASE_PASSWORD=postgres \
     DATABASE_HOST=localhost \
     AMQP_URL=amqp://ticker:ticker@10.0.0.126 \
     AMQP_EXCHANGE=ticker \
