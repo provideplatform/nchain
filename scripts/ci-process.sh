@@ -194,7 +194,7 @@ unit_test()
 {
     echo '....[PRVD] Setting up Prerequisites for Test Harness....'
     DB_NAME=goldmine_test
-    createuser goldmine
+    createuser goldmine -U postgres
     createdb goldmine_test -O goldmine
     PGPASSWORD=goldmine dropdb -U goldmine goldmine_test >/dev/null
     PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test >/dev/null
