@@ -52,18 +52,19 @@ func ethClonableEnabledNilConfigNetwork() (n *fixtures.FixtureMatcher) {
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{
 			Fields: &NetworkFields{
-				ApplicationID: nil,
-				UserID:        nil,
-				Name:          namePtr,
-				Description:   ptrTo("Ethereum Network"),
-				IsProduction:  ptrToBool(false),
-				Cloneable:     ptrToBool(true),
-				Enabled:       ptrToBool(true),
-				ChainID:       nil,
-				SidechainID:   nil,
-				NetworkID:     nil,
-				Config:        nil,
-				Stats:         nil},
+				// ApplicationID: nil,
+				// UserID:        nil,
+				Name:         namePtr,
+				Description:  ptrTo("Ethereum Network"),
+				IsProduction: ptrToBool(false),
+				Cloneable:    ptrToBool(true),
+				Enabled:      ptrToBool(true),
+				ChainID:      nil,
+				// SidechainID:   nil,
+				// NetworkID:     nil,
+				Config: nil,
+				// Stats:  nil
+			},
 			Name: namePtr},
 		Matcher: mc}
 

@@ -12,7 +12,7 @@ func ethClonableDisabledConfigNetwork() (n *fixtures.FixtureMatcher) {
 	optsNATSCreate := defaultNATSMatcherOptions(ptrTo("network.create"))
 
 	mc.AddBehavior("Create", func(opts ...interface{}) types.GomegaMatcher {
-		expectedCreateResult := true
+		expectedCreateResult := false
 		expectedContractCount := 0
 		return matchers.NetworkCreateMatcher(expectedCreateResult, expectedContractCount, opts...)
 	}, defaultMatcherOptions())
@@ -20,10 +20,10 @@ func ethClonableDisabledConfigNetwork() (n *fixtures.FixtureMatcher) {
 		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Create with NATS", func(opts ...interface{}) types.GomegaMatcher {
-		return BeTrue()
+		return BeFalse()
 	}, optsNATSCreate)
 	mc.AddBehavior("Validate", func(opts ...interface{}) types.GomegaMatcher {
-		return BeTrue()
+		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
 		return satisfyAllConfigKeys(true)
@@ -51,16 +51,16 @@ func ethClonableDisabledConfigNetwork() (n *fixtures.FixtureMatcher) {
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{
 			Fields: &NetworkFields{
-				ApplicationID: nil,
-				UserID:        nil,
-				Name:          ptrTo(name),
-				Description:   ptrTo("Ethereum Network"),
-				IsProduction:  ptrToBool(false),
-				Cloneable:     ptrToBool(true),
-				Enabled:       ptrToBool(false),
-				ChainID:       nil,
-				SidechainID:   nil,
-				NetworkID:     nil,
+				// ApplicationID: nil,
+				// UserID:        nil,
+				Name:         ptrTo(name),
+				Description:  ptrTo("Ethereum Network"),
+				IsProduction: ptrToBool(false),
+				Cloneable:    ptrToBool(true),
+				Enabled:      ptrToBool(false),
+				ChainID:      nil,
+				// SidechainID:   nil,
+				// NetworkID:     nil,
 				Config: marshalConfig(map[string]interface{}{
 					"block_explorer_url":  "https://unicorn-explorer.provide.network", // required
 					"chain":               "unicorn-v0",                               // required
@@ -75,7 +75,8 @@ func ethClonableDisabledConfigNetwork() (n *fixtures.FixtureMatcher) {
 					"network_id":          22,     // required
 					"protocol_id":         "poa",  // required
 					"websocket_url":       nil}),
-				Stats: nil},
+				// Stats: nil
+			},
 			Name: ptrTo(name)},
 		Matcher: mc}
 

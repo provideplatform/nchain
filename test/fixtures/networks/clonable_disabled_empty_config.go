@@ -51,18 +51,19 @@ func ethClonableDisabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{
 			Fields: &NetworkFields{
-				ApplicationID: nil,
-				UserID:        nil,
-				Name:          ptrTo(name),
-				Description:   ptrTo("Ethereum Network"),
-				IsProduction:  ptrToBool(false),
-				Cloneable:     ptrToBool(true),
-				Enabled:       ptrToBool(false),
-				ChainID:       nil,
-				SidechainID:   nil,
-				NetworkID:     nil,
-				Config:        marshalConfig(map[string]interface{}{}),
-				Stats:         nil},
+				// ApplicationID: nil,
+				// UserID:        nil,
+				Name:         ptrTo(name),
+				Description:  ptrTo("Ethereum Network"),
+				IsProduction: ptrToBool(false),
+				Cloneable:    ptrToBool(true),
+				Enabled:      ptrToBool(false),
+				// ChainID:       nil,
+				// SidechainID:   nil,
+				// NetworkID:     nil,
+				Config: marshalConfig(map[string]interface{}{}),
+				// Stats:         nil
+			},
 			Name: ptrTo(name)},
 		Matcher: mc}
 

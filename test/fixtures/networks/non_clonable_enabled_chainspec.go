@@ -60,16 +60,16 @@ func ethNonCloneableEnabledChainspecNetwork() (n *fixtures.FixtureMatcher) {
 	n = &fixtures.FixtureMatcher{
 		Fixture: &NetworkFixture{
 			Fields: &NetworkFields{
-				ApplicationID: nil,
-				UserID:        nil,
-				Name:          ptrTo(name),
-				Description:   ptrTo("Ethereum Network"),
-				IsProduction:  ptrToBool(false),
-				Cloneable:     ptrToBool(false),
-				Enabled:       ptrToBool(true),
-				ChainID:       nil,
-				SidechainID:   nil,
-				NetworkID:     nil,
+				// ApplicationID: nil,
+				// UserID:        nil,
+				Name:         ptrTo(name),
+				Description:  ptrTo("Ethereum Network"),
+				IsProduction: ptrToBool(false),
+				Cloneable:    ptrToBool(false),
+				Enabled:      ptrToBool(true),
+				ChainID:      nil,
+				// SidechainID:   nil,
+				// NetworkID:     nil,
 				Config: marshalConfig(map[string]interface{}{
 					"block_explorer_url":  "https://unicorn-explorer.provide.network",
 					"chain":               "unicorn-v0",
@@ -84,7 +84,8 @@ func ethNonCloneableEnabledChainspecNetwork() (n *fixtures.FixtureMatcher) {
 					"network_id":          22,
 					"protocol_id":         "poa", // required
 					"websocket_url":       nil}),
-				Stats: nil},
+				// Stats: nil
+			},
 			Name: ptrTo(name)},
 		Matcher: mc}
 

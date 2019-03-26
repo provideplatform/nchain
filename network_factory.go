@@ -48,18 +48,18 @@ type networkFactory struct {
 func (factory *networkFactory) network() (n *Network) {
 	nf := factory.fixture.Fields
 	n = &Network{
-		ApplicationID: nf.ApplicationID,
-		UserID:        nf.UserID,
-		Name:          nf.Name,
-		Description:   nf.Description,
-		IsProduction:  nf.IsProduction,
-		Cloneable:     nf.Cloneable,
-		Enabled:       nf.Enabled,
-		ChainID:       nf.ChainID,
-		SidechainID:   nf.SidechainID,
-		NetworkID:     nf.NetworkID,
-		Config:        nf.Config,
-		Stats:         nf.Stats,
+		// ApplicationID: nf.ApplicationID,
+		// UserID:        nf.UserID,
+		Name:         nf.Name,
+		Description:  nf.Description,
+		IsProduction: nf.IsProduction,
+		Cloneable:    nf.Cloneable,
+		Enabled:      nf.Enabled,
+		ChainID:      nf.ChainID,
+		// SidechainID:   nf.SidechainID,
+		// NetworkID:     nf.NetworkID,
+		Config: nf.Config,
+		// Stats:         nf.Stats,
 	}
 	return
 }

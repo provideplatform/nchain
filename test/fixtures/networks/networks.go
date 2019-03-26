@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/test/fixtures"
 	"github.com/provideservices/provide-go"
 )
@@ -138,18 +137,18 @@ func defaultNATSMatcherOptions(chNamePtr *string) map[string]interface{} {
 // NetworkFields is a copy of goldmine Network struct
 type NetworkFields struct {
 	provide.Model
-	ApplicationID *uuid.UUID
-	UserID        *uuid.UUID
-	Name          *string
-	Description   *string
-	IsProduction  *bool
-	Cloneable     *bool
-	Enabled       *bool
-	ChainID       *string
-	SidechainID   *uuid.UUID
-	NetworkID     *uuid.UUID
-	Config        *json.RawMessage
-	Stats         *provide.NetworkStatus
+	// ApplicationID *uuid.UUID
+	// UserID        *uuid.UUID
+	Name         *string
+	Description  *string
+	IsProduction *bool
+	Cloneable    *bool
+	Enabled      *bool
+	ChainID      *string
+	// SidechainID   *uuid.UUID
+	// NetworkID     *uuid.UUID
+	Config *json.RawMessage
+	// Stats         *provide.NetworkStatus
 }
 
 // NetworkFixture combines network fieldset and its name
@@ -184,35 +183,35 @@ func (nf *NetworkFields) clone() (nf2 *NetworkFields) {
 	config := nf.Config
 	if config == nil {
 		nf2 = &NetworkFields{
-			Model:         nf.Model,
-			ApplicationID: nf.ApplicationID,
-			UserID:        nf.UserID,
-			Name:          ptrTo(*nf.Name),
-			Description:   nf.Description,
-			IsProduction:  nf.IsProduction,
-			Cloneable:     nf.Cloneable,
-			Enabled:       nf.Enabled,
-			ChainID:       nf.ChainID,
-			SidechainID:   nf.SidechainID,
-			NetworkID:     nf.NetworkID,
-			Config:        nil,
-			Stats:         nf.Stats,
+			Model: nf.Model,
+			// ApplicationID: nf.ApplicationID,
+			// UserID:        nf.UserID,
+			Name:         ptrTo(*nf.Name),
+			Description:  nf.Description,
+			IsProduction: nf.IsProduction,
+			Cloneable:    nf.Cloneable,
+			Enabled:      nf.Enabled,
+			ChainID:      nf.ChainID,
+			// SidechainID:   nf.SidechainID,
+			// NetworkID:     nf.NetworkID,
+			Config: nil,
+			// Stats:         nf.Stats,
 		}
 	} else {
 		nf2 = &NetworkFields{
-			Model:         nf.Model,
-			ApplicationID: nf.ApplicationID,
-			UserID:        nf.UserID,
-			Name:          ptrTo(*nf.Name),
-			Description:   nf.Description,
-			IsProduction:  nf.IsProduction,
-			Cloneable:     nf.Cloneable,
-			Enabled:       nf.Enabled,
-			ChainID:       nf.ChainID,
-			SidechainID:   nf.SidechainID,
-			NetworkID:     nf.NetworkID,
-			Config:        ptrToJRW(*nf.Config),
-			Stats:         nf.Stats,
+			Model: nf.Model,
+			// ApplicationID: nf.ApplicationID,
+			// UserID:        nf.UserID,
+			Name:         ptrTo(*nf.Name),
+			Description:  nf.Description,
+			IsProduction: nf.IsProduction,
+			Cloneable:    nf.Cloneable,
+			Enabled:      nf.Enabled,
+			ChainID:      nf.ChainID,
+			// SidechainID:   nf.SidechainID,
+			// NetworkID:     nf.NetworkID,
+			Config: ptrToJRW(*nf.Config),
+			// Stats:         nf.Stats,
 		}
 	}
 
