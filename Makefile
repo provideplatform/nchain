@@ -12,9 +12,9 @@ flat: clean
 	mkdir .tmp/
 
 test:
-	PGPASSWORD=goldmine dropdb -U goldmine goldmine_test >/dev/null
-	PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test >/dev/null
-	PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql >/dev/null
+	PGPASSWORD=goldmine dropdb -U goldmine goldmine_test || true >/dev/null
+	PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test || true >/dev/null
+	PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql || true >/dev/null
 
 	NATS_TOKEN=testtoken \
 	NATS_URL=nats://localhost:4221 \
