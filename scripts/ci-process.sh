@@ -194,11 +194,11 @@ unit_test()
 {
     echo '....[PRVD] Setting up Prerequisites for Test Harness....'
     DB_NAME=goldmine_test
-    PGPASSWORD=postgres createuser -U postgres goldmine >/dev/null
-    PGPASSWORD=postgres createdb -U postgres  -O goldmine goldmine_test >/dev/null
-    PGPASSWORD=goldmine dropdb -U goldmine goldmine_test >/dev/null
-    PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test >/dev/null
-    PGPASSWORD=goldmine psql -U goldmine goldmine_test < db/networks_test.sql >/dev/null
+    PGPASSWORD=postgres createuser -U postgres goldmine || true
+    PGPASSWORD=postgres createdb -U postgres  -O goldmine goldmine_test || true
+    PGPASSWORD=goldmine dropdb -U goldmine goldmine_test || true
+    PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test || true
+    PGPASSWORD=goldmine psql -U goldmine goldmine_test < db/networks_test.sql || true
 
     echo '....[PRVD] Testing....'
     NATS_TOKEN=testtoken \
