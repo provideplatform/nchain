@@ -66,19 +66,6 @@ bootstrap_environment()
     echo '....Environment setup complete....'
 }
 
-get_build_info()
-{
-    echo '....Getting build values....'
-    revNumber=$(echo `git rev-list HEAD | wc -l`) # the echo trims leading whitespace
-    gitHash=`git rev-parse --short HEAD`
-    gitBranch=`git rev-parse --abbrev-ref HEAD`
-    buildDate=$(date '+%m.%d.%y')
-    buildTime=$(date '+%H.%M.%S')
-    echo "$(echo `git status` | grep "nothing to commit" > /dev/null 2>&1; if [ "$?" -ne "0" ]; then echo 'Local git status is dirty'; fi )";
-    buildRef=${gitBranch}-${gitHash}-${buildDate}-${buildTime}
-    echo 'Build Ref =' $buildRef
-}
-
 # Preparation
 echo '....Running the full continuous integration process....'
 scriptDir=`dirname $0`
@@ -88,7 +75,7 @@ echo 'Working Directory =' `pwd`
 # The Process
 echo '....[PRVD] Setting Up....'
 bootstrap_environment
-get_build_info
+
 rm ./goldmine 2>/dev/null || true # silence error if not present
 go fix .
 go fmt

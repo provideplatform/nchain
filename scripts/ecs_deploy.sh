@@ -1,5 +1,18 @@
 #!/bin/bash
 
+get_build_info()
+{
+    echo 'Getting build details...'
+    revNumber=$(echo `git rev-list HEAD | wc -l`) # the echo trims leading whitespace
+    gitHash=`git rev-parse --short HEAD`
+    gitBranch=`git rev-parse --abbrev-ref HEAD`
+    buildDate=$(date '+%m.%d.%y')
+    buildTime=$(date '+%H.%M.%S')
+    echo "$(echo `git status` | grep "nothing to commit" > /dev/null 2>&1; if [ "$?" -ne "0" ]; then echo 'Local git status is dirty'; fi )";
+    buildRef=${gitBranch}-${gitHash}-${buildDate}-${buildTime}
+    echo 'Build Ref =' $buildRef
+}
+
 setup_deployment_tools() 
 {
     if hash python 2>/dev/null
@@ -65,6 +78,8 @@ docker_build()
 
 ecs_deploy()
 {
+    get_build_info
+
     DEFINITION_FILE=ecs-task-definition.json
     MUNGED_FILE=ecs-task-definition-UPDATED.json
 
