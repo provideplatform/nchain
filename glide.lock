@@ -1,5 +1,5 @@
 hash: ab23aa1c786f431ac6b04c44d638896feedc4562849d4637d690fb90e41292bd
-updated: 2019-03-23T22:12:47.497424+02:00
+updated: 2019-03-27T12:28:42.49405-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: 84a0ff3f153cbd7e280a19029a864bb04b504e62
@@ -114,8 +114,6 @@ imports:
   - protoc-gen-gogo/descriptor
 - name: github.com/golang/mock
   version: 51421b967af1f557f93a59e0057aaf15ca02e29c
-  subpackages:
-  - gomock
 - name: github.com/golang/protobuf
   version: 347cf4a86c1cb8d262994d8ef5924d4576c5b331
   subpackages:
@@ -169,7 +167,7 @@ imports:
   - encoders/builtin
   - util
 - name: github.com/nats-io/go-nats-streaming
-  version: 6a8470f970a0f01992927611aed618e6c3f2cc57
+  version: ac8ca90f6f2344f58bef18d9a52cef07541c1c1b
   subpackages:
   - pb
 - name: github.com/nats-io/nkeys
