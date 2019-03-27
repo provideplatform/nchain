@@ -37,7 +37,7 @@ var _ = Describe("Main", func() {
 
 	var chPolling chan string
 
-	var networks, rest = testNetworks()
+	var networks, _ = testNetworks()
 
 	BeforeEach(func() {
 
