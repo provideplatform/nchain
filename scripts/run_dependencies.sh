@@ -25,6 +25,14 @@ else
     go get github.com/nats-io/nats-streaming-server
 fi
 
-gnatsd -auth testtoken -p 4221 &
-nats-streaming-server -cid provide -auth testtoken -p 4222 &
+if [[ -z "${NATS_SERVER_PORT}" ]]; then
+  NATS_SERVER_PORT=4221
+fi
+
+if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
+  NATS_STREAMING_SERVER_PORT=4222
+fi
+
+gnatsd -auth testtoken -p ${NATS_SERVER_PORT} &
+nats-streaming-server -cid provide -auth testtoken -p ${NATS_STREAMING_SERVER_PORT} &
 pg_ctl -D /usr/local/var/postgres start &

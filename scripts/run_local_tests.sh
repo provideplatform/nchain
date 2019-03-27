@@ -1,12 +1,20 @@
 #!/bin/bash
 
+if [[ -z "${NATS_SERVER_PORT}" ]]; then
+  NATS_SERVER_PORT=4221
+fi
+
+if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
+  NATS_STREAMING_SERVER_PORT=4222
+fi
+
 PGPASSWORD=goldmine dropdb -U goldmine goldmine_test || true >/dev/null
 PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test || true >/dev/null
 PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql || true >/dev/null
 
 NATS_TOKEN=testtoken \
-NATS_URL=nats://localhost:4221 \
-NATS_STREAMING_URL=nats://localhost:4222 \
+NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
+NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
 NATS_CLUSTER_ID=provide \
 NATS_STREAMING_CONCURRENCY=1 \
 GIN_MODE=release \
