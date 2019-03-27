@@ -55,9 +55,6 @@ setup_go()
         curl https://glide.sh/get | sh
     fi
 
-    echo '....Go-Getting....'
-    # go get -v github.com/provideapp/goldmine # TODO: revisit -u, deps, vendorizing. 
-
     if hash golint 2>/dev/null
     then
         echo 'Using golint...' # No version command or flag
