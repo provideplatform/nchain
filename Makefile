@@ -1,7 +1,7 @@
 .PHONY: build clean run_dependencies run_local stop_dependencies test
 
 clean:
-	rm ./goldmine > /dev/null
+	rm ./goldmine || true > /dev/null
 
 build: clean
 	go fmt
