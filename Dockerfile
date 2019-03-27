@@ -15,8 +15,9 @@ RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.4.21/solc-
 RUN mkdir -p /go/src/github.com/provideapp
 ADD . /go/src/github.com/provideapp/goldmine
 WORKDIR /go/src/github.com/provideapp/goldmine
-RUN go-wrapper download
-RUN go-wrapper install
+
+RUN curl https://glide.sh/get | sh
+RUN glide install
 
 EXPOSE 8080
-CMD ["go-wrapper", "run"]
+CMD ["go", "run"]
