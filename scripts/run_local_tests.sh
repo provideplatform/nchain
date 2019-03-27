@@ -8,9 +8,18 @@ if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
   NATS_STREAMING_SERVER_PORT=4222
 fi
 
-PGPASSWORD=goldmine dropdb -U goldmine goldmine_test || true >/dev/null
-PGPASSWORD=goldmine createdb -O goldmine -U goldmine goldmine_test || true >/dev/null
-PGPASSWORD=goldmine psql -Ugoldmine goldmine_test < db/networks_test.sql || true >/dev/null
+if [[ -z "${DATABASE_USER}" ]]; then
+  DATABASE_USER=goldmine
+fi
+
+if [[ -z "${PGPASSWORD}" ]]; then
+  PGPASSWORD=goldmine
+fi
+export PGPASSWORD
+
+dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
+createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
+psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
 
 NATS_TOKEN=testtoken \
 NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
@@ -20,7 +29,7 @@ NATS_STREAMING_CONCURRENCY=1 \
 GIN_MODE=release \
 DATABASE_HOST=localhost \
 DATABASE_NAME=goldmine_test \
-DATABASE_USER=goldmine \
-DATABASE_PASSWORD=goldmine \
+DATABASE_USER=${DATABASE_USER} \
+DATABASE_PASSWORD=${PGPASSWORD} \
 LOG_LEVEL=DEBUG \
 go test -v -race -cover -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
