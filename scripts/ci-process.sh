@@ -168,7 +168,7 @@ go fmt
 go clean -i
 
 glide install
-# (cd vendor/ && tar c .) | (cd src/ && tar xf -)
+(cd vendor/ && tar c .) | (cd src/ && tar xf -)
 
 echo '....[PRVD] Analyzing...'
 make lint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
