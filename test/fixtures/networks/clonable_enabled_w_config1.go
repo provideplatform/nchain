@@ -12,7 +12,7 @@ func ethClonableEnabledConfigNetwork1() (n *fixtures.FixtureMatcher) {
 	optsNATSCreate := defaultNATSMatcherOptions(ptrTo("network.create"))
 
 	mc.AddBehavior("Create", func(opts ...interface{}) types.GomegaMatcher {
-		expectedCreateResult := true
+		expectedCreateResult := false
 		expectedContractCount := 0
 		return matchers.NetworkCreateMatcher(expectedCreateResult, expectedContractCount, opts...)
 	}, defaultMatcherOptions())
@@ -20,10 +20,10 @@ func ethClonableEnabledConfigNetwork1() (n *fixtures.FixtureMatcher) {
 		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("Create with NATS", func(opts ...interface{}) types.GomegaMatcher {
-		return BeTrue()
+		return BeFalse()
 	}, optsNATSCreate)
 	mc.AddBehavior("Validate", func(opts ...interface{}) types.GomegaMatcher {
-		return BeTrue()
+		return BeFalse()
 	}, defaultMatcherOptions())
 	mc.AddBehavior("ParseConfig", func(opts ...interface{}) types.GomegaMatcher {
 		return satisfyAllConfigKeys(true)

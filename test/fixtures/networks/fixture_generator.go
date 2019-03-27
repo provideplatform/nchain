@@ -69,7 +69,7 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 			fieldName: ptrTo("Config/chainspec_url"),
 			values: []interface{}{
 				nil,
-				// ptrTo("https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json"),
+				ptrTo("https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json"),
 			},
 		},
 		// &networkFixtureFieldValues{
