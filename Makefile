@@ -5,7 +5,7 @@ clean:
 
 build: clean
 	go fmt
-	go build .
+	go build -a
 
 lint:
 	./scripts/lint.sh
