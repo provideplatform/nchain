@@ -12,9 +12,13 @@ if [[ -z "${DATABASE_USER}" ]]; then
   DATABASE_USER=goldmine
 fi
 
-PGPASSWORD=${PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
-PGPASSWORD=${PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
-PGPASSWORD=${PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
+if [[ -z "${DATABASE_PASSWORD}" ]]; then
+  DATABASE_PASSWORD=goldmine
+fi
+
+PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
+PGPASSWORD=${DATABASE_PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
+PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
 
 NATS_TOKEN=testtoken \
 NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
@@ -25,6 +29,6 @@ GIN_MODE=release \
 DATABASE_HOST=localhost \
 DATABASE_NAME=goldmine_test \
 DATABASE_USER=${DATABASE_USER} \
-DATABASE_PASSWORD=${PGPASSWORD} \
+DATABASE_PASSWORD=${DATABASE_PASSWORD} \
 LOG_LEVEL=DEBUG \
 go test -v -race -cover -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
