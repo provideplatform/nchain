@@ -78,8 +78,6 @@ docker_build()
 
 ecs_deploy()
 {
-    get_build_info
-
     DEFINITION_FILE=ecs-task-definition.json
     MUNGED_FILE=ecs-task-definition-UPDATED.json
 
@@ -108,6 +106,7 @@ then
     echo 'Skipping deployment due to missing environment configuration.'
 else
     setup_deployment_tools
+    get_build_info
     docker_build
     ecs_deploy
 fi
