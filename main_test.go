@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/provideapp/goldmine/test/matchers"
 
@@ -10,9 +11,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	// . "github.com/provideapp/goldmine/test/factories"
-	//. "github.com/onsi/gomega/types"
-	// provideapp "github.com/provideapp/goldmine"
 )
 
 func ptrTo(s string) *string {
@@ -21,6 +19,11 @@ func ptrTo(s string) *string {
 
 func ptrToBool(b bool) *bool {
 	return &b
+}
+
+func TestGoldmine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Goldmine Suite")
 }
 
 var _ = Describe("Main", func() {

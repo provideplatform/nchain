@@ -76,6 +76,7 @@ func init() {
 			"websocket_url":       nil}),
 		Stats: nil}
 }
+
 func TestNetwork_Create(t *testing.T) {
 
 	eth_chainspec_fileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn/spec.json"
