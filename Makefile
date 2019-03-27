@@ -8,7 +8,7 @@ build: clean
 	go build .
 
 lint:
-	./scripts/lint.sh | ./lint.sh
+	./scripts/lint.sh
 
 run_local: build run_dependencies
 	./scripts/run_local.sh
