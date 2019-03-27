@@ -55,13 +55,6 @@ setup_go()
         curl https://glide.sh/get | sh
     fi
 
-    if hash golint 2>/dev/null
-    then
-        echo 'Using golint...' # No version command or flag
-    else 
-        echo 'Installing golint'
-        go get -u golang.org/x/lint/golint
-    fi
     go env
 }
 
@@ -159,64 +152,6 @@ perform_deployment()
     fi
 }
 
-bootstrap_test_environment()
-{
-    if hash psql 2>/dev/null
-    then
-        echo 'Using' `psql --version`
-    else
-        echo 'Installing postgresql'
-        sudo apt-get update
-        sudo apt-get -y install postgresql
-    fi
-
-    if hash gnatsd 2>/dev/null
-    then
-        echo 'Using' `gnatsd --version`
-    else
-        echo 'Installing NATS server'
-        go get github.com/nats-io/gnatsd
-    fi
-
-    if hash nats-streaming-server 2>/dev/null
-    then
-        echo 'Using' `nats-streaming-server --version`
-    else
-        echo 'Installing NATS streaming server'
-        go get github.com/nats-io/nats-streaming-server
-    fi
-
-    nats-streaming-server -cid provide -auth testtoken -p 4222 &
-    gnatsd -auth testtoken -p 4221 &
-}
-
-# FIXME-- this logic should be broken out into a Makefile
-unit_test()
-{
-    echo '....[PRVD] Setting up Prerequisites for Test Harness....'
-    DB_NAME=goldmine_test
-    PGPASSWORD=postgres dropdb -U postgres ${DB_NAME} || true
-    PGPASSWORD=postgres createdb -U postgres ${DB_NAME} || true
-    PGPASSWORD=postgres psql -U postgres ${DB_NAME} < db/networks_test.sql || true
-
-    echo '....[PRVD] Testing....'
-    NATS_TOKEN=testtoken \
-    NATS_URL=nats://localhost:4221 \
-    NATS_STREAMING_URL=nats://localhost:4222 \
-    NATS_CLUSTER_ID=provide \
-    NATS_STREAMING_CONCURRENCY=1 \
-    GIN_MODE=release \
-    DATABASE_NAME=${DB_NAME} \
-    DATABASE_USER=postgres \
-    DATABASE_PASSWORD=postgres \
-    DATABASE_HOST=localhost \
-    AMQP_URL=amqp://ticker:ticker@10.0.0.126 \
-    AMQP_EXCHANGE=ticker \
-    LOG_LEVEL=DEBUG \
-    go test -v -race -cover -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
-    # go test -v -race -cover -html=cover/coverage.cov -o coverage.html ./... # TODO: -msan (for Clang's MemorySanitizer)
-}
-
 # Preparation
 echo '....Running the full continuous integration process....'
 scriptDir=`dirname $0`
@@ -236,11 +171,9 @@ glide install
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
 
 echo '....[PRVD] Analyzing...'
-# go vet
-golint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
+make lint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 
-bootstrap_test_environment
-unit_test
+make test
 
 echo '....[PRVD] Building....'
 go build -v

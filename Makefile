@@ -1,4 +1,4 @@
-.PHONY: build clean run_dependencies run_local stop_dependencies test
+.PHONY: build clean lint run_dependencies run_local stop_dependencies test
 
 clean:
 	rm ./goldmine || true > /dev/null
@@ -6,6 +6,9 @@ clean:
 build: clean
 	go fmt
 	go build .
+
+lint:
+	./scripts/lint.sh
 
 run_local: build run_dependencies
 	./scripts/run_local.sh
