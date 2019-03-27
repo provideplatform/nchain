@@ -9,4 +9,5 @@ else
 fi
 
 # go vet
+echo 'Running golint...'
 golint

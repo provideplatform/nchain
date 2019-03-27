@@ -1,4 +1,4 @@
-.PHONY: build clean lint run_dependencies run_local stop_dependencies test
+.PHONY: build clean ecs_deploy lint run_dependencies run_local stop_dependencies test
 
 clean:
 	rm ./goldmine 2>/dev/null || true
@@ -6,6 +6,9 @@ clean:
 build: clean
 	go fmt
 	go build .
+
+ecs_deploy:
+	./scripts/ecs_deploy.sh
 
 lint:
 	./scripts/lint.sh

@@ -58,59 +58,10 @@ setup_go()
     go env
 }
 
-setup_deployment_tools() 
-{
-    if hash python 2>/dev/null
-    then
-        echo 'Using: ' 
-        python --version
-    else
-        echo 'Installing python'
-        sudo apt-get update
-        sudo apt-get -y install python2.7
-    fi
-    if hash pip 2>/dev/null
-    then
-        echo 'Using' `pip --version`
-    else
-        echo 'Installing python'
-        sudo apt-get update
-        sudo apt-get -y install python-pip
-    fi
-    if hash aws 2>/dev/null
-    then
-        echo 'Using AWS CLI: ' 
-        aws --version
-    else
-        echo 'Installing AWS CLI'
-        pip install awscli --upgrade --user
-    fi
-    if hash docker 2>/dev/null
-    then
-        echo 'Using docker' `docker -v`
-    else
-        echo 'Installing docker'
-        sudo apt-get update
-        sudo apt-get install -y apt-transport-https \
-                                ca-certificates \
-                                software-properties-common
-        sudo apt-get install -y docker
-    fi
-    if hash jq 2>/dev/null
-    then
-        echo 'Using' `jq --version`
-    else
-        echo 'Installing jq'
-        sudo apt-get update
-        sudo apt-get -y install jq
-    fi
-}
-
 bootstrap_environment() 
 {
     echo '....Setting up environment....'
     setup_go
-    setup_deployment_tools
     mkdir -p reports/linters
     echo '....Environment setup complete....'
 }
@@ -126,30 +77,6 @@ get_build_info()
     echo "$(echo `git status` | grep "nothing to commit" > /dev/null 2>&1; if [ "$?" -ne "0" ]; then echo 'Local git status is dirty'; fi )";
     buildRef=${gitBranch}-${gitHash}-${buildDate}-${buildTime}
     echo 'Build Ref =' $buildRef
-}
-
-perform_deployment()
-{
-    if [[ -z "${ECR_REPOSITORY_NAME}" || -z "${ECS_CLUSTER}" || -z "${ECS_TASK_DEFINITION_FAMILY}" || -z "${ECS_SERVICE_NAME}" ]]
-    then
-        echo '....[PRVD] Skipping container deployment....'
-    else
-        DEFINITION_FILE=ecs-task-definition.json
-        MUNGED_FILE=ecs-task-definition-UPDATED.json
-        echo '....list-images....'
-        ECR_IMAGE_DIGEST=$(aws ecr list-images --repository-name provide/goldmine | jq '.imageIds[0].imageDigest')
-        echo '....describe-images....'
-        ECR_IMAGE=$(aws ecr describe-images --repository-name "${ECR_REPOSITORY_NAME}" --image-ids imageDigest="${ECR_IMAGE_DIGEST}" | jq '.')
-        echo '....describe-task-definition....'
-        ECS_TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${ECS_TASK_DEFINITION_FAMILY}" | jq '.taskDefinition | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.compatibilities) | del(.requiresAttributes)')
-        echo '....file manipulation....'
-        echo $ECS_TASK_DEFINITION > $DEFINITION_FILE
-        sed -E "s/goldmine:[a-zA-Z0-9\.-]+/goldmine:${buildRef}/" "./${DEFINITION_FILE}" > "./${MUNGED_FILE}"
-        echo '....register-task-definition....'
-        ECS_TASK_DEFINITION_ID=$(aws ecs register-task-definition --family "${ECS_TASK_DEFINITION_FAMILY}" --cli-input-json "file://${MUNGED_FILE}" | jq '.taskDefinition.taskDefinitionArn' | sed -E 's/.*\/(.*)"$/\1/')
-        echo '....update-service....'
-        aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${ECS_SERVICE_NAME}" --task-definition "${ECS_TASK_DEFINITION_ID}"
-    fi
 }
 
 # Preparation
@@ -171,23 +98,12 @@ glide install
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
 rm -rf vendor/
 
-echo '....[PRVD] Analyzing...'
 make lint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 
 DATABASE_USER=postgres DATABASE_PASSWORD=postgres make test
 
-echo '....[PRVD] Building....'
 go build -v
-echo '....[PRVD] Docker Build....'
-sudo docker build -t provide/goldmine .
-echo '....[PRVD] Docker Tag....'
-sudo docker tag provide/goldmine:latest "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
-echo '....[PRVD] Docker Push....'
-$(aws ecr get-login --no-include-email --region us-east-1)
-sudo docker push "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
-echo '....[PRVD] AWS Deployment....'
-perform_deployment
+make ecs_deploy
 
-# Finalization
 popd &>/dev/null
 echo '....CI process completed....'
