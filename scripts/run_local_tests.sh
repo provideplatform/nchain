@@ -12,14 +12,9 @@ if [[ -z "${DATABASE_USER}" ]]; then
   DATABASE_USER=goldmine
 fi
 
-if [[ -z "${PGPASSWORD}" ]]; then
-  PGPASSWORD=goldmine
-fi
-export PGPASSWORD
-
-dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
-createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
-psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
+PGPASSWORD=${PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
+PGPASSWORD=${PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
+PGPASSWORD=${PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
 
 NATS_TOKEN=testtoken \
 NATS_URL=nats://localhost:${NATS_SERVER_PORT} \

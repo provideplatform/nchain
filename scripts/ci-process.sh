@@ -174,7 +174,7 @@ rm -rf vendor/
 echo '....[PRVD] Analyzing...'
 make lint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 
-make test
+DATABASE_USER=postgres DATABASE_PASSWORD=postgres make test
 
 echo '....[PRVD] Building....'
 go build -v
