@@ -71,9 +71,7 @@ docker_build()
 
     echo 'Docker push...'
     $(aws ecr get-login --no-include-email --region us-east-1)
-
     sudo docker push "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
-    echo '....[PRVD] AWS Deployment....'
 }
 
 ecs_deploy()
