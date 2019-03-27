@@ -60,7 +60,7 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 			fieldName: ptrTo("Config/cloneable_cfg"),
 			values: []interface{}{
 				nil,
-				// map[string]interface{}{},
+				map[string]interface{}{},
 				// map[string]interface{}{
 				// "_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security,
 			},
