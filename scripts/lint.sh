@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 if hash golint 2>/dev/null
 then
