@@ -20,6 +20,7 @@ WORKDIR /go/src/github.com/provideapp/goldmine
 
 RUN curl https://glide.sh/get | sh
 RUN glide install
+RUN go build
 
 EXPOSE 8080
-CMD ["go", "run"]
+CMD ["./goldmine"]
