@@ -129,7 +129,7 @@ var _ = Describe("Main", func() {
 								ch <- msg
 							})
 							if err != nil {
-								Log.Debugf("conn failure")
+								common.Log.Debugf("conn failure")
 							}
 
 							natsGuaranteeDelivery(chName)
@@ -200,11 +200,11 @@ var _ = Describe("Main", func() {
 						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
 					})
 					It("should return network type correctly", func() {
-						Expect(n.isEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
-						Expect(n.isBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
-						Expect(n.isHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))
-						Expect(n.isLcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "ltc"))
-						Expect(n.isQuorumNetwork()).To(mc.MatchBehaviorFor("Network type", "quorum"))
+						Expect(n.IsEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
+						Expect(n.IsBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
+						Expect(n.IsHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))
+						Expect(n.IsLcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "ltc"))
+						Expect(n.IsQuorumNetwork()).To(mc.MatchBehaviorFor("Network type", "quorum"))
 					})
 					It("should not create second record", func() {
 						n.Create()
@@ -355,7 +355,7 @@ var _ = Describe("Main", func() {
 								Expect(n.Validate()).To(BeTrue())
 							})
 							It("should create successfully and send message to NATS", func() {
-								// Log.Debugf("%v", n)
+								// common.Log.Debugf("%v", n)
 								Expect(n.Create()).To(BeTrue())
 
 								// Eventually(chStr).Should(Receive(Equal(n.ID.String())))
@@ -379,11 +379,11 @@ var _ = Describe("Main", func() {
 								Expect(n.Errors).To(BeEmpty())
 							})
 							It("should be ETH network", func() {
-								Expect(n.isEthereumNetwork()).To(BeTrue(), "it's ETH network")
-								Expect(n.isBcoinNetwork()).To(BeFalse())
-								Expect(n.isHandshakeNetwork()).To(BeFalse())
-								Expect(n.isLcoinNetwork()).To(BeFalse())
-								Expect(n.isQuorumNetwork()).To(BeFalse())
+								Expect(n.IsEthereumNetwork()).To(BeTrue(), "it's ETH network")
+								Expect(n.IsBcoinNetwork()).To(BeFalse())
+								Expect(n.IsHandshakeNetwork()).To(BeFalse())
+								Expect(n.IsLcoinNetwork()).To(BeFalse())
+								Expect(n.IsQuorumNetwork()).To(BeFalse())
 							})
 
 							It("should have config parsed correctly", func() {

@@ -112,7 +112,7 @@ func getChainspec() (chainspecJSON map[string]interface{}, chainspecABIJSON map[
 		// fmt.Printf("%s\n", string(contents))
 		//chainspec_text = string(contents)
 		json.Unmarshal(contents, &chainspecJSON)
-		// Log.Debugf("error parsing chainspec: %v", errJSON)
+		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
 
 	}
 
@@ -129,7 +129,7 @@ func getChainspec() (chainspecJSON map[string]interface{}, chainspecABIJSON map[
 		// fmt.Printf("%s\n", string(contents))
 		// chainspec_abi_text = string(contents)
 		json.Unmarshal(contents, &chainspecABIJSON)
-		// Log.Debugf("error parsing chainspec: %v", errJSON)
+		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
 	}
 
 	return

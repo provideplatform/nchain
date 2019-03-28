@@ -9,7 +9,7 @@ GIN_MODE=release \
 DATABASE_LOGGING=false \
 DATABASE_USER=goldmine \
 DATABASE_PASSWORD=goldmine \
-DATABASE_NAME=goldmine \
+DATABASE_NAME=goldmine_sandbox \
 DATABASE_HOST=localhost \
 LOG_LEVEL=DEBUG \
 ./goldmine #dlv debug #./goldmine

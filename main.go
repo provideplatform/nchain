@@ -1,106 +1,49 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/http"
-	"strings"
-
-	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	uuid "github.com/kthomas/go.uuid"
 	provide "github.com/provideservices/provide-go"
+
+	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/connector"
+	"github.com/provideapp/goldmine/consumer"
+	"github.com/provideapp/goldmine/contract"
+	"github.com/provideapp/goldmine/filter"
+	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/goldmine/oracle"
+	"github.com/provideapp/goldmine/prices"
+	"github.com/provideapp/goldmine/token"
+	"github.com/provideapp/goldmine/tx"
+	"github.com/provideapp/goldmine/wallet"
 )
 
 func main() {
-	RunConsumers()
-	RunAPIUsageDaemon()
-	CacheTxFilters()
+	consumer.RunAPIUsageDaemon()
+	filter.CacheTxFilters()
 
 	r := gin.Default()
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
 	r.Use(provide.TrackAPICalls())
 
-	InstallNetworksAPI(r)
-	InstallPricesAPI(r)
-	InstallConnectorsAPI(r)
-	InstallContractsAPI(r)
-	InstallOraclesAPI(r)
-	InstallTokensAPI(r)
-	InstallTransactionsAPI(r)
-	InstallWalletsAPI(r)
+	network.InstallNetworksAPI(r)
+	prices.InstallPricesAPI(r)
+	connector.InstallConnectorsAPI(r)
+	contract.InstallContractsAPI(r)
+	oracle.InstallOraclesAPI(r)
+	token.InstallTokensAPI(r)
+	tx.InstallTransactionsAPI(r)
+	wallet.InstallWalletsAPI(r)
 
 	r.GET("/status", statusHandler)
 
-	if shouldServeTLS() {
-		r.RunTLS(ListenAddr, certificatePath, privateKeyPath)
+	if common.ShouldServeTLS() {
+		r.RunTLS(common.ListenAddr, common.CertificatePath, common.PrivateKeyPath)
 	} else {
-		r.Run(ListenAddr)
+		r.Run(common.ListenAddr)
 	}
-}
-
-func authorizedSubjectId(c *gin.Context, subject string) *uuid.UUID {
-	var id string
-	keyfn := func(jwtToken *jwt.Token) (interface{}, error) {
-		if claims, ok := jwtToken.Claims.(jwt.MapClaims); ok {
-			if sub, subok := claims["sub"].(string); subok {
-				subprts := strings.Split(sub, ":")
-				if len(subprts) != 2 {
-					return nil, fmt.Errorf("JWT subject malformed; %s", sub)
-				}
-				if subprts[0] != subject {
-					return nil, fmt.Errorf("JWT claims specified non-%s subject: %s", subject, subprts[0])
-				}
-				id = subprts[1]
-			}
-		}
-		return nil, nil
-	}
-	provide.ParseBearerAuthorizationHeader(c, &keyfn)
-	uuidV4, err := uuid.FromString(id)
-	if err != nil {
-		return nil
-	}
-	return &uuidV4
-}
-
-func render(obj interface{}, status int, c *gin.Context) {
-	c.Header("content-type", "application/json; charset=UTF-8")
-	c.Writer.WriteHeader(status)
-	if &obj != nil && status != http.StatusNoContent {
-		encoder := json.NewEncoder(c.Writer)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(obj); err != nil {
-			panic(err)
-		}
-	} else {
-		c.Header("content-length", "0")
-	}
-}
-
-func renderError(message string, status int, c *gin.Context) {
-	err := map[string]*string{}
-	err["message"] = &message
-	render(err, status, c)
-}
-
-func requireParams(requiredParams []string, c *gin.Context) error {
-	var errs []string
-	for _, param := range requiredParams {
-		if c.Query(param) == "" {
-			errs = append(errs, param)
-		}
-	}
-	if len(errs) > 0 {
-		msg := strings.Trim(fmt.Sprintf("missing required parameters: %s", strings.Join(errs, ", ")), " ")
-		renderError(msg, 400, c)
-		return errors.New(msg)
-	}
-	return nil
 }
 
 func statusHandler(c *gin.Context) {
-	render(nil, 204, c)
+	common.Render(nil, 204, c)
 }
