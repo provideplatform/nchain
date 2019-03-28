@@ -38,7 +38,7 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 		&networkFixtureFieldValues{
 			fieldName: ptrTo("Enabled"),
 			values: []interface{}{
-				// ptrTrue,
+				ptrTrue,
 				ptrFalse,
 			},
 		},
@@ -310,15 +310,15 @@ func (generator *NetworkFixtureGenerator) addField(
 						}
 					}
 				}
-				fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
-				if !alreadyAdded {
-					alreadyAdded = generator.findEqualConfig(*fields, config)
-				}
-				fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
+				// fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
+				// if !alreadyAdded {
+				// 	alreadyAdded = generator.findEqualConfig(*fields, config)
+				// }
+				// fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
 				if !alreadyAdded {
 					alreadyAdded = generator.fieldsEqual(*fields, nfClone)
 				}
-				fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
+				// fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
 
 			}
 			if !alreadyAdded {
@@ -349,9 +349,9 @@ func (generator *NetworkFixtureGenerator) findEqualConfig(fields []*NetworkField
 		if f.Config != nil {
 			json.Unmarshal(*f.Config, &c)
 			eq := reflect.DeepEqual(c, config)
-			fmt.Printf("      unmarshaled config: %v\n", c)
-			fmt.Printf("      tested config: %v", config)
-			fmt.Printf("      eq: %t\n", eq)
+			// fmt.Printf("      unmarshaled config: %v\n", c)
+			// fmt.Printf("      tested config: %v", config)
+			// fmt.Printf("      eq: %t\n", eq)
 			if eq {
 				return true
 			}

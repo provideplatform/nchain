@@ -2,7 +2,6 @@ package networkfixtures
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/provideapp/goldmine/test/fixtures"
@@ -275,7 +274,6 @@ func (nf *NetworkFields) genName(prefix *string) (name *string) {
 		}
 	}
 
-	fmt.Printf("prefix: %v\n", *prefix)
 	name = ptrTo((*prefix) + " " + production + clonable + enabled + cfg)
 	return
 }
