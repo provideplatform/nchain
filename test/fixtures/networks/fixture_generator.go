@@ -38,7 +38,7 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 		&networkFixtureFieldValues{
 			fieldName: ptrTo("Enabled"),
 			values: []interface{}{
-				ptrTrue,
+				// ptrTrue,
 				ptrFalse,
 			},
 		},
@@ -50,7 +50,7 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 			},
 		},
 		&networkFixtureFieldValues{
-			fieldName: ptrTo("Config/Skip"),
+			fieldName: ptrTo("Config/Skip"), // should be skipped if Config == nil
 			values: []interface{}{
 				ptrTrue,
 				ptrFalse,
@@ -69,6 +69,7 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 			fieldName: ptrTo("Config/chainspec_url"),
 			values: []interface{}{
 				nil,
+				// add empty URL
 				ptrTo("https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json"),
 			},
 		},
@@ -140,12 +141,23 @@ func (generator *NetworkFixtureGenerator) generate(fvs []*networkFixtureFieldVal
 	fmt.Printf("Starting fixture generation.\n")
 	nf := NetworkFields{}
 	config := generator.defaultConfig()
-	fmt.Printf("Initial config: %v\n", config)
+	// fmt.Printf("Initial config: %v\n", config)
+
+	// generate fixtures
 	generator.addField(&nf, fvs, 0, &fields, config)
 
+	// generation results
 	fmt.Printf("Generated %v fixtures. Starting tests.\n", len(fields))
 	for _, f := range fields {
 		fmt.Printf("Generated fixture '%v'\n", *f.Name)
+		// var config
+		c := map[string]interface{}{}
+		if f.Config != nil {
+			json.Unmarshal(*f.Config, &c)
+			fmt.Printf("  config: %v\n", c)
+		} else {
+			fmt.Printf("  config: %v\n", f.Config)
+		}
 		// fmt.Printf("  Fields: %v\n", f)
 	}
 	return
@@ -168,24 +180,42 @@ func (generator *NetworkFixtureGenerator) addField(
 		// for i := 0; i < len(fv.values); i++ {
 		// 	v := fv.values[i]
 
+		fmt.Printf("%v                                ", *fv.fieldName)
 		if *fv.fieldName == "Name/Prefix" {
 			nf.Name = v.(*string)
+			fmt.Printf("%v  \n", *nf.Name)
 		}
 		if *fv.fieldName == "IsProduction" {
 			nf.IsProduction = v.(*bool)
+			fmt.Printf("%t  \n", *nf.IsProduction)
 		}
 		if *fv.fieldName == "Cloneable" {
 			nf.Cloneable = v.(*bool)
+			fmt.Printf("%t  \n", *nf.Cloneable)
 		}
 		if *fv.fieldName == "Enabled" {
 			nf.Enabled = v.(*bool)
+			fmt.Printf("%t  \n", *nf.Enabled)
 		}
 		if *fv.fieldName == "Config" {
-			fmt.Printf("- Config set value to %v\n", v)
+			fmt.Printf("%v  \n", v)
+			// fmt.Printf("  nf: %v\n", nf)
+
 			// fmt.Printf("\nconfig v: %v\n", v)
 			if v == nil {
 				// fmt.Printf("config v = nil\n")
-				config["nil"] = true // sets config accumulator to nil to prevent other keys being added. but zero map is empty, not nil 8-[]
+
+				if _, ok := config["nil"]; !ok {
+					config = map[string]interface{}{}
+					config["nil"] = true // sets config accumulator to nil to prevent other keys being added. but zero map is empty, not nil 8-[]
+				}
+
+				if v, ok := config["counter"]; ok {
+					config["counter"] = v.(int) + 1
+				} else {
+					config["counter"] = 0
+				}
+				fmt.Printf("  nil counter: %v\n", config["counter"])
 			} else {
 				config = v.(map[string]interface{}) // sets config accumulator to specified value
 			}
@@ -193,33 +223,47 @@ func (generator *NetworkFixtureGenerator) addField(
 
 		nilconfig, ok := config["nil"]
 		skipConfigSkip := (ok && nilconfig.(bool))
-		if skipConfigSkip {
+
+		fmt.Printf("    config type: %T\n", config)
+		fmt.Printf("    config keys:\n")
+		for k := range config {
+			fmt.Printf("        %v\n", k)
+		}
+		fmt.Printf("\n")
+		fmt.Printf("    skipConfigSkip: %t\n", skipConfigSkip)
+		if !skipConfigSkip {
 			if *fv.fieldName == "Config/Skip" {
-				fmt.Printf("  - config skip v: %v\n", *v.(*bool))
-				fmt.Printf("config: %v\n", config)
-				fmt.Printf("  config len: %v\n", len(config))
+				fmt.Printf("  - config skip value: %v\n", *v.(*bool))
+				// fmt.Printf("  config len: %v\n", len(config))
 				if *v.(*bool) { // if config set to empty map, that means that nf.Config is expected to be nil
-					nf.Config = marshalConfig(map[string]interface{}{}) // sets Config explicitly.
+					//nf.Config = marshalConfig(map[string]interface{}{}) // sets Config explicitly.
 					//config = map[string]interface{}{}
 				} else {
 					// if Config isn't skipped we need to assign default value to `config` var
 
-					if n, ok := config["nil"]; ok && n.(bool) {
-						config = generator.defaultConfig()
-						fmt.Printf("    setting default config\n")
-					}
+					// if n, ok := config["nil"]; ok && n.(bool) { // old value to be substituted
+					config = generator.defaultConfig()
+					fmt.Printf("    setting default config\n")
+					// }
 				}
 				// fmt.Printf("nf.Config: %v\n", nf.Config)
 				// fmt.Printf("config: %v\n", config)
 			}
 		}
 
-		skipConfigKeys := skipConfigSkip || (nf.Config != nil && reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
+		skipConfigKeys := skipConfigSkip || len(config) == 0 //(nf.Config != nil && reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
 
-		fmt.Printf("skipConfigKeys: %t\n", skipConfigKeys)
-		fmt.Printf("nf.Config: %v\n", nf.Config)
+		fmt.Printf("        skipConfigKeys: %t\n", skipConfigKeys)
+		fmt.Printf("            %v %T  value  ", *fv.fieldName, v)
+		if skipConfigKeys {
+			fmt.Printf("skipped\n")
+		} else {
+			fmt.Printf("added\n")
+		}
+
+		fmt.Printf("      nf.Config before keys: %v\n", nf.Config)
 		if nf.Config != nil {
-			fmt.Printf("nf.Config eq {}: %v\n", reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
+			fmt.Printf("      nf.Config eq {}: %v\n", reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
 			//fmt.Printf("%t\n", reflect.DeepEqual(*nf.Config, json.RawMessage("{}")))
 		}
 		if !skipConfigKeys { // explicitly set to empty value
@@ -242,22 +286,43 @@ func (generator *NetworkFixtureGenerator) addField(
 		if fieldIndex == len(fvs)-1 { // last index is 1 less
 			initialName := *nf.Name
 
-			fmt.Printf("nf.Config2: %v\n", nf.Config)
-			if nf.Config == nil { // not set by Config/Empty
-				if len(config) != 0 {
-					nf.Config = marshalConfig(config)
-				} else {
-					nf.Config = nil // otherwise it gets populated with "{}"
-				}
+			fmt.Printf("      nf.Config after keys: %v\n", nf.Config)
+
+			configNil := false
+			if n, ok := config["nil"]; ok && n.(bool) {
+				configNil = true
+			}
+
+			if configNil {
+				nf.Config = nil // otherwise it gets populated with "{}"
+			} else {
+				nf.Config = marshalConfig(config)
 			}
 			nf.Name = nf.genName(nf.Name)
 			nfClone := nf.clone()
 
 			alreadyAdded := false
-			if nfClone.Config == nil {
-				alreadyAdded = generator.fieldsEqual(*fields, nfClone)
+			if nfClone.Config == nil || len(config) == 0 {
+				if n, ok := config["nil"]; ok && n.(bool) {
+					if v, ok := config["counter"]; ok {
+						if v.(int) > 0 {
+							alreadyAdded = true
+						}
+					}
+				}
+				fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
+				if !alreadyAdded {
+					alreadyAdded = generator.findEqualConfig(*fields, config)
+				}
+				fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
+				if !alreadyAdded {
+					alreadyAdded = generator.fieldsEqual(*fields, nfClone)
+				}
+				fmt.Printf("alreadyAdded: %t\n", alreadyAdded)
+
 			}
 			if !alreadyAdded {
+				fmt.Printf("FIXTURE ADDED ('%v') \n\n", *nfClone.Name)
 				*fields = append(*fields, nfClone)
 			}
 
@@ -276,6 +341,23 @@ func (generator *NetworkFixtureGenerator) addField(
 	}
 
 	return nil
+}
+
+func (generator *NetworkFixtureGenerator) findEqualConfig(fields []*NetworkFields, config map[string]interface{}) bool {
+	for _, f := range fields {
+		c := map[string]interface{}{}
+		if f.Config != nil {
+			json.Unmarshal(*f.Config, &c)
+			eq := reflect.DeepEqual(c, config)
+			fmt.Printf("      unmarshaled config: %v\n", c)
+			fmt.Printf("      tested config: %v", config)
+			fmt.Printf("      eq: %t\n", eq)
+			if eq {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (generator *NetworkFixtureGenerator) fieldsEqual(fields []*NetworkFields, nf *NetworkFields) bool {
