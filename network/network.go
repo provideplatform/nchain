@@ -529,26 +529,26 @@ func (n *Network) Validate() bool {
 					}
 				} else {
 					//fmt.Printf("Validate(): cloneable cfg is not asserted\n")
-					n.Errors = append(n.Errors, &provide.Error{StringOrNil("cloneable_cfg should not be null"), ptrToInt(11)})
+					n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("cloneable_cfg should not be null"), common.PtrToInt(11)})
 				}
 			} else {
-				n.Errors = append(n.Errors, &provide.Error{StringOrNil("cloneable_cfg should be present"), ptrToInt(11)})
+				n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("cloneable_cfg should be present"), common.PtrToInt(11)})
 			}
 		}
 
 		chainspecUrl, chUrlFound := config["chainspec_url"]
 		chainspec, chFound := config["chainspec"]
 		if !(chFound || chUrlFound) {
-			n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config chainspec_url or chainspec should be present"), ptrToInt(11)})
+			n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config chainspec_url or chainspec should be present"), common.PtrToInt(11)})
 		} else {
 			if chFound {
 				if chainspec == nil || chainspec == "" {
-					n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config chainspec value should not be empty"), ptrToInt(11)})
+					n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config chainspec value should not be empty"), common.PtrToInt(11)})
 				}
 			}
 			if chUrlFound {
 				if chainspecUrl == nil || chainspecUrl == "" {
-					n.Errors = append(n.Errors, &provide.Error{StringOrNil("Config chainspec_url value should not be empty"), ptrToInt(11)})
+					n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config chainspec_url value should not be empty"), common.PtrToInt(11)})
 				}
 			}
 		}

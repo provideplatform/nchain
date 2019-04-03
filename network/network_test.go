@@ -1,8 +1,14 @@
-package network
+package network_test
 
 import (
 	"fmt"
+	"testing"
 
+	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/contract"
+	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/goldmine/test"
+	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
 	"github.com/provideapp/goldmine/test/matchers"
 
 	dbconf "github.com/kthomas/go-db-config"
@@ -12,8 +18,79 @@ import (
 	//. "github.com/onsi/gomega/gstruct"
 )
 
+func ptrTo(s string) *string {
+	return &s
+}
+
+func ptrToBool(b bool) *bool {
+	return &b
+}
+
+func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture) {
+	// ns = make([]map[string]interface{}, 0)
+	// for _, nf := range networkfixtures.Networks() {
+	// 	n, s := networkFactory(nf.Fixture.(*networkfixtures.NetworkFixture))
+	// 	fmt.Printf("%v", n)
+	// 	// common.Log.Debugf("%s", n)
+
+	// 	ns = append(ns, map[string]interface{}{
+	// 		"matchers": nf.Matcher,
+	// 		"network":  n,
+	// 		"name":     s,
+	// 	})
+	// }
+	// return
+
+	networkFixtureGenerator := networkfixtures.NewNetworkFixtureGenerator()
+	dispatcher := networkfixtures.NewNetworkFixtureDispatcher(networkFixtureGenerator)
+
+	networks := dispatcher.Networks()
+	count := len(networks)
+	nf = make([]*networkFactory, count)
+	nc = dispatcher.NotCovered()
+
+	for i, n := range networks {
+		fixture := n.Fixture.(*networkfixtures.NetworkFixture)
+		nf[i] = &networkFactory{
+			fixture:  fixture,
+			Name:     fixture.Name,
+			Matchers: n.Matcher,
+		}
+	}
+	return
+}
+
+type networkFactory struct {
+	fixture  *networkfixtures.NetworkFixture
+	Name     *string
+	Matchers *matchers.MatcherCollection
+}
+
+func (factory *networkFactory) Network() (n *network.Network) {
+	nf := factory.fixture.Fields
+	n = &network.Network{
+		// ApplicationID: nf.ApplicationID,
+		// UserID:        nf.UserID,
+		Name:         nf.Name,
+		Description:  nf.Description,
+		IsProduction: nf.IsProduction,
+		Cloneable:    nf.Cloneable,
+		Enabled:      nf.Enabled,
+		ChainID:      nf.ChainID,
+		// SidechainID:   nf.SidechainID,
+		// NetworkID:     nf.NetworkID,
+		Config: nf.Config,
+		// Stats:         nf.Stats,
+	}
+	return
+}
+func TestNetworks(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Network Suite")
+}
+
 var _ = Describe("Network", func() {
-	var n *Network
+	var n *network.Network
 	var mc *matchers.MatcherCollection
 	var ch chan *stan.Msg
 	// var chStr chan string
@@ -27,7 +104,7 @@ var _ = Describe("Network", func() {
 
 	BeforeEach(func() {
 
-		n = &Network{
+		n = &network.Network{
 			ApplicationID: nil,
 			UserID:        nil,
 			Name:          ptrTo("Name ETH non-Cloneable Enabled"),
@@ -38,7 +115,7 @@ var _ = Describe("Network", func() {
 			ChainID:       nil,
 			SidechainID:   nil,
 			NetworkID:     nil,
-			Config: marshalConfig(map[string]interface{}{
+			Config: common.MarshalConfig(map[string]interface{}{
 				"block_explorer_url": "https://unicorn-explorer.provide.network", // required
 				"chain":              "unicorn-v0",                               // required
 				"chainspec_abi_url":  "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
@@ -62,8 +139,8 @@ var _ = Describe("Network", func() {
 	AfterEach(func() {
 
 		db := dbconf.DatabaseConnection()
-		db.Delete(Network{})
-		db.Delete(Contract{})
+		db.Delete(network.Network{})
+		db.Delete(contract.Contract{})
 
 		if natsSub != nil {
 			natsSub.Unsubscribe()
@@ -91,13 +168,13 @@ var _ = Describe("Network", func() {
 			for i := 0; i < len(networks); i++ {
 
 				nn := networks[i] // current network being tested
-				name := *nn.name  // current network name
+				name := *nn.Name  // current network name
 
 				Context(name, func() { // context for current network
 
 					BeforeEach(func() {
-						n = nn.network() // creating new pointer with network data for each test
-						mc = nn.matchers // set of matchers for current network
+						n = nn.Network() // creating new pointer with network data for each test
+						mc = nn.Matchers // set of matchers for current network
 					})
 
 					Context("NATS", func() {
@@ -109,23 +186,23 @@ var _ = Describe("Network", func() {
 								chName = *opts.NATSChannels[0]
 							}
 
-							natsConn = getNatsStreamingConnection()
+							natsConn = common.GetDefaultNatsStreamingConnection()
 							ch = make(chan *stan.Msg, 1)
 							natsSub, err = natsConn.QueueSubscribe(chName, chName, func(msg *stan.Msg) {
 								ch <- msg
 							})
 							if err != nil {
-								Log.Debugf("conn failure")
+								common.Log.Debugf("conn failure")
 							}
 
-							natsGuaranteeDelivery(chName)
+							test.NatsGuaranteeDelivery(chName)
 						})
 						It("should catch NATS message", func() {
 							chPolling = make(chan string, 1)
 							cf := func(ch chan string) error {
 								return nil
 							}
-							pollingToStrChFunc(chPolling, cf, nil)
+							test.PollingToStrChFunc(chPolling, cf, nil)
 
 							matcherName := "Create with NATS"
 							Expect(n.Create()).To(mc.MatchBehaviorFor(matcherName, chPolling))
@@ -145,7 +222,7 @@ var _ = Describe("Network", func() {
 								db := dbconf.DatabaseConnection()
 								//db.Model( &(reflect.TypeOf(m)){} ).Count(&count)
 
-								objects := []Contract{}
+								objects := []contract.Contract{}
 								db.Find(&objects)
 
 								for _, object := range objects {
@@ -156,12 +233,12 @@ var _ = Describe("Network", func() {
 								return nil
 							}
 
-							pollingToStrChFunc(chPolling, cf, nil) // last param nil to receive default message "timeout"
+							test.PollingToStrChFunc(chPolling, cf, nil) // last param nil to receive default message "timeout"
 							// 	}
 							// }
 
 							funcAfter = func() []interface{} {
-								objects := []Contract{}
+								objects := []contract.Contract{}
 								ptrs := []interface{}{}
 								db := dbconf.DatabaseConnection()
 								db.Find(&objects)
@@ -186,11 +263,11 @@ var _ = Describe("Network", func() {
 						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
 					})
 					It("should return network type correctly", func() {
-						Expect(n.isEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
-						Expect(n.isBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
-						Expect(n.isHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))
-						Expect(n.isLcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "ltc"))
-						Expect(n.isQuorumNetwork()).To(mc.MatchBehaviorFor("Network type", "quorum"))
+						Expect(n.IsEthereumNetwork()).To(mc.MatchBehaviorFor("Network type", "eth"))
+						Expect(n.IsBcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "btc"))
+						Expect(n.IsHandshakeNetwork()).To(mc.MatchBehaviorFor("Network type", "handshake"))
+						Expect(n.IsLcoinNetwork()).To(mc.MatchBehaviorFor("Network type", "ltc"))
+						Expect(n.IsQuorumNetwork()).To(mc.MatchBehaviorFor("Network type", "quorum"))
 					})
 					It("should not create second record", func() {
 						n.Create()

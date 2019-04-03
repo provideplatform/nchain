@@ -1,9 +1,10 @@
-package main
+package test
 
 import (
 	"time"
 
 	stan "github.com/nats-io/go-nats-streaming"
+	"github.com/provideapp/goldmine/common"
 )
 
 const natsMsgTimeout = time.Millisecond * 50
@@ -12,7 +13,7 @@ const natsMsgTimeout = time.Millisecond * 50
 // timeout can be passed as 4th param, polling interval as 5th one.
 type pollingToStrChFuncType func(ch chan string, chFunc func(ch chan string) error, endingMsg *string, durations ...time.Duration) error
 
-var pollingToStrChFunc pollingToStrChFuncType = func(
+var PollingToStrChFunc pollingToStrChFuncType = func(
 	ch chan string,
 	chFunc func(ch chan string) error,
 	endingMsg *string,
@@ -53,14 +54,14 @@ var pollingToStrChFunc pollingToStrChFuncType = func(
 	return nil
 }
 
-func natsGuaranteeDelivery(sub string) {
+func NatsGuaranteeDelivery(sub string) {
 
 	go func() {
 
 		//deliveries = map[string][]*stan.Msg{}
-		RunConsumers()
+		// RunConsumers()
 
-		natsConn := getNatsStreamingConnection()
+		natsConn := common.GetDefaultNatsStreamingConnection()
 
 		// TODO: use a mutex if we need to detect > 1 delivery on sub
 

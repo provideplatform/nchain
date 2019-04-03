@@ -1,11 +1,12 @@
-package network
+package n_test
 
 import (
+	"github.com/provideapp/goldmine/network"
 	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
 	"github.com/provideapp/goldmine/test/matchers"
 )
 
-func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture) {
+func TestNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture) {
 	// ns = make([]map[string]interface{}, 0)
 	// for _, nf := range networkfixtures.Networks() {
 	// 	n, s := networkFactory(nf.Fixture.(*networkfixtures.NetworkFixture))
@@ -32,8 +33,8 @@ func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture)
 		fixture := n.Fixture.(*networkfixtures.NetworkFixture)
 		nf[i] = &networkFactory{
 			fixture:  fixture,
-			name:     fixture.Name,
-			matchers: n.Matcher,
+			Name:     fixture.Name,
+			Matchers: n.Matcher,
 		}
 	}
 	return
@@ -41,13 +42,13 @@ func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture)
 
 type networkFactory struct {
 	fixture  *networkfixtures.NetworkFixture
-	name     *string
-	matchers *matchers.MatcherCollection
+	Name     *string
+	Matchers *matchers.MatcherCollection
 }
 
-func (factory *networkFactory) network() (n *Network) {
+func (factory *networkFactory) Network() (n *network.Network) {
 	nf := factory.fixture.Fields
-	n = &Network{
+	n = &network.Network{
 		// ApplicationID: nf.ApplicationID,
 		// UserID:        nf.UserID,
 		Name:         nf.Name,
