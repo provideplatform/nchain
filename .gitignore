@@ -34,6 +34,10 @@ goldmine
 # Miscellaneous
 .DS_Store
 
+# Test/coverage artifacts
+coverage.txt
+profile.out
+
 # Items generated for CI
 src/
 vendor/
