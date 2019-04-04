@@ -1,4 +1,4 @@
-.PHONY: build clean ecs_deploy lint run_dependencies run_local stop_dependencies test
+.PHONY: build clean ecs_deploy integration lint run_dependencies run_local stop_dependencies test
 
 clean:
 	rm ./goldmine 2>/dev/null || true
@@ -24,4 +24,8 @@ stop_dependencies:
 
 test: build
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_dependencies.sh
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_local_tests.sh
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_unit_tests.sh
+
+integration: build
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_dependencies.sh
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_integration_tests.sh

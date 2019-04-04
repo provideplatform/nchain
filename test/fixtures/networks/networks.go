@@ -2,7 +2,9 @@ package networkfixtures
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/provideapp/goldmine/test/fixtures"
 	"github.com/provideservices/provide-go"
@@ -10,6 +12,10 @@ import (
 
 func ptrTo(s string) *string {
 	return &s
+}
+
+func ptrToInt(i int) *int {
+	return &i
 }
 
 func ptrToBool(b bool) *bool {
@@ -36,7 +42,7 @@ func valEqVal(p1 *NetworkFields, p2 *NetworkFields, omitFields ...string) (b boo
 	}
 
 	defFieldsToCheck := []string{
-		"Name", // name should match because it affects logic
+		// "Name", // name should not match because it doesn't affects logic
 		"IsProduction",
 		"Cloneable",
 		"Enabled",
@@ -91,6 +97,10 @@ func valEqVal(p1 *NetworkFields, p2 *NetworkFields, omitFields ...string) (b boo
 						} else {
 							switch ftc {
 							case "Config":
+								// fmt.Printf("f1: %v\n", string(f1.(json.RawMessage)))
+								// fmt.Printf("f2: %v\n", string(f2.(json.RawMessage)))
+								// fmt.Printf("equal: %t\n", reflect.DeepEqual(f1.(json.RawMessage), f2.(json.RawMessage)))
+
 								b = b && reflect.DeepEqual(f1.(json.RawMessage), f2.(json.RawMessage))
 							case "Name":
 								b = b && reflect.DeepEqual(f1.(string), f2.(string))
@@ -157,24 +167,90 @@ type NetworkFixture struct {
 }
 
 // Networks function returns all network fixtures: fields and their names
+// the network filters have following naming rules:
+// - eth
+// - Clonable/NonClonable - filter Cloneable field state
+// - Disabled/Enabled     - filter Enabled field state
+// - EmptyConfig          - filter Config has value {}
+// - NilConfig            - filter Config has value nil
+// - ConfigN              - equal to ConfigNNNNNNNNNNNNN with same N: Config0 = Config00000000000000
+// - ConfigNNNNNNNNNNNNN  - filter Config has value with json fields of certain values.
+//    Each N reflects 1 field in the next order:
+//    - "block_explorer_url"
+//    - "chain"
+//    - "chainspec_abi_url"
+//    - "chainspec_url"
+//    - "cloneable_cfg"
+//    - "engine_id"
+//    - "is_ethereum_network"
+//    - "is_load_balanced"
+//    - "json_rpc_url"
+//    - "native_currency"
+//    - "network_id"
+//    - "protocol_id"
+//    - "websocket_url
+//    N follows the next rules:
+//    - equals 0 if the correspoding value is nil.
+//    - equals 1 if the corresponding value is empty or 0.
+//    - equals 2 if the corresponding value is default value for the field.
+//    - equals 3 for special case of chainspec data.
 func Networks() []*fixtures.FixtureMatcher {
 	//nf := defaultNetwork()
 	//fmt.Println("%v", *nf)
 	return []*fixtures.FixtureMatcher{
-		ethNonCloneableEnabledFullConfigNetwork(), // default, fixed
+		// ethNonCloneableEnabledFullConfigNetwork(), // default
 		// ethNonCloneableEnabledChainspecNetwork(), // TODO: support chainspec text
-		ethClonableDisabledEmptyConfigNetwork(), // fixed
-		ethClonableDisabledNilConfigNetwork(),   // fixed
-		ethClonableDisabledConfigNetwork(),      // fixed
-		ethClonableDisabledConfigNetwork1(),     // fixed
-		ethClonableDisabledConfigNetwork2(),     // fixed
-		ethClonableDisabledConfigNetwork3(),     // fixed
-		ethClonableEnabledEmptyConfigNetwork(),  // fixed
-		ethClonableEnabledNilConfigNetwork(),    // fixed
-		ethClonableEnabledFullConfigNetwork(),   // fixed
-		ethClonableEnabledConfigNetwork1(),      // fixed
-		ethClonableEnabledConfigNetwork2(),      // fixed
-		ethClonableEnabledConfigNetwork3(),      // fixed
+		ethClonableDisabledEmptyConfigNetwork(),
+		ethClonableDisabledNilConfigNetwork(),
+		ethClonableDisabledConfigNetwork0(),
+		ethClonableDisabledConfigNetwork1(),
+		// ethClonableDisabledConfigNetwork0222222202220(),
+		// ethClonableDisabledConfigNetwork1222222202220(),
+		// ethClonableDisabledConfigNetwork2022222202220(),
+		// ethClonableDisabledConfigNetwork2122222202220(),
+		// ethClonableDisabledConfigNetwork2220022202220(),
+		// ethClonableDisabledConfigNetwork2220122202220(),
+		// ethClonableDisabledConfigNetwork2220222202220(),
+		// ethClonableDisabledConfigNetwork2221022202220(),
+		// ethClonableDisabledConfigNetwork2221122202220(),
+		// ethClonableDisabledConfigNetwork2221222202220(),
+		// ethClonableDisabledConfigNetwork2222022202220(),
+		// ethClonableDisabledConfigNetwork2222122202220(),
+		// ethClonableDisabledConfigNetwork2222202202220(),
+		// ethClonableDisabledConfigNetwork2222212202220(),
+		// ethClonableDisabledConfigNetwork2222220202220(),
+		// ethClonableDisabledConfigNetwork2222221202220(),
+		// ethClonableDisabledConfigNetwork2222222002220(),
+		// ethClonableDisabledConfigNetwork2222222102220(),
+		// ethClonableDisabledConfigNetwork2222222200220(),
+		// ethClonableDisabledConfigNetwork2222222201220(),
+		// ethClonableDisabledConfigNetwork2222222202020(),
+		// ethClonableDisabledConfigNetwork2222222202120(),
+		// ethClonableDisabledConfigNetwork2222222202200(),
+		// ethClonableDisabledConfigNetwork2222222202210(),
+		// ethClonableDisabledConfigNetwork2222222202220(),
+		// ethClonableDisabledConfigNetwork2233022202220(),
+		// ethClonableDisabledConfigNetwork2233122202220(),
+		// ethClonableDisabledConfigNetwork2233222202220(),
+
+		ethClonableDisabledConfigNetwork2233222222220(),
+		ethClonableEnabledEmptyConfigNetwork(),
+		ethClonableEnabledNilConfigNetwork(),
+		ethClonableEnabledConfigNetwork0(),
+		ethClonableEnabledConfigNetwork1(),
+		ethClonableEnabledConfigNetwork2233222222220(),
+
+		// ethClonableEnabledEmptyConfigNetwork(),
+		// ethClonableEnabledNilConfigNetwork(),
+		// ethClonableEnabledConfigNetwork00(),
+		// ethClonableEnabledConfigNetwork01(),
+		// ethClonableEnabledConfigNetwork02(),
+		// ethClonableEnabledConfigNetwork10(),
+		// ethClonableEnabledConfigNetwork11(),
+		// ethClonableEnabledConfigNetwork12(),
+		// ethClonableEnabledConfigNetwork20(),
+		// ethClonableEnabledConfigNetwork21(),
+		// ethClonableEnabledConfigNetwork22(),
 	}
 }
 
@@ -217,18 +293,18 @@ func (nf *NetworkFields) clone() (nf2 *NetworkFields) {
 	return
 }
 
-func (nf *NetworkFields) genName(prefix *string) (name *string) {
+func (nf *NetworkFields) genName(prefix *string, nfg *NetworkFixtureGenerator) (name *string) {
 	production := "Production"
-	if !*(nf.IsProduction) {
+	if nf.IsProduction == nil || !*(nf.IsProduction) {
 		production = "Non" + production + " "
 	}
 	clonable := "Cloneable "
-	if !*(nf.Cloneable) {
+	if nf.Cloneable == nil || !*(nf.Cloneable) {
 		clonable = "Non" + clonable
 	}
 
 	enabled := "Enabled "
-	if !*(nf.Enabled) {
+	if nf.Enabled == nil || !*(nf.Enabled) {
 		enabled = "Disabled "
 	}
 
@@ -243,15 +319,25 @@ func (nf *NetworkFields) genName(prefix *string) (name *string) {
 		if len(config) == 0 {
 			cfg = "Empty " + cfg
 		} else {
+
+			// if nfg.FieldRegistered(ptrTo("Config/cloneable_cfg")) {
 			if config["cloneable_cfg"] == nil {
 				cfg += "nil cloneable_cfg "
 			} else {
 				if reflect.DeepEqual(config["cloneable_cfg"], map[string]interface{}{}) {
 					cfg += "empty cloneable_cfg "
 				} else {
+					// cloneable_cfg := config["cloneable_cfg"].(map[string]interface{})
+					// if _, secOk := cloneable_cfg["_security"]; secOk {
+					// 	cfg += "w cloneable_cfg w security "
+					// } else {
 					cfg += "w cloneable_cfg "
+					// }
 				}
 			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/chainspec_url")) {
 			if config["chainspec"] == nil && config["chainspec_url"] == nil {
 				cfg += "nil chainspec "
 			} else {
@@ -259,9 +345,27 @@ func (nf *NetworkFields) genName(prefix *string) (name *string) {
 					cfg += "w chainspec "
 				}
 				if config["chainspec_url"] != nil {
-					cfg += "w chainspec_url "
+					if config["chainspec_url"] == "" {
+						cfg += "empty chainspec_url "
+					} else {
+						cfg += "w chainspec_url "
+					}
 				}
 			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/block_explorer_url")) {
+			if config["block_explorer_url"] == nil {
+				cfg += "nil block_explorer_url "
+			} else {
+				if reflect.DeepEqual(config["block_explorer_url"], map[string]interface{}{}) {
+					cfg += "empty block_explorer_url "
+				} else {
+					cfg += "w block_explorer_url "
+				}
+			}
+			// }
+
 			// if config["block_explorer_url"] == nil {
 			// 	cfg += "nil block_explorer_url "
 			// } else {
@@ -271,6 +375,95 @@ func (nf *NetworkFields) genName(prefix *string) (name *string) {
 			// 		cfg += "w block_explorer_url "
 			// 	}
 			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/chain")) {
+			if config["chain"] == nil {
+				cfg += "nil chain "
+			} else {
+				if reflect.DeepEqual(config["chain"], map[string]interface{}{}) {
+					cfg += "empty chain "
+				} else {
+					cfg += "w chain "
+				}
+			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/engine_id")) {
+			if config["engine_id"] == nil {
+				cfg += "nil engine_id "
+			} else {
+				if reflect.DeepEqual(config["engine_id"], map[string]interface{}{}) {
+					cfg += "empty engine_id "
+				} else {
+					cfg += "w engine_id "
+				}
+			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/is_ethereum_network")) {
+			if config["is_ethereum_network"] == nil {
+				cfg += "nil eth "
+			} else {
+				fmt.Printf("is eth: %v\n", config["is_ethereum_network"].(bool))
+				if config["is_ethereum_network"].(bool) {
+					cfg += "eth:t "
+				} else {
+					cfg += "eth:f "
+				}
+			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/is_load_balanced")) {
+			if config["is_load_balanced"] == nil {
+				cfg += "nil lb "
+			} else {
+				if config["is_load_balanced"].(bool) {
+					cfg += "lb:t "
+				} else {
+					cfg += "lb:f "
+				}
+			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/native_currency")) {
+			if config["native_currency"] == nil {
+				cfg += "nil currency "
+			} else {
+				if nc := config["native_currency"]; nc == "" {
+					cfg += "empty currency "
+				} else {
+					cfg += nc.(string) + " currency "
+				}
+			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/network_id")) {
+			if config["network_id"] == nil {
+				cfg += "nil network_id "
+			} else {
+				if nc := config["network_id"]; nc == "" {
+					cfg += "empty network_id "
+				} else {
+					fmt.Printf("network id: %v\n", nc.(float64))
+					cfg += strconv.Itoa(int(nc.(float64))) + " network_id "
+				}
+			}
+			// }
+
+			// if nfg.FieldRegistered(ptrTo("Config/protocol_id")) {
+			if config["protocol_id"] == nil {
+				cfg += "nil protocol_id "
+			} else {
+				if nc := config["protocol_id"]; nc == "" {
+					cfg += "empty protocol_id "
+				} else {
+					cfg += nc.(string) + " protocol_id "
+				}
+			}
+			// }
+
+			// name := "ETH NonProduction Cloneable Disabled Config w cloneable_cfg w chainspec_url w block_explorer_url w chain w engine_id eth:t lb:t PRVD currency 22 network_id poa protocol_id "
+
 		}
 	}
 

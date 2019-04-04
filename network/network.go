@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"sync"
 	"time"
@@ -525,17 +526,76 @@ func (n *Network) Validate() bool {
 		})
 	}
 
+	if n.Enabled == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Enabled flag can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.IsProduction == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("IsProduction flag can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.Cloneable == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Cloneable flag can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.Name == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Name can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.Enabled == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Enabled flag can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.IsProduction == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("IsProduction flag can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.Cloneable == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Cloneable flag can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
+	if n.Name == nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Name can't be nil"),
+			Status:  common.PtrToInt(10),
+		})
+	}
+
 	config := map[string]interface{}{}
 	if n.Config != nil {
 		err := json.Unmarshal(*n.Config, &config)
 
 		if err == nil && len(config) == 0 {
-			n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config should not be empty"), common.PtrToInt(12)})
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config should not be empty"),
+				Status:  common.PtrToInt(12),
+			})
 		}
 
 		if err == nil && *n.Cloneable {
 			if cfg, cfgOk := config["cloneable_cfg"].(map[string]interface{}); cfgOk {
-				if _, securityCfgOk := cfg["_security"].(map[string]interface{}); !securityCfgOk {
+				if _, ok := cfg["_security"]; !ok {
 					n.Errors = append(n.Errors, &provide.Error{
 						Message: common.StringOrNil("Config _security value should be present for clonable network"),
 						Status:  common.PtrToInt(11),
@@ -543,28 +603,150 @@ func (n *Network) Validate() bool {
 				}
 			} else {
 				n.Errors = append(n.Errors, &provide.Error{
-					Message: common.StringOrNil("cloneable_cfg should be present"),
+					Message: common.StringOrNil("Config cloneable_cfg should not be null"),
 					Status:  common.PtrToInt(11),
 				})
 			}
+		} else {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config cloneable_cfg should be present"),
+				Status:  common.PtrToInt(11),
+			})
 		}
 
-		chainspecURL, chainspecURLOk := config["chainspec_url"].(string)
-		_, chainspecOk := config["chainspec"].(map[string]interface{})
-		if !chainspecURLOk && !chainspecOk {
+		chainspecURL, chainspecURLOk := config["chainspec_url"]
+		chainspec, chainspecOk := config["chainspec"]
+		if !(chainspecOk || chainspecURLOk) {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("Config chainspec_url or chainspec should be present"),
 				Status:  common.PtrToInt(11),
 			})
-		} else if chainspecURLOk {
-			if chainspecURL == "" {
-				n.Errors = append(n.Errors, &provide.Error{
-					Message: common.StringOrNil("Config chainspec_url value should not be empty"),
-					Status:  common.PtrToInt(11),
-				})
+		} else {
+			if chainspecOk {
+				if chainspec == nil || chainspec == "" {
+					n.Errors = append(n.Errors, &provide.Error{
+						Message: common.StringOrNil("Config chainspec value should not be empty"),
+						Status:  common.PtrToInt(11),
+					})
+				}
+			}
+			if chainspecURLOk {
+				if chainspecURL == nil {
+					n.Errors = append(n.Errors, &provide.Error{
+						Message: common.StringOrNil("Config chainspec_url value should not be empty"),
+						Status:  common.PtrToInt(11),
+					})
+				} else {
+					_, chParseErr := url.ParseRequestURI(chainspecURL.(string))
+					if chParseErr != nil {
+						n.Errors = append(n.Errors, &provide.Error{
+							Message: common.StringOrNil("Config chainspec_url value should be a valid URL"),
+							Status:  common.PtrToInt(11),
+						})
+					}
+				}
+			}
+			if chainspecURLOk {
+				if chainspecURL == nil {
+					n.Errors = append(n.Errors, &provide.Error{
+						Message: common.StringOrNil("Config chainspec_url value should not be empty"),
+						Status:  common.PtrToInt(11),
+					})
+				} else {
+					_, chParseErr := url.ParseRequestURI(chainspecURL.(string))
+					if chParseErr != nil {
+						n.Errors = append(n.Errors, &provide.Error{
+							Message: common.StringOrNil("Config chainspec_url value should be a valid URL"),
+							Status:  common.PtrToInt(11),
+						})
+					}
+				}
 			}
 		}
+
+		blockExplorerURL, blockExplorerURLOk := config["block_explorer_url"]
+		if !blockExplorerURLOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config block_explorer_url should not be nil"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if blockExplorerURL == nil || blockExplorerURL == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config block_explorer_url should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		}
+
+		chain, chainOk := config["chain"]
+		if !chainOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config chain should not be nil"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if chain == nil || chain == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config chain should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		}
+
+		engineID, engineIDOk := config["engine_id"]
+		if !engineIDOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config engine_id should not be nil"),
+				Status:  common.PtrToInt(11)})
+		} else if engineID == nil || engineID == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config engine_id should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		}
+
+		nativeCurrency, nativeCurrencyOk := config["native_currency"]
+		if !nativeCurrencyOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config native_currency should not be nil"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if nativeCurrency == nil || nativeCurrency == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config native_currency should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		}
+
+		networkID, networkIDOk := config["network_id"]
+		if !networkIDOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config network_id should not be nil"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if networkID == nil || networkID == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config network_id should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if int(networkID.(float64)) == 0 {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config network_id should not be zero"),
+				Status:  common.PtrToInt(11),
+			})
+		}
+
+		protocolID, protocolIDOk := config["protocol_id"]
+		if !protocolIDOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config protocol_id should not be nil"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if protocolID == nil || protocolID == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config protocol_id should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		}
 	}
+
 	// add error if Config is empty
 	// add error if Clonable and Config[:_security] is empty
 	// add error if Config is nil
@@ -593,10 +775,9 @@ func (n *Network) RpcURL() string {
 		if url, urlOk := balancerCfg["json_rpc_url"].(string); urlOk {
 			return url
 		}
-		// loadBalancedURL := fmt.Sprintf("wss://%s:%v", balancer.Host, balancer.Port)
 	}
-	if RpcURL, ok := cfg["json_rpc_url"].(string); ok {
-		return RpcURL
+	if rpcURL, ok := cfg["json_rpc_url"].(string); ok {
+		return rpcURL
 	}
 	return ""
 }
@@ -610,7 +791,6 @@ func (n *Network) websocketURL() string {
 		if url, urlOk := balancerCfg["websocket_url"].(string); urlOk {
 			return url
 		}
-		// loadBalancedURL := fmt.Sprintf("wss://%s:%v", balancer.Host, balancer.Port)
 	}
 	if websocketURL, ok := cfg["websocket_url"].(string); ok {
 		return websocketURL

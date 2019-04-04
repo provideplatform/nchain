@@ -1,9 +1,13 @@
+// +build unit
+
 package network_test
 
 import (
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/contract"
 	"github.com/provideapp/goldmine/network"
@@ -12,9 +16,11 @@ import (
 	"github.com/provideapp/goldmine/test/matchers"
 
 	dbconf "github.com/kthomas/go-db-config"
+	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/go-nats-streaming"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	//. "github.com/onsi/gomega/gstruct"
 )
 
@@ -41,7 +47,7 @@ func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture)
 	// }
 	// return
 
-	networkFixtureGenerator := networkfixtures.NewNetworkFixtureGenerator()
+	networkFixtureGenerator := networkfixtures.NewNetworkFixtureGenerator(nil)
 	dispatcher := networkfixtures.NewNetworkFixtureDispatcher(networkFixtureGenerator)
 
 	networks := dispatcher.Networks()
@@ -58,6 +64,11 @@ func testNetworks() (nf []*networkFactory, nc []*networkfixtures.NetworkFixture)
 		}
 	}
 	return
+}
+
+func clearNetworks(db *gorm.DB) {
+	uid, _ := uuid.FromString("36a5f8e0-bfc1-49f8-a7ba-86457bb52912")
+	db.Delete(network.Network{}, "id != ?", uid)
 }
 
 type networkFactory struct {
@@ -90,62 +101,18 @@ func TestNetworks(t *testing.T) {
 }
 
 var _ = Describe("Network", func() {
+
 	var n *network.Network
 	var mc *matchers.MatcherCollection
-	var ch chan *stan.Msg
+	// var ch chan *stan.Msg
 	// var chStr chan string
-	var natsConn stan.Conn
+	// var natsConn stan.Conn
 	var natsSub stan.Subscription
-	var err error
+	// var err error
 
 	var chPolling chan string
 
-	var networks, _ = testNetworks()
-
-	BeforeEach(func() {
-
-		n = &network.Network{
-			ApplicationID: nil,
-			UserID:        nil,
-			Name:          ptrTo("Name ETH non-Cloneable Enabled"),
-			Description:   ptrTo("Ethereum Network"),
-			IsProduction:  ptrToBool(false),
-			Cloneable:     ptrToBool(false),
-			Enabled:       ptrToBool(true),
-			ChainID:       nil,
-			SidechainID:   nil,
-			NetworkID:     nil,
-			Config: common.MarshalConfig(map[string]interface{}{
-				"block_explorer_url": "https://unicorn-explorer.provide.network", // required
-				"chain":              "unicorn-v0",                               // required
-				"chainspec_abi_url":  "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
-				"chainspec_url":      "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
-				"cloneable_cfg": map[string]interface{}{
-					"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security
-				"engine_id":           "authorityRound", // required
-				"is_ethereum_network": true,             // required for ETH
-				"is_load_balanced":    true,             // implies network load balancer count > 0
-				"json_rpc_url":        nil,
-				"native_currency":     "PRVD", // required
-				"network_id":          22,     // required
-				"protocol_id":         "poa",  // required
-				"websocket_url":       nil}),
-			Stats: nil}
-
-		ch = make(chan *stan.Msg, 1)
-
-	})
-
-	AfterEach(func() {
-
-		db := dbconf.DatabaseConnection()
-		db.Delete(network.Network{})
-		db.Delete(contract.Contract{})
-
-		if natsSub != nil {
-			natsSub.Unsubscribe()
-		}
-	})
+	var networks, rest = testNetworks()
 
 	Describe("Network", func() {
 		Context("production", func() {})
@@ -155,7 +122,11 @@ var _ = Describe("Network", func() {
 				// fixtures := networkFixtureGenerator.All()
 				// Expect(len(fixtures) - len(networks)).To(Equal(0))
 				// Expect(fixtures).To(HaveLen(8))
-				// FIXME: Expect(rest).To(HaveLen(0))
+				names := make([]*string, len(rest))
+				for i, f := range rest {
+					names[i] = f.Name
+				}
+				Expect(names).To(HaveLen(0))
 			})
 		})
 
@@ -173,41 +144,62 @@ var _ = Describe("Network", func() {
 				Context(name, func() { // context for current network
 
 					BeforeEach(func() {
+						var count int
+						db := dbconf.DatabaseConnection()
+						db.Model(&contract.Contract{}).Count(&count)
+						// fmt.Printf("contract count: %v\n", count)
+						// fmt.Printf("purging contracts\n")
+
+						db.Delete(contract.Contract{})
+						clearNetworks(db)
+						db.Model(&contract.Contract{}).Count(&count)
+						// fmt.Printf("contract count: %v\n", count)
+
 						n = nn.Network() // creating new pointer with network data for each test
 						mc = nn.Matchers // set of matchers for current network
 					})
 
-					Context("NATS", func() {
-						BeforeEach(func() {
+					AfterEach(func() {
+						db := dbconf.DatabaseConnection()
 
-							matcherName := "Create with NATS"
-							var chName string
-							if opts, ok := mc.MatcherOptionsFor(matcherName); ok {
-								chName = *opts.NATSChannels[0]
-							}
+						db.Delete(contract.Contract{})
 
-							natsConn = common.GetDefaultNatsStreamingConnection()
-							ch = make(chan *stan.Msg, 1)
-							natsSub, err = natsConn.QueueSubscribe(chName, chName, func(msg *stan.Msg) {
-								ch <- msg
-							})
-							if err != nil {
-								common.Log.Debugf("conn failure")
-							}
-
-							test.NatsGuaranteeDelivery(chName)
-						})
-						It("should catch NATS message", func() {
-							chPolling = make(chan string, 1)
-							cf := func(ch chan string) error {
-								return nil
-							}
-							test.PollingToStrChFunc(chPolling, cf, nil)
-
-							matcherName := "Create with NATS"
-							Expect(n.Create()).To(mc.MatchBehaviorFor(matcherName, chPolling))
-						})
+						if natsSub != nil {
+							natsSub.Unsubscribe()
+						}
 					})
+
+					// Context("NATS", func() {
+					// 	BeforeEach(func() {
+
+					// 		matcherName := "Create with NATS"
+					// 		var chName string
+					// 		if opts, ok := mc.MatcherOptionsFor(matcherName); ok {
+					// 			chName = *opts.NATSChannels[0]
+					// 		}
+
+					// 		natsConn = common.GetDefaultNatsStreamingConnection()
+					// 		ch = make(chan *stan.Msg, 1)
+					// 		natsSub, err = natsConn.QueueSubscribe(chName, chName, func(msg *stan.Msg) {
+					// 			ch <- msg
+					// 		})
+					// 		if err != nil {
+					// 			common.Log.Debugf("conn failure")
+					// 		}
+
+					// 		test.NatsGuaranteeDelivery(chName)
+					// 	})
+					// 	It("should catch NATS message", func() {
+					// 		chPolling = make(chan string, 1)
+					// 		cf := func(ch chan string) error {
+					// 			return nil
+					// 		}
+					// 		test.PollingToStrChFunc(chPolling, cf, nil)
+
+					// 		matcherName := "Create with NATS"
+					// 		Expect(n.Create()).To(mc.MatchBehaviorFor(matcherName, chPolling))
+					// 	})
+					// })
 
 					Context("channeling", func() {
 						It("should be created", func() {
@@ -225,8 +217,8 @@ var _ = Describe("Network", func() {
 								objects := []contract.Contract{}
 								db.Find(&objects)
 
-								for _, object := range objects {
-									fmt.Println(object.ID.String())
+								for i, object := range objects {
+									fmt.Printf("%vth object ID: %v\n", i, object.ID.String())
 									ch <- object.ID.String()
 								}
 
@@ -257,7 +249,7 @@ var _ = Describe("Network", func() {
 					})
 
 					It("should be valid", func() {
-						Expect(n.Validate()).To(mc.MatchBehaviorFor("Validate"))
+						Expect(n).To(mc.MatchBehaviorFor("Validate", n))
 					})
 					It("should parse config", func() {
 						Expect(n.ParseConfig()).To(mc.MatchBehaviorFor("ParseConfig"))
@@ -272,6 +264,9 @@ var _ = Describe("Network", func() {
 					It("should not create second record", func() {
 						n.Create()
 						Expect(n.Create()).To(mc.MatchBehaviorFor("Double Create"))
+					})
+					It("should return RPC URL", func() {
+						Expect(n.RpcURL()).To(mc.MatchBehaviorFor("RpcURL"))
 					})
 					It("should reload instance", func() {
 						// Expect(n.Reload()).To(mc.MatchBehaviorFor("Reload")) // FIXME
@@ -302,10 +297,10 @@ var _ = Describe("Network", func() {
 						// Expect(n.Status()).To(mc.MatchBehaviorFor("Status"))
 					})
 					It("should return NodeCount", func() {
-						// Expect(n.NodeCount()).To(mc.MatchBehaviorFor("NodeCount"))
+						Expect(n.NodeCount()).To(mc.MatchBehaviorFor("NodeCount"))
 					})
 					It("should return AvailablePeerCount", func() {
-						// Expect(n.AvailablePeerCount()).To(mc.MatchBehaviorFor("AvailablePeerCount"))
+						Expect(n.AvailablePeerCount()).To(mc.MatchBehaviorFor("AvailablePeerCount"))
 					})
 					It("should return bootnodes txt", func() {
 						// Expect(n.BootnodesTxt()).To(mc.MatchBehaviorFor("BootnodesTxt"))
@@ -323,6 +318,510 @@ var _ = Describe("Network", func() {
 				})
 			}
 		})
+		/* alex
+		Context("with LB", func() {
+			var nlb *network.Network
+			var lb, lb2 *network.LoadBalancer
+			BeforeEach(func() {
 
+				nlb = &network.Network{
+					ApplicationID: nil,
+					UserID:        nil,
+					Name:          ptrTo("Name ETH non-Cloneable Enabled"),
+					Description:   ptrTo("Ethereum Network"),
+					IsProduction:  ptrToBool(false),
+					Cloneable:     ptrToBool(false),
+					Enabled:       ptrToBool(true),
+					ChainID:       nil,
+					SidechainID:   nil,
+					NetworkID:     nil,
+					Config: common.MarshalConfig(map[string]interface{}{
+						"block_explorer_url": "https://unicorn-explorer.provide.network", // required
+						"chain":              "unicorn-v0",                               // required
+						"chainspec_abi_url":  "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
+						"chainspec_url":      "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
+						"cloneable_cfg": map[string]interface{}{
+							"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security
+						"engine_id":           "authorityRound", // required
+						"is_ethereum_network": true,             // required for ETH
+						"is_load_balanced":    true,             // implies network load balancer count > 0
+						"json_rpc_url":        nil,
+						"native_currency":     "PRVD", // required
+						"network_id":          22,     // required
+						"protocol_id":         "poa",  // required
+						"websocket_url":       nil}),
+					Stats: nil}
+
+				// ch = make(chan *stan.Msg, 1)
+				nlb.Create()
+
+				lbConfig := map[string]interface{}{
+					"json_rpc_url": "url",
+				}
+				lb = &network.LoadBalancer{
+					NetworkID: nlb.ID,
+					Name:      common.StringOrNil("LB"),
+					Type:      common.StringOrNil("rpc"),
+					Config:    common.MarshalConfig(lbConfig),
+				}
+				r := lb.Create()
+				fmt.Printf("load balancer created: %t\n", r)
+
+				lb2 = &network.LoadBalancer{
+					NetworkID: nlb.ID,
+					Name:      common.StringOrNil("LB2"),
+					Type:      common.StringOrNil("websocket"),
+					Region:    common.StringOrNil("region"),
+					Config:    common.MarshalConfig(lbConfig),
+				}
+				lb2.Create()
+
+			})
+
+			AfterEach(func() {
+				db := dbconf.DatabaseConnection()
+				clearNetworks(db)
+				db.Delete(network.LoadBalancer{})
+			})
+
+			Context("LoadBalancers()", func() {
+				It("should return all load balancer", func() {
+					db := dbconf.DatabaseConnection()
+
+					lbResult, lbErr := nlb.LoadBalancers(db, nil, nil)
+
+					Expect(lbResult[1]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"NetworkID": Equal(nlb.ID),
+						"Name":      gstruct.PointTo(Equal("LB")),
+						"Type":      gstruct.PointTo(Equal("rpc")),
+					})))
+					Expect(lbResult[0]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"NetworkID": Equal(nlb.ID),
+						"Name":      gstruct.PointTo(Equal("LB2")),
+						"Region":    gstruct.PointTo(Equal("region")),
+						"Type":      gstruct.PointTo(Equal("websocket")),
+					})))
+					Expect(lbResult).To(HaveLen(2))
+					Expect(lbErr).NotTo(HaveOccurred())
+				})
+
+				It("should return all load balancer", func() {
+					db := dbconf.DatabaseConnection()
+
+					lbResult, lbErr := nlb.LoadBalancers(db, nil, lb.Type)
+
+					Expect(lbResult[0]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"NetworkID": Equal(nlb.ID),
+						"Name":      gstruct.PointTo(Equal("LB")),
+						"Type":      gstruct.PointTo(Equal("rpc")),
+					})))
+					Expect(lbResult).To(HaveLen(1))
+					Expect(lbErr).NotTo(HaveOccurred())
+				})
+
+				It("should return all load balancer", func() {
+					db := dbconf.DatabaseConnection()
+
+					lbResult, lbErr := nlb.LoadBalancers(db, nil, lb2.Type)
+
+					Expect(lbResult[0]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"NetworkID": Equal(nlb.ID),
+						"Name":      gstruct.PointTo(Equal("LB2")),
+						"Region":    gstruct.PointTo(Equal("region")),
+						"Type":      gstruct.PointTo(Equal("websocket")),
+					})))
+					Expect(lbResult).To(HaveLen(1))
+					Expect(lbErr).NotTo(HaveOccurred())
+				})
+
+				It("should return load balancer with region", func() {
+					db := dbconf.DatabaseConnection()
+
+					lbResult, lbErr := nlb.LoadBalancers(db, common.StringOrNil("region"), nil)
+
+					Expect(lbResult[0]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"NetworkID": Equal(nlb.ID),
+						"Name":      gstruct.PointTo(Equal("LB2")),
+						"Region":    gstruct.PointTo(Equal("region")),
+						"Type":      gstruct.PointTo(Equal("websocket")),
+					})))
+					Expect(lbResult).To(HaveLen(1))
+					Expect(lbErr).NotTo(HaveOccurred())
+				})
+
+				It("should return load balancer with region and type", func() {
+					db := dbconf.DatabaseConnection()
+
+					lbResult, lbErr := nlb.LoadBalancers(db, common.StringOrNil("region"), lb2.Type)
+
+					Expect(lbResult[0]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"NetworkID": Equal(nlb.ID),
+						"Name":      gstruct.PointTo(Equal("LB2")),
+						"Region":    gstruct.PointTo(Equal("region")),
+						"Type":      gstruct.PointTo(Equal("websocket")),
+					})))
+					Expect(lbResult).To(HaveLen(1))
+					Expect(lbErr).NotTo(HaveOccurred())
+				})
+
+				It("should return empty load balancer array", func() {
+					db := dbconf.DatabaseConnection()
+
+					lbResult, lbErr := nlb.LoadBalancers(db, common.StringOrNil("region"), lb.Type)
+
+					Expect(lbResult).To(HaveLen(0))
+					Expect(lbErr).NotTo(HaveOccurred())
+				})
+			})
+
+			Context("RpcUrl()", func() {
+				It("should return LB rpc url", func() {
+					Expect(nlb.RpcURL()).To(Equal("url"))
+				})
+
+			})
+
+			It("should return status", func() {
+				status, statusErr := nlb.Status(true)
+				Expect(status).NotTo(BeNil())
+				Expect(statusErr).NotTo(HaveOccurred())
+			})
+
+		})
+
+		alex */
+		Context("with nodes", func() {
+			var nwnn *network.Network
+			var node *network.NetworkNode
+			var runningPeerNode *network.NetworkNode
+			var runningFullNode *network.NetworkNode
+			var runningValidatorNode *network.NetworkNode
+			var runningFaucetNode *network.NetworkNode
+
+			BeforeEach(func() {
+				nwnn = &network.Network{
+					ApplicationID: nil,
+					UserID:        nil,
+					Name:          ptrTo("Name ETH non-Cloneable Enabled"),
+					Description:   ptrTo("Ethereum Network"),
+					IsProduction:  ptrToBool(false),
+					Cloneable:     ptrToBool(false),
+					Enabled:       ptrToBool(true),
+					ChainID:       nil,
+					SidechainID:   nil,
+					NetworkID:     nil,
+					Config: common.MarshalConfig(map[string]interface{}{
+						"block_explorer_url": "https://unicorn-explorer.provide.network", // required
+						"chain":              "unicorn-v0",                               // required
+						"chainspec_abi_url":  "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
+						"chainspec_url":      "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
+						"cloneable_cfg": map[string]interface{}{
+							"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security
+						"engine_id":           "authorityRound", // required
+						"is_ethereum_network": true,             // required for ETH
+						"is_load_balanced":    true,             // implies network load balancer count > 0
+						"json_rpc_url":        nil,
+						"native_currency":     "PRVD", // required
+						"network_id":          22,     // required
+						"protocol_id":         "poa",  // required
+						"websocket_url":       nil}),
+					Stats: nil}
+
+				nwnn.Create()
+
+				nodeConfig := map[string]interface{}{
+					"role":     "role",
+					"peer_url": "peer_url",
+				}
+				node = &network.NetworkNode{
+					NetworkID: nwnn.ID,
+					Bootnode:  true,
+					Role:      common.StringOrNil("role"),
+					Config:    common.MarshalConfig(nodeConfig),
+				}
+				r := node.Create()
+				fmt.Printf("node created: %t\n", r)
+
+				runningPeerNode = &network.NetworkNode{
+					NetworkID: nwnn.ID,
+					Bootnode:  true,
+					Status:    common.StringOrNil("running"),
+					Role:      common.StringOrNil("peer"),
+					Config:    common.MarshalConfig(map[string]interface{}{"role": "peer"}),
+				}
+				runningPeerNode.Create()
+				runningFullNode = &network.NetworkNode{
+					NetworkID: nwnn.ID,
+					Bootnode:  true,
+					Status:    common.StringOrNil("running"),
+					Role:      common.StringOrNil("full"),
+					Config:    common.MarshalConfig(map[string]interface{}{"role": "full"}),
+				}
+				runningFullNode.Create()
+				runningValidatorNode = &network.NetworkNode{
+					NetworkID: nwnn.ID,
+					Bootnode:  true,
+					Status:    common.StringOrNil("running"),
+					Role:      common.StringOrNil("validator"),
+					Config:    common.MarshalConfig(map[string]interface{}{"role": "validator"}),
+				}
+				runningValidatorNode.Create()
+				runningFaucetNode = &network.NetworkNode{
+					NetworkID: nwnn.ID,
+					Bootnode:  true,
+					Status:    common.StringOrNil("running"),
+					Role:      common.StringOrNil("faucet"),
+					Config:    common.MarshalConfig(map[string]interface{}{"role": "faucet"}),
+				}
+				runningFaucetNode.Create()
+				time.Sleep(time.Duration(100) * time.Millisecond)
+			})
+
+			AfterEach(func() {
+				db := dbconf.DatabaseConnection()
+				clearNetworks(db)
+				db.Delete(network.NetworkNode{})
+			})
+
+			It("should return node", func() {
+				nodesRes, nodesErr := nwnn.Nodes()
+				Expect(nodesRes[0]).To(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"NetworkID": Equal(nwnn.ID),
+					"Role":      gstruct.PointTo(Equal("role")),
+				})))
+				Expect(nodesRes).To(HaveLen(5))
+				Expect(nodesErr).NotTo(HaveOccurred())
+			})
+			It("should return nodes count", func() {
+				Expect(nwnn.BootnodesCount()).To(Equal(uint64(5)))
+			})
+			It("should return boot nodes txt", func() {
+				txt, txtErr := nwnn.BootnodesTxt()
+				Expect(txt).To(gstruct.PointTo(Equal("peer_url")))
+				Expect(txtErr).NotTo(HaveOccurred())
+			})
+			It("should return AvailablePeerCount", func() {
+				Expect(nwnn.AvailablePeerCount()).To(Equal(uint64(0)))
+			})
+			It("should return network status", func() {
+				Expect(nwnn.Status(true)).NotTo(BeNil())
+			})
+		})
+		Context("without assotiation", func() {
+			var nwa *network.Network
+			uid_test, _ := uuid.FromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+			//var lb, lb2 *network.LoadBalancer
+			BeforeEach(func() {
+
+				// ch = make(chan *stan.Msg, 1)
+				nwa = &network.Network{
+					ApplicationID: nil,
+					UserID:        nil,
+					Name:          ptrTo("Name ETH non-Cloneable Enabled"),
+					Description:   ptrTo("Ethereum Network"),
+					IsProduction:  ptrToBool(false),
+					Cloneable:     ptrToBool(false),
+					Enabled:       ptrToBool(true),
+					ChainID:       nil,
+					SidechainID:   &uid_test,
+					NetworkID:     &uid_test,
+					Config: common.MarshalConfig(map[string]interface{}{
+						"block_explorer_url": "https://unicorn-explorer.provide.network", // required
+						"chain":              "unicorn-v0",                               // required
+						"chainspec_abi_url":  "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json",
+						"chainspec_url":      "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
+						"cloneable_cfg": map[string]interface{}{
+							"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security
+						"engine_id":           "authorityRound", // required
+						"is_ethereum_network": true,             // required for ETH
+						"is_load_balanced":    true,             // implies network load balancer count > 0
+						"json_rpc_url":        nil,
+						"native_currency":     "PRVD", // required
+						"network_id":          22,     // required
+						"protocol_id":         "poa",  // required
+						"websocket_url":       nil}),
+					Stats: nil}
+				nwa.Create()
+
+			})
+			AfterEach(func() {
+				db := dbconf.DatabaseConnection()
+				clearNetworks(db)
+
+			})
+
+			Context("reload network ", func() {
+				//nlb.Validate()
+				first_val_false := false
+				first_val_true := true
+				uid_test, _ := uuid.FromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+				fmt.Println("nwa.ApplicationID >>>>>>>>>>>>>>>>>>>>>>>")
+				//fmt.Println(&nwa.ApplicationID)
+				//first_uid := nwa.ApplicationID
+				//var p *MyError = nil
+				It("ApplicationID", func() {
+					nwa.ApplicationID = &uid_test
+					nwa.Reload()
+					Expect(nwa.ApplicationID).To(BeNil())
+				})
+
+				It("UserID", func() {
+					nwa.UserID = &uid_test
+					nwa.Reload()
+					Expect(nwa.UserID).To(BeNil())
+				})
+
+				It("Name", func() {
+					nwa.Name = ptrTo("test")
+					nwa.Reload()
+					Expect(nwa.Name).To(gstruct.PointTo(Equal("Name ETH non-Cloneable Enabled")))
+				})
+
+				It("Description", func() {
+					nwa.Description = ptrTo("test")
+					nwa.Reload()
+					Expect(nwa.Description).To(gstruct.PointTo(Equal("Ethereum Network")))
+				})
+
+				It("IsProduction", func() {
+					//fmt.Println("IsProduction >>>>>>>>>>>>>>>>")
+					//first_uid := nwa.NetworkID
+					first_IsProduction := *nwa.IsProduction
+					fmt.Println("first_IsProduction")
+					fmt.Println(first_IsProduction)
+					changed_IsProduction := !first_IsProduction
+					fmt.Println("changed_IsProduction")
+					fmt.Println(changed_IsProduction)
+					nwa.IsProduction = &first_val_true
+					nwa.Reload()
+					fmt.Println("first_IsProduction")
+					fmt.Println(first_IsProduction)
+					fmt.Println("nwa.IsProduction")
+					fmt.Println(*nwa.IsProduction)
+					Expect(*nwa.IsProduction).To(Equal(first_IsProduction))
+				})
+
+				It("Cloneable", func() {
+					nwa.Cloneable = &first_val_true
+					nwa.Reload()
+					Expect(*nwa.Cloneable).To(Equal(first_val_false))
+				})
+
+				It("Enabled", func() {
+					nwa.Enabled = &first_val_false
+					nwa.Reload()
+					Expect(*nwa.Enabled).To(Equal(first_val_true))
+				})
+				It("ChainID", func() {
+					chid := *nwa.ChainID // being set during Create()
+					nwa.ChainID = ptrTo("test")
+					nwa.Reload()
+					Expect(nwa.ChainID).To(gstruct.PointTo(Equal(chid)))
+				})
+
+				It("NetworkID", func() {
+					fmt.Println("reload network >>>>>>>>>>>>>>>>")
+					first_NetworkID := *nwa.NetworkID
+					uid := uuid.Nil
+					//uid2, _ := uuid.FromString("1ba7b810-9dad-11d1-80b4-00c04fd430c8")
+					nwa.NetworkID = &uid
+					//nlb.NetworkID
+					nwa.Reload()
+					Expect(nwa.NetworkID).To(gstruct.PointTo(Equal(first_NetworkID)))
+				})
+
+				It("SidechainID", func() {
+					fmt.Println("reload network >>>>>>>>>>>>>>>>")
+					first_NetworkID := *nwa.SidechainID
+					uid, _ := uuid.FromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+					//uid2, _ := uuid.FromString("1ba7b810-9dad-11d1-80b4-00c04fd430c8")
+					nwa.SidechainID = &uid
+					//nlb.NetworkID
+					nwa.Reload()
+					Expect(nwa.SidechainID).To(gstruct.PointTo(Equal(first_NetworkID)))
+				})
+
+			})
+
+			Context("Update network ", func() {
+				first_val_false := false
+				first_val_true := true
+				uid_test, _ := uuid.FromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+				It("ApplicationID", func() {
+					nwa.ApplicationID = &uid_test
+					nwa.Update()
+					Expect(nwa.ApplicationID).To(gstruct.PointTo(Equal(uid_test)))
+				})
+
+				It("UserID", func() {
+					nwa.UserID = &uid_test
+					nwa.Update()
+					Expect(*nwa.UserID).To(Equal(uid_test))
+				})
+
+				It("Name", func() {
+					nwa.Name = ptrTo("test Name")
+					nwa.Update()
+					Expect(*nwa.Name).To(Equal("test Name"))
+				})
+
+				It("Description", func() {
+					nwa.Description = ptrTo("test Description")
+					nwa.Update()
+					Expect(nwa.Description).To(gstruct.PointTo(Equal("test Description")))
+				})
+
+				It("IsProduction", func() {
+					//fmt.Println("IsProduction >>>>>>>>>>>>>>>>")
+					//first_uid := nwa.NetworkID
+					first_Update_IsProduction := !*nwa.IsProduction
+					nwa.IsProduction = &first_Update_IsProduction
+					nwa.Update()
+					Expect(*nwa.IsProduction).To(Equal(first_Update_IsProduction))
+				})
+
+				It("Cloneable", func() {
+					nwa.Cloneable = &first_val_true
+					nwa.Update()
+					Expect(*nwa.Cloneable).To(Equal(first_val_true))
+				})
+
+				It("Enabled", func() {
+					nwa.Enabled = &first_val_false
+					nwa.Update()
+					Expect(*nwa.Enabled).To(Equal(first_val_false))
+				})
+				It("ChainID", func() {
+					nwa.ChainID = ptrTo("test")
+					nwa.Update()
+					Expect(nwa.ChainID).To(gstruct.PointTo(Equal("test")))
+				})
+
+				It("NetworkID", func() {
+					fmt.Println("reload network >>>>>>>>>>>>>>>>")
+					//first_NetworkID := nwa.NetworkID
+					uid := uuid.Nil
+					//uid2, _ := uuid.FromString("1ba7b810-9dad-11d1-80b4-00c04fd430c8")
+					nwa.NetworkID = &uid
+					//nlb.NetworkID
+					nwa.Update()
+					//Expect(nwa.NetworkID).To(Equal(first_NetworkID))
+				})
+
+				It("SidechainID", func() {
+					fmt.Println("reload network >>>>>>>>>>>>>>>>")
+					//first_NetworkID := nwa.SidechainID
+					uid, _ := uuid.FromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+					//uid2, _ := uuid.FromString("1ba7b810-9dad-11d1-80b4-00c04fd430c8")
+					nwa.SidechainID = &uid
+					//nlb.NetworkID
+					nwa.Update()
+					Expect(*nwa.SidechainID).To(Equal(uid))
+				})
+
+			})
+
+		})
 	})
 })

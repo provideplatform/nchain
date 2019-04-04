@@ -144,7 +144,7 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 		common.Log.Debugf("Network contract creation invocation succeeded; ACKing NATS message for contract: %s", contract.ID)
 		msg.Ack()
 	} else {
-		common.Log.Warningf("Failed to persist network contract with address: %s; %s", addr)
+		common.Log.Warningf("Failed to persist network contract with address: %s", addr)
 		consumer.Nack(msg)
 	}
 }

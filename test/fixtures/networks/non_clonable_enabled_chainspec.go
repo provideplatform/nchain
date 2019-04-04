@@ -1,11 +1,6 @@
 package networkfixtures
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	"github.com/provideapp/goldmine/test/fixtures"
@@ -92,45 +87,45 @@ func ethNonCloneableEnabledChainspecNetwork() (n *fixtures.FixtureMatcher) {
 	return
 }
 
-func getChainspec() (chainspecJSON map[string]interface{}, chainspecABIJSON map[string]interface{}) {
-	ethChainspecFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn/spec.json"
-	ethChainspecAbiFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json"
-	response, err := http.Get(ethChainspecFileurl)
-	//chainspec_text := ""
-	// chainspec_abi_text := ""
-	chainspecJSON = map[string]interface{}{}
-	chainspecABIJSON = map[string]interface{}{}
+// func getChainspec() (chainspecJSON map[string]interface{}, chainspecABIJSON map[string]interface{}) {
+// 	ethChainspecFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn/spec.json"
+// 	ethChainspecAbiFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json"
+// 	response, err := http.Get(ethChainspecFileurl)
+// 	//chainspec_text := ""
+// 	// chainspec_abi_text := ""
+// 	chainspecJSON = map[string]interface{}{}
+// 	chainspecABIJSON = map[string]interface{}{}
 
-	if err != nil {
-		fmt.Printf("%s\n", err)
-	} else {
-		defer response.Body.Close()
-		contents, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			fmt.Printf("%s\n", err)
-		}
-		// fmt.Printf("%s\n", string(contents))
-		//chainspec_text = string(contents)
-		json.Unmarshal(contents, &chainspecJSON)
-		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
+// 	if err != nil {
+// 		fmt.Printf("%s\n", err)
+// 	} else {
+// 		defer response.Body.Close()
+// 		contents, err := ioutil.ReadAll(response.Body)
+// 		if err != nil {
+// 			fmt.Printf("%s\n", err)
+// 		}
+// 		// fmt.Printf("%s\n", string(contents))
+// 		//chainspec_text = string(contents)
+// 		json.Unmarshal(contents, &chainspecJSON)
+// 		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
 
-	}
+// 	}
 
-	responseAbi, err := http.Get(ethChainspecAbiFileurl)
+// 	responseAbi, err := http.Get(ethChainspecAbiFileurl)
 
-	if err != nil {
-		fmt.Printf("%s\n", err)
-	} else {
-		defer responseAbi.Body.Close()
-		contents, err := ioutil.ReadAll(responseAbi.Body)
-		if err != nil {
-			fmt.Printf("%s\n", err)
-		}
-		// fmt.Printf("%s\n", string(contents))
-		// chainspec_abi_text = string(contents)
-		json.Unmarshal(contents, &chainspecABIJSON)
-		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
-	}
+// 	if err != nil {
+// 		fmt.Printf("%s\n", err)
+// 	} else {
+// 		defer responseAbi.Body.Close()
+// 		contents, err := ioutil.ReadAll(responseAbi.Body)
+// 		if err != nil {
+// 			fmt.Printf("%s\n", err)
+// 		}
+// 		// fmt.Printf("%s\n", string(contents))
+// 		// chainspec_abi_text = string(contents)
+// 		json.Unmarshal(contents, &chainspecABIJSON)
+// 		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
+// 	}
 
-	return
-}
+// 	return
+// }

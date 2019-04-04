@@ -105,6 +105,24 @@ func NetworkCreateMatcher(expectedResult bool, expectedCount int, opts ...interf
 	}
 }
 
+func NetworkValidateMatcher(expectedResult bool, expectedCount int, errors []*string, opts ...interface{}) types.GomegaMatcher {
+	return &networkValidateMatcher{
+		expected:       nil,
+		expectedResult: expectedResult,
+		expectedCount:  expectedCount,
+		expectedErrors: errors,
+		nPtr:           opts[0],
+	}
+}
+
+type networkValidateMatcher struct {
+	expected       interface{}
+	expectedResult bool
+	expectedCount  int
+	expectedErrors []*string
+	nPtr           interface{}
+}
+
 type networkCreateMatcher struct {
 	expected       interface{}
 	expectedResult bool
@@ -114,7 +132,78 @@ type networkCreateMatcher struct {
 	fn             func() []interface{}
 }
 
-// duplication to  check fields
+func (matcher *networkValidateMatcher) Match(actual interface{}) (success bool, err error) {
+	n := matcher.nPtr // opts[0]
+
+	validateResult := callMethodOnPtr(n, "Validate").(bool)
+
+	var res1 bool
+	var err1 error
+
+	if matcher.expectedResult {
+		res1, err1 = (&matchers.BeTrueMatcher{}).Match(validateResult)
+	} else {
+		res1, err1 = (&matchers.BeFalseMatcher{}).Match(validateResult)
+	}
+	fmt.Printf("networkValidateMatcher step 1. network validated: %v\n", res1)
+
+	if !res1 || (err1 != nil) {
+		return res1, err1
+	}
+
+	model := fieldFromPtr(n, "Model").(provide.Model)
+
+	errors := fieldFromPtr(model, "Errors").([]*provide.Error)
+
+	// fmt.Printf("errors: %v\n", errors)
+
+	var res2 bool
+	var err2 error
+
+	res2, err2 = (&matchers.HaveLenMatcher{Count: matcher.expectedCount}).Match(errors)
+	fmt.Printf("networkValidateMatcher step 2. errors number match: %v\n", res2)
+
+	if !res2 || (err2 != nil) {
+		fmt.Printf("expected count: %v, actual count: %v\n", matcher.expectedCount, len(errors))
+		return res2, err2
+	}
+
+	var res3 bool
+	var err3 error
+
+	expectedErrorValues := []string{}
+	for _, ee := range matcher.expectedErrors {
+		// fmt.Printf("expected error: %v\n", *ee)
+		expectedErrorValues = append(expectedErrorValues, *ee)
+	}
+
+	for _, e := range errors {
+		str := *e.Message
+		fmt.Printf("str: %v\n", str)
+		res3, err3 = (&matchers.ContainElementMatcher{Element: str}).Match(expectedErrorValues)
+		fmt.Printf("res3: %t\n", res3)
+		fmt.Printf("err3: %v\n", err3)
+		if !res3 || (err3 != nil) {
+			fmt.Printf("networkValidateMatcher step 3. error messages match: %v\n", res3)
+			fmt.Printf("expected to have message '%v'\nhave: %v\n\n", str, expectedErrorValues)
+			return res3, err3
+		}
+	}
+
+	fmt.Printf("networkValidateMatcher step 3. error messages match: %v\n", res3)
+
+	return true, nil
+}
+
+func (matcher *networkValidateMatcher) FailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("Expected\n\t%#v\nto match\n\t%#v", actual, matcher.expected)
+}
+
+func (matcher *networkValidateMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	return fmt.Sprintf("Expected\n\t%#v\nnot to match\n\t%#v", actual, matcher.expected)
+}
+
+// duplication to check fields
 type Contract struct {
 	ApplicationID *uuid.UUID
 	NetworkID     uuid.UUID
@@ -242,6 +331,12 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 
 	objects := matcher.fn()
 
+	if matcher.expectedCount > 0 {
+		for i, o := range objects {
+			fmt.Printf("%vth object: %v\n", i, o)
+		}
+	}
+
 	res2, err2 := (&matchers.HaveLenMatcher{Count: matcher.expectedCount}).Match(objects)
 	fmt.Printf("networkCreateMatcher step 2. contracts created number match: %v\n", res2)
 	// fmt.Printf("err2: %v\n", err2)
@@ -273,8 +368,14 @@ func (matcher *networkCreateMatcher) Match(actual interface{}) (success bool, er
 			address := fieldFromPtr(contract, "Address").(*string)
 			fields.Address = address
 
-			// fmt.Printf("fields: %#v\n", fields)
-			// fmt.Printf("fields Name: %v\n", *fields.Name)
+			fmt.Printf("fields: %#v\n", fields)
+
+			fmt.Printf("networkID: %v\n", networkID)
+			fmt.Printf("fields NetworkID: %v\n", fields.NetworkID)
+			fmt.Printf("fields ApplicationID: %v\n", fields.ApplicationID)
+			fmt.Printf("fields ContractID: %v\n", fields.ContractID)
+			fmt.Printf("fields Name: %v\n", *fields.Name)
+			fmt.Printf("fields Address: %v\n", *fields.Address)
 			res3, err3 := (&gstruct.FieldsMatcher{
 				Fields: gstruct.Fields{
 					// "Model": MatchFields(IgnoreExtras, Fields{

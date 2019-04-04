@@ -376,6 +376,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 		}
 
 		common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, network.ID)
+		n.updateStatus(db, "pending", nil)
 
 		cfg := n.ParseConfig()
 
@@ -412,7 +413,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							if addr != nil && privateKey != nil {
 								keystoreJSON, err := provide.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
 								if err == nil {
-									common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", addr, *network.Name)
+									common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, *network.Name)
 									env["ENGINE_SIGNER"] = addr
 									env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
 									env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
@@ -485,6 +486,7 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 			if daemon, daemonOk := currentNetworkStats[network.ID.String()]; daemonOk {
 				if daemon.stats != nil {
 					if daemon.stats.Block > 0 {
+						common.Log.Warning("Deploying w/o network stats")
 						n._deploy(network, bootnodes, db)
 						ticker.Stop()
 						return

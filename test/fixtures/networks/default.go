@@ -58,7 +58,7 @@ func ethNonCloneableEnabledFullConfigNetwork() (n *fixtures.FixtureMatcher) {
 				Name:         ptrTo(name),
 				Description:  ptrTo("Ethereum Network"),
 				IsProduction: ptrToBool(false),
-				Cloneable:    ptrToBool(true),
+				Cloneable:    ptrToBool(false),
 				Enabled:      ptrToBool(true),
 				ChainID:      nil,
 				// SidechainID:   nil,

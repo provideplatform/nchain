@@ -455,7 +455,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 
 							cfg["target_groups"] = targetGroups
 							l.setConfig(cfg)
-							db.Save(l)
+							db.Save(&l)
 						}
 					}
 				} else {

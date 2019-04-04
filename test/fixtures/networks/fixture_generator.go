@@ -3,18 +3,43 @@ package networkfixtures
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/provideapp/goldmine/test/matchers"
 )
 
-func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*networkFixtureFieldValues) {
+func NewNetworkFixtureFieldValues(name *string, values []interface{}) *NetworkFixtureFieldValues {
+	return &NetworkFixtureFieldValues{
+		fieldName: name,
+		values:    values,
+	}
+}
+
+func NetworkFixtureFieldValuesVariety() (NetworkFixtureFieldValuesArray []*NetworkFixtureFieldValues) {
 
 	ptrTrue := ptrToBool(true)
 	ptrFalse := ptrToBool(false)
+	// emptyConfig := map[string]interface{}{}
+	// nilValuesConfig := nilValuesConfig()
+	// emptyValuesConfig := emptyValuesConfig()
 
-	networkFixtureFieldValuesArray = []*networkFixtureFieldValues{
-		&networkFixtureFieldValues{
+	chainspecConfig := defaultConfig()
+	delete(chainspecConfig, "chainspec_url")
+	delete(chainspecConfig, "chainspec_abi_url")
+	ch, chAbi := getChainspec()
+	chainspecConfig["chainspec"] = ch
+	chainspecConfig["chainspec_abi"] = chAbi
+	chainspecConfig["json_rpc_url"] = "url"
+	chainspecConfig["is_bcoin_network"] = true
+	chainspecConfig["is_handshake_network"] = true
+	chainspecConfig["is_lcoin_network"] = true
+	chainspecConfig["is_quorum_network"] = true
+
+	NetworkFixtureFieldValuesArray = []*NetworkFixtureFieldValues{
+		&NetworkFixtureFieldValues{
 			fieldName: ptrTo("Name/Prefix"),
 			values: []interface{}{
 				// ptrTo("   "),
@@ -22,79 +47,205 @@ func networkFixtureFieldValuesVariety() (networkFixtureFieldValuesArray []*netwo
 				// ptrTo("BTC")
 			},
 		},
-		&networkFixtureFieldValues{
+		&NetworkFixtureFieldValues{
 			fieldName: ptrTo("IsProduction"),
 			values: []interface{}{
 				// ptrTrue,
 				ptrFalse},
 		},
-		&networkFixtureFieldValues{
+		&NetworkFixtureFieldValues{
 			fieldName: ptrTo("Cloneable"),
 			values: []interface{}{
 				ptrTrue,
 				// ptrFalse,
 			},
 		},
-		&networkFixtureFieldValues{
+		&NetworkFixtureFieldValues{
 			fieldName: ptrTo("Enabled"),
 			values: []interface{}{
 				ptrTrue,
 				ptrFalse,
 			},
 		},
-		&networkFixtureFieldValues{
+		&NetworkFixtureFieldValues{
 			fieldName: ptrTo("Config"),
 			values: []interface{}{
 				nil,
-				map[string]interface{}{},
+				// emptyConfig,
+				// emptyValuesConfig,
+				// nilValuesConfig,
+				// chainspecConfig,
 			},
 		},
-		&networkFixtureFieldValues{
-			fieldName: ptrTo("Config/Skip"), // should be skipped if Config == nil
-			values: []interface{}{
-				ptrTrue,
-				ptrFalse,
-			},
-		},
-		&networkFixtureFieldValues{
-			fieldName: ptrTo("Config/cloneable_cfg"),
-			values: []interface{}{
-				nil,
-				map[string]interface{}{},
-				// map[string]interface{}{
-				// "_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security,
-			},
-		},
-		&networkFixtureFieldValues{
-			fieldName: ptrTo("Config/chainspec_url"),
-			values: []interface{}{
-				nil,
-				// add empty URL
-				ptrTo("https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json"),
-			},
-		},
-		// &networkFixtureFieldValues{
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/Skip"), // should be skipped if Config == nil
+		// 	values: []interface{}{
+		// 		// ptrTrue,
+		// 		ptrFalse,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/cloneable_cfg"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		map[string]interface{}{},
+		// 		map[string]interface{}{
+		// 			"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/chainspec_url"),
+		// 	values: []interface{}{
+		// 		// nil,
+		// 		// ptrTo(""),
+		// 		ptrTo("https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json"),
+		// 		// ptrTo("get https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json"),
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
 		// 	fieldName: ptrTo("Config/block_explorer_url"),
 		// 	values: []interface{}{
 		// 		nil,
+		// 		ptrTo(""),
 		// 		ptrTo("https://unicorn-explorer.provide.network"),
 		// 	},
 		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/chain"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrTo(""),
+		// 		ptrTo("unicorn-v0"),
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/engine_id"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrTo(""),
+		// 		ptrTo("authorityRound"),
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/is_ethereum_network"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrFalse,
+		// 		ptrTrue,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/is_bcoin_network"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrFalse,
+		// 		ptrTrue,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/is_handshake_network"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrFalse,
+		// 		ptrTrue,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/is_lcoin_network"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrFalse,
+		// 		ptrTrue,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/is_quorum_network"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrFalse,
+		// 		ptrTrue,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/is_load_balanced"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrFalse,
+		// 		ptrTrue,
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/native_currency"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrTo(""),
+		// 		ptrTo("PRVD"),
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/network_id"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		// ptrTo(""),
+		// 		ptrToInt(0),
+		// 		ptrToInt(22),
+		// 	},
+		// },
+		// &NetworkFixtureFieldValues{
+		// 	fieldName: ptrTo("Config/protocol_id"),
+		// 	values: []interface{}{
+		// 		nil,
+		// 		ptrTo(""),
+		// 		ptrTo("poa"),
+		// 	},
+		// },
+		// 	name := "ETH NonProduction Cloneable Disabled Config w cloneable_cfg w chainspec_url w block_explorer_url w chain w engine_id eth:t lb:t PRVD currency 22 network_id poa protocol_id "
+
 	}
+
 	return
 }
 
 // NetworkFixtureGenerator is a thing that generates test fixtures based on set of rules
 type NetworkFixtureGenerator struct {
-	fieldValuesVariety []*networkFixtureFieldValues
+	fieldValuesVariety []*NetworkFixtureFieldValues
+	fieldNames         []*string
 	fixtures           []*NetworkFields
 }
 
+// FieldRegistered returns true if `fieldNames` field has specified string value
+func (g *NetworkFixtureGenerator) FieldRegistered(fieldName *string) (b bool) {
+	for _, fn := range g.fieldNames {
+		// fmt.Printf("fn: %v\n", fn)
+		// fmt.Printf("fieldName: %v\n", fieldName)
+		if *fn == *fieldName {
+			return true
+		}
+	}
+	return false
+}
+
 // NewNetworkFixtureGenerator generates NetworkFixtureGenerator with default field-value pairs
-func NewNetworkFixtureGenerator() (nfg *NetworkFixtureGenerator) {
-	fieldValuesVariety := networkFixtureFieldValuesVariety()
+func NewNetworkFixtureGenerator(fieldValues []*NetworkFixtureFieldValues) (nfg *NetworkFixtureGenerator) {
+	var fieldValuesVariety []*NetworkFixtureFieldValues
+	var names []*string
+
+	if fieldValues == nil {
+		fieldValuesVariety = NetworkFixtureFieldValuesVariety()
+	} else {
+		fieldValuesVariety = fieldValues
+	}
+
+	names = make([]*string, len(fieldValues))
+	for i, nffv := range fieldValues {
+		// fmt.Printf("nffv: %v\n", nffv.fieldName)
+		names[i] = nffv.fieldName
+	}
+
+	fmt.Printf("names: %#v\n", names)
 	nfg = &NetworkFixtureGenerator{
 		fieldValuesVariety: fieldValuesVariety,
+		fieldNames:         names,
 	}
 	nfg.fixtures = nfg.Generate()
 	return
@@ -113,7 +264,7 @@ func (generator *NetworkFixtureGenerator) AddMatcherCollection(mc *matchers.Matc
 
 // Select function returns fixtures specified by opts
 func (generator *NetworkFixtureGenerator) Select(fieldValues *NetworkFields) (nfs []*NetworkFields, pnfs []*NetworkFields) {
-	fmt.Printf("field values: %v\n", fieldValues)
+	// fmt.Printf("field values: %v\n", fieldValues)
 	for _, f := range generator.fixtures {
 		if valEqVal(f, fieldValues) {
 			nfs = append(nfs, f)
@@ -125,7 +276,8 @@ func (generator *NetworkFixtureGenerator) Select(fieldValues *NetworkFields) (nf
 	return
 }
 
-type networkFixtureFieldValues struct {
+// NetworkFixtureFieldValues struct holds field name and array of field values to be iterated during fixture generation.
+type NetworkFixtureFieldValues struct {
 	fieldName *string
 	values    []interface{}
 }
@@ -135,8 +287,11 @@ func (generator *NetworkFixtureGenerator) Generate() (fields []*NetworkFields) {
 	return generator.generate(generator.fieldValuesVariety)
 }
 
-func (generator *NetworkFixtureGenerator) generate(fvs []*networkFixtureFieldValues) (fields []*NetworkFields) {
+func (generator *NetworkFixtureGenerator) generate(fvs []*NetworkFixtureFieldValues) (fields []*NetworkFields) {
 	fields = make([]*NetworkFields, 0)
+	if len(fvs) == 0 {
+		return
+	}
 
 	fmt.Printf("Starting fixture generation.\n")
 	nf := NetworkFields{}
@@ -170,7 +325,7 @@ func (generator *NetworkFixtureGenerator) generate(fvs []*networkFixtureFieldVal
 // as suffixes. The name is set after the last field value is set.
 func (generator *NetworkFixtureGenerator) addField(
 	nf *NetworkFields,
-	fvs []*networkFixtureFieldValues,
+	fvs []*NetworkFixtureFieldValues,
 	fieldIndex int,
 	fields *([]*NetworkFields),
 	config map[string]interface{}) error {
@@ -272,12 +427,60 @@ func (generator *NetworkFixtureGenerator) addField(
 				// nf.Config = generator.updateConfig(nf.Config, ptrTo("cloneable_cfg"), v)
 			}
 			if *fv.fieldName == "Config/chainspec_url" {
-				config = generator.updConfig(config, ptrTo("chainspec_url"), v)
+
+				if v != nil && strings.HasPrefix(*v.(*string), "get ") {
+					chainspecJSON, chainspecABIJSON := getChainspec()
+					config = generator.updConfig(config, ptrTo("chainspec"), chainspecJSON)
+					config = generator.updConfig(config, ptrTo("chainspec_abi"), chainspecABIJSON)
+					delete(config, "chainspec_url")
+					delete(config, "chainspec_abi_url")
+				} else {
+					config = generator.updConfig(config, ptrTo("chainspec_url"), v)
+					if _, ok := config["chainspec"]; ok {
+						delete(config, "chainspec")
+						delete(config, "chainspec_abi")
+						generator.updConfig(config, ptrTo("chainspec_abi_url"), ptrTo(generator.defaultConfig()["chainspec_abi_url"].(string)))
+					}
+					// if _, ok := config["chainspec_abi"]; ok {
+					// }
+				}
 				// nf.Config = generator.updateConfig(nf.Config, ptrTo("chainspec_url"), v)
 			}
-			// if *fv.fieldName == "Config/block_explorer_url" {
-			// 	config = generator.updConfig(config, ptrTo("block_explorer_url"), v)
-			// }
+			if *fv.fieldName == "Config/block_explorer_url" {
+				config = generator.updConfig(config, ptrTo("block_explorer_url"), v)
+			}
+			if *fv.fieldName == "Config/chain" {
+				config = generator.updConfig(config, ptrTo("chain"), v)
+
+			}
+			if *fv.fieldName == "Config/engine_id" {
+				config = generator.updConfig(config, ptrTo("engine_id"), v)
+
+			}
+			if *fv.fieldName == "Config/is_ethereum_network" {
+				config = generator.updConfig(config, ptrTo("is_ethereum_network"), v)
+
+			}
+			if *fv.fieldName == "Config/is_load_balanced" {
+				config = generator.updConfig(config, ptrTo("is_load_balanced"), v)
+
+			}
+			if *fv.fieldName == "Config/native_currency" {
+				config = generator.updConfig(config, ptrTo("native_currency"), v)
+
+			}
+			if *fv.fieldName == "Config/network_id" {
+				config = generator.updConfig(config, ptrTo("network_id"), v)
+
+			}
+			if *fv.fieldName == "Config/poa" {
+				config = generator.updConfig(config, ptrTo("poa"), v)
+
+			}
+			if *fv.fieldName == "Config/protocol_id" {
+				config = generator.updConfig(config, ptrTo("protocol_id"), v)
+
+			}
 		}
 
 		// fmt.Printf("fv field: %v\n", *fv.fieldName)
@@ -298,7 +501,7 @@ func (generator *NetworkFixtureGenerator) addField(
 			} else {
 				nf.Config = marshalConfig(config)
 			}
-			nf.Name = nf.genName(nf.Name)
+			nf.Name = nf.genName(nf.Name, generator)
 			nfClone := nf.clone()
 
 			alreadyAdded := false
@@ -381,8 +584,23 @@ func (generator *NetworkFixtureGenerator) updConfig(c map[string]interface{}, ke
 		c[*key] = nil
 	} else {
 		ref := reflect.ValueOf(value)
+		// fmt.Printf("key: %v\n", *key)
+		if *key != "cloneable_cfg" {
+			// fmt.Printf("ref: %v\n", ref)
+			// fmt.Printf("ref kind: %v\n", ref.Kind())
+			// fmt.Printf("ref type: %v\n", ref.Type())
+			// fmt.Printf("ref type eq typeof true: %t\n", ref.Type() == reflect.TypeOf(ptrToBool(true)))
+			// fmt.Printf("ref elem: %v\n", ref.Elem())
+		}
+
 		if ref.Kind() == reflect.Map {
 			c[*key] = value
+		} else if ref.Type() == reflect.TypeOf(ptrToBool(true)) {
+			// fmt.Printf("ref bool: %v\n", *ref.Interface().(*bool))
+			c[*key] = *ref.Interface().(*bool)
+		} else if ref.Type() == reflect.TypeOf(ptrToInt(1)) {
+			// fmt.Printf("ref int: %v\n", *ref.Interface().(*int))
+			c[*key] = *ref.Interface().(*int)
 		} else {
 			// fmt.Printf("elem type: %T\n", ref.Elem().Type()) // *reflect.rtype
 			c[*key] = ref.Elem().String()
@@ -420,6 +638,10 @@ func (generator *NetworkFixtureGenerator) updateConfig(config *json.RawMessage, 
 }
 
 func (generator *NetworkFixtureGenerator) defaultConfig() map[string]interface{} {
+	return defaultConfig()
+}
+
+func defaultConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"block_explorer_url": "https://unicorn-explorer.provide.network", // required
 		"chain":              "unicorn-v0",                               // required
@@ -437,9 +659,86 @@ func (generator *NetworkFixtureGenerator) defaultConfig() map[string]interface{}
 		"websocket_url":       nil}
 }
 
+func nilValuesConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"block_explorer_url":  nil, // required
+		"chain":               nil, // required
+		"chainspec_abi_url":   nil,
+		"chainspec_url":       nil, // required If ethereum network
+		"cloneable_cfg":       nil, // If cloneable CFG then security
+		"engine_id":           nil, // required
+		"is_ethereum_network": nil, // required for ETH
+		"is_load_balanced":    nil, // implies network load balancer count > 0
+		"json_rpc_url":        nil,
+		"native_currency":     nil, // required
+		"network_id":          nil, // required
+		"protocol_id":         nil, // required
+		"websocket_url":       nil}
+}
+
+func emptyValuesConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"block_explorer_url":  "", // required
+		"chain":               "", // required
+		"chainspec_abi_url":   "",
+		"chainspec_url":       "",                       // required If ethereum network
+		"cloneable_cfg":       map[string]interface{}{}, // If cloneable CFG then security
+		"engine_id":           "",                       // required
+		"is_ethereum_network": false,                    // required for ETH
+		"is_load_balanced":    false,                    // implies network load balancer count > 0
+		"json_rpc_url":        "",
+		"native_currency":     "", // required
+		"network_id":          0,  // required
+		"protocol_id":         "", // required
+		"websocket_url":       ""}
+}
+
 func (generator *NetworkFixtureGenerator) defaultConfigMarshalled() *json.RawMessage {
 
 	c := generator.defaultConfig()
 
 	return marshalConfig(c)
+}
+
+func getChainspec() (chainspecJSON map[string]interface{}, chainspecABIJSON map[string]interface{}) {
+	ethChainspecFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn/spec.json"
+	ethChainspecAbiFileurl := "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.abi.json"
+	response, err := http.Get(ethChainspecFileurl)
+	//chainspec_text := ""
+	// chainspec_abi_text := ""
+	chainspecJSON = map[string]interface{}{}
+	chainspecABIJSON = map[string]interface{}{}
+
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	} else {
+		defer response.Body.Close()
+		contents, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			fmt.Printf("%s\n", err)
+		}
+		// fmt.Printf("%s\n", string(contents))
+		//chainspec_text = string(contents)
+		json.Unmarshal(contents, &chainspecJSON)
+		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
+
+	}
+
+	responseAbi, err := http.Get(ethChainspecAbiFileurl)
+
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	} else {
+		defer responseAbi.Body.Close()
+		contents, err := ioutil.ReadAll(responseAbi.Body)
+		if err != nil {
+			fmt.Printf("%s\n", err)
+		}
+		// fmt.Printf("%s\n", string(contents))
+		// chainspec_abi_text = string(contents)
+		json.Unmarshal(contents, &chainspecABIJSON)
+		// common.Log.Debugf("error parsing chainspec: %v", errJSON)
+	}
+
+	return
 }

@@ -13,6 +13,7 @@ const natsMsgTimeout = time.Millisecond * 50
 // timeout can be passed as 4th param, polling interval as 5th one.
 type pollingToStrChFuncType func(ch chan string, chFunc func(ch chan string) error, endingMsg *string, durations ...time.Duration) error
 
+// PollingToStrChFunc is the function helping tests to get info from goroutines
 var PollingToStrChFunc pollingToStrChFuncType = func(
 	ch chan string,
 	chFunc func(ch chan string) error,
@@ -21,13 +22,15 @@ var PollingToStrChFunc pollingToStrChFuncType = func(
 
 	startedAt := time.Now().UnixNano()
 	interval := (time.Millisecond * 10)
-	timeout := (time.Millisecond * 100)
+	timeout := (time.Millisecond * 350)
+	// fmt.Printf("durations len: %v\n", len(durations))
 	if len(durations) > 0 {
 		timeout = durations[0]
 		if len(durations) > 1 {
 			interval = durations[1]
 		}
 	}
+	// fmt.Printf("polling timeout: %v\n", timeout)
 	ticker := time.NewTicker(interval)
 	timer := time.NewTimer(timeout)
 
@@ -36,6 +39,8 @@ var PollingToStrChFunc pollingToStrChFuncType = func(
 			select {
 			case <-ticker.C:
 				elapsedMillis := (time.Now().UnixNano() - startedAt) / 1000000
+				// fmt.Printf("time elapsed: %v\n", elapsedMillis)
+
 				if elapsedMillis >= int64(timeout) {
 					ticker.Stop()
 				}

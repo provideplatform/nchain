@@ -250,6 +250,7 @@ func (c *Contract) Create() bool {
 				})
 			}
 		}
+
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
 			if success {
@@ -268,6 +269,7 @@ func (c *Contract) Create() bool {
 			return success
 		}
 	}
+
 	return false
 }
 
