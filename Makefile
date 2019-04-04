@@ -25,6 +25,6 @@ run_dependencies:
 stop_dependencies:
 	./scripts/stop_dependencies.sh
 
-test: build
+test: build gorace
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_dependencies.sh
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 ./scripts/run_local_tests.sh

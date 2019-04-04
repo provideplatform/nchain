@@ -81,12 +81,12 @@ func createNatsTxCreateSubscriptions(natsConnection stan.Conn, wg *sync.WaitGrou
 
 			txFinalizeSubscription, err := natsConnection.QueueSubscribe(natsTxCreateSubject, natsTxCreateSubject, consumeTxCreateMsg, stan.SetManualAckMode(), stan.AckWait(txCreateAckWait), stan.MaxInflight(natsTxCreateMaxInFlight), stan.DurableName(natsTxCreateSubject))
 			if err != nil {
-				common.Log.Warningf("Failed to subscribe to NATS subject: %s", txFinalizeSubscription)
+				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxCreateSubject)
 				wg.Done()
 				return
 			}
 			defer txFinalizeSubscription.Unsubscribe()
-			common.Log.Debugf("Subscribed to NATS subject: %s", txFinalizeSubscription)
+			common.Log.Debugf("Subscribed to NATS subject: %s", natsTxCreateSubject)
 
 			wg.Wait()
 		}()
@@ -101,12 +101,12 @@ func createNatsTxFinalizeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGr
 
 			txFinalizeSubscription, err := natsConnection.QueueSubscribe(natsTxFinalizeSubject, natsTxFinalizeSubject, consumeTxFinalizeMsg, stan.SetManualAckMode(), stan.AckWait(txFinalizeAckWait), stan.MaxInflight(natsTxFinalizeMaxInFlight), stan.DurableName(natsTxFinalizeSubject))
 			if err != nil {
-				common.Log.Warningf("Failed to subscribe to NATS subject: %s", txFinalizeSubscription)
+				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxFinalizeSubject)
 				wg.Done()
 				return
 			}
 			defer txFinalizeSubscription.Unsubscribe()
-			common.Log.Debugf("Subscribed to NATS subject: %s", txFinalizeSubscription)
+			common.Log.Debugf("Subscribed to NATS subject: %s", natsTxFinalizeSubject)
 
 			wg.Wait()
 		}()

@@ -60,12 +60,12 @@ func createNatsNetworkContractCreateInvocationSubscriptions(natsConnection stan.
 
 			networkContractCreateInvocationSubscription, err := natsConnection.QueueSubscribe(natsNetworkContractCreateInvocationSubject, natsNetworkContractCreateInvocationSubject, consumeNetworkContractCreateInvocationMsg, stan.SetManualAckMode(), stan.AckWait(natsNetworkContractCreateInvocationTimeout), stan.MaxInflight(natsNetworkContractCreateInvocationMaxInFlight), stan.DurableName(natsNetworkContractCreateInvocationSubject))
 			if err != nil {
-				common.Log.Warningf("Failed to subscribe to NATS subject: %s", networkContractCreateInvocationSubscription)
+				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsNetworkContractCreateInvocationSubject)
 				wg.Done()
 				return
 			}
 			defer networkContractCreateInvocationSubscription.Unsubscribe()
-			common.Log.Debugf("Subscribed to NATS subject: %s", networkContractCreateInvocationSubscription)
+			common.Log.Debugf("Subscribed to NATS subject: %s", natsNetworkContractCreateInvocationSubject)
 
 			wg.Wait()
 		}()
