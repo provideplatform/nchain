@@ -26,7 +26,7 @@ PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/netw
 REGEX_TEMPLATE=github.com/provideapp/goldmine
 
 #for d in $(go list ./... | grep -v vendor); do
-for  c in $(find . -type d -name '*' | grep -v vendor | grep -v .git | grep -v scripts); do
+for  c in $(find . -type d -name '*' | grep -v vendor | grep -v .git | grep -v scripts | grep -v bin); do
 # echo $d
 # c=$(echo "$d" | sed 's+.*/goldmine+\.+g')
 echo $c
