@@ -42,12 +42,6 @@ DATABASE_NAME=goldmine_test \
 DATABASE_USER=${DATABASE_USER} \
 DATABASE_PASSWORD=${DATABASE_PASSWORD} \
 LOG_LEVEL=DEBUG \
-go test "$c" -v -timeout 30s -cover -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
-#-coverprofile=profile.out -coverpkg=".$c"
-# -v -race -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace 
-    # if [ -f profile.out ]; then
-    #     cat profile.out >> coverage.txt
-    #     rm profile.out
-    # fi
+go test "$c" -v -timeout 30s -cover -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace -coverprofile=profile.out -coverpkg="$c"
 done
 
