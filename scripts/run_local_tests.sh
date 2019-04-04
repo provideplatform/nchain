@@ -28,7 +28,7 @@ REGEX_TEMPLATE=github.com/provideapp/goldmine
 for d in $(go list ./... | grep -v vendor); do
 
 echo $d
-c=$(echo "$d" | sed 's/github.com\/provideapp\/goldmine//g')
+c=$(echo "$d" | sed 's+.*/goldmine+\.+g')
 echo $c
 NATS_TOKEN=testtoken \
 NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
@@ -41,7 +41,7 @@ DATABASE_NAME=goldmine_test \
 DATABASE_USER=${DATABASE_USER} \
 DATABASE_PASSWORD=${DATABASE_PASSWORD} \
 LOG_LEVEL=DEBUG \
-go test ".$c" -v -timeout 30s -cover -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
+go test "$c" -v -timeout 30s -cover -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace
 #-coverprofile=profile.out -coverpkg=".$c"
 # -v -race -timeout 30s -ginkgo.randomizeAllSpecs -ginkgo.progress -ginkgo.trace 
     # if [ -f profile.out ]; then
