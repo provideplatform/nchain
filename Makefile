@@ -1,4 +1,4 @@
-.PHONY: build clean ecs_deploy lint run_dependencies run_local stop_dependencies test
+.PHONY: build clean ecs_deploy gorace lint run_dependencies run_local stop_dependencies test
 
 clean:
 	rm ./goldmine 2>/dev/null || true
@@ -9,6 +9,9 @@ build: clean
 
 ecs_deploy:
 	./scripts/ecs_deploy.sh
+
+gorace:
+	./scripts/gorace.sh
 
 lint:
 	./scripts/lint.sh
