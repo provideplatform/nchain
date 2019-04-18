@@ -508,7 +508,10 @@ func (n *Network) Validate() bool {
 	n.Errors = make([]*provide.Error, 0)
 
 	if n.Config == nil {
-		n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config value should be present"), common.PtrToInt(10)})
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("Config value should be present"),
+			Status:  common.PtrToInt(10),
+		})
 	}
 
 	config := map[string]interface{}{}
@@ -520,36 +523,34 @@ func (n *Network) Validate() bool {
 		}
 
 		if err == nil && *n.Cloneable {
-			if cfg, found := config["cloneable_cfg"]; found {
-				//fmt.Printf("Validate(): cloneable cfg is found\n")
-				if cfg_asserted, ok := cfg.(map[string]interface{}); ok {
-					//fmt.Printf("Validate(): cloneable cfg is asserted\n")
-					if _, ok := cfg_asserted["_security"]; !ok {
-						n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config _security value should be present for clonable network"), common.PtrToInt(11)})
-					}
-				} else {
-					//fmt.Printf("Validate(): cloneable cfg is not asserted\n")
-					n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("cloneable_cfg should not be null"), common.PtrToInt(11)})
+			if cfg, cfgOk := config["cloneable_cfg"].(map[string]interface{}); cfgOk {
+				if _, securityCfgOk := cfg["_security"].(map[string]interface{}); !securityCfgOk {
+					n.Errors = append(n.Errors, &provide.Error{
+						Message: common.StringOrNil("Config _security value should be present for clonable network"),
+						Status:  common.PtrToInt(11),
+					})
 				}
 			} else {
-				n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("cloneable_cfg should be present"), common.PtrToInt(11)})
+				n.Errors = append(n.Errors, &provide.Error{
+					Message: common.StringOrNil("cloneable_cfg should be present"),
+					Status:  common.PtrToInt(11),
+				})
 			}
 		}
 
-		chainspecUrl, chUrlFound := config["chainspec_url"]
-		chainspec, chFound := config["chainspec"]
-		if !(chFound || chUrlFound) {
-			n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config chainspec_url or chainspec should be present"), common.PtrToInt(11)})
-		} else {
-			if chFound {
-				if chainspec == nil || chainspec == "" {
-					n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config chainspec value should not be empty"), common.PtrToInt(11)})
-				}
-			}
-			if chUrlFound {
-				if chainspecUrl == nil || chainspecUrl == "" {
-					n.Errors = append(n.Errors, &provide.Error{common.StringOrNil("Config chainspec_url value should not be empty"), common.PtrToInt(11)})
-				}
+		chainspecURL, chainspecURLOk := config["chainspec_url"].(string)
+		_, chainspecOk := config["chainspec"].(map[string]interface{})
+		if !chainspecURLOk && !chainspecOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("Config chainspec_url or chainspec should be present"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if chainspecURLOk {
+			if chainspecURL == "" {
+				n.Errors = append(n.Errors, &provide.Error{
+					Message: common.StringOrNil("Config chainspec_url value should not be empty"),
+					Status:  common.PtrToInt(11),
+				})
 			}
 		}
 	}
