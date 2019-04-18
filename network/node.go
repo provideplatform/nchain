@@ -461,6 +461,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 	rcd, rcdOk := cfg["rc.d"].(string)
 	region, regionOk := cfg["region"].(string)
+	vpc, vpcOK := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
 
 	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
@@ -694,7 +695,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						n.setConfig(cfg)
 						db.Save(n)
 
-						taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, securityGroupIds, []string{}, overrides)
+						taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
 
 						if err != nil || len(taskIds) == 0 {
 							desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())

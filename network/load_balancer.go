@@ -221,6 +221,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 	providerID, providerOk := balancerCfg["provider_id"].(string)
 	credentials, credsOk := balancerCfg["credentials"].(map[string]interface{})
 	region, regionOk := balancerCfg["region"].(string)
+	vpcID, _ := balancerCfg["vpc_id"].(string)
 
 	l.Description = common.StringOrNil(fmt.Sprintf("%s - %s %s", *l.Name, targetID, region))
 	l.Region = common.StringOrNil(region)
@@ -236,7 +237,6 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
-			vpcID := *common.DefaultAWSConfig.DefaultVpcID // FIXME-- create and use managed vpc
 
 			// start security group handling
 			securityGroupIds := make([]string, 0)
