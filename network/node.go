@@ -461,7 +461,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 	rcd, rcdOk := cfg["rc.d"].(string)
 	region, regionOk := cfg["region"].(string)
-	vpc, vpcOK := cfg["vpc_id"].(string)
+	vpc, _ := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
 
 	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
