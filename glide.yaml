@@ -28,6 +28,7 @@ import:
 - package: github.com/kthomas/exchange-consumer
 - package: github.com/kthomas/go-aws-config
 - package: github.com/kthomas/go-aws-wrapper
+  version: master
 - package: github.com/kthomas/go-db-config
 - package: github.com/kthomas/go-logger
 - package: github.com/kthomas/go-natsutil
