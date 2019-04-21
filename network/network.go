@@ -192,6 +192,17 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 	}
 }
 
+// setIsLoadBalanced just sets a hint inside the network config
+func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
+	cfg := n.ParseConfig()
+	if val {
+		delete(cfg, "json_rpc_url")
+		delete(cfg, "websocket_url")
+	}
+	n.setConfig(cfg)
+	db.Save(&n)
+}
+
 // Reload the underlying network instance
 func (n *Network) Reload() {
 	db := dbconf.DatabaseConnection()
@@ -272,7 +283,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *Ne
 		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator', 'faucet')", n.ID).First(&node)
 	}
 
-	isLoadBalanced := n.isLoadBalanced(db, nodeCfg["region"].(string), "rpc")
+	isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil("rpc"))
 
 	if node != nil && node.ID != uuid.Nil {
 		var lb *LoadBalancer
@@ -297,7 +308,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *Ne
 				err = fmt.Errorf("Failed to provision load balancer in region: %s; %s", region, *lb.Errors[0].Message)
 				common.Log.Warning(err.Error())
 			}
-			isLoadBalanced = n.isLoadBalanced(db, region, "rpc")
+			isLoadBalanced = n.isLoadBalanced(db, common.StringOrNil(region), common.StringOrNil("rpc"))
 		} else {
 			balancers, err := n.LoadBalancers(db, common.StringOrNil(region), common.StringOrNil("rpc"))
 			if err != nil {
@@ -367,8 +378,8 @@ func (n *Network) LoadBalancers(db *gorm.DB, region, balancerType *string) ([]*L
 	return balancers, nil
 }
 
-func (n *Network) isLoadBalanced(db *gorm.DB, region, balancerType string) bool {
-	balancers, err := n.LoadBalancers(db, common.StringOrNil(region), common.StringOrNil(balancerType))
+func (n *Network) isLoadBalanced(db *gorm.DB, region, balancerType *string) bool {
+	balancers, err := n.LoadBalancers(db, region, balancerType)
 	if err != nil {
 		common.Log.Warningf("Failed to retrieve network load balancers; %s", err.Error())
 		return false
@@ -387,7 +398,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) 
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := n.isLoadBalanced(db, nodeCfg["region"].(string), "explorer")
+			isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil("explorer"))
 
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				common.Log.Warningf("Failed to resolve and balance explorer urls for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
@@ -451,7 +462,7 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := n.isLoadBalanced(db, nodeCfg["region"].(string), "explorer")
+			isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil("explorer"))
 
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				common.Log.Warningf("Failed to resolve and balance studio (IDE) url for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)

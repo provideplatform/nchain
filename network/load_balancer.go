@@ -345,6 +345,9 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 	db.Model(l).Association("Nodes").Append(node)
 
+	network := node.relatedNetwork()
+	network.setIsLoadBalanced(db, true)
+
 	cfg := l.ParseConfig()
 
 	targetID, targetOk := cfg["target_id"].(string)
@@ -504,13 +507,16 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 	}
 
 	db.Model(&l).Association("Nodes").Delete(node)
-	balancedNodeCount := db.Model(&l).Association("Nodes").Count()
+	balancedNodeCount := db.Model(&l).Association("Nodes").Count() // TODO-- create a balancer_daemon (like stats daemon) to monitor balancer state
 	common.Log.Debugf("Load balancer %s contains %d remaining balanced nodes", l.ID, balancedNodeCount)
 	if balancedNodeCount == 0 {
 		common.Log.Debugf("Attempting to deprovision load balancer %s in region: %s", l.ID, region)
 		msg, _ := json.Marshal(l)
 		natsConnection := common.GetDefaultNatsStreamingConnection()
 		natsConnection.Publish(natsLoadBalancerDeprovisioningSubject, msg)
+
+		network := node.relatedNetwork()
+		network.setIsLoadBalanced(db, network.isLoadBalanced(db, nil, nil))
 	}
 
 	return nil
