@@ -215,10 +215,10 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	if tx.Create() {
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
-		common.Log.Debugf("Contract compiled from source and deployed via tx: %s", *tx.Hash)
+		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
 		msg.Ack()
 	} else {
-		common.Log.Warningf("Failed to deploy compiled contract; tx failed with %d error(s); %s", len(tx.Errors), *tx.Errors[0].Message)
+		common.Log.Warningf("Failed to execute transaction; tx failed with %d error(s); %s", len(tx.Errors), *tx.Errors[0].Message)
 		consumer.Nack(msg)
 	}
 }
@@ -430,11 +430,11 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 	return tx.Response, nil
 }
 
-func wfunc(w interface{}, txParams *map[string]interface{}) *uuid.UUID {
+func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 	db := dbconf.DatabaseConnection()
 	tmpWallet := &wallet.Wallet{}
 	wallet := w.(*wallet.Wallet)
-	params := *txParams
+	// params := txParams
 	if wallet != nil {
 		// need reflection to work with wallet here, or...
 		if wallet.ID != uuid.Nil {
@@ -446,8 +446,8 @@ func wfunc(w interface{}, txParams *map[string]interface{}) *uuid.UUID {
 			}
 		}
 		if common.StringOrNil(wallet.Address) != nil && wallet.PrivateKey != nil {
-			params["public_key"] = wallet.Address
-			params["private_key"] = wallet.PrivateKey
+			txParams["public_key"] = wallet.Address
+			txParams["private_key"] = wallet.PrivateKey
 		}
 	}
 	return &uuid.Nil
@@ -490,10 +490,15 @@ func consumeTxMsg(msg *stan.Msg) {
 		execution.Wallet = wallet
 	}
 
-	kontract := &contract.Contract{}
-	dbconf.DatabaseConnection().Where("id = ?", *execution.ContractID).Find(&kontract)
-	if kontract == nil || kontract.ID == uuid.Nil {
-		common.Log.Errorf("Unable to execute contract; contract not found: %s", kontract.ID)
+	db := dbconf.DatabaseConnection()
+
+	cntract := &contract.Contract{}
+	db.Where("id = ?", *execution.ContractID).Find(&cntract)
+	if cntract == nil || cntract.ID == uuid.Nil {
+		db.Where("address = ?", *execution.ContractID).Find(&cntract)
+	}
+	if cntract == nil || cntract.ID == uuid.Nil {
+		common.Log.Errorf("Unable to execute contract; contract not found: %s", cntract.ID)
 		consumer.Nack(msg)
 		return
 	}
@@ -503,17 +508,17 @@ func consumeTxMsg(msg *stan.Msg) {
 		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
 	}
 
-	walletFn := func(w interface{}, txParams *map[string]interface{}) *uuid.UUID {
+	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 		return wfunc(w.(*wallet.Wallet), txParams)
 	}
 
-	executionResponse, err := kontract.ExecuteFromTx(execution, walletFn, txCreateFn)
+	executionResponse, err := cntract.ExecuteFromTx(execution, walletFn, txCreateFn)
 
 	if err != nil {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
 		consumer.Nack(msg)
 	} else {
-		common.Log.Debugf("Executed contract; tx: %s", executionResponse)
+		common.Log.Debugf("Executed contract: %s", executionResponse)
 		msg.Ack()
 	}
 }

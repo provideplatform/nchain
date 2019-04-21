@@ -227,12 +227,12 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		execution.Nonce = &nonceUint
 	}
 
-	network_ := &network.Network{}
+	ntwrk := &network.Network{}
 	if execution.NetworkID != nil && *execution.NetworkID != uuid.Nil {
-		db.Where("id = ?", execution.NetworkID).Find(&network_)
+		db.Where("id = ?", execution.NetworkID).Find(&ntwrk)
 	}
 
-	if network_ == nil || network_.ID == uuid.Nil {
+	if ntwrk == nil || ntwrk.ID == uuid.Nil {
 		common.RenderError("network not found for arbitrary contract execution", 404, c)
 		return
 	}
@@ -248,7 +248,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	paramsMsg := json.RawMessage(paramsJSON)
 
 	ephemeralContract := &contract.Contract{
-		NetworkID: network_.ID,
+		NetworkID: ntwrk.ID,
 		Address:   common.StringOrNil(c.Param("id")),
 		Params:    &paramsMsg,
 	}
@@ -257,7 +257,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	txCreateFn := func(c *contract.Contract, network *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
 		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
 	}
-	walletFn := func(w interface{}, txParams *map[string]interface{}) *uuid.UUID {
+	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 		return wfunc(w.(wallet.Wallet), txParams)
 	}
 
@@ -417,8 +417,8 @@ func contractExecutionHandler(c *gin.Context) {
 	txCreateFn := func(c *contract.Contract, network *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
 		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
 	}
-	walletFn := func(w interface{}, txParams *map[string]interface{}) *uuid.UUID {
-		return wfunc(w.(wallet.Wallet), txParams)
+	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
+		return wfunc(w.(*wallet.Wallet), txParams)
 	}
 
 	executionResponse, err := execution.ExecuteFromTx(walletFn, txCreateFn)

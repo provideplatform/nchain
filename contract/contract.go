@@ -373,7 +373,7 @@ func (c *Contract) Create() bool {
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
 func (c *Contract) ExecuteFromTx(
 	execution *ContractExecution,
-	walletFn func(interface{}, *map[string]interface{}) *uuid.UUID,
+	walletFn func(interface{}, map[string]interface{}) *uuid.UUID,
 	txCreateFn func(*Contract, *network.Network, *uuid.UUID, *ContractExecution, *json.RawMessage) (*ContractExecutionResponse, error)) (*ContractExecutionResponse, error) {
 
 	var err error
@@ -392,7 +392,7 @@ func (c *Contract) ExecuteFromTx(
 
 	txParams := map[string]interface{}{}
 
-	walletID := walletFn(wallet, &txParams)
+	walletID := walletFn(wallet, txParams)
 
 	if gas == nil {
 		gas64 := float64(0)

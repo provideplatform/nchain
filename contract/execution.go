@@ -75,7 +75,7 @@ const natsTxSubject = "goldmine.tx"
 
 // Execute an ephemeral ContractExecution in Transaction context
 func (e *ContractExecution) ExecuteFromTx(
-	walletFn func(interface{}, *map[string]interface{}) *uuid.UUID,
+	walletFn func(interface{}, map[string]interface{}) *uuid.UUID,
 	txCreateFn func(*Contract, *network.Network, *uuid.UUID, *ContractExecution, *json.RawMessage) (*ContractExecutionResponse, error),
 ) (interface{}, error) {
 	var _abi *abi.ABI
