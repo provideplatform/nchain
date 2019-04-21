@@ -349,13 +349,14 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
 							if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
 								addr = common.StringOrNil(masterOfCeremony)
-								var out *string
-								db.Select("private_key FROM wallets").Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
-								if out == nil {
+								out := []string{}
+								db.Table("wallets").Select("private_key").Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
+								if out == nil || len(out) == 0 || len(out[0]) == 0 {
 									common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
 									addr, privateKey, err = provide.EVMGenerateKeyPair()
 								} else {
-									privateKey, err = common.DecryptECDSAPrivateKey(*out, common.GpgPrivateKey, common.WalletEncryptionKey)
+									encryptedKey := common.StringOrNil(out[0])
+									privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey, common.GpgPrivateKey, common.WalletEncryptionKey)
 									if err == nil {
 										common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
 									}
