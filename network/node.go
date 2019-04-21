@@ -252,16 +252,11 @@ func (n *NetworkNode) ParseConfig() map[string]interface{} {
 // Delete a network node
 func (n *NetworkNode) Delete() bool {
 	n.undeploy()
-	db := dbconf.DatabaseConnection()
-	result := db.Delete(n)
-	errors := result.GetErrors()
-	if len(errors) > 0 {
-		for _, err := range errors {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil(err.Error()),
-			})
-		}
-	}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"network_node_id": n.ID.String(),
+	})
+	natsConnection := common.GetDefaultNatsStreamingConnection()
+	natsConnection.Publish(natsDeleteTerminatedNetworkNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
@@ -354,17 +349,17 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 							_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
 							if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
 								addr = common.StringOrNil(masterOfCeremony)
-								// wallet := &Wallet{}
-								// dbconf.DatabaseConnection().Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Find(&wallet)
-								// if wallet == nil || wallet.ID == uuid.Nil {
-								// 	common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
-								// 	addr, privateKey, err = provide.EVMGenerateKeyPair()
-								// } else {
-								// 	privateKey, err = common.DecryptECDSAPrivateKey(*wallet.PrivateKey, common.GpgPrivateKey, common.WalletEncryptionKey)
-								// 	if err == nil {
-								// 		common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
-								// 	}
-								// }
+								var out *string
+								db.Select("private_key FROM wallets").Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
+								if out == nil {
+									common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
+									addr, privateKey, err = provide.EVMGenerateKeyPair()
+								} else {
+									privateKey, err = common.DecryptECDSAPrivateKey(*out, common.GpgPrivateKey, common.WalletEncryptionKey)
+									if err == nil {
+										common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
+									}
+								}
 							} else if !masterOfCeremonyPrivateKeyOk {
 								common.Log.Debugf("Generating managed master of ceremony signing identity for network: %s", *network.Name)
 								addr, privateKey, err = provide.EVMGenerateKeyPair()
@@ -706,6 +701,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						}
 						common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", container, region, taskIds)
 						cfg["target_task_ids"] = taskIds
+						n.setConfig(cfg)
+						db.Save(n)
 
 						n.resolveHost(db, network, cfg, taskIds)
 						n.resolvePeerURL(db, network, cfg, taskIds)
@@ -939,8 +936,8 @@ func (n *NetworkNode) undeploy() error {
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 
-	common.Log.Debugf("Configuration for network node undeploy: target id: %s; crendentials: %s; target instance ids: %s",
-		targetID, credentials, instanceIds)
+	common.Log.Debugf("Configuration for network node undeploy: target id: %s; crendentials: %s; target instance ids: %s; target task ids: %s",
+		targetID, credentials, instanceIds, taskIds)
 
 	if targetOk && providerOk && regionOk && credsOk {
 		if strings.ToLower(targetID) == "aws" {
@@ -972,8 +969,8 @@ func (n *NetworkNode) undeploy() error {
 						n.Status = common.StringOrNil("terminated")
 						db.Save(n)
 
-						var loadBalancers []*LoadBalancer
-						db.Model(&n).Related(&loadBalancers)
+						loadBalancers := make([]*LoadBalancer, 0)
+						db.Model(&n).Association("LoadBalancers").Find(&loadBalancers)
 						for _, balancer := range loadBalancers {
 							common.Log.Debugf("Attempting to unbalance network node %s on load balancer: %s", n.ID, balancer.ID)
 							msg, _ := json.Marshal(map[string]interface{}{
@@ -991,6 +988,7 @@ func (n *NetworkNode) undeploy() error {
 				}
 			}
 
+			// FIXME-- move the following security group removal to an async NATS operation
 			ticker := time.NewTicker(securityGroupTerminationTickerInterval)
 			go func() {
 				startedAt := time.Now()

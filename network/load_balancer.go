@@ -127,16 +127,6 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-			if securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{}); securityGroupIdsOk {
-				for _, securityGroupID := range securityGroupIds {
-					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID.(string))
-					if err != nil {
-						common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
-						return err
-					}
-				}
-			}
-
 			targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string)
 			if targetGroupsOk {
 				for _, targetGroupArn := range targetGroups {
@@ -152,6 +142,16 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 			if err != nil {
 				common.Log.Warningf("Failed to delete load balancer: %s; %s", *l.Name, err.Error())
 				return err
+			}
+
+			if securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{}); securityGroupIdsOk {
+				for _, securityGroupID := range securityGroupIds {
+					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID.(string))
+					if err != nil {
+						common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
+						return err
+					}
+				}
 			}
 
 			if l.Delete() {
@@ -240,40 +240,56 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 
 			// start security group handling
 			securityGroupIds := make([]string, 0)
+			var securityGroupID *string
 			securityGroupDesc := fmt.Sprintf("security group for load balancer: %s", l.ID.String())
 			securityGroup, _ := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID))
-			if securityGroup != nil {
-				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
-			}
-			balancerCfg["target_security_group_ids"] = securityGroupIds
-
-			if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-				switch ingress.(type) {
-				case map[string]interface{}:
-					ingressCfg := ingress.(map[string]interface{})
-					for cidr := range ingressCfg {
-						tcp := make([]int64, 0)
-						udp := make([]int64, 0)
-						if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-							for i := range _tcp {
-								_port := int64(_tcp[i].(float64))
-								tcp = append(tcp, _port)
-							}
+			if securityGroup == nil {
+				securityGroups, err := awswrapper.GetSecurityGroups(accessKeyID, secretAccessKey, region)
+				if err == nil {
+					for _, secGroup := range securityGroups.SecurityGroups {
+						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc {
+							securityGroupID = secGroup.GroupId
+							break
 						}
+					}
+				}
+			} else {
+				securityGroupID = securityGroup.GroupId
+			}
 
-						// UDP not currently supported by classic ELB API; UDP support is not needed here at this time...
-						// if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-						// 	for i := range _udp {
-						// 		_port := int64(_udp[i].(float64))
-						// 		udp = append(udp, _port)
-						// 	}
-						// }
+			if securityGroupID != nil {
+				securityGroupIds = append(securityGroupIds, *securityGroupID)
 
-						_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
-						if err != nil {
-							err := fmt.Errorf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; %d tcp ports; %d udp ports: %s", region, *securityGroup.GroupId, len(tcp), len(udp), err.Error())
-							common.Log.Warningf(err.Error())
-							return err
+				balancerCfg["target_security_group_ids"] = securityGroupIds
+
+				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+					switch ingress.(type) {
+					case map[string]interface{}:
+						ingressCfg := ingress.(map[string]interface{})
+						for cidr := range ingressCfg {
+							tcp := make([]int64, 0)
+							udp := make([]int64, 0)
+							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+								for i := range _tcp {
+									_port := int64(_tcp[i].(float64))
+									tcp = append(tcp, _port)
+								}
+							}
+
+							// UDP not currently supported by classic ELB API; UDP support is not needed here at this time...
+							// if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+							// 	for i := range _udp {
+							// 		_port := int64(_udp[i].(float64))
+							// 		udp = append(udp, _port)
+							// 	}
+							// }
+
+							_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroupID, cidr, tcp, udp)
+							if err != nil {
+								err := fmt.Errorf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; %d tcp ports; %d udp ports: %s", region, *securityGroupID, len(tcp), len(udp), err.Error())
+								common.Log.Warningf(err.Error())
+								// return err // FIXME-- gotta be a sane way to check for actual failures; this will workaround duplicates for now as those should be acceptable
+							}
 						}
 					}
 				}
@@ -299,6 +315,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 						balancerCfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
 						balancerCfg["websocket_port"] = websocketPort
 						balancerCfg["target_balancer_id"] = loadBalancer.LoadBalancerArn
+						balancerCfg["vpc_id"] = loadBalancer.VpcId
 
 						l.Host = loadBalancer.DNSName
 						l.setConfig(balancerCfg)
@@ -334,6 +351,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 	region, regionOk := cfg["region"].(string)
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
+	vpcID, _ := cfg["vpc_id"].(string)
 	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
 
 	if l.Host != nil {
@@ -348,7 +366,6 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && arnOk && securityCfgOk {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
-			vpcID := *common.DefaultAWSConfig.DefaultVpcID // FIXME-- create and use managed vpc
 
 			var targetGroups map[float64]string
 			targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string)
@@ -465,9 +482,10 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 					}
 
 					if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
+						common.Log.Debugf("Attempting to deregister target groups: %s", targetGroups)
 						for port, targetGroupArn := range targetGroups {
 							_port := int64(port)
-							_, err := awswrapper.DeregisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn), node.IPv4, &_port)
+							_, err := awswrapper.DeregisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn), node.PrivateIPv4, &_port)
 							if err != nil {
 								desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
 								common.Log.Warning(desc)
@@ -486,24 +504,9 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 	}
 
 	db.Model(&l).Association("Nodes").Delete(node)
-	if db.Model(&l).Association("Nodes").Count() == 0 {
-		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && securityCfgOk {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
-
-			if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
-				for _, targetGroupArn := range targetGroups {
-					_, err := awswrapper.DeleteTargetGroup(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn))
-					if err != nil {
-						desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
-						common.Log.Warning(desc)
-						return err
-					}
-					common.Log.Debugf("Dropped target group %s in region: %s", targetGroupArn, region)
-				}
-			}
-		}
-
+	balancedNodeCount := db.Model(&l).Association("Nodes").Count()
+	common.Log.Debugf("Load balancer %s contains %d remaining balanced nodes", l.ID, balancedNodeCount)
+	if balancedNodeCount == 0 {
 		common.Log.Debugf("Attempting to deprovision load balancer %s in region: %s", l.ID, region)
 		msg, _ := json.Marshal(l)
 		natsConnection := common.GetDefaultNatsStreamingConnection()
