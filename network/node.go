@@ -390,6 +390,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 												chainspecJSON, err := json.Marshal(chainspec)
 												if err == nil {
 													chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
+													chainspecJSON = []byte(strings.Replace(string(chainspecJSON), strings.ToLower(templateMasterOfCeremony[2:]), string(*addr)[2:], -1))
 													var newChainspec map[string]interface{}
 													err = json.Unmarshal(chainspecJSON, &newChainspec)
 													if err == nil {
