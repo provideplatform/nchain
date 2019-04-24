@@ -39,7 +39,6 @@ func init() {
 	db := dbconf.DatabaseConnection()
 	db.AutoMigrate(&NetworkNode{})
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_region", "region")
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_role", "role")
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_status", "status")
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
