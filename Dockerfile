@@ -2,6 +2,8 @@ FROM golang:1.11
 
 RUN apt-get install -y curl
 
+RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.5.7/solc-static-linux > /usr/local/bin/solc-v0.5.7 && chmod +x /usr/local/bin/solc-v0.5.7
+RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.5.6/solc-static-linux > /usr/local/bin/solc-v0.5.6 && chmod +x /usr/local/bin/solc-v0.5.6
 RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.5.5/solc-static-linux > /usr/local/bin/solc-v0.5.5 && chmod +x /usr/local/bin/solc-v0.5.5
 RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.5.4/solc-static-linux > /usr/local/bin/solc-v0.5.4 && chmod +x /usr/local/bin/solc-v0.5.4
 RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.5.3/solc-static-linux > /usr/local/bin/solc-v0.5.3 && chmod +x /usr/local/bin/solc-v0.5.3
