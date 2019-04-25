@@ -1,5 +1,5 @@
 hash: f12e68f1354785c4a55fc33381c939afe11f5e149d795317807f810e54a952d3
-updated: 2019-04-23T04:32:28.52462-04:00
+updated: 2019-04-25T06:50:51.267205-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: e24eb225f15679bbe54f91bfa7da3b00e59b9768
@@ -139,7 +139,7 @@ imports:
 - name: github.com/kthomas/go-aws-config
   version: b7870ac562affcec9bca207a432af6e5bf0e4b3e
 - name: github.com/kthomas/go-aws-wrapper
-  version: 6476c3b37a9aa965d0891df956cb75bc366cb194
+  version: 846f0f4cd2f3f51be7f1aea02399f0654f0e3835
 - name: github.com/kthomas/go-db-config
   version: fe566ecb4d7e3e2e1cf39d3a739e1ecfbec912f8
 - name: github.com/kthomas/go-logger
