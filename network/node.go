@@ -323,8 +323,6 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 	}
 
 	go func() {
-		common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n)
-
 		var network = &Network{}
 		db.Model(n).Related(&network)
 		if network == nil || network.ID == uuid.Nil {
@@ -333,6 +331,8 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 			common.Log.Warning(desc)
 			return
 		}
+
+		common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, network.ID)
 
 		bootnodes, err := network.requireBootnodes(db, n)
 		if err != nil {

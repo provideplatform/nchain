@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -106,6 +107,10 @@ func (l *LoadBalancer) ParseConfig() map[string]interface{} {
 	return config
 }
 
+func (l *LoadBalancer) buildTargetGroupName(port int64) string {
+	return ethcommon.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), port)))[0:31]
+}
+
 func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to deprovision infrastructure for load balancer with id: %s", l.ID)
 	cfg := l.ParseConfig()
@@ -127,21 +132,20 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-			targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string)
-			if targetGroupsOk {
+			_, err := awswrapper.DeleteLoadBalancerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn))
+			if err != nil {
+				common.Log.Warningf("Failed to delete load balancer: %s; %s", *l.Name, err.Error())
+				return err
+			}
+
+			if targetGroups, targetGroupsOk := cfg["target_groups"].(map[string]interface{}); targetGroupsOk {
 				for _, targetGroupArn := range targetGroups {
-					_, err := awswrapper.DeleteTargetGroup(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn))
+					_, err := awswrapper.DeleteTargetGroup(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn.(string)))
 					if err != nil {
 						common.Log.Warningf("Failed to delete load balanced target group: %s; %s", targetGroupArn, err.Error())
 						return err
 					}
 				}
-			}
-
-			_, err := awswrapper.DeleteLoadBalancerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn))
-			if err != nil {
-				common.Log.Warningf("Failed to delete load balancer: %s; %s", *l.Name, err.Error())
-				return err
 			}
 
 			if securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{}); securityGroupIdsOk {
@@ -370,11 +374,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-			var targetGroups map[float64]string
-			targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string)
+			var targetGroups map[int64]string
+			targetGroups, targetGroupsOk := cfg["target_groups"].(map[int64]string)
 			if !targetGroupsOk {
 				common.Log.Debugf("Attempting to lazily initialize load balanced target groups for network node %s on balancer: %s", node.ID, l.ID)
-				targetGroups = map[float64]string{}
+				targetGroups = map[int64]string{}
 
 				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
 					common.Log.Debugf("Found security group ingress rules to apply to load balanced target group for network node %s on balancer: %s", node.ID, l.ID)
@@ -393,7 +397,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 							}
 
 							for _, tcpPort := range tcp {
-								targetGroupName := ethcommon.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), tcpPort)))[0:31]
+								targetGroupName := l.buildTargetGroupName(tcpPort)
 								targetGroup, err := awswrapper.CreateTargetGroup(accessKeyID, secretAccessKey, region, common.StringOrNil(vpcID), common.StringOrNil(targetGroupName), common.StringOrNil("HTTP"), tcpPort)
 								if err != nil {
 									desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
@@ -404,7 +408,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 								}
 								common.Log.Debugf("Upserted target group %s in region: %s", targetGroupName, region)
 								if len(targetGroup.TargetGroups) == 1 {
-									targetGroups[float64(tcpPort)] = *targetGroup.TargetGroups[0].TargetGroupArn
+									targetGroups[tcpPort] = *targetGroup.TargetGroups[0].TargetGroupArn
 								}
 							}
 
@@ -414,17 +418,16 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 						}
 					}
 				} else {
-					desc := fmt.Sprintf("Failed to resolve security ingress rules for creation of load balanced target group in region: %s", region)
+					desc := fmt.Sprintf("Failed to resolve security ingress rules for creation of load balanced target groups in region: %s", region)
 					common.Log.Warning(desc)
 					return fmt.Errorf(desc)
 				}
 
-				if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
+				if targetGroups, targetGroupsOk := cfg["target_groups"].(map[int64]string); targetGroupsOk {
 					common.Log.Debugf("Found target groups for load balanced target registration for network node %s on balancer: %s", node.ID, l.ID)
 
 					for port, targetGroupArn := range targetGroups {
-						_port := int64(port)
-						target, err := awswrapper.RegisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn), node.PrivateIPv4, &_port)
+						_, err := awswrapper.RegisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port)
 						if err != nil {
 							desc := fmt.Sprintf("Failed to add target to load balanced target group in region: %s; %s", region, err.Error())
 							common.Log.Warning(desc)
@@ -432,9 +435,9 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 							db.Save(l)
 							return fmt.Errorf(desc)
 						}
-						common.Log.Debugf("Registered load balanced target: %s", target)
+						common.Log.Debugf("Registered load balanced target for balancer %s on port: %s", l.ID, port)
 
-						_, err = awswrapper.CreateListenerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &_port)
+						_, err = awswrapper.CreateListenerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
 						if err != nil {
 							common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
 						}
@@ -484,17 +487,18 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 						}
 					}
 
-					if targetGroups, targetGroupsOk := cfg["target_groups"].(map[float64]string); targetGroupsOk {
-						common.Log.Debugf("Attempting to deregister target groups: %s", targetGroups)
-						for port, targetGroupArn := range targetGroups {
-							_port := int64(port)
-							_, err := awswrapper.DeregisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn), node.PrivateIPv4, &_port)
+					if targetGroups, targetGroupsOk := cfg["target_groups"].(map[string]interface{}); targetGroupsOk {
+						common.Log.Debugf("Attempting to deregister target groups for load balancer: %s", l.ID)
+						for portStr, targetGroupArn := range targetGroups {
+							_port, _ := strconv.Atoi(portStr)
+							port := int64(_port)
+							_, err := awswrapper.DeregisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn.(string)), node.PrivateIPv4, &port)
 							if err != nil {
 								desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
 								common.Log.Warning(desc)
 								return err
 							}
-							common.Log.Debugf("Deregistered target: %s:%v", node.IPv4, port)
+							common.Log.Debugf("Deregistered target: %s:%v", *node.PrivateIPv4, port)
 						}
 					}
 				}
