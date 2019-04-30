@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -31,11 +32,19 @@ func contractsListHandler(c *gin.Context) {
 
 	query := ContractListQuery()
 
+	if appID == nil && c.Query("application_id") != "" {
+		appIDString := c.Query("application_id")
+		appUUID, err := uuid.FromString(appIDString)
+		if err != nil {
+			msg := fmt.Sprintf("malformed application_id provided; %s", err.Error())
+			common.RenderError(msg, 422, c)
+			return
+		}
+		appID = &appUUID
+	}
+
 	if appID != nil {
 		query = query.Where("contracts.application_id = ?", appID)
-	}
-	if userID != nil {
-		query = query.Where("contracts.application_id IS NULL")
 	}
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
