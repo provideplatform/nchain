@@ -446,12 +446,9 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 		kontract := &contract.Contract{}
 		var tok *token.Token
 
-		tokenCreateFn := func(
-			c *contract.Contract,
-			name string,
-			decimals *big.Int,
-			symbol string) (b bool, id uuid.UUID, errorsNum int, msg string) {
+		tokenCreateFn := func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 			common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+
 			tok = &token.Token{
 				ApplicationID: c.ApplicationID,
 				NetworkID:     c.NetworkID,
@@ -462,11 +459,9 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 				Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
 			}
 
-			b = tok.Create()
-			id = tok.ID
-			errorsNum = len(tok.Errors)
-			msg = *common.StringOrNil(*tok.Errors[0].Message)
-
+			createdToken = tok.Create()
+			tokenID = tok.ID
+			errs = tok.Errors
 			return
 		}
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)

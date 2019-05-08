@@ -413,18 +413,7 @@ func (c *Contract) ExecuteFromTx(
 }
 
 // ResolveTokenContract called in tx/tx
-func (c *Contract) ResolveTokenContract(
-	db *gorm.DB,
-	network *network.Network,
-	walletAddress *string,
-	client *ethclient.Client,
-	receipt *types.Receipt,
-	tokenCreateFn func(
-		*Contract,
-		string,
-		*big.Int,
-		string) (
-		bool, uuid.UUID, int, string)) {
+func (c *Contract) ResolveTokenContract(db *gorm.DB, network *network.Network, walletAddress *string, client *ethclient.Client, receipt *types.Receipt, tokenCreateFn func(*Contract, string, *big.Int, string) (bool, uuid.UUID, []*provide.Error)) {
 	ticker := time.NewTicker(resolveTokenTickerInterval)
 	go func() {
 		startedAt := time.Now()
@@ -508,14 +497,14 @@ func (c *Contract) ResolveTokenContract(
 							// 	Decimals:      decimals.Uint64(),
 							// 	Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
 							// }
-							res, id, errorsNum, msg := tokenCreateFn(c, name, decimals, symbol)
+							res, id, errs := tokenCreateFn(c, name, decimals, symbol)
 
 							if res {
 								common.Log.Debugf("Created token %s for associated %s contract: %s", id, *network.Name, c.ID)
 								ticker.Stop()
 								return
-							} else {
-								common.Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, errorsNum, msg)
+							} else if len(errs) > 0 {
+								common.Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(errs), errs[0].Message)
 							}
 						}
 					} else {
