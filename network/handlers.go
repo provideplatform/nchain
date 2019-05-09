@@ -164,12 +164,21 @@ func networkConnectorsListHandler(c *gin.Context) {
 
 func networkNodesListHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
-	if userID == nil {
+	appID := common.AuthorizedSubjectId(c, "application")
+	if userID == nil && appID == nil {
 		common.RenderError("unauthorized", 401, c)
 		return
 	}
 
-	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.user_id = ?", c.Param("id"), userID)
+	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ?", c.Param("id"))
+
+	if userID != nil {
+		query = query.Where("network_nodes.user_id = ?", userID)
+	}
+
+	if appID != nil {
+		query = query.Where("network_nodes.application_id = ?", appID)
+	}
 
 	var nodes []NetworkNode
 	query = query.Order("network_nodes.created_at ASC")
@@ -179,7 +188,8 @@ func networkNodesListHandler(c *gin.Context) {
 
 func networkNodeDetailsHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
-	if userID == nil {
+	appID := common.AuthorizedSubjectId(c, "application")
+	if userID == nil && appID == nil {
 		common.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -192,6 +202,9 @@ func networkNodeDetailsHandler(c *gin.Context) {
 	} else if userID != nil && *node.UserID != *userID {
 		common.RenderError("forbidden", 403, c)
 		return
+	} else if appID != nil && *node.ApplicationID != *appID {
+		common.RenderError("forbidden", 403, c)
+		return
 	}
 
 	common.Render(node, 200, c)
@@ -199,7 +212,8 @@ func networkNodeDetailsHandler(c *gin.Context) {
 
 func networkNodeLogsHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
-	if userID == nil {
+	appID := common.AuthorizedSubjectId(c, "application")
+	if userID == nil && appID == nil {
 		common.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -210,6 +224,9 @@ func networkNodeLogsHandler(c *gin.Context) {
 		common.RenderError("network node not found", 404, c)
 		return
 	} else if userID != nil && *node.UserID != *userID {
+		common.RenderError("forbidden", 403, c)
+		return
+	} else if appID != nil && *node.ApplicationID != *appID {
 		common.RenderError("forbidden", 403, c)
 		return
 	}
@@ -225,7 +242,8 @@ func networkNodeLogsHandler(c *gin.Context) {
 
 func createNetworkNodeHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
-	if userID == nil {
+	appID := common.AuthorizedSubjectId(c, "application")
+	if userID == nil && appID == nil {
 		common.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -248,8 +266,9 @@ func createNetworkNodeHandler(c *gin.Context) {
 		return
 	}
 	node.Status = common.StringOrNil("pending")
-	node.UserID = userID
 	node.NetworkID = networkID
+	node.UserID = userID
+	node.ApplicationID = appID
 
 	var network = &Network{}
 	dbconf.DatabaseConnection().Model(node).Related(&network)
@@ -259,6 +278,9 @@ func createNetworkNodeHandler(c *gin.Context) {
 	}
 
 	if network.UserID != nil && *network.UserID != *userID {
+		common.RenderError("forbidden", 403, c)
+		return
+	} else if appID != nil && *node.ApplicationID != *appID {
 		common.RenderError("forbidden", 403, c)
 		return
 	}

@@ -39,6 +39,8 @@ func init() {
 	db := dbconf.DatabaseConnection()
 	db.AutoMigrate(&NetworkNode{})
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
+	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_user_id", "user_id")
+	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_application_id", "application_id")
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_role", "role")
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_status", "status")
 	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
@@ -52,6 +54,7 @@ type NetworkNode struct {
 	provide.Model
 	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
 	Bootnode      bool             `sql:"not null;default:'false'" json:"is_bootnode"`
 	Host          *string          `json:"host"`
 	IPv4          *string          `json:"ipv4"`
