@@ -296,7 +296,8 @@ func createNetworkNodeHandler(c *gin.Context) {
 
 func deleteNetworkNodeHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
-	if userID == nil {
+	appID := common.AuthorizedSubjectId(c, "application")
+	if userID == nil && appID == nil {
 		common.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -307,10 +308,14 @@ func deleteNetworkNodeHandler(c *gin.Context) {
 		common.RenderError("network node not found", 404, c)
 		return
 	}
-	if *userID != *node.UserID {
+	if userID != nil && node.UserID != nil && *userID != *node.UserID {
+		common.RenderError("forbidden", 403, c)
+		return
+	} else if appID != nil && node.ApplicationID != nil && *node.ApplicationID != *appID {
 		common.RenderError("forbidden", 403, c)
 		return
 	}
+
 	if !node.Delete() {
 		common.RenderError("network node not deleted", 500, c)
 		return
