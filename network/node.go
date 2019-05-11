@@ -470,44 +470,54 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 		}
 	}
 
+	var securityCfg map[string]interface{}
+	var providerCfgByRegion map[string]interface{}
+
 	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
-	if !cloneableCfgOk {
-		desc := fmt.Sprintf("Failed to parse cloneable configuration for network node: %s", n.ID)
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warning(desc)
-		return
-	}
+	if cloneableCfgOk {
+		cloneableSecurityCfg, cloneableSecurityCfgOk := cloneableCfg["_security"].(map[string]interface{})
+		if !cloneableSecurityCfgOk {
+			desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return
+		}
+		securityCfg = cloneableSecurityCfg
 
-	securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{})
-	if !securityCfgOk {
-		desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warning(desc)
-		return
-	}
+		cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
+		if !cloneableTargetOk {
+			desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return
+		}
 
-	cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
-	if !cloneableTargetOk {
-		desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warning(desc)
-		return
-	}
+		cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
+		if !cloneableProviderOk {
+			desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return
+		}
 
-	cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
-	if !cloneableProviderOk {
-		desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warning(desc)
-		return
-	}
-
-	providerCfgByRegion, providerCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
-	if !providerCfgByRegionOk && !regionOk {
-		desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warningf(desc)
-		return
+		cloneableProviderCfgByRegion, cloneableProviderCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
+		if !cloneableProviderCfgByRegionOk && !regionOk {
+			desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warningf(desc)
+			return
+		} else {
+			providerCfgByRegion = cloneableProviderCfgByRegion
+		}
+	} else {
+		secCfg, secCfgOk := cfg["_security"].(map[string]interface{})
+		if !secCfgOk {
+			desc := fmt.Sprintf("Failed to parse security configuration for network node: %s", n.ID)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return
+		}
+		securityCfg = secCfg
 	}
 
 	common.Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable provider cfg: %s; network config: %s",
@@ -646,71 +656,81 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				}
 			} else if strings.ToLower(providerID) == "docker" {
 				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
-				if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
+				var resolvedContainer *string
+
+				if container, containerOk := cfg["container"].(string); containerOk {
+					resolvedContainer = common.StringOrNil(container)
+				} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
 					common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
 					if container, containerOk := containerRolesByRegion[role].(string); containerOk {
-						common.Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, container)
-						common.Log.Debugf("Attempting to deploy container %s in EC2 region: %s", container, region)
-						envOverrides := map[string]interface{}{}
-						if envOk {
-							for k := range env {
-								envOverrides[k] = env[k]
-							}
-						}
-
-						if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-							envOverrides["BOOTNODES"] = bnodes
-						} else {
-							bootnodesTxt, err := network.BootnodesTxt()
-							if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-								envOverrides["BOOTNODES"] = bootnodesTxt
-							}
-						}
-						if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
-							if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-								envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
-							} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
-								envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
-							}
-						}
-
-						if client, clientOk := networkCfg["client"].(string); clientOk {
-							envOverrides["CLIENT"] = client
-						} else {
-							if defaultClientEnv, defaultClientEnvOk := engineToNetworkNodeClientEnvMapping[engineID]; defaultClientEnvOk {
-								envOverrides["CLIENT"] = defaultClientEnv
-							} else {
-								envOverrides["CLIENT"] = defaultClient
-							}
-						}
-
-						if chain, chainOk := networkCfg["chain"].(string); chainOk {
-							envOverrides["CHAIN"] = chain
-						}
-						overrides := map[string]interface{}{
-							"environment": envOverrides,
-						}
-						cfg["env"] = envOverrides
-						n.setConfig(cfg)
-						db.Save(n)
-
-						taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, container, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
-
-						if err != nil || len(taskIds) == 0 {
-							desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", container, region, err.Error())
-							n.updateStatus(db, "failed", &desc)
-							n.unregisterSecurityGroups()
-							common.Log.Warning(desc)
-							return
-						}
-						common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", container, region, taskIds)
-						cfg["target_task_ids"] = taskIds
-						n.setConfig(cfg)
-						db.Save(n)
-
-						n.resolveHost(db, network, cfg, taskIds)
-						n.resolvePeerURL(db, network, cfg, taskIds)
+						resolvedContainer = common.StringOrNil(container)
 					}
+				} else {
+					common.Log.Warningf("Failed to resolve deployable container(s) by region in EC2 region: %s", region)
+				}
+
+				if resolvedContainer != nil {
+					common.Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, resolvedContainer)
+					common.Log.Debugf("Attempting to deploy container %s in EC2 region: %s", resolvedContainer, region)
+					envOverrides := map[string]interface{}{}
+					if envOk {
+						for k := range env {
+							envOverrides[k] = env[k]
+						}
+					}
+
+					if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+						envOverrides["BOOTNODES"] = bnodes
+					} else {
+						bootnodesTxt, err := network.BootnodesTxt()
+						if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+							envOverrides["BOOTNODES"] = bootnodesTxt
+						}
+					}
+					if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
+						if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+							envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
+						} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
+							envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
+						}
+					}
+
+					if client, clientOk := networkCfg["client"].(string); clientOk {
+						envOverrides["CLIENT"] = client
+					} else {
+						if defaultClientEnv, defaultClientEnvOk := engineToNetworkNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+							envOverrides["CLIENT"] = defaultClientEnv
+						} else {
+							envOverrides["CLIENT"] = defaultClient
+						}
+					}
+
+					if chain, chainOk := networkCfg["chain"].(string); chainOk {
+						envOverrides["CHAIN"] = chain
+					}
+					overrides := map[string]interface{}{
+						"environment": envOverrides,
+					}
+					cfg["env"] = envOverrides
+					n.setConfig(cfg)
+					db.Save(n)
+
+					taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, *resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
+
+					if err != nil || len(taskIds) == 0 {
+						desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *resolvedContainer, region, err.Error())
+						n.updateStatus(db, "failed", &desc)
+						n.unregisterSecurityGroups()
+						common.Log.Warning(desc)
+						return
+					}
+					common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *resolvedContainer, region, taskIds)
+					cfg["target_task_ids"] = taskIds
+					n.setConfig(cfg)
+					db.Save(n)
+
+					n.resolveHost(db, network, cfg, taskIds)
+					n.resolvePeerURL(db, network, cfg, taskIds)
 				}
 			}
 		}
