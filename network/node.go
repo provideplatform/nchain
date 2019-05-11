@@ -2,7 +2,6 @@ package network
 
 import (
 	"crypto/ecdsa"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -458,7 +457,6 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	providerID, providerOk := cfg["provider_id"].(string)
 	role, roleOk := cfg["role"].(string)
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
-	rcd, rcdOk := cfg["rc.d"].(string)
 	region, regionOk := cfg["region"].(string)
 	vpc, _ := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
@@ -520,8 +518,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 		securityCfg = secCfg
 	}
 
-	common.Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, rc.d: %s; cloneable provider cfg: %s; network config: %s",
-		targetID, providerID, role, credentials, region, rcd, providerCfgByRegion, networkCfg)
+	common.Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, cloneable provider cfg: %s; network config: %s",
+		targetID, providerID, role, credentials, region, providerCfgByRegion, networkCfg)
 
 	if targetOk && engineOk && providerOk && roleOk && credsOk && regionOk {
 		if strings.ToLower(targetID) == "aws" {
@@ -613,48 +611,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				}
 			}
 
-			if strings.ToLower(providerID) == "ubuntu-vm" {
-				var userData = ""
-				if rcdOk {
-					userData = base64.StdEncoding.EncodeToString([]byte(rcd))
-				}
-
-				common.Log.Debugf("Attempting to deploy network node instance(s) in EC2 region: %s", region)
-				if imagesByRegion, imagesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); imagesByRegionOk {
-					common.Log.Debugf("Resolved deployable images by region in EC2 region: %s", region)
-					if imageVersionsByRole, imageVersionsByRoleOk := imagesByRegion[role].(map[string]interface{}); imageVersionsByRoleOk {
-						common.Log.Debugf("Resolved deployable image versions for role: %s; in EC2 region: %s", role, region)
-						versions := make([]string, 0)
-						for version := range imageVersionsByRole {
-							versions = append(versions, version)
-						}
-						common.Log.Debugf("Resolved %v deployable image version(s) for role: %s", len(versions), role)
-						version := versions[len(versions)-1] // defaults to latest version for now
-						common.Log.Debugf("Attempting to lookup update for version: %s", version)
-						if imageID, imageIDOk := imageVersionsByRole[version].(string); imageIDOk {
-							common.Log.Debugf("Attempting to deploy image %s@@%s in EC2 region: %s", imageID, version, region)
-							instanceIds, err := awswrapper.LaunchAMI(accessKeyID, secretAccessKey, region, imageID, userData, 1, 1)
-							if err != nil || len(instanceIds) == 0 {
-								desc := fmt.Sprintf("Attempt to deploy image %s@%s in EC2 %s region failed; %s", imageID, version, region, err.Error())
-								n.updateStatus(db, "failed", &desc)
-								n.unregisterSecurityGroups()
-								common.Log.Warning(desc)
-								return
-							}
-							common.Log.Debugf("Attempt to deploy image %s@%s in EC2 %s region successful; instance ids: %s", imageID, version, region, instanceIds)
-							cfg["target_instance_ids"] = instanceIds
-
-							common.Log.Debugf("Assigning %v security groups for deployed image %s@%s in EC2 %s region; instance ids: %s", len(securityGroupIds), imageID, version, region, instanceIds)
-							for i := range instanceIds {
-								awswrapper.SetInstanceSecurityGroups(accessKeyID, secretAccessKey, region, instanceIds[i], securityGroupIds)
-							}
-
-							n.resolveHost(db, network, cfg, instanceIds)
-							n.resolvePeerURL(db, network, cfg, instanceIds)
-						}
-					}
-				}
-			} else if strings.ToLower(providerID) == "docker" {
+			if strings.ToLower(providerID) == "docker" {
 				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
 				var resolvedContainer *string
 
@@ -762,20 +719,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 					accessKeyID := credentials["aws_access_key_id"].(string)
 					secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-					if strings.ToLower(providerID) == "ubuntu-vm" {
-						instanceDetails, err := awswrapper.GetInstanceDetails(accessKeyID, secretAccessKey, region, id)
-						if err == nil {
-							if len(instanceDetails.Reservations) > 0 {
-								reservation := instanceDetails.Reservations[0]
-								if len(reservation.Instances) > 0 {
-									instance := reservation.Instances[0]
-									n.Host = instance.PublicDnsName
-									n.IPv4 = instance.PublicIpAddress
-									n.PrivateIPv4 = instance.PrivateIpAddress
-								}
-							}
-						}
-					} else if strings.ToLower(providerID) == "docker" {
+					if strings.ToLower(providerID) == "docker" {
 						containerDetails, err := awswrapper.GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
 						if err == nil {
 							if len(containerDetails.Tasks) > 0 {
@@ -872,11 +816,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[stri
 					accessKeyID := credentials["aws_access_key_id"].(string)
 					secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-					if strings.ToLower(providerID) == "ubuntu-vm" {
-						common.Log.Warningf("Peer URL resolution is not yet implemented for non-containerized AWS deployments")
-						ticker.Stop()
-						return
-					} else if strings.ToLower(providerID) == "docker" {
+					if strings.ToLower(providerID) == "docker" {
 						logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
 						if err == nil {
 							for i := range logs.Events {
@@ -956,34 +896,17 @@ func (n *NetworkNode) undeploy() error {
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	instanceIds, instanceIdsOk := cfg["target_instance_ids"].([]interface{})
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 
-	common.Log.Debugf("Configuration for network node undeploy: target id: %s; crendentials: %s; target instance ids: %s; target task ids: %s",
-		targetID, credentials, instanceIds, taskIds)
+	common.Log.Debugf("Configuration for network node undeploy: target id: %s; crendentials: %s; target task ids: %s", targetID, credentials, taskIds)
 
 	if targetOk && providerOk && regionOk && credsOk {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-			if strings.ToLower(providerID) == "ubuntu-vm" && instanceIdsOk {
-				for i := range instanceIds {
-					instanceID := instanceIds[i].(string)
-
-					_, err := awswrapper.TerminateInstance(accessKeyID, secretAccessKey, region, instanceID)
-					if err == nil {
-						common.Log.Debugf("Terminated EC2 instance with id: %s", instanceID)
-						n.Status = common.StringOrNil("terminated")
-						db.Save(n)
-					} else {
-						err = fmt.Errorf("Failed to terminate EC2 instance with id: %s; %s", instanceID, err.Error())
-						common.Log.Warning(err.Error())
-						return err
-					}
-				}
-			} else if strings.ToLower(providerID) == "docker" && taskIdsOk {
+			if strings.ToLower(providerID) == "docker" && taskIdsOk {
 				for i := range taskIds {
 					taskID := taskIds[i].(string)
 
