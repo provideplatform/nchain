@@ -727,7 +727,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 						containerDetails, err := awswrapper.GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
 						if err == nil {
 							if len(containerDetails.Tasks) > 0 {
-								task := containerDetails.Tasks[0]
+								task := containerDetails.Tasks[0] // FIXME-- should this support exposing all tasks?
 								taskStatus := ""
 								if task.LastStatus != nil {
 									taskStatus = strings.ToLower(*task.LastStatus)
