@@ -336,12 +336,13 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 
 		common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, network.ID)
 
+		cfg := n.ParseConfig()
+
 		bootnodes, err := network.requireBootnodes(db, n)
 		if err != nil {
 			switch err.(type) {
 			case bootnodesInitialized:
 				common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
-				cfg := n.ParseConfig()
 				if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
 					if strings.ToLower(protocol) == "poa" {
 						if env, envOk := cfg["env"].(map[string]interface{}); envOk {
@@ -413,7 +414,15 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 				n._deploy(network, bootnodes, db)
 			}
 		} else {
-			n.requireGenesis(network, bootnodes, db)
+			if p2p, p2pOk := cfg["p2p"].(bool); p2pOk {
+				if p2p {
+					n.requireGenesis(network, bootnodes, db)
+				} else {
+					n._deploy(network, bootnodes, db)
+				}
+			} else {
+				n.requireGenesis(network, bootnodes, db) // default assumes p2p
+			}
 		}
 	}()
 }
