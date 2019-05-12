@@ -452,6 +452,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	cfg["default_json_rpc_port"] = networkCfg["default_json_rpc_port"]
 	cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
 
+	containerID, containerOk := cfg["container"].(string)
 	targetID, targetOk := cfg["target_id"].(string)
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
@@ -460,6 +461,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	region, regionOk := cfg["region"].(string)
 	vpc, _ := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
+	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
 
 	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
 		common.Log.Debugf("Applying environment overrides to network node per network env configuration")
@@ -468,54 +470,47 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 		}
 	}
 
-	var securityCfg map[string]interface{}
 	var providerCfgByRegion map[string]interface{}
 
 	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
 	if cloneableCfgOk {
-		cloneableSecurityCfg, cloneableSecurityCfgOk := cloneableCfg["_security"].(map[string]interface{})
-		if !cloneableSecurityCfgOk {
-			desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
-			n.updateStatus(db, "failed", &desc)
-			common.Log.Warning(desc)
-			return
-		}
-		securityCfg = cloneableSecurityCfg
-
-		cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
-		if !cloneableTargetOk {
-			desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
-			n.updateStatus(db, "failed", &desc)
-			common.Log.Warning(desc)
-			return
+		if !securityCfgOk {
+			cloneableSecurityCfg, cloneableSecurityCfgOk := cloneableCfg["_security"].(map[string]interface{})
+			if !cloneableSecurityCfgOk {
+				desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
+				n.updateStatus(db, "failed", &desc)
+				common.Log.Warning(desc)
+				return
+			}
+			securityCfg = cloneableSecurityCfg
 		}
 
-		cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
-		if !cloneableProviderOk {
-			desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
-			n.updateStatus(db, "failed", &desc)
-			common.Log.Warning(desc)
-			return
-		}
+		if !containerOk {
+			cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
+			if !cloneableTargetOk {
+				desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
+				n.updateStatus(db, "failed", &desc)
+				common.Log.Warning(desc)
+				return
+			}
 
-		cloneableProviderCfgByRegion, cloneableProviderCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
-		if !cloneableProviderCfgByRegionOk && !regionOk {
-			desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
-			n.updateStatus(db, "failed", &desc)
-			common.Log.Warningf(desc)
-			return
-		} else {
+			cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
+			if !cloneableProviderOk {
+				desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
+				n.updateStatus(db, "failed", &desc)
+				common.Log.Warning(desc)
+				return
+			}
+
+			cloneableProviderCfgByRegion, cloneableProviderCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
+			if !cloneableProviderCfgByRegionOk && !regionOk {
+				desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
+				n.updateStatus(db, "failed", &desc)
+				common.Log.Warningf(desc)
+				return
+			}
 			providerCfgByRegion = cloneableProviderCfgByRegion
 		}
-	} else {
-		secCfg, secCfgOk := cfg["_security"].(map[string]interface{})
-		if !secCfgOk {
-			desc := fmt.Sprintf("Failed to parse security configuration for network node: %s", n.ID)
-			n.updateStatus(db, "failed", &desc)
-			common.Log.Warning(desc)
-			return
-		}
-		securityCfg = secCfg
 	}
 
 	common.Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, cloneable provider cfg: %s; network config: %s",
@@ -615,8 +610,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
 				var resolvedContainer *string
 
-				if container, containerOk := cfg["container"].(string); containerOk {
-					resolvedContainer = common.StringOrNil(container)
+				if containerOk {
+					resolvedContainer = common.StringOrNil(containerID)
 				} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
 					common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
 					if container, containerOk := containerRolesByRegion[role].(string); containerOk {
