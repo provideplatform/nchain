@@ -28,17 +28,58 @@ func init() {
 // LoadBalancer instances represent a physical or virtual load balancer of a specific type (i.e., JSON-RPC) which belongs to a network
 type LoadBalancer struct {
 	provide.Model
-	NetworkID   uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	Name        *string          `sql:"not null" json:"name"`
-	Type        *string          `sql:"not null" json:"type"`
-	Host        *string          `json:"host"`
-	IPv4        *string          `json:"ipv4"`
-	IPv6        *string          `json:"ipv6"`
-	Description *string          `json:"description"`
-	Region      *string          `json:"region"`
-	Status      *string          `sql:"not null;default:'provisioning'" json:"status"`
-	Nodes       []NetworkNode    `gorm:"many2many:load_balancers_network_nodes" json:"-"`
-	Config      *json.RawMessage `sql:"type:json" json:"config"`
+	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	Name            *string          `sql:"not null" json:"name"`
+	Type            *string          `sql:"not null" json:"type"`
+	Host            *string          `json:"host"`
+	IPv4            *string          `json:"ipv4"`
+	IPv6            *string          `json:"ipv6"`
+	Description     *string          `json:"description"`
+	Region          *string          `json:"region"`
+	Status          *string          `sql:"not null;default:'provisioning'" json:"status"`
+	Nodes           []NetworkNode    `gorm:"many2many:load_balancers_network_nodes" json:"-"`
+	Config          *json.RawMessage `sql:"type:json" json:"config"`
+	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+}
+
+func (l *LoadBalancer) decryptedConfig() (map[string]interface{}, error) {
+	decryptedParams := map[string]interface{}{}
+	if l.EncryptedConfig != nil {
+		encryptedConfigJSON, err := common.PGPPubDecrypt(*l.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt encrypted load balancer config; %s", err.Error())
+			return decryptedParams, err
+		}
+
+		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		if err != nil {
+			common.Log.Warningf("Failed to unmarshal decrypted load balancer config; %s", err.Error())
+			return decryptedParams, err
+		}
+	}
+	return decryptedParams, nil
+}
+
+func (l *LoadBalancer) encryptConfig() bool {
+	if l.EncryptedConfig != nil {
+		encryptedConfig, err := common.PGPPubEncrypt(*l.EncryptedConfig, common.GpgPublicKey)
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt load balancer config; %s", err.Error())
+			l.Errors = append(l.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+			return false
+		}
+		l.EncryptedConfig = encryptedConfig
+	}
+	return true
+}
+
+func (l *LoadBalancer) setEncryptedConfig(params map[string]interface{}) {
+	paramsJSON, _ := json.Marshal(params)
+	_paramsJSON := string(json.RawMessage(paramsJSON))
+	l.EncryptedConfig = &_paramsJSON
+	l.encryptConfig()
 }
 
 // Create and persist a new load balancer

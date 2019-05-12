@@ -51,20 +51,61 @@ func init() {
 // or even phyiscal infrastructure
 type NetworkNode struct {
 	provide.Model
-	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	Bootnode      bool             `sql:"not null;default:'false'" json:"is_bootnode"`
-	Host          *string          `json:"host"`
-	IPv4          *string          `json:"ipv4"`
-	IPv6          *string          `json:"ipv6"`
-	PrivateIPv4   *string          `json:"private_ipv4"`
-	PrivateIPv6   *string          `json:"private_ipv6"`
-	Description   *string          `json:"description"`
-	Role          *string          `sql:"not null;default:'peer'" json:"role"`
-	Status        *string          `sql:"not null;default:'pending'" json:"status"`
-	LoadBalancers []LoadBalancer   `gorm:"many2many:load_balancers_network_nodes" json:"-"`
-	Config        *json.RawMessage `sql:"type:json" json:"config"`
+	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	UserID          *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	Bootnode        bool             `sql:"not null;default:'false'" json:"is_bootnode"`
+	Host            *string          `json:"host"`
+	IPv4            *string          `json:"ipv4"`
+	IPv6            *string          `json:"ipv6"`
+	PrivateIPv4     *string          `json:"private_ipv4"`
+	PrivateIPv6     *string          `json:"private_ipv6"`
+	Description     *string          `json:"description"`
+	Role            *string          `sql:"not null;default:'peer'" json:"role"`
+	Status          *string          `sql:"not null;default:'pending'" json:"status"`
+	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_network_nodes" json:"-"`
+	Config          *json.RawMessage `sql:"type:json" json:"config"`
+	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+}
+
+func (n *NetworkNode) decryptedConfig() (map[string]interface{}, error) {
+	decryptedParams := map[string]interface{}{}
+	if n.EncryptedConfig != nil {
+		encryptedConfigJSON, err := common.PGPPubDecrypt(*n.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt encrypted network node config; %s", err.Error())
+			return decryptedParams, err
+		}
+
+		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		if err != nil {
+			common.Log.Warningf("Failed to unmarshal decrypted network node config; %s", err.Error())
+			return decryptedParams, err
+		}
+	}
+	return decryptedParams, nil
+}
+
+func (n *NetworkNode) encryptConfig() bool {
+	if n.EncryptedConfig != nil {
+		encryptedConfig, err := common.PGPPubEncrypt(*n.EncryptedConfig, common.GpgPublicKey)
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt network node config; %s", err.Error())
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+			return false
+		}
+		n.EncryptedConfig = encryptedConfig
+	}
+	return true
+}
+
+func (n *NetworkNode) setEncryptedConfig(params map[string]interface{}) {
+	paramsJSON, _ := json.Marshal(params)
+	_paramsJSON := string(json.RawMessage(paramsJSON))
+	n.EncryptedConfig = &_paramsJSON
+	n.encryptConfig()
 }
 
 // Create and persist a new network node
@@ -358,7 +399,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) {
 									addr, privateKey, err = provide.EVMGenerateKeyPair()
 								} else {
 									encryptedKey := common.StringOrNil(out[0])
-									privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey, common.GpgPrivateKey, common.WalletEncryptionKey)
+									privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey, common.GpgPrivateKey, common.GpgPassword)
 									if err == nil {
 										common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
 									}

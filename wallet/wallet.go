@@ -133,7 +133,7 @@ func (w *Wallet) Validate() bool {
 	var err error
 	if w.PrivateKey != nil {
 		if network.IsEthereumNetwork() {
-			_, err = common.DecryptECDSAPrivateKey(*w.PrivateKey, common.GpgPrivateKey, common.WalletEncryptionKey)
+			_, err = common.DecryptECDSAPrivateKey(*w.PrivateKey, common.GpgPrivateKey, common.GpgPassword)
 		}
 	} else {
 		w.Errors = append(w.Errors, &provide.Error{

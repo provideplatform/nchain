@@ -22,9 +22,9 @@ var (
 	PrivateKeyPath  string
 	requireTLS      bool
 
-	GpgPublicKey        string
-	GpgPrivateKey       string
-	WalletEncryptionKey string
+	GpgPublicKey  string
+	GpgPrivateKey string
+	GpgPassword   string
 
 	bootstrapOnce sync.Once
 
@@ -150,6 +150,6 @@ eZ0L
 -----END PGP PRIVATE KEY BLOCK-----
 		`
 
-		WalletEncryptionKey = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
+		GpgPassword = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 	})
 }
