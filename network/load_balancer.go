@@ -234,7 +234,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 
 	var securityCfg map[string]interface{}
 	if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
-		securityCfg, _ = cloneableCfg["_security"].(map[string]interface{})
+		securityCfg, _ = cloneableCfg["security"].(map[string]interface{})
 	}
 	if securityCfg == nil || len(securityCfg) == 0 {
 		common.Log.Warningf("Failed to parse cloneable security configuration for load balancer: %s; attempting to create sane initial configuration", n.ID)
@@ -259,7 +259,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 				"0.0.0.0/0": ingressCfg,
 			},
 		}
-		balancerCfg["_security"] = securityCfg
+		balancerCfg["security"] = securityCfg
 	}
 
 	targetID, targetOk := balancerCfg["target_id"].(string)
@@ -400,13 +400,13 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 	vpcID, _ := cfg["vpc_id"].(string)
-	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
+	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 
 	if l.Host != nil {
 		common.Log.Debugf("Attempting to load balance network node %s on balancer: %s", node.ID, l.ID)
 
 		if !securityCfgOk {
-			desc := fmt.Sprintf("Failed to resolve _security configuration for lazy initialization of load balanced target group in region: %s", region)
+			desc := fmt.Sprintf("Failed to resolve security configuration for lazy initialization of load balanced target group in region: %s", region)
 			common.Log.Warning(desc)
 			return fmt.Errorf(desc)
 		}
@@ -508,7 +508,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 	region, regionOk := cfg["region"].(string)
 	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 	// targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
-	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
+	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 
 	if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && securityCfgOk {
 		accessKeyID := credentials["aws_access_key_id"].(string)

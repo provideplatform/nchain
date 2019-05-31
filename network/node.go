@@ -62,7 +62,7 @@ type NetworkNode struct {
 	PrivateIPv6     *string          `json:"private_ipv6"`
 	Description     *string          `json:"description"`
 	Role            *string          `sql:"not null;default:'peer'" json:"role"`
-	Status          *string          `sql:"not null;default:'pending'" json:"status"`
+	Status          *string          `sql:"not null;default:'init'" json:"status"`
 	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_network_nodes" json:"-"`
 	Config          *json.RawMessage `sql:"type:json" json:"config"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
@@ -513,7 +513,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	region, regionOk := cfg["region"].(string)
 	vpc, _ := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
-	securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{})
+	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 
 	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
 		common.Log.Debugf("Applying environment overrides to network node per network env configuration")
@@ -527,7 +527,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
 	if cloneableCfgOk {
 		if !securityCfgOk {
-			cloneableSecurityCfg, cloneableSecurityCfgOk := cloneableCfg["_security"].(map[string]interface{})
+			cloneableSecurityCfg, cloneableSecurityCfgOk := cloneableCfg["security"].(map[string]interface{})
 			if !cloneableSecurityCfgOk {
 				desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
 				n.updateStatus(db, "failed", &desc)
@@ -582,7 +582,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
 			}
 
-			cfg["_security"] = securityCfg
+			cfg["security"] = securityCfg
 			cfg["region"] = region
 			cfg["target_security_group_ids"] = securityGroupIds
 			n.setConfig(cfg)

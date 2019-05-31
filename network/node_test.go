@@ -82,10 +82,10 @@ var _ = Describe("Node", func() {
 								node.Role = common.StringOrNil("validator")
 								node.Config = marshalConfig(
 									map[string]interface{}{
-										"_security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}},
+										"security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}},
 								)
 
-								// "config":{"_security":{"egress":"*","ingress":{"0.0.0.0/0":{"tcp":[5001,8050,8051,8080,30300],"udp":[30300]}}},
+								// "config":{"security":{"egress":"*","ingress":{"0.0.0.0/0":{"tcp":[5001,8050,8051,8080,30300],"udp":[30300]}}},
 								Expect(node.Create()).To(BeTrue())
 								Expect(node.Status).To(gstruct.PointTo(Equal("init")))
 								time.Sleep(time.Duration(100) * time.Millisecond)

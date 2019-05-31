@@ -271,7 +271,7 @@ x-total-results-count: 1
             "chainspec_abi_url": null,
             "chainspec_url": null,
             "cloneable_cfg": {
-                "_security": {
+                "security": {
                     "egress": "*",
                     "ingress": {
                         "0.0.0.0/0": {
@@ -501,7 +501,7 @@ access-control-allow-origin: *
         "chainspec_abi_url": null,
         "chainspec_url": null,
         "cloneable_cfg": {
-            "_security": {
+            "security": {
                 "egress": "*",
                 "ingress": {
                     "0.0.0.0/0": {
@@ -992,7 +992,7 @@ $ curl -i \
             "chainspec_abi_url": null,
             "chainspec_url": null,
             "cloneable_cfg": {
-              "_security": {
+              "security": {
                 "egress": "*",
                 "ingress": {
                   "0.0.0.0/0": {
@@ -1209,7 +1209,7 @@ access-control-allow-origin: *
     "chainspec_abi_url": null,
     "chainspec_url": null,
     "cloneable_cfg": {
-      "_security": {
+      "security": {
         "egress": "*",
         "ingress": {
           "0.0.0.0/0": {

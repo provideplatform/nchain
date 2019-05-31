@@ -328,7 +328,7 @@ func (nf *NetworkFields) genName(prefix *string, nfg *NetworkFixtureGenerator) (
 					cfg += "empty cloneable_cfg "
 				} else {
 					// cloneable_cfg := config["cloneable_cfg"].(map[string]interface{})
-					// if _, secOk := cloneable_cfg["_security"]; secOk {
+					// if _, secOk := cloneable_cfg["security"]; secOk {
 					// 	cfg += "w cloneable_cfg w security "
 					// } else {
 					cfg += "w cloneable_cfg "

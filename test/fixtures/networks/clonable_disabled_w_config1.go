@@ -28,7 +28,7 @@ func ethClonableDisabledConfigNetwork1() (n *fixtures.FixtureMatcher) {
 		expectedResult := false
 		expectedErrorsCount := 8
 		errors := []*string{
-			common.StringOrNil("Config _security value should be present for clonable network"),
+			common.StringOrNil("Config security value should be present for clonable network"),
 			common.StringOrNil("Config chainspec_url value should be a valid URL"),
 			common.StringOrNil("Config block_explorer_url should not be empty"),
 			common.StringOrNil("Config chain should not be empty"),

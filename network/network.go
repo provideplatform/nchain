@@ -257,18 +257,6 @@ func (n *Network) setChainID() {
 	}
 }
 
-func (n *Network) getSecurityConfiguration(db *gorm.DB) map[string]interface{} {
-	cloneableCfg, cloneableCfgOk := n.ParseConfig()["cloneable_cfg"].(map[string]interface{})
-	if !cloneableCfgOk {
-		return nil
-	}
-	securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{})
-	if !securityCfgOk {
-		return nil
-	}
-	return securityCfg
-}
-
 // resolveAndBalanceJsonRpcAndWebsocketUrls updates the network's configured block
 // JSON-RPC urls (i.e. web-based IDE), and enriches the network cfg; if no load
 // balancer is provisioned for the account-region-type, a load balancer is provisioned
@@ -593,11 +581,11 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		if err == nil && *n.Cloneable {
+		if err == nil && n.Cloneable != nil && *n.Cloneable {
 			if cfg, cfgOk := config["cloneable_cfg"].(map[string]interface{}); cfgOk {
-				if _, ok := cfg["_security"]; !ok {
+				if _, ok := cfg["security"]; !ok {
 					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("Config _security value should be present for clonable network"),
+						Message: common.StringOrNil("Config security value should be present for clonable network"),
 						Status:  common.PtrToInt(11),
 					})
 				}
@@ -607,11 +595,6 @@ func (n *Network) Validate() bool {
 					Status:  common.PtrToInt(11),
 				})
 			}
-		} else {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config cloneable_cfg should be present"),
-				Status:  common.PtrToInt(11),
-			})
 		}
 
 		chainspecURL, chainspecURLOk := config["chainspec_url"]
@@ -748,7 +731,7 @@ func (n *Network) Validate() bool {
 	}
 
 	// add error if Config is empty
-	// add error if Clonable and Config[:_security] is empty
+	// add error if Clonable and Config[:security] is empty
 	// add error if Config is nil
 	return len(n.Errors) == 0
 }

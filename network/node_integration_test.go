@@ -859,7 +859,7 @@ var _ = Describe("Node", func() {
 					var sg []interface{}
 					var sgOk bool
 
-					// it should have created security groups for the peer based on its _security config (you are checking this already just added it for parity with my other stub comments)
+					// it should have created security groups for the peer based on its security config (you are checking this already just added it for parity with my other stub comments)
 
 					BeforeEach(func() {
 						sg, sgOk = peerNodeConfig["target_security_group_ids"].([]interface{})
