@@ -23,34 +23,62 @@ if [[ -z "${TAGS}" ]]; then
   TAGS=unit
 fi
 
+if [[ -z "${RACE}" ]]; then
+  RACE=false
+fi
+
 PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
 PGPASSWORD=${DATABASE_PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
 PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
 
-pkgs=(*/)
+pkgs=(bridge common connector consumer contract db filter network oracle prices token tx wallet)
 for d in "${pkgs[@]}" ; do
   pkg=$(echo $d | sed 's/\/*$//g')
   
-  NATS_TOKEN=testtoken \
-  NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
-  NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
-  NATS_CLUSTER_ID=provide \
-  NATS_STREAMING_CONCURRENCY=1 \
-  GIN_MODE=release \
-  DATABASE_HOST=localhost \
-  DATABASE_NAME=goldmine_test \
-  DATABASE_USER=${DATABASE_USER} \
-  DATABASE_PASSWORD=${DATABASE_PASSWORD} \
-  LOG_LEVEL=DEBUG \
-  TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
-  TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
-  go test "./${pkg}" -v \
-                     -race \
-                     -timeout 1800s \
-                     -cover \
-                     -coverpkg="./${pkg}" \
-                     -coverprofile=profile.out \
-                     -ginkgo.progress \
-                     -ginkgo.trace \
-                     -tags="$TAGS"
+  if [ "$RACE" = "true" ]; then
+    NATS_TOKEN=testtoken \
+    NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
+    NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
+    NATS_CLUSTER_ID=provide \
+    NATS_STREAMING_CONCURRENCY=1 \
+    GIN_MODE=release \
+    DATABASE_HOST=localhost \
+    DATABASE_NAME=goldmine_test \
+    DATABASE_USER=${DATABASE_USER} \
+    DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+    LOG_LEVEL=DEBUG \
+    TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
+    TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
+    go test "./${pkg}" -v \
+                      -timeout 1800s \
+                      -cover \
+                      -coverpkg="./${pkg}" \
+                      -coverprofile=profile.out \
+                      -ginkgo.progress \
+                      -ginkgo.trace \
+                      -tags="$TAGS"
+  else
+    NATS_TOKEN=testtoken \
+    NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
+    NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
+    NATS_CLUSTER_ID=provide \
+    NATS_STREAMING_CONCURRENCY=1 \
+    GIN_MODE=release \
+    DATABASE_HOST=localhost \
+    DATABASE_NAME=goldmine_test \
+    DATABASE_USER=${DATABASE_USER} \
+    DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+    LOG_LEVEL=DEBUG \
+    TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
+    TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
+    go test "./${pkg}" -v \
+                      -race \
+                      -timeout 1800s \
+                      -cover \
+                      -coverpkg="./${pkg}" \
+                      -coverprofile=profile.out \
+                      -ginkgo.progress \
+                      -ginkgo.trace \
+                      -tags="$TAGS"
+  fi
 done
