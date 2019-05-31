@@ -24,7 +24,7 @@ if [[ -z "${TAGS}" ]]; then
 fi
 
 if [[ -z "${RACE}" ]]; then
-  RACE=false
+  RACE=true
 fi
 
 PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
