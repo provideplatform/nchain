@@ -50,13 +50,14 @@ for d in "${pkgs[@]}" ; do
     TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
     TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
     go test "./${pkg}" -v \
-                      -timeout 1800s \
-                      -cover \
-                      -coverpkg="./${pkg}" \
-                      -coverprofile=profile.out \
-                      -ginkgo.progress \
-                      -ginkgo.trace \
-                      -tags="$TAGS"
+                       -race \
+                       -timeout 1800s \
+                       -cover \
+                       -coverpkg="./${pkg}" \
+                       -coverprofile=profile.out \
+                       -ginkgo.progress \
+                       -ginkgo.trace \
+                       -tags="$TAGS"
   else
     NATS_TOKEN=testtoken \
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
@@ -72,13 +73,12 @@ for d in "${pkgs[@]}" ; do
     TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
     TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
     go test "./${pkg}" -v \
-                      -race \
-                      -timeout 1800s \
-                      -cover \
-                      -coverpkg="./${pkg}" \
-                      -coverprofile=profile.out \
-                      -ginkgo.progress \
-                      -ginkgo.trace \
-                      -tags="$TAGS"
+                       -timeout 1800s \
+                       -cover \
+                       -coverpkg="./${pkg}" \
+                       -coverprofile=profile.out \
+                       -ginkgo.progress \
+                       -ginkgo.trace \
+                       -tags="$TAGS"
   fi
 done
