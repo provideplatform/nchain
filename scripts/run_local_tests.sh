@@ -64,7 +64,9 @@ echo $c
 #   TAGS="unit"
 # fi
 
-echo $TAGS
+if [[ "${TAGS}" ]]; then
+  TAGS=unit
+fi
 
 # AWS_RUN=${AWS_RUN} \
 NATS_TOKEN=testtoken \
@@ -80,5 +82,4 @@ DATABASE_PASSWORD=${DATABASE_PASSWORD} \
 LOG_LEVEL=DEBUG \
 TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
 TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
-go test "$c" -v -race -timeout 1800s -cover  -ginkgo.progress -ginkgo.trace -coverprofile=profile.out -coverpkg="$c" -tags="$TAGS"
-
+go test "$c" -v -timeout 1800s -cover  -ginkgo.progress -ginkgo.trace -coverprofile=profile.out -coverpkg="$c" -tags="$TAGS"
