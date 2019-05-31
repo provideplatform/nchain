@@ -744,204 +744,188 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					n.setConfig(cfg)
 					db.Save(n)
 
-					n.resolveHost(db, network, cfg, taskIds)
-					n.resolvePeerURL(db, network, cfg, taskIds)
+					msg, _ := json.Marshal(map[string]interface{}{
+						"network_node_id": n.ID.String(),
+					})
+					natsConnection := common.GetDefaultNatsStreamingConnection()
+					natsConnection.Publish(natsResolveNetworkNodeHostSubject, msg)
+					natsConnection.Publish(natsResolveNetworkNodePeerURLSubject, msg)
 				}
 			}
 		}
 	}
 }
 
-func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) {
-	ticker := time.NewTicker(resolveHostTickerInterval)
-	startedAt := time.Now()
-	for {
-		select {
-		case <-ticker.C:
-			if n.Host == nil {
-				if time.Now().Sub(startedAt) >= resolveHostTickerTimeout {
-					desc := fmt.Sprintf("Failed to resolve hostname for network node: %s; timing out after %v", n.ID.String(), resolveHostTickerTimeout)
-					n.updateStatus(db, "failed", &desc)
-					ticker.Stop()
-					common.Log.Warning(desc)
-					return
-				}
+func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) error {
+	id := identifiers[len(identifiers)-1]
+	targetID, targetOk := cfg["target_id"].(string)
+	providerID, providerOk := cfg["provider_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 
-				id := identifiers[len(identifiers)-1]
-				targetID, targetOk := cfg["target_id"].(string)
-				providerID, providerOk := cfg["provider_id"].(string)
-				region, regionOk := cfg["region"].(string)
-				credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk && credsOk {
+		accessKeyID := credentials["aws_access_key_id"].(string)
+		secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-				if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk && credsOk {
-					accessKeyID := credentials["aws_access_key_id"].(string)
-					secretAccessKey := credentials["aws_secret_access_key"].(string)
+		if strings.ToLower(providerID) == "docker" {
+			containerDetails, err := awswrapper.GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
+			if err == nil {
+				if len(containerDetails.Tasks) > 0 {
+					task := containerDetails.Tasks[0] // FIXME-- should this support exposing all tasks?
+					taskStatus := ""
+					if task.LastStatus != nil {
+						taskStatus = strings.ToLower(*task.LastStatus)
+					}
+					if taskStatus == "running" && len(task.Attachments) > 0 {
+						attachment := task.Attachments[0]
+						if attachment.Type != nil && *attachment.Type == "ElasticNetworkInterface" {
+							for i := range attachment.Details {
+								kvp := attachment.Details[i]
+								if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
+									interfaceDetails, err := awswrapper.GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, *kvp.Value)
+									if err == nil {
+										if len(interfaceDetails.NetworkInterfaces) > 0 {
+											common.Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
+											n.PrivateIPv4 = interfaceDetails.NetworkInterfaces[0].PrivateIpAddress
 
-					if strings.ToLower(providerID) == "docker" {
-						containerDetails, err := awswrapper.GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
-						if err == nil {
-							if len(containerDetails.Tasks) > 0 {
-								task := containerDetails.Tasks[0] // FIXME-- should this support exposing all tasks?
-								taskStatus := ""
-								if task.LastStatus != nil {
-									taskStatus = strings.ToLower(*task.LastStatus)
-								}
-								if taskStatus == "running" && len(task.Attachments) > 0 {
-									attachment := task.Attachments[0]
-									if attachment.Type != nil && *attachment.Type == "ElasticNetworkInterface" {
-										for i := range attachment.Details {
-											kvp := attachment.Details[i]
-											if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
-												interfaceDetails, err := awswrapper.GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, *kvp.Value)
-												if err == nil {
-													if len(interfaceDetails.NetworkInterfaces) > 0 {
-														common.Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
-														n.PrivateIPv4 = interfaceDetails.NetworkInterfaces[0].PrivateIpAddress
-
-														interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
-														if interfaceAssociation != nil {
-															n.Host = interfaceAssociation.PublicDnsName
-															n.IPv4 = interfaceAssociation.PublicIp
-														}
-													}
-												}
-												break
+											interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
+											if interfaceAssociation != nil {
+												n.Host = interfaceAssociation.PublicDnsName
+												n.IPv4 = interfaceAssociation.PublicIp
 											}
 										}
 									}
+									break
 								}
 							}
 						}
 					}
 				}
 			}
-
-			if n.Host != nil {
-				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
-				n.Status = common.StringOrNil("running")
-				db.Save(n)
-
-				role, roleOk := cfg["role"].(string)
-				if roleOk {
-					if role == "explorer" {
-						go network.resolveAndBalanceExplorerUrls(db, n)
-					} else if role == "faucet" {
-						common.Log.Warningf("Faucet role not yet supported")
-					} else if role == "studio" {
-						go network.resolveAndBalanceStudioUrls(db, n)
-					}
-				}
-
-				ticker.Stop()
-				return
-			}
 		}
 	}
+
+	if n.Host == nil {
+		if time.Now().Sub(n.CreatedAt) >= resolvePeerTickerTimeout {
+			desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTickerTimeout)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return fmt.Errorf(desc)
+		}
+
+		return fmt.Errorf("Failed to resolved host for network node with id: %s", n.ID)
+	}
+
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+	n.Status = common.StringOrNil("running")
+	db.Save(&n)
+
+	role, roleOk := cfg["role"].(string)
+	if roleOk {
+		if role == "explorer" {
+			go network.resolveAndBalanceExplorerUrls(db, n)
+		} else if role == "faucet" {
+			common.Log.Warningf("Faucet role not yet supported")
+		} else if role == "studio" {
+			go network.resolveAndBalanceStudioUrls(db, n)
+		}
+	}
+
+	return nil
 }
 
-func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) {
+func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) error {
 	role, roleOk := cfg["role"].(string)
 	if !roleOk || role != "peer" && role != "full" && role != "validator" {
-		return
+		return nil
 	}
 
 	common.Log.Debugf("Attempting to resolve peer url for network node: %s", n.ID.String())
 
-	ticker := time.NewTicker(resolvePeerTickerInterval)
-	startedAt := time.Now()
 	var peerURL *string
-	for {
-		select {
-		case <-ticker.C:
-			if peerURL == nil {
-				if time.Now().Sub(startedAt) >= resolvePeerTickerTimeout {
-					common.Log.Warningf("Failed to resolve peer url for network node: %s; timing out after %v", n.ID.String(), resolvePeerTickerTimeout)
-					n.Status = common.StringOrNil("peer_resolution_failed")
-					db.Save(n)
-					ticker.Stop()
-					return
-				}
 
-				id := identifiers[len(identifiers)-1]
-				targetID, targetOk := cfg["target_id"].(string)
-				engineID, engineOk := cfg["engine_id"].(string)
-				providerID, providerOk := cfg["provider_id"].(string)
-				region, regionOk := cfg["region"].(string)
-				credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	id := identifiers[len(identifiers)-1]
+	targetID, targetOk := cfg["target_id"].(string)
+	engineID, engineOk := cfg["engine_id"].(string)
+	providerID, providerOk := cfg["provider_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	credentials, credsOk := cfg["credentials"].(map[string]interface{})
 
-				if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk && credsOk {
-					accessKeyID := credentials["aws_access_key_id"].(string)
-					secretAccessKey := credentials["aws_secret_access_key"].(string)
+	if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk && credsOk {
+		accessKeyID := credentials["aws_access_key_id"].(string)
+		secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-					if strings.ToLower(providerID) == "docker" {
-						logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
-						if err == nil {
-							for i := range logs.Events {
-								event := logs.Events[i]
-								if event.Message != nil {
-									msg := string(*event.Message)
+		if strings.ToLower(providerID) == "docker" {
+			logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
+			if err == nil {
+				for i := range logs.Events {
+					event := logs.Events[i]
+					if event.Message != nil {
+						msg := string(*event.Message)
 
-									if network.IsBcoinNetwork() {
-										const bcoinPoolIdentitySearchString = "Pool identity key:"
-										poolIdentityFoundIndex := strings.LastIndex(msg, bcoinPoolIdentitySearchString)
-										if poolIdentityFoundIndex != -1 {
-											defaultPeerListenPort := common.EngineToDefaultPeerListenPortMapping[engineID]
-											poolIdentity := strings.TrimSpace(msg[poolIdentityFoundIndex+len(bcoinPoolIdentitySearchString) : len(msg)-1])
-											node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.IPv4, defaultPeerListenPort)
-											peerURL = &node
-											cfg["peer_url"] = node
-											cfg["peer_identity"] = poolIdentity
-											ticker.Stop()
-											break
-										}
-									} else if network.IsEthereumNetwork() {
-										nodeInfo := &provide.EthereumJsonRpcResponse{}
-										err := json.Unmarshal([]byte(msg), &nodeInfo)
-										if err == nil && nodeInfo != nil {
-											result, resultOk := nodeInfo.Result.(map[string]interface{})
-											if resultOk {
-												if enode, enodeOk := result["enode"].(string); enodeOk {
-													peerURL = common.StringOrNil(enode)
-													cfg["peer"] = result
-													cfg["peer_url"] = enode
-													ticker.Stop()
-													break
-												}
-											}
-										} else if err != nil {
-											enodeIndex := strings.LastIndex(msg, "enode://")
-											if enodeIndex != -1 {
-												enode := msg[enodeIndex:]
-												peerURL = common.StringOrNil(enode)
-												cfg["peer_url"] = enode
-												ticker.Stop()
-												break
-											}
-										}
+						if network.IsBcoinNetwork() {
+							const bcoinPoolIdentitySearchString = "Pool identity key:"
+							poolIdentityFoundIndex := strings.LastIndex(msg, bcoinPoolIdentitySearchString)
+							if poolIdentityFoundIndex != -1 {
+								defaultPeerListenPort := common.EngineToDefaultPeerListenPortMapping[engineID]
+								poolIdentity := strings.TrimSpace(msg[poolIdentityFoundIndex+len(bcoinPoolIdentitySearchString) : len(msg)-1])
+								node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.IPv4, defaultPeerListenPort)
+								peerURL = &node
+								cfg["peer_url"] = node
+								cfg["peer_identity"] = poolIdentity
+								break
+							}
+						} else if network.IsEthereumNetwork() {
+							nodeInfo := &provide.EthereumJsonRpcResponse{}
+							err := json.Unmarshal([]byte(msg), &nodeInfo)
+							if err == nil && nodeInfo != nil {
+								result, resultOk := nodeInfo.Result.(map[string]interface{})
+								if resultOk {
+									if enode, enodeOk := result["enode"].(string); enodeOk {
+										peerURL = common.StringOrNil(enode)
+										cfg["peer"] = result
+										cfg["peer_url"] = enode
+										break
 									}
+								}
+							} else if err != nil {
+								enodeIndex := strings.LastIndex(msg, "enode://")
+								if enodeIndex != -1 {
+									enode := msg[enodeIndex:]
+									peerURL = common.StringOrNil(enode)
+									cfg["peer_url"] = enode
+									break
 								}
 							}
 						}
 					}
 				}
 			}
-
-			if peerURL != nil {
-				common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
-				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
-				db.Save(n)
-
-				if role == "peer" || role == "full" || role == "validator" || role == "faucet" {
-					go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
-				}
-
-				ticker.Stop()
-				return
-			}
 		}
 	}
+
+	if peerURL == nil {
+		if time.Now().Sub(n.CreatedAt) >= resolvePeerTickerTimeout {
+			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolveHostTickerTimeout)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return fmt.Errorf(desc)
+		}
+
+		return fmt.Errorf("Failed to resolved peer url for network node with id: %s", n.ID)
+	}
+
+	common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+	db.Save(&n)
+
+	if role == "peer" || role == "full" || role == "validator" || role == "faucet" {
+		go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
+	}
+
+	return nil
 }
 
 func (n *NetworkNode) undeploy() error {

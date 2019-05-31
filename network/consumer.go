@@ -20,20 +20,34 @@ const natsBlockFinalizedSubjectMaxInFlight = 64
 const natsBlockFinalizedSubjectTimeout = time.Minute * 1
 
 const natsLoadBalancerInvocationTimeout = time.Second * 15
+
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 const natsLoadBalancerDeprovisioningMaxInFlight = 64
+
 const natsLoadBalancerProvisioningSubject = "goldmine.loadbalancer.provision"
 const natsLoadBalancerProvisioningMaxInFlight = 64
+
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerBalanceNodeMaxInFlight = 64
+
 const natsLoadBalancerUnbalanceNodeSubject = "goldmine.node.unbalance"
 const natsLoadBalancerUnbalanceNodeMaxInFlight = 64
+
 const natsDeployNetworkNodeSubject = "goldmine.node.deploy"
 const natsDeployNetworkNodeMaxInFlight = 64
 const natsDeployNetworkNodeInvocationTimeout = time.Minute * 1
+
 const natsDeleteTerminatedNetworkNodeSubject = "goldmine.node.delete"
 const natsDeleteTerminatedNetworkNodeMaxInFlight = 64
 const natsDeleteTerminatedNetworkNodeInvocationTimeout = time.Minute * 1
+
+const natsResolveNetworkNodeHostSubject = "goldmine.node.resolve-host"
+const natsResolveNetworkNodeHostMaxInFlight = 64
+const natsResolveNetworkNodeHostInvocationTimeout = time.Second * 10
+
+const natsResolveNetworkNodePeerURLSubject = "goldmine.node.resolve-peer"
+const natsResolveNetworkNodePeerURLMaxInFlight = 64
+const natsResolveNetworkNodePeerURLInvocationTimeout = time.Second * 10
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 
@@ -59,6 +73,8 @@ func init() {
 	createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection, &waitGroup)
 	createNatsDeployNetworkNodeSubscriptions(natsConnection, &waitGroup)
 	createNatsDeleteTerminatedNetworkNodeSubscriptions(natsConnection, &waitGroup)
+	createNatsResolveNetworkNodeHostSubscriptions(natsConnection, &waitGroup)
+	createNatsResolveNetworkNodePeerURLSubscriptions(natsConnection, &waitGroup)
 }
 
 func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
@@ -175,6 +191,46 @@ func createNatsDeployNetworkNodeSubscriptions(natsConnection stan.Conn, wg *sync
 			}
 			defer deployNetworkNodeSubscription.Unsubscribe()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsDeployNetworkNodeSubject)
+
+			wg.Wait()
+		}()
+	}
+}
+
+func createNatsResolveNetworkNodeHostSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		wg.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			resolveNetworkNodeHostSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodeHostSubject, natsResolveNetworkNodeHostSubject, consumeResolveNetworkNodeHostMsg, stan.SetManualAckMode(), stan.AckWait(natsResolveNetworkNodeHostInvocationTimeout), stan.MaxInflight(natsResolveNetworkNodeHostMaxInFlight), stan.DurableName(natsResolveNetworkNodeHostSubject))
+			if err != nil {
+				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsResolveNetworkNodeHostSubject)
+				wg.Done()
+				return
+			}
+			defer resolveNetworkNodeHostSubscription.Unsubscribe()
+			common.Log.Debugf("Subscribed to NATS subject: %s", natsResolveNetworkNodeHostSubject)
+
+			wg.Wait()
+		}()
+	}
+}
+
+func createNatsResolveNetworkNodePeerURLSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		wg.Add(1)
+		go func() {
+			defer natsConnection.Close()
+
+			resolveNetworkNodePeerURLSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodePeerURLSubject, natsResolveNetworkNodePeerURLSubject, consumeResolveNetworkNodePeerURLMsg, stan.SetManualAckMode(), stan.AckWait(natsResolveNetworkNodePeerURLInvocationTimeout), stan.MaxInflight(natsResolveNetworkNodePeerURLMaxInFlight), stan.DurableName(natsResolveNetworkNodePeerURLSubject))
+			if err != nil {
+				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsResolveNetworkNodePeerURLSubject)
+				wg.Done()
+				return
+			}
+			defer resolveNetworkNodePeerURLSubscription.Unsubscribe()
+			common.Log.Debugf("Subscribed to NATS subject: %s", natsResolveNetworkNodePeerURLSubject)
 
 			wg.Wait()
 		}()
@@ -496,5 +552,121 @@ func consumeDeleteTerminatedNetworkNodeMsg(msg *stan.Msg) {
 		consumer.Nack(msg)
 		return
 	}
+	msg.Ack()
+}
+
+func consumeResolveNetworkNodeHostMsg(msg *stan.Msg) {
+	common.Log.Debugf("Consuming NATS deploy network node message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal deploy network node message; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
+	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+
+	if !networkNodeIDOk {
+		common.Log.Warningf("Failed to deploy network node; no network node id provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	node := &NetworkNode{}
+	db.Where("id = ?", networkNodeID).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		common.Log.Warningf("Failed to deploy network node; no network node resolved for id: %s", networkNodeID)
+		consumer.Nack(msg)
+		return
+	}
+
+	var network = &Network{}
+	db.Model(node).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		desc := fmt.Sprintf("Failed to retrieve network for network node: %s", node.ID)
+		common.Log.Warning(desc)
+		node.updateStatus(db, "failed", &desc)
+		consumer.Nack(msg)
+		return
+	}
+
+	cfg := node.ParseConfig()
+	taskIds, taskIdsOk := cfg["target_task_ids"].([]string)
+
+	if !taskIdsOk {
+		common.Log.Warningf("Failed to deploy network node; no target_task_ids provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	err = node.resolveHost(db, network, cfg, taskIds)
+	if err != nil {
+		common.Log.Warningf("Failed to resolve network node host; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
+	msg.Ack()
+}
+
+func consumeResolveNetworkNodePeerURLMsg(msg *stan.Msg) {
+	common.Log.Debugf("Consuming NATS deploy network node message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal deploy network node message; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
+	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+
+	if !networkNodeIDOk {
+		common.Log.Warningf("Failed to deploy network node; no network node id provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	node := &NetworkNode{}
+	db.Where("id = ?", networkNodeID).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		common.Log.Warningf("Failed to resolve network node; no network node resolved for id: %s", networkNodeID)
+		consumer.Nack(msg)
+		return
+	}
+
+	var network = &Network{}
+	db.Model(node).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		desc := fmt.Sprintf("Failed to retrieve network for network node: %s", node.ID)
+		common.Log.Warning(desc)
+		node.updateStatus(db, "failed", &desc)
+		consumer.Nack(msg)
+		return
+	}
+
+	cfg := node.ParseConfig()
+	taskIds, taskIdsOk := cfg["target_task_ids"].([]string)
+
+	if !taskIdsOk {
+		common.Log.Warningf("Failed to deploy network node; no target_task_ids provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	err = node.resolvePeerURL(db, network, cfg, taskIds)
+	if err != nil {
+		common.Log.Warningf("Failed to resolve network node peer url; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
 	msg.Ack()
 }
