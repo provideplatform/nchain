@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -130,7 +131,11 @@ func (n *NetworkNode) Create() bool {
 		if !db.NewRecord(n) {
 			success := rowsAffected > 0
 			if success {
-				n.deploy(db)
+				msg, _ := json.Marshal(map[string]interface{}{
+					"network_node_id": n.ID.String(),
+				})
+				natsConnection := common.GetDefaultNatsStreamingConnection()
+				natsConnection.Publish(natsDeployNetworkNodeSubject, msg)
 			}
 			return success
 		}
@@ -359,114 +364,123 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
 }
 
-func (n *NetworkNode) deploy(db *gorm.DB) {
+func (n *NetworkNode) deploy(db *gorm.DB) error {
 	if n.Config == nil {
-		common.Log.Debugf("Not attempting to deploy network node without a valid configuration; network node id: %s", n.ID)
-		return
+		msg := fmt.Sprintf("Not attempting to deploy network node without a valid configuration; network node id: %s", n.ID)
+		common.Log.Warning(msg)
+		return errors.New(msg)
 	}
 
-	go func() {
-		var network = &Network{}
-		db.Model(n).Related(&network)
-		if network == nil || network.ID == uuid.Nil {
-			desc := fmt.Sprintf("Failed to retrieve network for network node: %s", n.ID)
-			n.updateStatus(db, "failed", &desc)
-			common.Log.Warning(desc)
-			return
-		}
+	var network = &Network{}
+	db.Model(n).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		msg := fmt.Sprintf("Failed to retrieve network for network node: %s", n.ID)
+		n.updateStatus(db, "failed", &msg)
+		common.Log.Warning(msg)
+		return errors.New(msg)
+	}
 
-		common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, network.ID)
-		n.updateStatus(db, "pending", nil)
+	common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, network.ID)
+	n.updateStatus(db, "pending", nil)
 
-		cfg := n.ParseConfig()
+	cfg := n.ParseConfig()
 
-		bootnodes, err := network.requireBootnodes(db, n)
-		if err != nil {
-			switch err.(type) {
-			case bootnodesInitialized:
-				common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
-				if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
-					if strings.ToLower(protocol) == "poa" {
-						if env, envOk := cfg["env"].(map[string]interface{}); envOk {
-							var addr *string
-							var privateKey *ecdsa.PrivateKey
-							_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
-							if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
-								addr = common.StringOrNil(masterOfCeremony)
-								out := []string{}
-								db.Table("wallets").Select("private_key").Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
-								if out == nil || len(out) == 0 || len(out[0]) == 0 {
-									common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
-									addr, privateKey, err = provide.EVMGenerateKeyPair()
-								} else {
-									encryptedKey := common.StringOrNil(out[0])
-									privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey, common.GpgPrivateKey, common.GpgPassword)
-									if err == nil {
-										common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
-									}
-								}
-							} else if !masterOfCeremonyPrivateKeyOk {
-								common.Log.Debugf("Generating managed master of ceremony signing identity for network: %s", *network.Name)
+	bootnodes, err := network.requireBootnodes(db, n)
+	if err != nil {
+		switch err.(type) {
+		case bootnodesInitialized:
+			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
+			if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
+				if strings.ToLower(protocol) == "poa" {
+					if env, envOk := cfg["env"].(map[string]interface{}); envOk {
+						var addr *string
+						var privateKey *ecdsa.PrivateKey
+						_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
+						if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
+							addr = common.StringOrNil(masterOfCeremony)
+							out := []string{}
+							db.Table("wallets").Select("private_key").Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
+							if out == nil || len(out) == 0 || len(out[0]) == 0 {
+								common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
 								addr, privateKey, err = provide.EVMGenerateKeyPair()
-							}
-
-							if addr != nil && privateKey != nil {
-								keystoreJSON, err := provide.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+							} else {
+								encryptedKey := common.StringOrNil(out[0])
+								privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey, common.GpgPrivateKey, common.GpgPassword)
 								if err == nil {
-									common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, *network.Name)
-									env["ENGINE_SIGNER"] = addr
-									env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-									env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
+									common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
+								} else {
+									msg := fmt.Sprintf("Failed to decrypt private key for master of ceremony on network: %s", *network.Name)
+									common.Log.Warning(msg)
+									return errors.New(msg)
+								}
+							}
+						} else if !masterOfCeremonyPrivateKeyOk {
+							common.Log.Debugf("Generating managed master of ceremony signing identity for network: %s", *network.Name)
+							addr, privateKey, err = provide.EVMGenerateKeyPair()
+						}
 
-									n.setConfig(cfg)
+						if addr != nil && privateKey != nil {
+							keystoreJSON, err := provide.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+							if err == nil {
+								common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, *network.Name)
+								env["ENGINE_SIGNER"] = addr
+								env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+								env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
 
-									networkCfg := network.ParseConfig()
-									if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
-										if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
-											nonSystemAccounts := make([]string, 0)
-											for account := range accounts {
-												if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
-													nonSystemAccounts = append(nonSystemAccounts, account)
-												}
+								n.setConfig(cfg)
+
+								networkCfg := network.ParseConfig()
+								if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
+									if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
+										nonSystemAccounts := make([]string, 0)
+										for account := range accounts {
+											if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
+												nonSystemAccounts = append(nonSystemAccounts, account)
 											}
-											if len(nonSystemAccounts) == 1 {
-												templateMasterOfCeremony := nonSystemAccounts[0]
-												chainspecJSON, err := json.Marshal(chainspec)
+										}
+										if len(nonSystemAccounts) == 1 {
+											templateMasterOfCeremony := nonSystemAccounts[0]
+											chainspecJSON, err := json.Marshal(chainspec)
+											if err == nil {
+												chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
+												chainspecJSON = []byte(strings.Replace(string(chainspecJSON), strings.ToLower(templateMasterOfCeremony[2:]), strings.ToLower(string(*addr)[2:]), -1))
+												var newChainspec map[string]interface{}
+												err = json.Unmarshal(chainspecJSON, &newChainspec)
 												if err == nil {
-													chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
-													chainspecJSON = []byte(strings.Replace(string(chainspecJSON), strings.ToLower(templateMasterOfCeremony[2:]), strings.ToLower(string(*addr)[2:]), -1))
-													var newChainspec map[string]interface{}
-													err = json.Unmarshal(chainspecJSON, &newChainspec)
-													if err == nil {
-														networkCfg["chainspec"] = newChainspec
-														network.setConfig(networkCfg)
-														db.Save(network)
-													}
+													networkCfg["chainspec"] = newChainspec
+													network.setConfig(networkCfg)
+													db.Save(network)
 												}
 											}
 										}
 									}
-								} else {
-									common.Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
 								}
+							} else {
+								common.Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
 							}
 						}
 					}
 				}
+			}
+			n._deploy(network, bootnodes, db)
+		default:
+			msg := fmt.Sprintf("Failed to deploy node %s to network: %s", n.ID, *network.Name)
+			common.Log.Warning(msg)
+			return errors.New(msg)
+		}
+	} else {
+		if p2p, p2pOk := cfg["p2p"].(bool); p2pOk {
+			if p2p {
+				n.requireGenesis(network, bootnodes, db)
+			} else {
 				n._deploy(network, bootnodes, db)
 			}
 		} else {
-			if p2p, p2pOk := cfg["p2p"].(bool); p2pOk {
-				if p2p {
-					n.requireGenesis(network, bootnodes, db)
-				} else {
-					n._deploy(network, bootnodes, db)
-				}
-			} else {
-				n.requireGenesis(network, bootnodes, db) // default assumes p2p
-			}
+			n.requireGenesis(network, bootnodes, db) // default assumes p2p
 		}
-	}()
+	}
+
+	return nil
 }
 
 func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode, db *gorm.DB) {
