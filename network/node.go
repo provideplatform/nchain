@@ -332,7 +332,7 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
-			if providerID, providerIdOk := cfg["provider_id"].(string); providerIdOk {
+			if providerID, providerIDOk := cfg["provider_id"].(string); providerIDOk {
 				if strings.ToLower(providerID) == "docker" {
 					if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
 						logs := make([]string, 0)
