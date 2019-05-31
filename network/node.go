@@ -565,9 +565,6 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 		}
 	}
 
-	common.Log.Debugf("Configuration for network node deploy: target id: %s; provider: %s; role: %s; crendentials: %s; region: %s, cloneable provider cfg: %s; network config: %s",
-		targetID, providerID, role, credentials, region, providerCfgByRegion, networkCfg)
-
 	if targetOk && engineOk && providerOk && roleOk && credsOk && regionOk {
 		if strings.ToLower(targetID) == "aws" {
 			accessKeyID := credentials["aws_access_key_id"].(string)
