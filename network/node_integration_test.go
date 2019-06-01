@@ -759,6 +759,7 @@ var _ = Describe("Node", func() {
 						taskId := taskIds[0].(string)
 						awsTasksStartedIds[1] = &taskId
 
+						validatorNode.Reload()
 						peerNode.Reload()
 						err := json.Unmarshal(*peerNode.Config, &peerNodeConfig)
 						Expect(err).NotTo(HaveOccurred())
