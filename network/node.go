@@ -449,7 +449,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 												if err == nil {
 													networkCfg["chainspec"] = newChainspec
 													network.setConfig(networkCfg)
-													db.Save(network)
+													db.Save(&network)
 												}
 											}
 										}
@@ -462,7 +462,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 					}
 				}
 			}
-			n._deploy(network, bootnodes, db)
+			return n._deploy(network, bootnodes, db)
 		default:
 			msg := fmt.Sprintf("Failed to deploy node %s to network: %s", n.ID, *network.Name)
 			common.Log.Warning(msg)
@@ -471,19 +471,15 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 	} else {
 		if p2p, p2pOk := cfg["p2p"].(bool); p2pOk {
 			if p2p {
-				n.requireGenesis(network, bootnodes, db)
-			} else {
-				n._deploy(network, bootnodes, db)
+				return n.requireGenesis(network, bootnodes, db)
 			}
-		} else {
-			n.requireGenesis(network, bootnodes, db) // default assumes p2p
+			return n._deploy(network, bootnodes, db)
 		}
+		return n.requireGenesis(network, bootnodes, db) // default assumes p2p
 	}
-
-	return nil
 }
 
-func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode, db *gorm.DB) {
+func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode, db *gorm.DB) error {
 	ticker := time.NewTicker(resolveGenesisTickerInterval)
 	startedAt := time.Now()
 	for {
@@ -494,16 +490,14 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
 				ticker.Stop()
-				return
+				return errors.New(desc)
 			}
 
 			if daemon, daemonOk := currentNetworkStats[network.ID.String()]; daemonOk {
 				if daemon.stats != nil {
 					if daemon.stats.Block > 0 {
-						common.Log.Warning("Deploying w/o network stats")
-						n._deploy(network, bootnodes, db)
 						ticker.Stop()
-						return
+						return n._deploy(network, bootnodes, db)
 					}
 				}
 			}
@@ -511,7 +505,7 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 	}
 }
 
-func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *gorm.DB) {
+func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *gorm.DB) error {
 	cfg := n.ParseConfig()
 	networkCfg := network.ParseConfig()
 
@@ -546,7 +540,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				desc := fmt.Sprintf("Failed to parse cloneable security configuration for network node: %s", n.ID)
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
-				return
+				return errors.New(desc)
 			}
 			securityCfg = cloneableSecurityCfg
 		}
@@ -557,7 +551,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
-				return
+				return errors.New(desc)
 			}
 
 			cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
@@ -565,7 +559,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
-				return
+				return errors.New(desc)
 			}
 
 			cloneableProviderCfgByRegion, cloneableProviderCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
@@ -573,7 +567,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warningf(desc)
-				return
+				return errors.New(desc)
 			}
 			providerCfgByRegion = cloneableProviderCfgByRegion
 		}
@@ -602,7 +596,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				desc := fmt.Sprintf("Failed to create security group in EC2 region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
-				return
+				return errors.New(desc)
 			}
 
 			if egress, egressOk := securityCfg["egress"]; egressOk {
@@ -728,7 +722,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					}
 					cfg["env"] = envOverrides
 					n.setConfig(cfg)
-					db.Save(n)
+					db.Save(&n)
 
 					taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, *resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
 
@@ -737,12 +731,12 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						n.updateStatus(db, "failed", &desc)
 						n.unregisterSecurityGroups()
 						common.Log.Warning(desc)
-						return
+						return errors.New(desc)
 					}
 					common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *resolvedContainer, region, taskIds)
 					cfg["target_task_ids"] = taskIds
 					n.setConfig(cfg)
-					db.Save(n)
+					db.Save(&n)
 
 					msg, _ := json.Marshal(map[string]interface{}{
 						"network_node_id": n.ID.String(),
@@ -754,6 +748,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 			}
 		}
 	}
+
+	return nil
 }
 
 func (n *NetworkNode) resolveHost(db *gorm.DB) error {
@@ -827,7 +823,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB) error {
 	}
 
 	if n.Host == nil {
-		if time.Now().Sub(n.CreatedAt) >= resolvePeerTickerTimeout {
+		if time.Now().Sub(n.CreatedAt) >= resolveHostTickerTimeout {
 			desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTickerTimeout)
 			n.updateStatus(db, "failed", &desc)
 			common.Log.Warning(desc)
@@ -949,7 +945,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
 
 	if peerURL == nil {
 		if time.Now().Sub(n.CreatedAt) >= resolvePeerTickerTimeout {
-			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolveHostTickerTimeout)
+			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTickerTimeout)
 			n.updateStatus(db, "failed", &desc)
 			common.Log.Warning(desc)
 			return fmt.Errorf(desc)
