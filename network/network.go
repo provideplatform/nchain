@@ -88,7 +88,7 @@ func (n *Network) Create() bool {
 		if !db.NewRecord(n) {
 			success := rowsAffected > 0
 			if success {
-				go n.resolveContracts(db)
+				n.resolveContracts(db)
 			}
 			return success
 		}
