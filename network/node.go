@@ -757,6 +757,10 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 }
 
 func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) error {
+	if len(identifiers) == 0 {
+		return fmt.Errorf("Unable to resolve network node host without any node identifiers")
+	}
+
 	id := identifiers[len(identifiers)-1]
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
@@ -836,6 +840,10 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 }
 
 func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) error {
+	if len(identifiers) == 0 {
+		return fmt.Errorf("Unable to resolve network node peer url without any node identifiers")
+	}
+
 	role, roleOk := cfg["role"].(string)
 	if !roleOk || role != "peer" && role != "full" && role != "validator" {
 		return nil
