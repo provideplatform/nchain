@@ -89,6 +89,10 @@ make lint > reports/linters/golint.txt # TODO: add -set_exit_status once we clea
 
 DATABASE_USER=postgres DATABASE_PASSWORD=postgres make test
 
+if [ "$RUN_INTEGRATION_SUITE" = "true" ]; then
+  DATABASE_USER=postgres DATABASE_PASSWORD=postgres make integration
+done
+
 go build -v
 make ecs_deploy
 
