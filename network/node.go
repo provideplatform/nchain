@@ -202,9 +202,9 @@ func (n *NetworkNode) reachableOnPort(port uint) bool {
 	return false
 }
 
-func (n *NetworkNode) relatedNetwork() *Network {
+func (n *NetworkNode) relatedNetwork(db *gorm.DB) *Network {
 	var network = &Network{}
-	dbconf.DatabaseConnection().Model(n).Related(&network)
+	db.Model(n).Related(&network)
 	if network == nil || network.ID == uuid.Nil {
 		common.Log.Warningf("Failed to retrieve network for network node: %s", n.ID)
 		return nil
@@ -756,7 +756,24 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	}
 }
 
-func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) error {
+func (n *NetworkNode) resolveHost(db *gorm.DB) error {
+	network := n.relatedNetwork(db)
+	if network == nil {
+		return fmt.Errorf("Failed to resolve host for network node %s; no network resolved", n.ID)
+	}
+
+	cfg := n.ParseConfig()
+	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
+
+	if !taskIdsOk {
+		return fmt.Errorf("Failed to deploy network node %s; no target_task_ids provided", n.ID)
+	}
+
+	identifiers := make([]string, len(taskIds))
+	for _, id := range taskIds {
+		identifiers = append(identifiers, id.(string))
+	}
+
 	if len(identifiers) == 0 {
 		return fmt.Errorf("Unable to resolve network node host without any node identifiers")
 	}
@@ -839,7 +856,24 @@ func (n *NetworkNode) resolveHost(db *gorm.DB, network *Network, cfg map[string]
 	return nil
 }
 
-func (n *NetworkNode) resolvePeerURL(db *gorm.DB, network *Network, cfg map[string]interface{}, identifiers []string) error {
+func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
+	network := n.relatedNetwork(db)
+	if network == nil {
+		return fmt.Errorf("Failed to resolve peer url for network node %s; no network resolved", n.ID)
+	}
+
+	cfg := n.ParseConfig()
+	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
+
+	if !taskIdsOk {
+		return fmt.Errorf("Failed to deploy network node %s; no target_task_ids provided", n.ID)
+	}
+
+	identifiers := make([]string, len(taskIds))
+	for _, id := range taskIds {
+		identifiers = append(identifiers, id.(string))
+	}
+
 	if len(identifiers) == 0 {
 		return fmt.Errorf("Unable to resolve network node peer url without any node identifiers")
 	}

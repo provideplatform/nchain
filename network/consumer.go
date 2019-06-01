@@ -17,37 +17,46 @@ import (
 
 const natsBlockFinalizedSubject = "goldmine.block.finalized"
 const natsBlockFinalizedSubjectMaxInFlight = 64
-const natsBlockFinalizedSubjectTimeout = time.Minute * 1
+const natsBlockFinalizedInvocationTimeout = time.Minute * 1
+const natsBlockFinalizedTimeout = int64(1000 * 60 * 10)
 
 const natsLoadBalancerInvocationTimeout = time.Second * 15
 
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 const natsLoadBalancerDeprovisioningMaxInFlight = 64
+const natsLoadBalancerDeprovisioningTimeout = int64(1000 * 60 * 10)
 
 const natsLoadBalancerProvisioningSubject = "goldmine.loadbalancer.provision"
 const natsLoadBalancerProvisioningMaxInFlight = 64
+const natsLoadBalancerProvisioningTimeout = int64(1000 * 60 * 10)
 
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerBalanceNodeMaxInFlight = 64
+const natsLoadBalancerBalanceNodeTimeout = int64(1000 * 60 * 10)
 
 const natsLoadBalancerUnbalanceNodeSubject = "goldmine.node.unbalance"
 const natsLoadBalancerUnbalanceNodeMaxInFlight = 64
+const natsLoadBalancerUnbalanceNodeTimeout = int64(1000 * 60 * 10)
 
 const natsDeployNetworkNodeSubject = "goldmine.node.deploy"
 const natsDeployNetworkNodeMaxInFlight = 64
 const natsDeployNetworkNodeInvocationTimeout = time.Minute * 1
+const natsDeployNetworkNodeTimeout = int64(1000 * 60 * 10)
 
 const natsDeleteTerminatedNetworkNodeSubject = "goldmine.node.delete"
 const natsDeleteTerminatedNetworkNodeMaxInFlight = 64
 const natsDeleteTerminatedNetworkNodeInvocationTimeout = time.Minute * 1
+const natsDeleteTerminatedNetworkNodeTimeout = int64(1000 * 60 * 10)
 
 const natsResolveNetworkNodeHostSubject = "goldmine.node.resolve-host"
 const natsResolveNetworkNodeHostMaxInFlight = 64
 const natsResolveNetworkNodeHostInvocationTimeout = time.Second * 10
+const natsResolveNetworkNodeHostTimeout = int64(1000 * 60 * 10)
 
 const natsResolveNetworkNodePeerURLSubject = "goldmine.node.resolve-peer"
 const natsResolveNetworkNodePeerURLMaxInFlight = 64
 const natsResolveNetworkNodePeerURLInvocationTimeout = time.Second * 10
+const natsResolveNetworkNodePeerURLTimeout = int64(1000 * 60 * 10)
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 
@@ -83,7 +92,7 @@ func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg *sync.Wa
 		go func() {
 			defer natsConnection.Close()
 
-			blockFinalizedSubscription, err := natsConnection.QueueSubscribe(natsBlockFinalizedSubject, natsBlockFinalizedSubject, consumeBlockFinalizedMsg, stan.SetManualAckMode(), stan.AckWait(natsBlockFinalizedSubjectTimeout), stan.MaxInflight(natsBlockFinalizedSubjectMaxInFlight), stan.DurableName(natsBlockFinalizedSubject))
+			blockFinalizedSubscription, err := natsConnection.QueueSubscribe(natsBlockFinalizedSubject, natsBlockFinalizedSubject, consumeBlockFinalizedMsg, stan.SetManualAckMode(), stan.AckWait(natsBlockFinalizedInvocationTimeout), stan.MaxInflight(natsBlockFinalizedSubjectMaxInFlight), stan.DurableName(natsBlockFinalizedSubject))
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsBlockFinalizedSubject)
 				wg.Done()
@@ -321,7 +330,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 
 	if err != nil {
 		common.Log.Warningf("Failed to handle block finalized message; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsBlockFinalizedTimeout)
 	} else {
 		msg.Ack()
 	}
@@ -341,6 +350,7 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 	err = balancer.provision(dbconf.DatabaseConnection())
 	if err != nil {
 		common.Log.Warningf("Failed to provision load balancer; %s", err.Error())
+		consumer.AttemptNack(msg, natsLoadBalancerProvisioningTimeout)
 	} else {
 		common.Log.Debugf("Load balancer provisioning succeeded; ACKing NATS message for balancer: %s", balancer.ID)
 		msg.Ack()
@@ -361,6 +371,7 @@ func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
 	err = balancer.deprovision(dbconf.DatabaseConnection())
 	if err != nil {
 		common.Log.Warningf("Failed to deprovision load balancer; %s", err.Error())
+		consumer.AttemptNack(msg, natsLoadBalancerDeprovisioningTimeout)
 	} else {
 		common.Log.Debugf("Load balancer deprovisioning succeeded; ACKing NATS message for balancer: %s", balancer.ID)
 		msg.Ack()
@@ -412,6 +423,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	err = balancer.balanceNode(db, node)
 	if err != nil {
 		common.Log.Warningf("Failed to balance node on load balancer; %s", err.Error())
+		consumer.AttemptNack(msg, natsLoadBalancerBalanceNodeTimeout)
 	} else {
 		common.Log.Debugf("Load balancer node balancing succeeded; ACKing NATS message: %s", balancer.ID)
 		msg.Ack()
@@ -464,6 +476,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	err = balancer.unbalanceNode(db, node)
 	if err != nil {
 		common.Log.Warningf("Failed to remove node from load balancer; %s", err.Error())
+		consumer.AttemptNack(msg, natsLoadBalancerUnbalanceNodeTimeout)
 	} else {
 		common.Log.Debugf("Load balancer node removal succeeded; ACKing NATS message: %s", balancer.ID)
 		msg.Ack()
@@ -502,7 +515,7 @@ func consumeDeployNetworkNodeMsg(msg *stan.Msg) {
 	err = node.deploy(db)
 	if err != nil {
 		common.Log.Warningf("Failed to deploy network node; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsDeployNetworkNodeTimeout)
 		return
 	}
 
@@ -549,7 +562,7 @@ func consumeDeleteTerminatedNetworkNodeMsg(msg *stan.Msg) {
 	if len(errors) > 0 {
 		err := errors[0]
 		common.Log.Warningf("Failed to delete terminated network node; %s", common.StringOrNil(err.Error()))
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsDeleteTerminatedNetworkNodeTimeout)
 		return
 	}
 	msg.Ack()
@@ -584,29 +597,10 @@ func consumeResolveNetworkNodeHostMsg(msg *stan.Msg) {
 		return
 	}
 
-	var network = &Network{}
-	db.Model(node).Related(&network)
-	if network == nil || network.ID == uuid.Nil {
-		desc := fmt.Sprintf("Failed to retrieve network for network node: %s", node.ID)
-		common.Log.Warning(desc)
-		node.updateStatus(db, "failed", &desc)
-		consumer.Nack(msg)
-		return
-	}
-
-	cfg := node.ParseConfig()
-	taskIds, taskIdsOk := cfg["target_task_ids"].([]string)
-
-	if !taskIdsOk {
-		common.Log.Warningf("Failed to deploy network node; no target_task_ids provided")
-		consumer.Nack(msg)
-		return
-	}
-
-	err = node.resolveHost(db, network, cfg, taskIds)
+	err = node.resolveHost(db)
 	if err != nil {
 		common.Log.Warningf("Failed to resolve network node host; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsResolveNetworkNodeHostTimeout)
 		return
 	}
 
@@ -642,29 +636,10 @@ func consumeResolveNetworkNodePeerURLMsg(msg *stan.Msg) {
 		return
 	}
 
-	var network = &Network{}
-	db.Model(node).Related(&network)
-	if network == nil || network.ID == uuid.Nil {
-		desc := fmt.Sprintf("Failed to retrieve network for network node: %s", node.ID)
-		common.Log.Warning(desc)
-		node.updateStatus(db, "failed", &desc)
-		consumer.Nack(msg)
-		return
-	}
-
-	cfg := node.ParseConfig()
-	taskIds, taskIdsOk := cfg["target_task_ids"].([]string)
-
-	if !taskIdsOk {
-		common.Log.Warningf("Failed to deploy network node; no target_task_ids provided")
-		consumer.Nack(msg)
-		return
-	}
-
-	err = node.resolvePeerURL(db, network, cfg, taskIds)
+	err = node.resolvePeerURL(db)
 	if err != nil {
 		common.Log.Warningf("Failed to resolve network node peer url; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsResolveNetworkNodePeerURLTimeout)
 		return
 	}
 

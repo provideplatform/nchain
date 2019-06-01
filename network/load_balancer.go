@@ -390,7 +390,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 	db.Model(l).Association("Nodes").Append(node)
 
-	network := node.relatedNetwork()
+	network := node.relatedNetwork(db)
 	network.setIsLoadBalanced(db, true)
 
 	cfg := l.ParseConfig()
@@ -560,7 +560,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 		natsConnection := common.GetDefaultNatsStreamingConnection()
 		natsConnection.Publish(natsLoadBalancerDeprovisioningSubject, msg)
 
-		network := node.relatedNetwork()
+		network := node.relatedNetwork(db)
 		network.setIsLoadBalanced(db, network.isLoadBalanced(db, nil, nil))
 	}
 
