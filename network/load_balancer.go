@@ -104,7 +104,9 @@ func (l *LoadBalancer) Create() bool {
 		if !db.NewRecord(l) {
 			success := rowsAffected > 0
 			if success {
-				msg, _ := json.Marshal(l)
+				msg, _ := json.Marshal(map[string]interface{}{
+					"load_balancer_id": l.ID,
+				})
 				natsConnection := common.GetDefaultNatsStreamingConnection()
 				natsConnection.Publish(natsLoadBalancerProvisioningSubject, msg)
 			}
@@ -556,7 +558,9 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 	common.Log.Debugf("Load balancer %s contains %d remaining balanced nodes", l.ID, balancedNodeCount)
 	if balancedNodeCount == 0 {
 		common.Log.Debugf("Attempting to deprovision load balancer %s in region: %s", l.ID, region)
-		msg, _ := json.Marshal(l)
+		msg, _ := json.Marshal(map[string]interface{}{
+			"load_balancer_id": l.ID,
+		})
 		natsConnection := common.GetDefaultNatsStreamingConnection()
 		natsConnection.Publish(natsLoadBalancerDeprovisioningSubject, msg)
 

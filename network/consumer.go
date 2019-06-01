@@ -338,11 +338,28 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 
 func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS load balancer provisioning message: %s", msg)
-	var balancer *LoadBalancer
+	var params map[string]interface{}
 
-	err := json.Unmarshal(msg.Data, &balancer)
+	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal load balancer provisioning message; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
+	balancerID, balancerIDOk := params["load_balancer_id"].(string)
+	if !balancerIDOk {
+		common.Log.Warningf("Failed to provision load balancer; no load balancer id provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	balancer := &LoadBalancer{}
+	db.Where("id = ?", balancerID).Find(&balancer)
+	if balancer == nil || balancer.ID == uuid.Nil {
+		common.Log.Warningf("Failed to provision load balancer; no load balancer resolved for id: %s", balancerID)
 		consumer.Nack(msg)
 		return
 	}
@@ -359,11 +376,28 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 
 func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS load balancer deprovisioning message: %s", msg)
-	var balancer *LoadBalancer
+	var params map[string]interface{}
 
-	err := json.Unmarshal(msg.Data, &balancer)
+	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal load balancer deprovisioning message; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
+	balancerID, balancerIDOk := params["load_balancer_id"].(string)
+	if !balancerIDOk {
+		common.Log.Warningf("Failed to deprovision load balancer; no load balancer id provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	balancer := &LoadBalancer{}
+	db.Where("id = ?", balancerID).Find(&balancer)
+	if balancer == nil || balancer.ID == uuid.Nil {
+		common.Log.Warningf("Failed to deprovision load balancer; no load balancer resolved for id: %s", balancerID)
 		consumer.Nack(msg)
 		return
 	}
