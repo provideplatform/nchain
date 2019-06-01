@@ -542,42 +542,6 @@ var _ = Describe("Node", func() {
 			// FIXME: assert basic network sanity?
 		})
 
-		// AfterEach(func() {})
-
-		// XContext("when a single validator node is created by the master of ceremony", func() {
-		// 	ctxId := "single_validator_node"
-		// 	var validatorNode *network.NetworkNode
-
-		// 	BeforeEach(func() {
-		// 		if validatorNode == nil {
-		// 			validatorNode, _ = createValidatorNode(ctxId, awsKey, awsSecret, awsRegion, true)
-
-		// 			startStatsDaemon(n)
-
-		// 			taskIds := keyFromConfig(validatorNode.Config, "target_task_ids").([]interface{})
-		// 			fmt.Printf("task ids: %v\n", taskIds)
-		// 			taskId := taskIds[0].(string)
-		// 			awsTasksStartedIds[0] = &taskId
-
-		// 			lb, _ := n.LoadBalancers(db, &awsRegion, nil)
-		// 			lbIds := make([]*string, len(lb))
-		// 			for i, l := range lb {
-		// 				lbIds[i] = l.Name
-		// 			}
-		// 			// newLB := extraStrings([]*string{}, lbIds)
-		// 			newLB := extraStrings(preTestAWSLBs, lbIds)
-		// 			for _, l := range newLB {
-		// 				lbStartedIds = append(lbStartedIds, l)
-		// 			}
-		// 		}
-		// 	})
-
-		// 	It("should contain task id", func() {
-		// 		fmt.Printf("aws tasks: %v\n", awsTasksStartedIds)
-		// 		Expect(awsTasksStartedIds[0]).NotTo(BeNil())
-		// 	})
-		// })
-
 		Context("when a single validator node is created by the master of ceremony", func() {
 			ctxId := "single_validator_node"
 			var validatorNode *network.NetworkNode
@@ -592,11 +556,6 @@ var _ = Describe("Node", func() {
 					fmt.Printf("starting stats daemon : \n")
 
 					startStatsDaemon(n)
-
-					// taskIds := keyFromConfig(validatorNode.Config, "target_task_ids").([]interface{})
-					// fmt.Printf("task ids: %v\n", taskIds)
-					// taskId := taskIds[0].(string)
-					// awsTasksStartedIds[0] = &taskId
 
 					lb, _ := n.LoadBalancers(db, &awsRegion, nil)
 					lbIds := make([]*string, len(lb))
@@ -614,19 +573,14 @@ var _ = Describe("Node", func() {
 			})
 
 			It("should contain task id", func() {
-				fmt.Printf("aws tasks: %v\n", awsTasksStartedIds)
 				Expect(awsTasksStartedIds[0]).NotTo(BeNil())
 				validatorScenarioCount--
 			})
 
-			It("should have status running", func() {
-				Expect(validatorNode.Status).To(gstruct.PointTo(Equal("running")))
+			It("should have status genesis", func() {
+				Expect(validatorNode.Status).To(gstruct.PointTo(Equal("genesis")))
 				validatorScenarioCount--
 			})
-
-			// fmt.Printf("  NODE : %v\n", validatorNode)
-			// if validatorNode != nil && *validatorNode.Status != "failed" {
-			// 	fmt.Printf("  NODE status: %v\n", *validatorNode.Status)
 
 			Describe("load balancing", func() {
 				var loadBalancers []*network.LoadBalancer
@@ -732,16 +686,9 @@ var _ = Describe("Node", func() {
 					Context("target groups", func() {
 						var ports = [...]int64{5001, 8050, 8051, 8080, 30300}
 
-						// BeforeEach(func() {
-						// })
-
-						//for i := 0; i < len(ports); i++ {
-
 						for _, p := range ports {
 							cTitle := fmt.Sprintf("%v port", p)
 							Context(cTitle, func() {
-								// Context("port 5001", func() {
-								// p := 5001
 								var cfgTargetGroups map[string]interface{}
 								var targetGroupsResp *elbv2.DescribeTargetGroupsOutput
 								var targetGroupsRespError error
@@ -755,7 +702,6 @@ var _ = Describe("Node", func() {
 									targetGroupsResp, targetGroupsRespError = awswrapper.GetTargetGroup(awsKey, awsSecret, "us-west-2", targetGroupName)
 
 									targetGroups = targetGroupsResp.TargetGroups
-									// time.Sleep(time.Second * time.Duration(5))
 								})
 
 								It("should return from amazon without error", func() {
@@ -800,8 +746,6 @@ var _ = Describe("Node", func() {
 				var peerScenarioCount = 9
 
 				BeforeEach(func() {
-					// FIXME!!! peerNode should be called node or peer here...		peerNode = &network.NetworkNode{}
-
 					if lb == nil {
 						lb = &network.LoadBalancer{}
 						db := dbconf.DatabaseConnection()
@@ -819,15 +763,13 @@ var _ = Describe("Node", func() {
 
 				})
 
-				Describe("peer node itself", func() {
+				Describe("the peer node", func() {
 					It("should have role 'peer'", func() {
 						Expect(peerNode.Role).To(gstruct.PointTo(Equal("peer")))
 						peerScenarioCount--
 					})
 
 					It("should have status 'running'", func() {
-						// This is sure to fail now that all the sleeps are out in favor of relying on the suite to always run end to end
-
 						Expect(peerNode.Status).To(gstruct.PointTo(Equal("running")))
 						peerScenarioCount--
 					})
@@ -837,6 +779,7 @@ var _ = Describe("Node", func() {
 					var envCfg map[string]interface{}
 					var envCfgOk bool
 					BeforeEach(func() {
+						peerNode.Reload()
 						err := json.Unmarshal(*peerNode.Config, &peerNodeConfig)
 						Expect(err).NotTo(HaveOccurred())
 
