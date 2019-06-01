@@ -177,6 +177,7 @@ func createPeerNode(ctx, awsKey, awsSecret string) (node *network.NetworkNode, e
 
 	if res {
 		wait(time.Duration(8)*time.Minute, ptrTo("to deploy second node..."))
+		node.Reload()
 	}
 
 	return node, nil
@@ -206,6 +207,7 @@ func contextMutexReleased(ctx string, t string) bool {
 }
 
 func removeNode(ctx string, node *network.NetworkNode) (err error) {
+	node.Reload()
 	node.Delete()
 	// Expect(node.Status).To(gstruct.PointTo(Equal("deprovisioning")))
 
