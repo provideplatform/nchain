@@ -91,7 +91,7 @@ DATABASE_USER=postgres DATABASE_PASSWORD=postgres make test
 
 if [ "$RUN_INTEGRATION_SUITE" = "true" ]; then
   DATABASE_USER=postgres DATABASE_PASSWORD=postgres make integration
-done
+fi
 
 go build -v
 make ecs_deploy
