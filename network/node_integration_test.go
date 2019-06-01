@@ -758,6 +758,10 @@ var _ = Describe("Node", func() {
 						fmt.Printf("    task ids: %v\n", taskIds)
 						taskId := taskIds[0].(string)
 						awsTasksStartedIds[1] = &taskId
+
+						peerNode.Reload()
+						err := json.Unmarshal(*peerNode.Config, &peerNodeConfig)
+						Expect(err).NotTo(HaveOccurred())
 					}
 					fmt.Printf("=== BEFORE peerNode: %v\n", peerNode)
 
@@ -779,10 +783,6 @@ var _ = Describe("Node", func() {
 					var envCfg map[string]interface{}
 					var envCfgOk bool
 					BeforeEach(func() {
-						peerNode.Reload()
-						err := json.Unmarshal(*peerNode.Config, &peerNodeConfig)
-						Expect(err).NotTo(HaveOccurred())
-
 						envCfg, envCfgOk = peerNodeConfig["env"].(map[string]interface{})
 					})
 					It("should be present", func() {
