@@ -603,7 +603,7 @@ var _ = Describe("Network", func() {
 				Expect(txtErr).NotTo(HaveOccurred())
 			})
 			It("should return AvailablePeerCount", func() {
-				Expect(nwnn.AvailablePeerCount()).To(Equal(uint64(4)))
+				Expect(nwnn.AvailablePeerCount()).To(Equal(uint64(0)))
 			})
 			It("should return network status", func() {
 				Expect(nwnn.Status(true)).NotTo(BeNil())
