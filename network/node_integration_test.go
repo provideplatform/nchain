@@ -854,6 +854,9 @@ var _ = Describe("Node", func() {
 					})
 				})
 
+				Context("when second peer is created", func() {
+
+				})
 				// Context("when the peer is deleted", func() {
 
 				// 	BeforeEach(func() {
