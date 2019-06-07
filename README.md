@@ -24,7 +24,7 @@ Enumerate available blockchain `Network`s and related configuration details.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks
 HTTP/2 200
 date: Wed, 10 Oct 2018 14:56:22 GMT
@@ -344,7 +344,7 @@ Fetch details for the given `Network`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50
 HTTP/2 200
 date: Wed, 10 Oct 2018 15:03:53 GMT
@@ -575,7 +575,7 @@ _Not yet implemented._
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/addresses
 HTTP/2 501
 date: Wed, 10 Oct 2018 15:07:42 GMT
@@ -599,7 +599,7 @@ _Not yet implemented._
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/blocks
 HTTP/2 501
 date: Wed, 10 Oct 2018 15:09:07 GMT
@@ -621,7 +621,7 @@ Enumerate the contracts of the given `Network`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/contracts
 HTTP/2 200
 date: Wed, 10 Oct 2018 15:09:44 GMT
@@ -655,7 +655,7 @@ Enumerate the transactions of the given `Network`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/transactions
 HTTP/2 200
 date: Wed, 10 Oct 2018 15:11:38 GMT
@@ -711,7 +711,7 @@ Fetch the details of the `Network`'s specified `Transaction`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/transactions/f1125746-fa73-4392-a935-7a57faf3f7b0
 HTTP/2 200
 date: Sat, 13 Oct 2018 16:59:32 GMT
@@ -774,7 +774,7 @@ Update the given `Network`.
 
 ```console
 $ curl -i -XPUT \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50 \
     -d '{"name": "provide.network \"unicorn\" testnet CLONE now with more update"}'
 HTTP/2 204
@@ -791,7 +791,7 @@ Fetch the details of the `Network`s specified `Contract`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/contracts/752eadfa-f138-4c73-a9b9-822a5bfb4dc6
 HTTP/2 200
 date: Sat, 13 Oct 2018 17:39:52 GMT
@@ -867,7 +867,7 @@ Create a new `Network`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks \
     -d '{"config": {
             "block_explorer_url": null,
@@ -1283,7 +1283,7 @@ _Not yet implemented._
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/bridges
 HTTP/2 501
 date: Sat, 13 Oct 2018 17:41:42 GMT
@@ -1307,7 +1307,7 @@ _Not yet implemented._
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/connectors
 HTTP/2 501
 date: Sat, 13 Oct 2018 17:43:05 GMT
@@ -1329,7 +1329,7 @@ Enumerate the specified `Network`'s `Node`s.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/nodes
 HTTP/2 200
 date: Mon, 15 Oct 2018 02:33:43 GMT
@@ -1459,7 +1459,7 @@ Fetch the details of the `Network`'s specified `Node`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/nodes/59d1e7ce-3316-45b2-bf06-5fae2c6294fe
 HTTP/2 200
 date: Mon, 15 Oct 2018 03:04:19 GMT
@@ -1595,7 +1595,7 @@ Get the logs for the specified `Node`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/nodes/59d1e7ce-3316-45b2-bf06-5fae2c6294fe/logs
 HTTP/2 200 
 date: Mon, 15 Oct 2018 03:07:47 GMT
@@ -1637,7 +1637,7 @@ Remove the `Network`'s specified `Node`.
 
 ```console
 $ curl -i -XDELETE \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/nodes/59d1e7ce-3316-45b2-bf06-5fae2c6294fe
 HTTP/2 204
 date: Mon, 15 Oct 2018 03:11:37 GMT
@@ -1655,7 +1655,7 @@ _Not yet implemented._
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/e5e0a051-6af7-4d1e-88cd-0ea1f67abd50/oracles
 HTTP/2 501
 date: Sat, 13 Oct 2018 17:58:52 GMT
@@ -1677,7 +1677,7 @@ Enumerate the specified `Network`'s `Tokens`s.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/tokens
 HTTP/2 200
 date: Sat, 13 Oct 2018 17:06:52 GMT
@@ -1698,7 +1698,7 @@ Check the status of the given `Network`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/transactions
 HTTP/2 200
 date: Fri, 12 Oct 2018 22:44:01 GMT
@@ -1755,7 +1755,7 @@ Fetch real-time pricing data for major currency pairs and supported tokens.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/prices
 HTTP/2 200
 date: Wed, 10 Oct 2018 15:19:12 GMT
@@ -1783,7 +1783,7 @@ Enumerate configured `Connector`s.
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/connectors
 HTTP/2 200
 date: Fri, 12 Oct 2018 22:14:36 GMT
@@ -1804,7 +1804,7 @@ Enumerate configured `Connector`s.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/connectors
 HTTP/2 200
 date: Mon, 15 Oct 2018 03:18:17 GMT
@@ -1839,7 +1839,7 @@ Configure a new `Connector`.
 
 ```console
 $ curl -i \ 
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/applications/25b6339c-f11f-4a00-94d7-0a6e9b64586d/connectors \
     -d '{"network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
           "application_id": "25b6339c-f11f-4a00-94d7-0a6e9b64586d",
@@ -1881,7 +1881,7 @@ _Not yet implemented._
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/connectors/9e5e269a-f074-49e2-8383-ab94a33ae30a
 HTTP/2 501
 date: Mon, 15 Oct 2018 03:39:29 GMT
@@ -1903,7 +1903,7 @@ Remove the specified `Connector`.
 
 ```console
 $ curl -i -XDELETE \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/connectors/9e5e269a-f074-49e2-8383-ab94a33ae30a
 HTTP/2 204
 date: Mon, 15 Oct 2018 03:42:18 GMT
@@ -1921,7 +1921,7 @@ Enumerate managed smart contracts. Each `Contract` contains a `params` object wh
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/v1/contracts
 HTTP/2 200
 date: Wed, 10 Oct 2018 15:21:44 GMT
@@ -1967,7 +1967,7 @@ Deploy a new `Contract`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer yoUr-AutH-TOKeN-FrOm-sIgnINg-in' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/contracts \
     -d '{"network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
           "wallet_id": "86ee6d48-66bb-4122-8073-a078854d09e6",
@@ -2057,7 +2057,7 @@ Fetch details for the specified `Contract`.
 
 ```console
 $ curl -i \
-    -H 'Authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/contracts/55271393-34c7-4d53-8aa8-4a4b06554c1a
 HTTP/2 200
 date: Mon, 15 Oct 2018 03:58:36 GMT
@@ -2149,7 +2149,7 @@ Explanation of request body:
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/contracts/3b9fe62e-5da7-43dc-838f-3cfa1421ed0f/execute \
      -d '{"wallet_id": "a-signing-identity-identifier", "method": "a_method_from_the_contract", "params": ["arguments", "for", "the", "method"], "value": 0.5}'
 HTTP/2 202
@@ -2175,7 +2175,7 @@ Enumerate managed oracle contracts.
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/oracles
 HTTP/2 200
 date: Fri, 12 Oct 2018 21:29:35 GMT
@@ -2211,7 +2211,7 @@ Enumerate managed `Token` contracts.
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/tokens
 HTTP/2 200
 date: Fri, 12 Oct 2018 21:31:31 GMT
@@ -2241,7 +2241,7 @@ _Not yet implemented._
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/tokens/52d9caf3-0a56-4670-886e-8136b633d52b
 HTTP/2 501
 date: Sat, 13 Oct 2018 17:34:49 GMT
@@ -2266,7 +2266,7 @@ Enumerate `Transaction`s.
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/transactions
 HTTP/2 200
 date: Fri, 12 Oct 2018 21:37:43 GMT
@@ -2305,7 +2305,7 @@ Prepare and sign a protocol `Transaction` using a managed signing `Wallet` on be
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/transactions \
      -d '{"network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4", "wallet_id": "efef1044-4958-43bc-903b-28f2bb938037", "to": "0xfb17cB7bb99128AAb60B1DD103271d99C8237c0d", "value": 0}'
 HTTP/2 201
@@ -2343,7 +2343,7 @@ The signed transaction is broadcast to the `Network` targeted by the given `netw
 
 ```console
 $ curl -i \
-    -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+    -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
     https://goldmine.provide.services/api/v1/transactions \
     -d '{
   "network_id": "ba02ff92-f5bb-4d44-9187-7e1cc214b9fc",
@@ -2469,7 +2469,7 @@ Fetch the details of the specified `Transaction`.
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/transactions/fb4c5912-628f-4d8e-9c67-76d379010a71
 HTTP/2 200
 date: Fri, 12 Oct 2018 21:41:43 GMT
@@ -2535,7 +2535,7 @@ Enumerate wallets used for storing cryptocurrency or tokens on behalf of users f
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/wallets
 HTTP/2 200
 date: Fri, 12 Oct 2018 21:45:14 GMT
@@ -2568,7 +2568,7 @@ Create a managed `Wallet` (signing identity) capable of storing cryptocurrencies
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/wallets \
      -d '{"network_id":"024ff1ef-7369-4dee-969c-1918c6edb5d4"}'
 HTTP/2 201
@@ -2599,7 +2599,7 @@ Return `Network`-specific details for the requested `Wallet`.
 ```console
 $ curl -i \
      -H 'content-type: application/json' \
-     -H 'authorization: bearer an-apPliCaTIOn-aPi-tOkEn' \
+     -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/wallets/efef1044-4958-43bc-903b-28f2bb938037
 HTTP/2 200
 date: Fri, 12 Oct 2018 21:49:34 GMT
