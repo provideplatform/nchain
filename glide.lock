@@ -1,5 +1,5 @@
 hash: f12e68f1354785c4a55fc33381c939afe11f5e149d795317807f810e54a952d3
-updated: 2019-04-25T06:50:51.267205-04:00
+updated: 2019-06-07T08:43:44.977306-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: e24eb225f15679bbe54f91bfa7da3b00e59b9768
@@ -10,7 +10,7 @@ imports:
   subpackages:
   - monotime
 - name: github.com/aws/aws-sdk-go
-  version: b75b128df9f8734f891139bc1378b5cd44d1cb0d
+  version: e60e439fb094e0390e5396d25a27b7d3b692c7a6
   subpackages:
   - aws
   - aws/awserr
@@ -113,7 +113,7 @@ imports:
   - proto
   - protoc-gen-gogo/descriptor
 - name: github.com/golang/mock
-  version: 51421b967af1f557f93a59e0057aaf15ca02e29c
+  version: 9fa652df1129bef0e734c9cf9bf6dbae9ef3b9fa
 - name: github.com/golang/protobuf
   version: d3c38a4eb4970272b87a425ae00ccc4548e2f9bb
   subpackages:
@@ -123,7 +123,7 @@ imports:
 - name: github.com/gorilla/websocket
   version: 66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d
 - name: github.com/jinzhu/gorm
-  version: e3987fd4b803c16497aa4dfd2e75db7a6a061a4e
+  version: b7156195f7f3415f97c20abbd6aff894b847fee8
   subpackages:
   - dialects/postgres
 - name: github.com/jinzhu/inflection
@@ -168,14 +168,21 @@ imports:
   - util
 - name: github.com/nats-io/go-nats-streaming
   version: 512d9079d04064a6b2788d47e9800269d6e32ba8
+- name: github.com/nats-io/nats.go
+  version: 7b479cded2b9dc8541620a8d0912ea8e4d571dca
   subpackages:
-  - pb
+  - encoders/builtin
+  - util
 - name: github.com/nats-io/nkeys
   version: 1546a3320a8f195a5b5c84aef8309377c2e411d5
 - name: github.com/nats-io/nuid
   version: 3024a71c3cbe30667286099921591e6fcc328230
+- name: github.com/nats-io/stan.go
+  version: c5efdc3e2330fb9c81f34082d0c04a8de817748a
+  subpackages:
+  - pb
 - name: github.com/onsi/gomega
-  version: abeb93df1e828c834ddbe55cb416f31b82409a3c
+  version: efe19c39ca106ee4ed42a1b25e1a80a53be4831a
   subpackages:
   - format
   - gstruct
@@ -195,7 +202,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: eac53f51f94ccc994a1237eea501c81480182019
+  version: d82983a00f0b2422bcee5f56513d7287320fe6ae
 - name: github.com/rs/cors
   version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/satori/go.uuid
@@ -221,6 +228,8 @@ imports:
   version: 2dc34c0b87808deb8e2c69e1625db4c14e5d0d4a
   subpackages:
   - codec
+- name: github.com/vincent-petithory/dataurl
+  version: 9a301d65acbb728fcc3ace14f45f511a4cfeea9c
 - name: golang.org/x/crypto
   version: 38d8ce5564a5b71b2e3a00553993f1b9a7ae852f
   subpackages:
@@ -243,7 +252,7 @@ imports:
   - cpu
   - unix
 - name: golang.org/x/text
-  version: f4905fbd45b6790792202848439271c74074bbfd
+  version: 342b2e1fbaa52c93f31447ad2c6abc048c63e475
   subpackages:
   - encoding
   - encoding/charmap
@@ -277,7 +286,7 @@ testImports:
   - watch
   - winfile
 - name: github.com/onsi/ginkgo
-  version: eea6ad008b96acdaa524f5b409513bf062b500ad
+  version: 4cb744166b80afeec15fd0b4446c640a7688cd51
   subpackages:
   - config
   - internal/codelocation
