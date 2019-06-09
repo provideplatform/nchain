@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/go-nats-streaming"
@@ -74,11 +75,28 @@ func createNatsNetworkContractCreateInvocationSubscriptions(natsConnection stan.
 
 func consumeContractCompilerInvocationMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS contract compiler invocation message: %s", msg)
-	var contract *Contract
 
-	err := json.Unmarshal(msg.Data, &contract)
+	var params map[string]interface{}
+	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal contract compiler invocation message; %s", err.Error())
+		consumer.Nack(msg)
+		return
+	}
+
+	contractID, contractIDOk := params["contract_id"].(string)
+	if !contractIDOk {
+		common.Log.Warning("Failed to compile contract; contract_id not provided")
+		consumer.Nack(msg)
+		return
+	}
+
+	contract := &Contract{}
+	db := dbconf.DatabaseConnection()
+	db.Where("id = ?", contractID).Find(&contract)
+
+	if contract == nil || contract.ID == uuid.Nil {
+		common.Log.Warningf("Failed to compile contract; no contract resolved for %s", contractID)
 		consumer.Nack(msg)
 		return
 	}
@@ -99,7 +117,7 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 	var params map[string]interface{}
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal network contract creation invocation invocation message; %s", err.Error())
+		common.Log.Warningf("Failed to umarshal network contract creation invocation message; %s", err.Error())
 		consumer.Nack(msg)
 		return
 	}

@@ -257,13 +257,11 @@ func (c *Contract) Create() bool {
 				params := c.ParseParams()
 				_, rawSourceOk := params["raw_source"].(string)
 				if rawSourceOk {
-					common.Log.Debugf("Found raw source...")
-					contractCompilerInvocationMsg, err := json.Marshal(c)
-					if err != nil {
-						common.Log.Warningf("Failed to marshal contract for raw source compilation; %s", err.Error())
-					}
+					msg, _ := json.Marshal(map[string]interface{}{
+						"contract_id": c.ID.String(),
+					})
 					natsConnection := common.GetDefaultNatsStreamingConnection()
-					natsConnection.Publish(natsContractCompilerInvocationSubject, contractCompilerInvocationMsg)
+					natsConnection.Publish(natsContractCompilerInvocationSubject, msg)
 				}
 			}
 			return success
