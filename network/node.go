@@ -109,11 +109,48 @@ func (n *NetworkNode) setEncryptedConfig(params map[string]interface{}) {
 	n.encryptConfig()
 }
 
+func (n *NetworkNode) sanitizeConfig() {
+	cfg := n.ParseConfig()
+
+	encryptedCfg, err := n.decryptedConfig()
+	if err != nil {
+		encryptedCfg = map[string]interface{}{}
+	}
+
+	if env, envOk := cfg["env"].(map[string]interface{}); envOk {
+		encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
+		if !encryptedEnvOk {
+			encryptedEnv = map[string]interface{}{}
+			encryptedCfg["env"] = encryptedEnv
+		}
+
+		if credentials, credentialsOk := cfg["credentials"]; credentialsOk {
+			encryptedCfg["credentials"] = credentials
+			delete(cfg, "credentials")
+		}
+
+		if engineSignerKeyJSON, engineSignerKeyJSONOk := env["ENGINE_SIGNER_KEY_JSON"]; engineSignerKeyJSONOk {
+			encryptedEnv["ENGINE_SIGNER_KEY_JSON"] = engineSignerKeyJSON
+			delete(env, "ENGINE_SIGNER_KEY_JSON")
+		}
+
+		if engineSignerPrivateKey, engineSignerPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"]; engineSignerPrivateKeyOk {
+			encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"] = engineSignerPrivateKey
+			delete(env, "ENGINE_SIGNER_PRIVATE_KEY")
+		}
+	}
+
+	n.setConfig(cfg)
+	n.setEncryptedConfig(encryptedCfg)
+}
+
 // Create and persist a new network node
 func (n *NetworkNode) Create() bool {
 	if !n.Validate() {
 		return false
 	}
+
+	n.sanitizeConfig()
 
 	db := dbconf.DatabaseConnection()
 
@@ -157,6 +194,23 @@ func (n *NetworkNode) peerURL() *string {
 	}
 
 	return nil
+}
+
+// privateConfig returns a merged version of the config and encrypted config
+func (n *NetworkNode) privateConfig() map[string]interface{} {
+	config := map[string]interface{}{}
+	if n.Config != nil {
+		err := json.Unmarshal(*n.Config, &config)
+		if err != nil {
+			common.Log.Warningf("Failed to unmarshal network node config; %s", err.Error())
+			return nil
+		}
+	}
+	encryptedConfig, _ := n.decryptedConfig()
+	for k := range encryptedConfig {
+		config[k] = encryptedConfig[k]
+	}
+	return config
 }
 
 func (n *NetworkNode) reachableViaJSONRPC() (bool, uint) {
@@ -322,10 +376,11 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 	}
 
 	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
 
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := cfg["region"].(string)
 
 	if !targetOk || !providerOk || !credsOk {
@@ -384,6 +439,13 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 	n.updateStatus(db, "pending", nil)
 
 	cfg := n.ParseConfig()
+	encryptedCfg, err := n.decryptedConfig()
+	if err != nil {
+		return fmt.Errorf("Failed to decrypt config for network node: %s", n.ID)
+	}
+
+	env, envOk := cfg["env"].(map[string]interface{})
+	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
 
 	bootnodes, err := network.requireBootnodes(db, n)
 	if err != nil {
@@ -392,10 +454,10 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
 			if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
 				if strings.ToLower(protocol) == "poa" {
-					if env, envOk := cfg["env"].(map[string]interface{}); envOk {
+					if envOk && encryptedEnvOk {
 						var addr *string
 						var privateKey *ecdsa.PrivateKey
-						_, masterOfCeremonyPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
+						_, masterOfCeremonyPrivateKeyOk := encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"].(string)
 						if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
 							addr = common.StringOrNil(masterOfCeremony)
 							out := []string{}
@@ -424,10 +486,13 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 							if err == nil {
 								common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, *network.Name)
 								env["ENGINE_SIGNER"] = addr
-								env["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-								env["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
+								encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+								encryptedEnv["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
 
 								n.setConfig(cfg)
+								n.setEncryptedConfig(encryptedCfg)
+								n.sanitizeConfig()
+								db.Save(&n)
 
 								networkCfg := network.ParseConfig()
 								if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
@@ -507,6 +572,7 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 
 func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *gorm.DB) error {
 	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
 	networkCfg := network.ParseConfig()
 
 	cfg["default_json_rpc_port"] = networkCfg["default_json_rpc_port"]
@@ -517,10 +583,11 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	role, roleOk := cfg["role"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := cfg["region"].(string)
 	vpc, _ := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
+	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 
 	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
@@ -687,6 +754,11 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 							envOverrides[k] = env[k]
 						}
 					}
+					if encryptedEnvOk {
+						for k := range encryptedEnv {
+							envOverrides[k] = encryptedEnv[k]
+						}
+					}
 
 					if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
 						envOverrides["BOOTNODES"] = bnodes
@@ -722,6 +794,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					}
 					cfg["env"] = envOverrides
 					n.setConfig(cfg)
+					n.sanitizeConfig()
 					db.Save(&n)
 
 					taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, *resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
@@ -736,6 +809,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *resolvedContainer, region, taskIds)
 					cfg["target_task_ids"] = taskIds
 					n.setConfig(cfg)
+					n.sanitizeConfig()
 					db.Save(&n)
 
 					msg, _ := json.Marshal(map[string]interface{}{
@@ -759,6 +833,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 
 	if !taskIdsOk {
@@ -778,7 +853,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB) error {
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
 	if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk && credsOk {
 		accessKeyID := credentials["aws_access_key_id"].(string)
@@ -859,6 +934,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 
 	if !taskIdsOk {
@@ -888,7 +964,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
 	if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk && credsOk {
 		accessKeyID := credentials["aws_access_key_id"].(string)
@@ -973,13 +1049,13 @@ func (n *NetworkNode) undeploy() error {
 	n.updateStatus(db, "deprovisioning", nil)
 
 	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
+
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	region, regionOk := cfg["region"].(string)
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
-
-	common.Log.Debugf("Configuration for network node undeploy: target id: %s; crendentials: %s; target task ids: %s", targetID, credentials, taskIds)
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
 	if targetOk && providerOk && regionOk && credsOk {
 		if strings.ToLower(targetID) == "aws" {
@@ -1046,10 +1122,12 @@ func (n *NetworkNode) unregisterSecurityGroups() error {
 	common.Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID)
 
 	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
+
 	targetID, targetOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
 	if targetOk && regionOk && credsOk && securityGroupIdsOk {
 		if strings.ToLower(targetID) == "aws" {

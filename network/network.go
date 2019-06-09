@@ -278,7 +278,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *Ne
 		var lb *LoadBalancer
 		var err error
 
-		balancerCfg := node.ParseConfig()
+		balancerCfg := node.privateConfig()
 		region, _ := balancerCfg["region"].(string)
 
 		if !isLoadBalanced {
