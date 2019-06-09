@@ -82,11 +82,30 @@ func (l *LoadBalancer) setEncryptedConfig(params map[string]interface{}) {
 	l.encryptConfig()
 }
 
+func (l *LoadBalancer) sanitizeConfig() {
+	cfg := l.ParseConfig()
+
+	encryptedCfg, err := l.decryptedConfig()
+	if err != nil {
+		encryptedCfg = map[string]interface{}{}
+	}
+
+	if credentials, credentialsOk := cfg["credentials"]; credentialsOk {
+		encryptedCfg["credentials"] = credentials
+		delete(cfg, "credentials")
+	}
+
+	l.setConfig(cfg)
+	l.setEncryptedConfig(encryptedCfg)
+}
+
 // Create and persist a new load balancer
 func (l *LoadBalancer) Create() bool {
 	if !l.Validate() {
 		return false
 	}
+
+	l.sanitizeConfig()
 
 	db := dbconf.DatabaseConnection()
 
@@ -157,10 +176,11 @@ func (l *LoadBalancer) buildTargetGroupName(port int64) string {
 func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to deprovision infrastructure for load balancer with id: %s", l.ID)
 	cfg := l.ParseConfig()
+	encryptedCfg, _ := l.decryptedConfig()
 	l.updateStatus(db, "deprovisioning", l.Description)
 
 	targetID, targetIDOk := cfg["target_id"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := cfg["region"].(string)
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 
@@ -219,6 +239,8 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 	cfg := n.ParseConfig()
 
 	balancerCfg := l.ParseConfig()
+	balancerEncryptedCfg, _ := l.decryptedConfig()
+
 	var balancerType string
 	if l.Type != nil {
 		balancerType = *l.Type
@@ -266,7 +288,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 
 	targetID, targetOk := balancerCfg["target_id"].(string)
 	providerID, providerOk := balancerCfg["provider_id"].(string)
-	credentials, credsOk := balancerCfg["credentials"].(map[string]interface{})
+	credentials, credsOk := balancerEncryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := balancerCfg["region"].(string)
 	vpcID, _ := balancerCfg["vpc_id"].(string)
 
@@ -344,8 +366,6 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 			// end security group handling
 
 			if providerID, providerIDOk := balancerCfg["provider_id"].(string); providerIDOk {
-				// TODO: for ubuntu-vm provider
-
 				if strings.ToLower(providerID) == "docker" {
 					loadBalancersResp, err := awswrapper.CreateLoadBalancerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIds)
 					if err != nil {
@@ -366,6 +386,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 
 						l.Host = loadBalancer.DNSName
 						l.setConfig(balancerCfg)
+						l.sanitizeConfig()
 						l.updateStatus(db, "active", l.Description)
 						db.Save(&l)
 						if len(l.Errors) == 0 {
@@ -396,10 +417,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 	network.setIsLoadBalanced(db, true)
 
 	cfg := l.ParseConfig()
+	encryptedCfg, _ := l.decryptedConfig()
 
 	targetID, targetOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 	vpcID, _ := cfg["vpc_id"].(string)
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
@@ -505,10 +527,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 	common.Log.Debugf("Attempting to unbalance network node %s from balancer: %s", node.ID, l.ID)
 	cfg := l.ParseConfig()
+	encryptedCfg, _ := l.decryptedConfig()
 
 	targetID, targetOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	// targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 
@@ -596,10 +619,12 @@ func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to unregister security groups for load balancer with id: %s", l.ID)
 
 	cfg := l.ParseConfig()
+	encryptedCfg, _ := l.decryptedConfig()
+
 	targetID, targetOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
-	credentials, credsOk := cfg["credentials"].(map[string]interface{})
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
 	if targetOk && regionOk && credsOk && securityGroupIdsOk {
 		if strings.ToLower(targetID) == "aws" {
