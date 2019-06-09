@@ -12,4 +12,5 @@ DATABASE_PASSWORD=goldmine \
 DATABASE_NAME=goldmine_sandbox \
 DATABASE_HOST=localhost \
 LOG_LEVEL=DEBUG \
+SOLC_BIN=/usr/local/bin/solc \
 ./goldmine #dlv debug #./goldmine
