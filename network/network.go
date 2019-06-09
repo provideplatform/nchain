@@ -673,24 +673,6 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		networkID, networkIDOk := config["network_id"]
-		if !networkIDOk {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config network_id should not be nil"),
-				Status:  common.PtrToInt(11),
-			})
-		} else if networkID == nil || networkID == "" {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config network_id should not be empty"),
-				Status:  common.PtrToInt(11),
-			})
-		} else if int(networkID.(float64)) == 0 {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config network_id should not be zero"),
-				Status:  common.PtrToInt(11),
-			})
-		}
-
 		protocolID, protocolIDOk := config["protocol_id"]
 		if !protocolIDOk {
 			n.Errors = append(n.Errors, &provide.Error{
