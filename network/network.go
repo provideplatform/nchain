@@ -597,9 +597,9 @@ func (n *Network) Validate() bool {
 			}
 		}
 
-		chainspecURL, chainspecURLOk := config["chainspec_url"]
 		chainspec, chainspecOk := config["chainspec"]
-		if !(chainspecOk || chainspecURLOk) {
+		chainspecURL, chainspecURLOk := config["chainspec_url"].(string)
+		if !chainspecOk && !chainspecURLOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("Config chainspec_url or chainspec should be present"),
 				Status:  common.PtrToInt(11),
@@ -614,50 +614,25 @@ func (n *Network) Validate() bool {
 				}
 			}
 			if chainspecURLOk {
-				if chainspecURL == nil {
+				_, err := url.Parse(chainspecURL)
+				if err != nil {
 					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("Config chainspec_url value should not be empty"),
+						Message: common.StringOrNil("Config chainspec_url should be a valid URL if provided"),
 						Status:  common.PtrToInt(11),
 					})
-				} else {
-					_, chParseErr := url.ParseRequestURI(chainspecURL.(string))
-					if chParseErr != nil {
-						n.Errors = append(n.Errors, &provide.Error{
-							Message: common.StringOrNil("Config chainspec_url value should be a valid URL"),
-							Status:  common.PtrToInt(11),
-						})
-					}
-				}
-			}
-			if chainspecURLOk {
-				if chainspecURL == nil {
-					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("Config chainspec_url value should not be empty"),
-						Status:  common.PtrToInt(11),
-					})
-				} else {
-					_, chParseErr := url.ParseRequestURI(chainspecURL.(string))
-					if chParseErr != nil {
-						n.Errors = append(n.Errors, &provide.Error{
-							Message: common.StringOrNil("Config chainspec_url value should be a valid URL"),
-							Status:  common.PtrToInt(11),
-						})
-					}
 				}
 			}
 		}
 
-		blockExplorerURL, blockExplorerURLOk := config["block_explorer_url"]
-		if !blockExplorerURLOk {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config block_explorer_url should not be nil"),
-				Status:  common.PtrToInt(11),
-			})
-		} else if blockExplorerURL == nil || blockExplorerURL == "" {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config block_explorer_url should not be empty"),
-				Status:  common.PtrToInt(11),
-			})
+		blockExplorerURL, blockExplorerURLOk := config["block_explorer_url"].(string)
+		if blockExplorerURLOk {
+			_, err := url.Parse(blockExplorerURL)
+			if err != nil {
+				n.Errors = append(n.Errors, &provide.Error{
+					Message: common.StringOrNil("Config block_explorer_url should be a valid URL if provided"),
+					Status:  common.PtrToInt(11),
+				})
+			}
 		}
 
 		chain, chainOk := config["chain"]

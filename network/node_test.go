@@ -90,7 +90,7 @@ var _ = Describe("Node", func() {
 								// "config":{"security":{"egress":"*","ingress":{"0.0.0.0/0":{"tcp":[5001,8050,8051,8080,30300],"udp":[30300]}}},
 								Expect(node.Create()).To(BeTrue())
 								Expect(node.Status).To(gstruct.PointTo(Equal("init")))
-								time.Sleep(time.Duration(3000) * time.Millisecond)
+								time.Sleep(time.Duration(5000) * time.Millisecond)
 								node.Reload()
 								Expect(node.Status).To(gstruct.PointTo(Equal("failed")))
 								// Expect(node.Status).To(gstruct.PointTo(Equal("genesis"))) - not possible w/o real network
