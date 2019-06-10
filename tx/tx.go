@@ -142,6 +142,21 @@ func (t *Transaction) Create() bool {
 		db.Model(t).Related(&wllt)
 	}
 
+	if ntwrk != nil || ntwrk.ID == uuid.Nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil("invalid network for tx broadcast"),
+		})
+	}
+	if wllt == nil || wllt.ID == uuid.Nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil("invalid signing identity for tx broadcast"),
+		})
+	}
+
+	if len(t.Errors) > 0 {
+		return false
+	}
+
 	var signingErr error
 	err := t.sign(db, ntwrk, wllt)
 	if err != nil {
