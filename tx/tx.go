@@ -129,15 +129,21 @@ func (t *Transaction) Create() bool {
 	}
 
 	db := dbconf.DatabaseConnection()
-	var network = &network.Network{}
-	var wallet = &wallet.Wallet{}
+
+	var ntwrk *network.Network
 	if t.NetworkID != uuid.Nil {
-		db.Model(t).Related(&network)
-		db.Model(t).Related(&wallet)
+		ntwrk = &network.Network{}
+		db.Model(t).Related(&ntwrk)
+	}
+
+	var wllt *wallet.Wallet
+	if t.WalletID != nil && *t.WalletID != uuid.Nil {
+		wllt = &wallet.Wallet{}
+		db.Model(t).Related(&wllt)
 	}
 
 	var signingErr error
-	err := t.sign(db, network, wallet)
+	err := t.sign(db, ntwrk, wllt)
 	if err != nil {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
@@ -168,7 +174,7 @@ func (t *Transaction) Create() bool {
 					desc := signingErr.Error()
 					t.updateStatus(db, "failed", &desc)
 				} else {
-					err = t.broadcast(db, network, wallet)
+					err = t.broadcast(db, ntwrk, wllt)
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
 						natsConnection := common.GetDefaultNatsStreamingConnection()
