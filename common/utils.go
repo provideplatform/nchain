@@ -12,7 +12,7 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	selfsignedcert "github.com/kthomas/go-self-signed-cert"
-	stan "github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/stan.go"
 )
 
 func buildListenAddr() string {

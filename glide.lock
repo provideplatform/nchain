@@ -1,5 +1,5 @@
-hash: f12e68f1354785c4a55fc33381c939afe11f5e149d795317807f810e54a952d3
-updated: 2019-06-10T00:02:42.22183-04:00
+hash: 2d0ff63746830c3fa57e8fd2dceca1463ee250891abd57c19a6b5c867277d600
+updated: 2019-06-10T00:10:50.152391-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: e24eb225f15679bbe54f91bfa7da3b00e59b9768
@@ -161,15 +161,6 @@ imports:
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
   version: 94122c33edd36123c84d5368cfb2b69df93a0ec8
-- name: github.com/nats-io/go-nats
-  version: c528ff487513eec69347b5598eb35d91f0a63820
-  subpackages:
-  - encoders/builtin
-  - util
-- name: github.com/nats-io/go-nats-streaming
-  version: c4c6d40b2ba9166e155cda77274d615aed57f314
-  subpackages:
-  - pb
 - name: github.com/nats-io/nats.go
   version: 7b479cded2b9dc8541620a8d0912ea8e4d571dca
   subpackages:

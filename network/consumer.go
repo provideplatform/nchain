@@ -9,7 +9,7 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	stan "github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/consumer"
 	provide "github.com/provideservices/provide-go"

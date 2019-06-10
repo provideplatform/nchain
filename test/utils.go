@@ -3,7 +3,7 @@ package test
 import (
 	"time"
 
-	stan "github.com/nats-io/go-nats-streaming"
+	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
 )
 

@@ -35,7 +35,7 @@ import:
   version: master
 - package: github.com/kthomas/go.uuid
   version: master
-- package: github.com/nats-io/go-nats-streaming
+- package: github.com/nats-io/stan.go
   version: master
 - package: github.com/provideservices/provide-chainpoint
   version: master
