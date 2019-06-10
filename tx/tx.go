@@ -260,7 +260,7 @@ func (t *Transaction) GetNetwork() (*network.Network, error) {
 	db := dbconf.DatabaseConnection()
 	var network = &network.Network{}
 	db.Model(t).Related(&network)
-	if network == nil {
+	if network == nil || network.ID == uuid.Nil {
 		return nil, fmt.Errorf("Failed to retrieve transaction network for tx: %s", t.ID)
 	}
 	return network, nil
@@ -271,7 +271,7 @@ func (t *Transaction) GetWallet() (*wallet.Wallet, error) {
 	db := dbconf.DatabaseConnection()
 	var wallet = &wallet.Wallet{}
 	db.Model(t).Related(&wallet)
-	if wallet == nil {
+	if wallet == nil || wallet.ID == uuid.Nil {
 		return nil, fmt.Errorf("Failed to retrieve transaction wallet for tx: %s", t.ID)
 	}
 	return wallet, nil
