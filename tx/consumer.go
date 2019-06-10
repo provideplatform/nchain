@@ -212,7 +212,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 	tx.setParams(txParams)
 
-	if tx.Create() {
+	if tx.Create(db) {
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
 		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
@@ -291,8 +291,10 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 			return nil, &out, nil
 		}
 
+		db := dbconf.DatabaseConnection()
+
 		var txResponse *contract.ContractExecutionResponse
-		if tx.Create() {
+		if tx.Create(db) {
 			common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
 			if tx.Response != nil {
 				txResponse = tx.Response
