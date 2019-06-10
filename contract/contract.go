@@ -55,7 +55,7 @@ type Contract struct {
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
 func ContractListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("contracts.id, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.name, contracts.address")
+	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address")
 }
 
 // CompiledArtifact - parse the original JSON params used for contract creation and attempt to unmarshal to a provide.CompiledArtifact
