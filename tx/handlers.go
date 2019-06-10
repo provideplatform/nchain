@@ -58,7 +58,22 @@ func transactionsListHandler(c *gin.Context) {
 	}
 
 	if c.Query("from") != "" {
-		query = query.Where("transactions.from = ?", c.Query("from"))
+		from := &wallet.Wallet{}
+		db := dbconf.DatabaseConnection()
+		fromQuery := db.Where("address = ?", from)
+		if c.Query("network_id") != "" {
+			fromQuery = fromQuery.Where("network_id = ?", c.Query("network_id"))
+		}
+		fromQuery.Find(&from)
+		if from != nil && from.ID != uuid.Nil {
+			query = query.Where("transactions.wallet_id = ?", from.ID)
+		} else {
+			common.RenderError("from address not resolved to a known signer", 404, c)
+		}
+	}
+
+	if c.Query("network_id") != "" {
+		query = query.Where("transactions.network_id = ?", c.Query("network_id"))
 	}
 
 	if c.Query("wallet_id") != "" {
