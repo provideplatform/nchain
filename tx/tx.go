@@ -513,7 +513,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 
 func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Wallet, traces *provide.EthereumTxTraceResponse) {
 	kontract := t.GetContract(db)
-	if kontract == nil {
+	if kontract == nil || kontract.ID == uuid.Nil {
 		common.Log.Debugf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")
 		return
 	}
