@@ -47,6 +47,7 @@ type Transaction struct {
 	UserID           *uuid.UUID                          `sql:"type:uuid" json:"user_id"`
 	NetworkID        uuid.UUID                           `sql:"not null;type:uuid" json:"network_id"`
 	WalletID         *uuid.UUID                          `sql:"type:uuid" json:"wallet_id"`
+	Signer           *string                             `sql:"-" json:"signer,omitempty"`
 	To               *string                             `json:"to"`
 	Value            *TxValue                            `sql:"not null;type:text" json:"value"`
 	Data             *string                             `json:"data"`
@@ -123,12 +124,10 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 
 // Create and persist a new transaction. Side effects include persistence of contract and/or token instances
 // when the tx represents a contract and/or token creation.
-func (t *Transaction) Create() bool {
+func (t *Transaction) Create(db *gorm.DB) bool {
 	if !t.Validate() {
 		return false
 	}
-
-	db := dbconf.DatabaseConnection()
 
 	var ntwrk *network.Network
 	if t.NetworkID != uuid.Nil {

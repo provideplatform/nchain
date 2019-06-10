@@ -107,15 +107,26 @@ func createTransactionHandler(c *gin.Context) {
 		return
 	}
 
-	if appID != nil {
-		tx.ApplicationID = appID
+	tx.ApplicationID = appID
+	tx.UserID = userID
+
+	db := dbconf.DatabaseConnection()
+
+	if tx.Signer != nil {
+		if tx.WalletID != nil {
+			common.RenderError("provided signer and wallet_id to tx creation, which is ambiguous", 400, c)
+			return
+		}
+
+		wallet := &wallet.Wallet{}
+		db.Where("address = ?", tx.Signer).Find(&wallet)
+		if wallet == nil || wallet.ID == uuid.Nil {
+			common.RenderError("failed to resolve signer address to wallet", 404, c)
+			return
+		}
 	}
 
-	if userID != nil {
-		tx.UserID = userID
-	}
-
-	if tx.Create() {
+	if tx.Create(db) {
 		common.Render(tx, 201, c)
 	} else {
 		obj := map[string]interface{}{}
