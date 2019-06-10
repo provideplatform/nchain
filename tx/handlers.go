@@ -53,6 +53,18 @@ func transactionsListHandler(c *gin.Context) {
 		query = query.Where("transactions.status IN ?", strings.Split(c.Query("status"), ","))
 	}
 
+	if c.Query("to") != "" {
+		query = query.Where("transactions.to = ?", c.Query("to"))
+	}
+
+	if c.Query("from") != "" {
+		query = query.Where("transactions.from = ?", c.Query("from"))
+	}
+
+	if c.Query("wallet_id") != "" {
+		query = query.Where("transactions.wallet_id = ?", c.Query("wallet_id"))
+	}
+
 	var txs []Transaction
 	query = query.Order("created_at DESC")
 	provide.Paginate(c, query, &Transaction{}).Find(&txs)
