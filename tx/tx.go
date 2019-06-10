@@ -142,7 +142,7 @@ func (t *Transaction) Create() bool {
 		db.Model(t).Related(&wllt)
 	}
 
-	if ntwrk != nil || ntwrk.ID == uuid.Nil {
+	if ntwrk == nil || ntwrk.ID == uuid.Nil {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("invalid network for tx broadcast"),
 		})
