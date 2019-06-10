@@ -124,6 +124,7 @@ func createTransactionHandler(c *gin.Context) {
 			common.RenderError("failed to resolve signer address to wallet", 404, c)
 			return
 		}
+		tx.WalletID = &wallet.ID
 	}
 
 	if tx.Create(db) {
