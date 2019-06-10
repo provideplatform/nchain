@@ -210,7 +210,7 @@ func (t *Transaction) GetContract(db *gorm.DB) *contract.Contract {
 	var c *contract.Contract
 	if t.To != nil {
 		c = &contract.Contract{}
-		db.Model(&contract.Contract{}).Where("network_id = ? AND address = ?", t.NetworkID, t.To).Find(&c)
+		db.Where("network_id = ? AND address = ?", t.NetworkID, t.To).Find(&c)
 	}
 	return c
 }
