@@ -3,6 +3,7 @@ package filter
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -113,11 +114,9 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 		"payload": txPayload,
 	}
 	natsPayload, _ := json.Marshal(natsMsg)
+	common.SharedNatsConnection.Publish(natsStreamingTxFilterExecSubjectPrefix, natsPayload)
 
-	natsConnection := common.GetDefaultNatsStreamingConnection()
-	natsConnection.Publish(natsStreamingTxFilterExecSubjectPrefix, natsPayload)
-
-	natsConn := natsutil.GetNatsConnection()
+	natsConn, _ := natsutil.GetNatsConnection(os.Getenv("NATS_URL"), 30*time.Second)
 	defer natsConn.Close()
 
 	sub, err := natsConn.SubscribeSync(natsStreamingTxFilterReturnSubject)

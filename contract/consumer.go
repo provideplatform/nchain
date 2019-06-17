@@ -24,22 +24,25 @@ const natsNetworkContractCreateInvocationMaxInFlight = 32
 var waitGroup sync.WaitGroup
 
 func init() {
-	natsConnection := consumer.GetNatsStreamingConnection()
-	if natsConnection == nil {
-		return
-	}
-
-	createNatsContractCompilerInvocationSubscriptions(natsConnection, &waitGroup)
-	createNatsNetworkContractCreateInvocationSubscriptions(natsConnection, &waitGroup)
+	createNatsContractCompilerInvocationSubscriptions(&waitGroup)
+	createNatsNetworkContractCreateInvocationSubscriptions(&waitGroup)
 }
 
-func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsContractCompilerInvocationSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsContractCompilerInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			contractCompilerInvocationSubscription, err := natsConnection.QueueSubscribe(natsContractCompilerInvocationSubject, natsContractCompilerInvocationSubject, consumeContractCompilerInvocationMsg, stan.SetManualAckMode(), stan.AckWait(natsContractCompilerInvocationTimeout), stan.MaxInflight(natsContractCompilerInvocationMaxInFlight), stan.DurableName(natsContractCompilerInvocationSubject))
+			contractCompilerInvocationSubscription, err := natsConnection.QueueSubscribe(natsContractCompilerInvocationSubject,
+				natsContractCompilerInvocationSubject,
+				consumeContractCompilerInvocationMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsContractCompilerInvocationTimeout),
+				stan.MaxInflight(natsContractCompilerInvocationMaxInFlight),
+				stan.DurableName(natsContractCompilerInvocationSubject),
+			)
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsContractCompilerInvocationSubject)
 				wg.Done()
@@ -53,13 +56,21 @@ func createNatsContractCompilerInvocationSubscriptions(natsConnection stan.Conn,
 	}
 }
 
-func createNatsNetworkContractCreateInvocationSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsNetworkContractCreateInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			networkContractCreateInvocationSubscription, err := natsConnection.QueueSubscribe(natsNetworkContractCreateInvocationSubject, natsNetworkContractCreateInvocationSubject, consumeNetworkContractCreateInvocationMsg, stan.SetManualAckMode(), stan.AckWait(natsNetworkContractCreateInvocationTimeout), stan.MaxInflight(natsNetworkContractCreateInvocationMaxInFlight), stan.DurableName(natsNetworkContractCreateInvocationSubject))
+			networkContractCreateInvocationSubscription, err := natsConnection.QueueSubscribe(natsNetworkContractCreateInvocationSubject,
+				natsNetworkContractCreateInvocationSubject,
+				consumeNetworkContractCreateInvocationMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsNetworkContractCreateInvocationTimeout),
+				stan.MaxInflight(natsNetworkContractCreateInvocationMaxInFlight),
+				stan.DurableName(natsNetworkContractCreateInvocationSubject),
+			)
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsNetworkContractCreateInvocationSubject)
 				wg.Done()

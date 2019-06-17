@@ -171,8 +171,7 @@ func (n *NetworkNode) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"network_node_id": n.ID.String(),
 				})
-				natsConnection := common.GetDefaultNatsStreamingConnection()
-				natsConnection.Publish(natsDeployNetworkNodeSubject, msg)
+				common.SharedNatsConnection.Publish(natsDeployNetworkNodeSubject, msg)
 			}
 			return success
 		}
@@ -356,8 +355,7 @@ func (n *NetworkNode) Delete() bool {
 	msg, _ := json.Marshal(map[string]interface{}{
 		"network_node_id": n.ID.String(),
 	})
-	natsConnection := common.GetDefaultNatsStreamingConnection()
-	natsConnection.Publish(natsDeleteTerminatedNetworkNodeSubject, msg)
+	common.SharedNatsConnection.Publish(natsDeleteTerminatedNetworkNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
@@ -815,9 +813,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					msg, _ := json.Marshal(map[string]interface{}{
 						"network_node_id": n.ID.String(),
 					})
-					natsConnection := common.GetDefaultNatsStreamingConnection()
-					natsConnection.Publish(natsResolveNetworkNodeHostSubject, msg)
-					natsConnection.Publish(natsResolveNetworkNodePeerURLSubject, msg)
+					common.SharedNatsConnection.Publish(natsResolveNetworkNodeHostSubject, msg)
+					common.SharedNatsConnection.Publish(natsResolveNetworkNodePeerURLSubject, msg)
 				}
 			}
 		}
@@ -1080,8 +1077,7 @@ func (n *NetworkNode) undeploy() error {
 								"load_balancer_id": balancer.ID.String(),
 								"network_node_id":  n.ID.String(),
 							})
-							natsConnection := common.GetDefaultNatsStreamingConnection()
-							natsConnection.Publish(natsLoadBalancerUnbalanceNodeSubject, msg)
+							common.SharedNatsConnection.Publish(natsLoadBalancerUnbalanceNodeSubject, msg)
 						}
 					} else {
 						err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())

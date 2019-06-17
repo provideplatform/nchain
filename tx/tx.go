@@ -191,8 +191,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					err = t.broadcast(db, ntwrk, wllt)
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
-						natsConnection := common.GetDefaultNatsStreamingConnection()
-						natsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
+						common.SharedNatsConnection.Publish(natsTxReceiptSubject, txReceiptMsg)
 					} else {
 						desc := err.Error()
 						t.updateStatus(db, "failed", &desc)

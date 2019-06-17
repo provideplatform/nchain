@@ -184,8 +184,7 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 						}
 
 						payload, _ := json.Marshal(params)
-						natsConnection := common.GetDefaultNatsStreamingConnection()
-						natsConnection.Publish(natsNetworkContractCreateInvocationSubject, payload)
+						common.SharedNatsConnection.Publish(natsNetworkContractCreateInvocationSubject, payload)
 					}
 				}
 			}
@@ -316,8 +315,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *Ne
 				"load_balancer_id": lb.ID.String(),
 				"network_node_id":  node.ID.String(),
 			})
-			natsConnection := common.GetDefaultNatsStreamingConnection()
-			natsConnection.Publish(natsLoadBalancerBalanceNodeSubject, msg)
+			common.SharedNatsConnection.Publish(natsLoadBalancerBalanceNodeSubject, msg)
 		} else {
 			if reachable, port := node.reachableViaJSONRPC(); reachable {
 				common.Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
@@ -724,7 +722,7 @@ func (n *Network) RpcURL() string {
 
 func (n *Network) websocketURL() string {
 	cfg := n.ParseConfig()
-	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil("websocket"))
+	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil("rpc"))
 	if balancers != nil && len(balancers) > 0 {
 		balancer := balancers[0] // FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()

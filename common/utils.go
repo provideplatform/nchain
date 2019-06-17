@@ -10,9 +10,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	dbconf "github.com/kthomas/go-db-config"
-	natsutil "github.com/kthomas/go-natsutil"
 	selfsignedcert "github.com/kthomas/go-self-signed-cert"
-	stan "github.com/nats-io/stan.go"
 )
 
 func buildListenAddr() string {
@@ -44,32 +42,7 @@ func DecryptECDSAPrivateKey(encryptedKey, gpgPrivateKey, gpgEncryptionKey string
 	return nil, errors.New("Failed to decode ecdsa private key after retrieval from encrypted storage")
 }
 
-func GetDefaultNatsStreamingConnection() stan.Conn {
-	conn := natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
-		if NatsDefaultConnectionLostHandler != nil {
-			NatsDefaultConnectionLostHandler()
-		}
-	})
-	if conn == nil {
-		return nil
-	}
-	return *conn
-}
-
-func GetNatsStreamingConnection(connectionLostHandler func()) stan.Conn {
-	conn := natsutil.GetNatsStreamingConnection(func(_ stan.Conn, reason error) {
-		if connectionLostHandler != nil {
-			connectionLostHandler()
-		} else if NatsDefaultConnectionLostHandler != nil {
-			NatsDefaultConnectionLostHandler()
-		}
-	})
-	if conn == nil {
-		return nil
-	}
-	return *conn
-}
-
+// ShouldServeTLS returns true if the API should be served over TLS
 func ShouldServeTLS() bool {
 	if requireTLS {
 		privKeyPath, certPath, err := selfsignedcert.GenerateToDisk()
@@ -125,14 +98,17 @@ func StringOrNil(str string) *string {
 	return &str
 }
 
+// BoolOrNil returns a pointer to the given bool
 func BoolOrNil(b bool) *bool {
 	return &b
 }
 
+// PtrToInt returns a pointer to the given int
 func PtrToInt(i int) *int {
 	return &i
 }
 
+// MarshalConfig marshals the given map to raw JSON
 func MarshalConfig(opts map[string]interface{}) *json.RawMessage {
 	cfgJSON, _ := json.Marshal(opts)
 	_cfgJSON := json.RawMessage(cfgJSON)

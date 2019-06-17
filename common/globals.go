@@ -2,11 +2,12 @@ package common
 
 import (
 	"os"
-	"sync"
 	"time"
 
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
+	natsutil "github.com/kthomas/go-natsutil"
+	stan "github.com/nats-io/stan.go"
 )
 
 const reachabilityTimeout = time.Millisecond * 2500
@@ -26,34 +27,32 @@ var (
 	GpgPrivateKey string
 	GpgPassword   string
 
-	bootstrapOnce sync.Once
-
-	NatsDefaultConnectionLostHandler func()
-
 	EngineToDefaultJSONRPCPortMapping    = map[string]uint{"authorityRound": 8050, "handshake": 13037}
 	EngineToDefaultPeerListenPortMapping = map[string]uint{"authorityRound": 30303, "handshake": 13038}
 	EngineToDefaultWebsocketPortMapping  = map[string]uint{"authorityRound": 8051}
 	TxFilters                            = map[string][]interface{}{}
+
+	// SharedNatsConnection is a cached connection used by most NATS Publish calls
+	SharedNatsConnection stan.Conn
 )
 
 func init() {
-	bootstrapOnce.Do(func() {
-		ListenAddr = os.Getenv("LISTEN_ADDR")
-		if ListenAddr == "" {
-			ListenAddr = buildListenAddr()
-		}
+	ListenAddr = os.Getenv("LISTEN_ADDR")
+	if ListenAddr == "" {
+		ListenAddr = buildListenAddr()
+	}
 
-		requireTLS = os.Getenv("REQUIRE_TLS") == "true"
+	requireTLS = os.Getenv("REQUIRE_TLS") == "true"
 
-		lvl := os.Getenv("LOG_LEVEL")
-		if lvl == "" {
-			lvl = "INFO"
-		}
-		Log = logger.NewLogger("goldmine", lvl, true)
+	lvl := os.Getenv("LOG_LEVEL")
+	if lvl == "" {
+		lvl = "INFO"
+	}
+	Log = logger.NewLogger("goldmine", lvl, true)
 
-		DefaultAWSConfig = awsconf.GetConfig()
+	DefaultAWSConfig = awsconf.GetConfig()
 
-		GpgPublicKey = `
+	GpgPublicKey = `
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQENBFlHZUMBCACo5hsdQGcvLzBWrlA19CRbgzNqA2e22yVrFWNEN4JAhrYsepXX
@@ -87,7 +86,7 @@ Cw==
 -----END PGP PUBLIC KEY BLOCK-----
 `
 
-		GpgPrivateKey = `
+	GpgPrivateKey = `
 -----BEGIN PGP PRIVATE KEY BLOCK-----
 
 lQPGBFlHZUMBCACo5hsdQGcvLzBWrlA19CRbgzNqA2e22yVrFWNEN4JAhrYsepXX
@@ -150,6 +149,7 @@ eZ0L
 -----END PGP PRIVATE KEY BLOCK-----
 		`
 
-		GpgPassword = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
-	})
+	GpgPassword = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
+
+	SharedNatsConnection, _ = natsutil.GetNatsStreamingConnection(30*time.Second, nil)
 }

@@ -68,31 +68,37 @@ type natsBlockFinalizedMsg struct {
 }
 
 var waitGroup sync.WaitGroup
+var SharedNatsConnection stan.Conn
 
 func init() {
-	natsConnection := consumer.GetNatsStreamingConnection()
-	if natsConnection == nil {
-		return
-	}
+	SharedNatsConnection, _ = natsutil.GetNatsStreamingConnection(time.Second*30, nil)
 
-	createNatsBlockFinalizedSubscriptions(natsConnection, &waitGroup)
-	createNatsLoadBalancerProvisioningSubscriptions(natsConnection, &waitGroup)
-	createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection, &waitGroup)
-	createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection, &waitGroup)
-	createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection, &waitGroup)
-	createNatsDeployNetworkNodeSubscriptions(natsConnection, &waitGroup)
-	createNatsDeleteTerminatedNetworkNodeSubscriptions(natsConnection, &waitGroup)
-	createNatsResolveNetworkNodeHostSubscriptions(natsConnection, &waitGroup)
-	createNatsResolveNetworkNodePeerURLSubscriptions(natsConnection, &waitGroup)
+	createNatsBlockFinalizedSubscriptions(&waitGroup)
+	createNatsLoadBalancerProvisioningSubscriptions(&waitGroup)
+	createNatsLoadBalancerDeprovisioningSubscriptions(&waitGroup)
+	createNatsLoadBalancerBalanceNodeSubscriptions(&waitGroup)
+	createNatsLoadBalancerUnbalanceNodeSubscriptions(&waitGroup)
+	createNatsDeployNetworkNodeSubscriptions(&waitGroup)
+	createNatsDeleteTerminatedNetworkNodeSubscriptions(&waitGroup)
+	createNatsResolveNetworkNodeHostSubscriptions(&waitGroup)
+	createNatsResolveNetworkNodePeerURLSubscriptions(&waitGroup)
 }
 
-func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsBlockFinalizedInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			blockFinalizedSubscription, err := natsConnection.QueueSubscribe(natsBlockFinalizedSubject, natsBlockFinalizedSubject, consumeBlockFinalizedMsg, stan.SetManualAckMode(), stan.AckWait(natsBlockFinalizedInvocationTimeout), stan.MaxInflight(natsBlockFinalizedSubjectMaxInFlight), stan.DurableName(natsBlockFinalizedSubject))
+			blockFinalizedSubscription, err := natsConnection.QueueSubscribe(natsBlockFinalizedSubject,
+				natsBlockFinalizedSubject,
+				consumeBlockFinalizedMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsBlockFinalizedInvocationTimeout),
+				stan.MaxInflight(natsBlockFinalizedSubjectMaxInFlight),
+				stan.DurableName(natsBlockFinalizedSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsBlockFinalizedSubject)
 				wg.Done()
@@ -106,13 +112,21 @@ func createNatsBlockFinalizedSubscriptions(natsConnection stan.Conn, wg *sync.Wa
 	}
 }
 
-func createNatsLoadBalancerProvisioningSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsLoadBalancerProvisioningSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			loadBalancerProvisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerProvisioningSubject, natsLoadBalancerProvisioningSubject, consumeLoadBalancerProvisioningMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerProvisioningMaxInFlight), stan.DurableName(natsLoadBalancerProvisioningSubject))
+			loadBalancerProvisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerProvisioningSubject,
+				natsLoadBalancerProvisioningSubject,
+				consumeLoadBalancerProvisioningMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsLoadBalancerInvocationTimeout),
+				stan.MaxInflight(natsLoadBalancerProvisioningMaxInFlight),
+				stan.DurableName(natsLoadBalancerProvisioningSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerProvisioningSubject)
 				wg.Done()
@@ -126,13 +140,21 @@ func createNatsLoadBalancerProvisioningSubscriptions(natsConnection stan.Conn, w
 	}
 }
 
-func createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsLoadBalancerDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			loadBalancerDeprovisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerDeprovisioningSubject, natsLoadBalancerDeprovisioningSubject, consumeLoadBalancerDeprovisioningMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerDeprovisioningMaxInFlight), stan.DurableName(natsLoadBalancerDeprovisioningSubject))
+			loadBalancerDeprovisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerDeprovisioningSubject,
+				natsLoadBalancerDeprovisioningSubject,
+				consumeLoadBalancerDeprovisioningMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsLoadBalancerInvocationTimeout),
+				stan.MaxInflight(natsLoadBalancerDeprovisioningMaxInFlight),
+				stan.DurableName(natsLoadBalancerDeprovisioningSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerDeprovisioningSubject)
 				wg.Done()
@@ -146,13 +168,21 @@ func createNatsLoadBalancerDeprovisioningSubscriptions(natsConnection stan.Conn,
 	}
 }
 
-func createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsLoadBalancerBalanceNodeSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			loadBalancerBalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerBalanceNodeSubject, natsLoadBalancerBalanceNodeSubject, consumeLoadBalancerBalanceNodeMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerBalanceNodeMaxInFlight), stan.DurableName(natsLoadBalancerBalanceNodeSubject))
+			loadBalancerBalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerBalanceNodeSubject,
+				natsLoadBalancerBalanceNodeSubject,
+				consumeLoadBalancerBalanceNodeMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsLoadBalancerInvocationTimeout),
+				stan.MaxInflight(natsLoadBalancerBalanceNodeMaxInFlight),
+				stan.DurableName(natsLoadBalancerBalanceNodeSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerBalanceNodeSubject)
 				wg.Done()
@@ -166,13 +196,21 @@ func createNatsLoadBalancerBalanceNodeSubscriptions(natsConnection stan.Conn, wg
 	}
 }
 
-func createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsLoadBalancerUnbalanceNodeSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			loadBalancerUnbalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerUnbalanceNodeSubject, natsLoadBalancerUnbalanceNodeSubject, consumeLoadBalancerUnbalanceNodeMsg, stan.SetManualAckMode(), stan.AckWait(natsLoadBalancerInvocationTimeout), stan.MaxInflight(natsLoadBalancerUnbalanceNodeMaxInFlight), stan.DurableName(natsLoadBalancerUnbalanceNodeSubject))
+			loadBalancerUnbalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerUnbalanceNodeSubject,
+				natsLoadBalancerUnbalanceNodeSubject,
+				consumeLoadBalancerUnbalanceNodeMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsLoadBalancerInvocationTimeout),
+				stan.MaxInflight(natsLoadBalancerUnbalanceNodeMaxInFlight),
+				stan.DurableName(natsLoadBalancerUnbalanceNodeSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerUnbalanceNodeSubject)
 				wg.Done()
@@ -186,13 +224,21 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(natsConnection stan.Conn, 
 	}
 }
 
-func createNatsDeployNetworkNodeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsDeployNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsDeployNetworkNodeInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			deployNetworkNodeSubscription, err := natsConnection.QueueSubscribe(natsDeployNetworkNodeSubject, natsDeployNetworkNodeSubject, consumeDeployNetworkNodeMsg, stan.SetManualAckMode(), stan.AckWait(natsDeployNetworkNodeInvocationTimeout), stan.MaxInflight(natsDeployNetworkNodeMaxInFlight), stan.DurableName(natsDeployNetworkNodeSubject))
+			deployNetworkNodeSubscription, err := natsConnection.QueueSubscribe(natsDeployNetworkNodeSubject,
+				natsDeployNetworkNodeSubject,
+				consumeDeployNetworkNodeMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsDeployNetworkNodeInvocationTimeout),
+				stan.MaxInflight(natsDeployNetworkNodeMaxInFlight),
+				stan.DurableName(natsDeployNetworkNodeSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsDeployNetworkNodeSubject)
 				wg.Done()
@@ -206,13 +252,21 @@ func createNatsDeployNetworkNodeSubscriptions(natsConnection stan.Conn, wg *sync
 	}
 }
 
-func createNatsResolveNetworkNodeHostSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsResolveNetworkNodeHostSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsResolveNetworkNodeHostInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			resolveNetworkNodeHostSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodeHostSubject, natsResolveNetworkNodeHostSubject, consumeResolveNetworkNodeHostMsg, stan.SetManualAckMode(), stan.AckWait(natsResolveNetworkNodeHostInvocationTimeout), stan.MaxInflight(natsResolveNetworkNodeHostMaxInFlight), stan.DurableName(natsResolveNetworkNodeHostSubject))
+			resolveNetworkNodeHostSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodeHostSubject,
+				natsResolveNetworkNodeHostSubject,
+				consumeResolveNetworkNodeHostMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsResolveNetworkNodeHostInvocationTimeout),
+				stan.MaxInflight(natsResolveNetworkNodeHostMaxInFlight),
+				stan.DurableName(natsResolveNetworkNodeHostSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsResolveNetworkNodeHostSubject)
 				wg.Done()
@@ -226,13 +280,21 @@ func createNatsResolveNetworkNodeHostSubscriptions(natsConnection stan.Conn, wg 
 	}
 }
 
-func createNatsResolveNetworkNodePeerURLSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsResolveNetworkNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsResolveNetworkNodePeerURLInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			resolveNetworkNodePeerURLSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodePeerURLSubject, natsResolveNetworkNodePeerURLSubject, consumeResolveNetworkNodePeerURLMsg, stan.SetManualAckMode(), stan.AckWait(natsResolveNetworkNodePeerURLInvocationTimeout), stan.MaxInflight(natsResolveNetworkNodePeerURLMaxInFlight), stan.DurableName(natsResolveNetworkNodePeerURLSubject))
+			resolveNetworkNodePeerURLSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodePeerURLSubject,
+				natsResolveNetworkNodePeerURLSubject,
+				consumeResolveNetworkNodePeerURLMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsResolveNetworkNodePeerURLInvocationTimeout),
+				stan.MaxInflight(natsResolveNetworkNodePeerURLMaxInFlight),
+				stan.DurableName(natsResolveNetworkNodePeerURLSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsResolveNetworkNodePeerURLSubject)
 				wg.Done()
@@ -246,13 +308,21 @@ func createNatsResolveNetworkNodePeerURLSubscriptions(natsConnection stan.Conn, 
 	}
 }
 
-func createNatsDeleteTerminatedNetworkNodeSubscriptions(natsConnection stan.Conn, wg *sync.WaitGroup) {
+func createNatsDeleteTerminatedNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
+			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsDeleteTerminatedNetworkNodeInvocationTimeout, nil)
 			defer natsConnection.Close()
 
-			deleteTerminatedNetworkNodeSubscription, err := natsConnection.QueueSubscribe(natsDeleteTerminatedNetworkNodeSubject, natsDeleteTerminatedNetworkNodeSubject, consumeDeleteTerminatedNetworkNodeMsg, stan.SetManualAckMode(), stan.AckWait(natsDeleteTerminatedNetworkNodeInvocationTimeout), stan.MaxInflight(natsDeleteTerminatedNetworkNodeMaxInFlight), stan.DurableName(natsDeleteTerminatedNetworkNodeSubject))
+			deleteTerminatedNetworkNodeSubscription, err := natsConnection.QueueSubscribe(natsDeleteTerminatedNetworkNodeSubject,
+				natsDeleteTerminatedNetworkNodeSubject,
+				consumeDeleteTerminatedNetworkNodeMsg,
+				stan.SetManualAckMode(),
+				stan.AckWait(natsDeleteTerminatedNetworkNodeInvocationTimeout),
+				stan.MaxInflight(natsDeleteTerminatedNetworkNodeMaxInFlight),
+				stan.DurableName(natsDeleteTerminatedNetworkNodeSubject))
+
 			if err != nil {
 				common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsDeleteTerminatedNetworkNodeSubject)
 				wg.Done()
@@ -314,8 +384,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								}
 
 								msgPayload, _ := json.Marshal(params)
-								natsConnection := common.GetDefaultNatsStreamingConnection()
-								natsConnection.Publish(natsTxFinalizeSubject, msgPayload)
+								common.SharedNatsConnection.Publish(natsTxFinalizeSubject, msgPayload)
 							}
 						}
 					}
