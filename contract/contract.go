@@ -137,7 +137,7 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 		common.Log.Warningf("Failed to marshal params for tx creation; %s", err.Error())
 	}
 
-	common.SharedNatsConnection.Publish(natsTxCreateSubject, txCreationMsg)
+	common.NATSPublish(natsTxCreateSubject, txCreationMsg)
 
 	return artifact, nil
 }
@@ -259,7 +259,7 @@ func (c *Contract) Create() bool {
 					msg, _ := json.Marshal(map[string]interface{}{
 						"contract_id": c.ID.String(),
 					})
-					common.SharedNatsConnection.Publish(natsContractCompilerInvocationSubject, msg)
+					common.NATSPublish(natsContractCompilerInvocationSubject, msg)
 				}
 			}
 			return success

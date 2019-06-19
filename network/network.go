@@ -184,7 +184,7 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 						}
 
 						payload, _ := json.Marshal(params)
-						common.SharedNatsConnection.Publish(natsNetworkContractCreateInvocationSubject, payload)
+						common.NATSPublish(natsNetworkContractCreateInvocationSubject, payload)
 					}
 				}
 			}
@@ -315,7 +315,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *Ne
 				"load_balancer_id": lb.ID.String(),
 				"network_node_id":  node.ID.String(),
 			})
-			common.SharedNatsConnection.Publish(natsLoadBalancerBalanceNodeSubject, msg)
+			common.NATSPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		} else {
 			if reachable, port := node.reachableViaJSONRPC(); reachable {
 				common.Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)

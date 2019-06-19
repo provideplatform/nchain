@@ -126,7 +126,7 @@ func (l *LoadBalancer) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"load_balancer_id": l.ID,
 				})
-				common.SharedNatsConnection.Publish(natsLoadBalancerProvisioningSubject, msg)
+				common.NATSPublish(natsLoadBalancerProvisioningSubject, msg)
 			}
 			return success
 		}
@@ -583,7 +583,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": l.ID,
 		})
-		common.SharedNatsConnection.Publish(natsLoadBalancerDeprovisioningSubject, msg)
+		common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
 
 		network := node.relatedNetwork(db)
 		network.setIsLoadBalanced(db, network.isLoadBalanced(db, nil, nil))

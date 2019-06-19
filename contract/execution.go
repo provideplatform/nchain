@@ -105,5 +105,5 @@ func (e *ContractExecution) ExecuteFromTx(
 	e.PublishedAt = &publishedAt
 
 	txMsg, _ := json.Marshal(e)
-	return e, common.SharedNatsConnection.Publish(natsTxSubject, txMsg)
+	return e, common.NATSPublish(natsTxSubject, txMsg)
 }
