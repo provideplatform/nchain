@@ -137,7 +137,7 @@ func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
 		common.Log.Warningf("Failed to marshal params for tx creation; %s", err.Error())
 	}
 
-	common.SharedNatsConnection.Publish(natsContractCompilerInvocationSubject, txCreationMsg)
+	common.SharedNatsConnection.Publish(natsTxCreateSubject, txCreationMsg)
 
 	return artifact, nil
 }
