@@ -151,5 +151,9 @@ eZ0L
 
 	GpgPassword = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 
-	SharedNatsConnection, _ = natsutil.GetNatsStreamingConnection(30*time.Second, nil)
+	natsConnection, err := natsutil.GetNatsStreamingConnection(30*time.Second, nil)
+	if err != nil {
+		Log.Panicf("Failed to establish shared NATS streaming connection; %s", err.Error())
+	}
+	SharedNatsConnection = natsConnection
 }
