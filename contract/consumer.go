@@ -32,9 +32,7 @@ func createNatsContractCompilerInvocationSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
-			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsContractCompilerInvocationTimeout, nil)
-			defer natsConnection.Close()
-
+			natsConnection, err := natsutil.GetNatsStreamingConnection(natsContractCompilerInvocationTimeout, nil)
 			contractCompilerInvocationSubscription, err := natsConnection.QueueSubscribe(natsContractCompilerInvocationSubject,
 				natsContractCompilerInvocationSubject,
 				consumeContractCompilerInvocationMsg,
@@ -48,7 +46,7 @@ func createNatsContractCompilerInvocationSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer contractCompilerInvocationSubscription.Unsubscribe()
+			defer contractCompilerInvocationSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsContractCompilerInvocationSubject)
 
 			wg.Wait()
@@ -60,9 +58,7 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		wg.Add(1)
 		go func() {
-			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsNetworkContractCreateInvocationTimeout, nil)
-			defer natsConnection.Close()
-
+			natsConnection, err := natsutil.GetNatsStreamingConnection(natsContractCompilerInvocationTimeout, nil)
 			networkContractCreateInvocationSubscription, err := natsConnection.QueueSubscribe(natsNetworkContractCreateInvocationSubject,
 				natsNetworkContractCreateInvocationSubject,
 				consumeNetworkContractCreateInvocationMsg,
@@ -76,7 +72,7 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 				wg.Done()
 				return
 			}
-			defer networkContractCreateInvocationSubscription.Unsubscribe()
+			defer networkContractCreateInvocationSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsNetworkContractCreateInvocationSubject)
 
 			wg.Wait()

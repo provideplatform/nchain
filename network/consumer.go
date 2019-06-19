@@ -89,8 +89,6 @@ func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsBlockFinalizedInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			blockFinalizedSubscription, err := natsConnection.QueueSubscribe(natsBlockFinalizedSubject,
 				natsBlockFinalizedSubject,
 				consumeBlockFinalizedMsg,
@@ -104,7 +102,7 @@ func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer blockFinalizedSubscription.Unsubscribe()
+			defer blockFinalizedSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsBlockFinalizedSubject)
 
 			wg.Wait()
@@ -117,8 +115,6 @@ func createNatsLoadBalancerProvisioningSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			loadBalancerProvisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerProvisioningSubject,
 				natsLoadBalancerProvisioningSubject,
 				consumeLoadBalancerProvisioningMsg,
@@ -132,7 +128,7 @@ func createNatsLoadBalancerProvisioningSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer loadBalancerProvisioningSubscription.Unsubscribe()
+			defer loadBalancerProvisioningSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerProvisioningSubject)
 
 			wg.Wait()
@@ -145,8 +141,6 @@ func createNatsLoadBalancerDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			loadBalancerDeprovisioningSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerDeprovisioningSubject,
 				natsLoadBalancerDeprovisioningSubject,
 				consumeLoadBalancerDeprovisioningMsg,
@@ -160,7 +154,7 @@ func createNatsLoadBalancerDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer loadBalancerDeprovisioningSubscription.Unsubscribe()
+			defer loadBalancerDeprovisioningSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerDeprovisioningSubject)
 
 			wg.Wait()
@@ -173,8 +167,6 @@ func createNatsLoadBalancerBalanceNodeSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			loadBalancerBalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerBalanceNodeSubject,
 				natsLoadBalancerBalanceNodeSubject,
 				consumeLoadBalancerBalanceNodeMsg,
@@ -188,7 +180,7 @@ func createNatsLoadBalancerBalanceNodeSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer loadBalancerBalanceNodeSubscription.Unsubscribe()
+			defer loadBalancerBalanceNodeSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerBalanceNodeSubject)
 
 			wg.Wait()
@@ -201,8 +193,6 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsLoadBalancerInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			loadBalancerUnbalanceNodeSubscription, err := natsConnection.QueueSubscribe(natsLoadBalancerUnbalanceNodeSubject,
 				natsLoadBalancerUnbalanceNodeSubject,
 				consumeLoadBalancerUnbalanceNodeMsg,
@@ -216,7 +206,7 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer loadBalancerUnbalanceNodeSubscription.Unsubscribe()
+			defer loadBalancerUnbalanceNodeSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsLoadBalancerUnbalanceNodeSubject)
 
 			wg.Wait()
@@ -229,8 +219,6 @@ func createNatsDeployNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsDeployNetworkNodeInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			deployNetworkNodeSubscription, err := natsConnection.QueueSubscribe(natsDeployNetworkNodeSubject,
 				natsDeployNetworkNodeSubject,
 				consumeDeployNetworkNodeMsg,
@@ -244,7 +232,7 @@ func createNatsDeployNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer deployNetworkNodeSubscription.Unsubscribe()
+			defer deployNetworkNodeSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsDeployNetworkNodeSubject)
 
 			wg.Wait()
@@ -257,8 +245,6 @@ func createNatsResolveNetworkNodeHostSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsResolveNetworkNodeHostInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			resolveNetworkNodeHostSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodeHostSubject,
 				natsResolveNetworkNodeHostSubject,
 				consumeResolveNetworkNodeHostMsg,
@@ -272,7 +258,7 @@ func createNatsResolveNetworkNodeHostSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer resolveNetworkNodeHostSubscription.Unsubscribe()
+			defer resolveNetworkNodeHostSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsResolveNetworkNodeHostSubject)
 
 			wg.Wait()
@@ -285,8 +271,6 @@ func createNatsResolveNetworkNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsResolveNetworkNodePeerURLInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			resolveNetworkNodePeerURLSubscription, err := natsConnection.QueueSubscribe(natsResolveNetworkNodePeerURLSubject,
 				natsResolveNetworkNodePeerURLSubject,
 				consumeResolveNetworkNodePeerURLMsg,
@@ -300,7 +284,7 @@ func createNatsResolveNetworkNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer resolveNetworkNodePeerURLSubscription.Unsubscribe()
+			defer resolveNetworkNodePeerURLSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsResolveNetworkNodePeerURLSubject)
 
 			wg.Wait()
@@ -313,8 +297,6 @@ func createNatsDeleteTerminatedNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(natsDeleteTerminatedNetworkNodeInvocationTimeout, nil)
-			defer natsConnection.Close()
-
 			deleteTerminatedNetworkNodeSubscription, err := natsConnection.QueueSubscribe(natsDeleteTerminatedNetworkNodeSubject,
 				natsDeleteTerminatedNetworkNodeSubject,
 				consumeDeleteTerminatedNetworkNodeMsg,
@@ -328,7 +310,7 @@ func createNatsDeleteTerminatedNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer deleteTerminatedNetworkNodeSubscription.Unsubscribe()
+			defer deleteTerminatedNetworkNodeSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsDeleteTerminatedNetworkNodeSubject)
 
 			wg.Wait()
@@ -384,7 +366,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								}
 
 								msgPayload, _ := json.Marshal(params)
-								common.SharedNatsConnection.Publish(natsTxFinalizeSubject, msgPayload)
+								common.NATSPublish(natsTxFinalizeSubject, msgPayload)
 							}
 						}
 					}

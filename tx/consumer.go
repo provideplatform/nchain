@@ -53,8 +53,6 @@ func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(txAckWait, nil)
-			defer natsConnection.Close()
-
 			txSubscription, err := natsConnection.QueueSubscribe(natsTxSubject,
 				natsTxSubject,
 				consumeTxMsg,
@@ -69,7 +67,7 @@ func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer txSubscription.Unsubscribe()
+			defer txSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
 
 			wg.Wait()
@@ -82,8 +80,6 @@ func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(txCreateAckWait, nil)
-			defer natsConnection.Close()
-
 			txFinalizeSubscription, err := natsConnection.QueueSubscribe(natsTxCreateSubject,
 				natsTxCreateSubject,
 				consumeTxCreateMsg,
@@ -98,7 +94,7 @@ func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer txFinalizeSubscription.Unsubscribe()
+			defer txFinalizeSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsTxCreateSubject)
 
 			wg.Wait()
@@ -111,8 +107,6 @@ func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(txFinalizeAckWait, nil)
-			defer natsConnection.Close()
-
 			txFinalizeSubscription, err := natsConnection.QueueSubscribe(natsTxFinalizeSubject,
 				natsTxFinalizeSubject,
 				consumeTxFinalizeMsg,
@@ -127,7 +121,7 @@ func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer txFinalizeSubscription.Unsubscribe()
+			defer txFinalizeSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsTxFinalizeSubject)
 
 			wg.Wait()
@@ -140,8 +134,6 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 		wg.Add(1)
 		go func() {
 			natsConnection, _ := natsutil.GetNatsStreamingConnection(txReceiptAckWait, nil)
-			defer natsConnection.Close()
-
 			txReceiptSubscription, err := natsConnection.QueueSubscribe(natsTxReceiptSubject,
 				natsTxReceiptSubject,
 				consumeTxReceiptMsg,
@@ -156,7 +148,7 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 				wg.Done()
 				return
 			}
-			defer txReceiptSubscription.Unsubscribe()
+			defer txReceiptSubscription.Close()
 			common.Log.Debugf("Subscribed to NATS subject: %s", natsTxReceiptSubject)
 
 			wg.Wait()
