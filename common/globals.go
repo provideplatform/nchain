@@ -6,7 +6,6 @@ import (
 
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
-	natsutil "github.com/kthomas/go-natsutil"
 	stan "github.com/nats-io/stan.go"
 )
 
@@ -151,9 +150,8 @@ eZ0L
 
 	GpgPassword = "walletencryptionkey" // FIXME-- remove GPG and this key and configure safely
 
-	natsConnection, err := natsutil.GetNatsStreamingConnection(30*time.Second, nil)
+	err := EstablishNATSStreamingConnection()
 	if err != nil {
-		Log.Panicf("Failed to establish shared NATS streaming connection; %s", err.Error())
+		Log.Panicf("Failed to established NATS streaming connection; %s", err.Error())
 	}
-	SharedNatsConnection = natsConnection
 }
