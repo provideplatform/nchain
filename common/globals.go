@@ -32,7 +32,7 @@ var (
 	TxFilters                            = map[string][]interface{}{}
 
 	// SharedNatsConnection is a cached connection used by most NATS Publish calls
-	SharedNatsConnection stan.Conn
+	SharedNatsConnection *stan.Conn
 )
 
 func init() {

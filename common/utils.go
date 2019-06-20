@@ -138,9 +138,9 @@ func EstablishNATSStreamingConnection() error {
 }
 
 // GetSharedNatsStreamingConnection retrieves the NATS streaming connection
-func GetSharedNatsStreamingConnection() (stan.Conn, error) {
+func GetSharedNatsStreamingConnection() (*stan.Conn, error) {
 	if SharedNatsConnection != nil {
-		conn := SharedNatsConnection.NatsConn()
+		conn := (*SharedNatsConnection).NatsConn()
 		if conn != nil && !conn.IsClosed() && !conn.IsDraining() && !conn.IsReconnecting() {
 			return SharedNatsConnection, nil
 		}
@@ -161,5 +161,5 @@ func NATSPublish(subject string, msg []byte) error {
 		Log.Warningf("Failed to retrieve shared NATS streaming connection for Publish; %s", err.Error())
 		return err
 	}
-	return natsConnection.Publish(subject, msg)
+	return (*natsConnection).Publish(subject, msg)
 }

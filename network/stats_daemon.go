@@ -51,7 +51,7 @@ type StatsDaemon struct {
 	attempt        uint32
 	backoff        int64
 	dataSource     *NetworkStatsDataSource
-	natsConnection stan.Conn
+	natsConnection *stan.Conn
 
 	log *logger.Logger
 
@@ -476,7 +476,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			Timestamp: lastBlockAt,
 		})
 
-		sd.natsConnection.Publish(natsBlockFinalizedSubject, natsPayload)
+		(*sd.natsConnection).Publish(natsBlockFinalizedSubject, natsPayload)
 	}
 }
 
