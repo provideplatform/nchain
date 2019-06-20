@@ -94,7 +94,8 @@ func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsBlockFinalizedInvocationTimeout),
 					stan.MaxInflight(natsBlockFinalizedSubjectMaxInFlight),
-					stan.DurableName(natsBlockFinalizedSubject))
+					stan.DurableName(natsBlockFinalizedSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsBlockFinalizedSubject)
@@ -125,7 +126,8 @@ func createNatsLoadBalancerProvisioningSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsLoadBalancerInvocationTimeout),
 					stan.MaxInflight(natsLoadBalancerProvisioningMaxInFlight),
-					stan.DurableName(natsLoadBalancerProvisioningSubject))
+					stan.DurableName(natsLoadBalancerProvisioningSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerProvisioningSubject)
@@ -156,7 +158,8 @@ func createNatsLoadBalancerDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsLoadBalancerInvocationTimeout),
 					stan.MaxInflight(natsLoadBalancerDeprovisioningMaxInFlight),
-					stan.DurableName(natsLoadBalancerDeprovisioningSubject))
+					stan.DurableName(natsLoadBalancerDeprovisioningSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerDeprovisioningSubject)
@@ -187,7 +190,8 @@ func createNatsLoadBalancerBalanceNodeSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsLoadBalancerInvocationTimeout),
 					stan.MaxInflight(natsLoadBalancerBalanceNodeMaxInFlight),
-					stan.DurableName(natsLoadBalancerBalanceNodeSubject))
+					stan.DurableName(natsLoadBalancerBalanceNodeSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerBalanceNodeSubject)
@@ -218,7 +222,8 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsLoadBalancerInvocationTimeout),
 					stan.MaxInflight(natsLoadBalancerUnbalanceNodeMaxInFlight),
-					stan.DurableName(natsLoadBalancerUnbalanceNodeSubject))
+					stan.DurableName(natsLoadBalancerUnbalanceNodeSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsLoadBalancerUnbalanceNodeSubject)
@@ -249,7 +254,8 @@ func createNatsDeployNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsDeployNetworkNodeInvocationTimeout),
 					stan.MaxInflight(natsDeployNetworkNodeMaxInFlight),
-					stan.DurableName(natsDeployNetworkNodeSubject))
+					stan.DurableName(natsDeployNetworkNodeSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsDeployNetworkNodeSubject)
@@ -280,7 +286,8 @@ func createNatsResolveNetworkNodeHostSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsResolveNetworkNodeHostInvocationTimeout),
 					stan.MaxInflight(natsResolveNetworkNodeHostMaxInFlight),
-					stan.DurableName(natsResolveNetworkNodeHostSubject))
+					stan.DurableName(natsResolveNetworkNodeHostSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsResolveNetworkNodeHostSubject)
@@ -311,7 +318,8 @@ func createNatsResolveNetworkNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsResolveNetworkNodePeerURLInvocationTimeout),
 					stan.MaxInflight(natsResolveNetworkNodePeerURLMaxInFlight),
-					stan.DurableName(natsResolveNetworkNodePeerURLSubject))
+					stan.DurableName(natsResolveNetworkNodePeerURLSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsResolveNetworkNodePeerURLSubject)
@@ -342,7 +350,8 @@ func createNatsDeleteTerminatedNetworkNodeSubscriptions(wg *sync.WaitGroup) {
 					stan.SetManualAckMode(),
 					stan.AckWait(natsDeleteTerminatedNetworkNodeInvocationTimeout),
 					stan.MaxInflight(natsDeleteTerminatedNetworkNodeMaxInFlight),
-					stan.DurableName(natsDeleteTerminatedNetworkNodeSubject))
+					stan.DurableName(natsDeleteTerminatedNetworkNodeSubject),
+				)
 
 				if err != nil {
 					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsDeleteTerminatedNetworkNodeSubject)
@@ -416,7 +425,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 					err = fmt.Errorf("Failed to decode EVM block header; %s", err.Error())
 				}
 			} else {
-				common.Log.Debugf("Received unhandled finalized block header type: %s", blockFinalizedMsg.Block)
+				common.Log.Warningf("Received unhandled finalized block header; network id: %s", *blockFinalizedMsg.NetworkID)
 			}
 		}
 	}
