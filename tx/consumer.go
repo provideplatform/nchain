@@ -50,129 +50,53 @@ func init() {
 
 func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		wg.Add(1)
-		go func() {
-			var subscribe func(_ stan.Conn, _ error)
-			subscribe = func(_ stan.Conn, _ error) {
-				natsConnection, _ := natsutil.GetNatsStreamingConnection(txAckWait, subscribe)
-				txSubscription, err := (*natsConnection).QueueSubscribe(natsTxSubject,
-					natsTxSubject,
-					consumeTxMsg,
-					stan.SetManualAckMode(),
-					stan.AckWait(txAckWait),
-					stan.MaxInflight(natsTxMaxInFlight),
-					stan.DurableName(natsTxSubject),
-				)
-
-				if err != nil {
-					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxSubject)
-					wg.Done()
-					return
-				}
-				defer txSubscription.Close()
-				common.Log.Debugf("Subscribed to NATS subject: %s", natsTxSubject)
-
-				wg.Wait()
-			}
-
-			subscribe(nil, nil)
-		}()
+		natsutil.RequireNatsStreamingSubscription(wg,
+			txAckWait,
+			natsTxSubject,
+			natsTxSubject,
+			consumeTxMsg,
+			txAckWait,
+			natsTxMaxInFlight,
+		)
 	}
 }
 
 func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		wg.Add(1)
-		go func() {
-			var subscribe func(_ stan.Conn, _ error)
-			subscribe = func(_ stan.Conn, _ error) {
-				natsConnection, _ := natsutil.GetNatsStreamingConnection(txCreateAckWait, subscribe)
-				txFinalizeSubscription, err := (*natsConnection).QueueSubscribe(natsTxCreateSubject,
-					natsTxCreateSubject,
-					consumeTxCreateMsg,
-					stan.SetManualAckMode(),
-					stan.AckWait(txCreateAckWait),
-					stan.MaxInflight(natsTxCreateMaxInFlight),
-					stan.DurableName(natsTxCreateSubject),
-				)
-
-				if err != nil {
-					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxCreateSubject)
-					wg.Done()
-					return
-				}
-				defer txFinalizeSubscription.Close()
-				common.Log.Debugf("Subscribed to NATS subject: %s", natsTxCreateSubject)
-
-				wg.Wait()
-			}
-
-			subscribe(nil, nil)
-		}()
+		natsutil.RequireNatsStreamingSubscription(wg,
+			txCreateAckWait,
+			natsTxCreateSubject,
+			natsTxCreateSubject,
+			consumeTxCreateMsg,
+			txCreateAckWait,
+			natsTxCreateMaxInFlight,
+		)
 	}
 }
 
 func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		wg.Add(1)
-		go func() {
-			var subscribe func(_ stan.Conn, _ error)
-			subscribe = func(_ stan.Conn, _ error) {
-				natsConnection, _ := natsutil.GetNatsStreamingConnection(txFinalizeAckWait, subscribe)
-				txFinalizeSubscription, err := (*natsConnection).QueueSubscribe(natsTxFinalizeSubject,
-					natsTxFinalizeSubject,
-					consumeTxFinalizeMsg,
-					stan.SetManualAckMode(),
-					stan.AckWait(txFinalizeAckWait),
-					stan.MaxInflight(natsTxFinalizeMaxInFlight),
-					stan.DurableName(natsTxFinalizeSubject),
-				)
-
-				if err != nil {
-					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxFinalizeSubject)
-					wg.Done()
-					return
-				}
-				defer txFinalizeSubscription.Close()
-				common.Log.Debugf("Subscribed to NATS subject: %s", natsTxFinalizeSubject)
-
-				wg.Wait()
-			}
-
-			subscribe(nil, nil)
-		}()
+		natsutil.RequireNatsStreamingSubscription(wg,
+			txFinalizeAckWait,
+			natsTxFinalizeSubject,
+			natsTxFinalizeSubject,
+			consumeTxFinalizeMsg,
+			txFinalizeAckWait,
+			natsTxFinalizeMaxInFlight,
+		)
 	}
 }
 
 func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		wg.Add(1)
-		go func() {
-			var subscribe func(_ stan.Conn, _ error)
-			subscribe = func(_ stan.Conn, _ error) {
-				natsConnection, _ := natsutil.GetNatsStreamingConnection(txReceiptAckWait, subscribe)
-				txReceiptSubscription, err := (*natsConnection).QueueSubscribe(natsTxReceiptSubject,
-					natsTxReceiptSubject,
-					consumeTxReceiptMsg,
-					stan.SetManualAckMode(),
-					stan.AckWait(txReceiptAckWait),
-					stan.MaxInflight(natsTxReceiptMaxInFlight),
-					stan.DurableName(natsTxReceiptSubject),
-				)
-
-				if err != nil {
-					common.Log.Warningf("Failed to subscribe to NATS subject: %s", natsTxReceiptSubject)
-					wg.Done()
-					return
-				}
-				defer txReceiptSubscription.Close()
-				common.Log.Debugf("Subscribed to NATS subject: %s", natsTxReceiptSubject)
-
-				wg.Wait()
-			}
-
-			subscribe(nil, nil)
-		}()
+		natsutil.RequireNatsStreamingSubscription(wg,
+			txReceiptAckWait,
+			natsTxReceiptSubject,
+			natsTxReceiptSubject,
+			consumeTxReceiptMsg,
+			txReceiptAckWait,
+			natsTxReceiptMaxInFlight,
+		)
 	}
 }
 
