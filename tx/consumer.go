@@ -487,7 +487,7 @@ func consumeTxMsg(msg *stan.Msg) {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
 		consumer.Nack(msg)
 	} else {
-		common.Log.Debugf("Executed contract: %s", executionResponse)
+		common.Log.Debugf("Executed contract: %s", executionResponse.Response)
 		msg.Ack()
 	}
 }
@@ -582,7 +582,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 		}
 	}
 	if len(tx.Errors) > 0 {
-		common.Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", hash, tx.Errors[0].Message)
+		common.Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", hash, *tx.Errors[0].Message)
 		consumer.Nack(msg)
 		return
 	}
