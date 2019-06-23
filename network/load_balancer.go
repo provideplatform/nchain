@@ -134,6 +134,29 @@ func (l *LoadBalancer) Create() bool {
 	return false
 }
 
+// Update an existing load balancer
+func (l *LoadBalancer) Update() bool {
+	if !l.Validate() {
+		return false
+	}
+
+	l.sanitizeConfig()
+
+	db := dbconf.DatabaseConnection()
+
+	result := db.Save(&l)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			l.Errors = append(l.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+		}
+	}
+
+	return len(l.Errors) == 0
+}
+
 // Delete a load balancer
 func (l *LoadBalancer) Delete() bool {
 	db := dbconf.DatabaseConnection()

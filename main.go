@@ -8,6 +8,7 @@ import (
 	"github.com/provideapp/goldmine/connector"
 	"github.com/provideapp/goldmine/consumer"
 	"github.com/provideapp/goldmine/contract"
+	"github.com/provideapp/goldmine/db"
 	"github.com/provideapp/goldmine/filter"
 	"github.com/provideapp/goldmine/network"
 	"github.com/provideapp/goldmine/oracle"
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	db.MigrateConfigs()
 	consumer.RunAPIUsageDaemon()
 	filter.CacheTxFilters()
 

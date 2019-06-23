@@ -179,6 +179,29 @@ func (n *NetworkNode) Create() bool {
 	return false
 }
 
+// Update an existing network node
+func (n *NetworkNode) Update() bool {
+	if !n.Validate() {
+		return false
+	}
+
+	n.sanitizeConfig()
+
+	db := dbconf.DatabaseConnection()
+
+	result := db.Save(&n)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+		}
+	}
+
+	return len(n.Errors) == 0
+}
+
 // setConfig sets the network config in-memory
 func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
