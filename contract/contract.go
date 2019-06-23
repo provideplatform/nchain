@@ -502,7 +502,7 @@ func (c *Contract) ResolveTokenContract(db *gorm.DB, network *network.Network, w
 								ticker.Stop()
 								return
 							} else if len(errs) > 0 {
-								common.Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(errs), errs[0].Message)
+								common.Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(errs), *errs[0].Message)
 							}
 						}
 					} else {
