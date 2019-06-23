@@ -8,6 +8,7 @@ import (
 	"github.com/provideapp/goldmine/common"
 )
 
+// RunExchangeConsumer runs a real-time consumer of pricing data for the given currency pair
 func RunExchangeConsumer(currencyPair string, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
@@ -16,7 +17,7 @@ func RunExchangeConsumer(currencyPair string, wg *sync.WaitGroup) {
 		if err != nil {
 			common.Log.Warningf("Consumer exited unexpectedly; %s", err)
 		} else {
-			common.Log.Infof("Exiting consumer %s", consumer)
+			common.Log.Debug("Exiting exchange consumer...")
 		}
 	}()
 }
@@ -28,7 +29,7 @@ func priceTick(msg *exchangeConsumer.GdaxMessage) error {
 			SetPrice(msg.ProductId, msg.Sequence, price)
 		}
 	} else {
-		common.Log.Debugf("Dropping GDAX message; %s", msg)
+		common.Log.Debugf("Dropping GDAX message; seq: %d", msg.Sequence)
 	}
 	return nil
 }

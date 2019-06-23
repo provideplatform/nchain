@@ -66,7 +66,7 @@ func NatsGuaranteeDelivery(sub string) {
 		//deliveries = map[string][]*stan.Msg{}
 		// RunConsumers()
 
-		natsConn := common.GetDefaultNatsStreamingConnection()
+		natsConn, _ := common.GetSharedNatsStreamingConnection()
 
 		// TODO: use a mutex if we need to detect > 1 delivery on sub
 
@@ -75,9 +75,9 @@ func NatsGuaranteeDelivery(sub string) {
 		// wg := sync.WaitGroup{}
 		// wg.Add(1)
 
-		defer natsConn.Close()
+		defer (*natsConn).Close()
 
-		natsSub, err := natsConn.QueueSubscribe(sub, sub, func(msg *stan.Msg) {
+		natsSub, err := (*natsConn).QueueSubscribe(sub, sub, func(msg *stan.Msg) {
 			common.Log.Debugf("subject: " + msg.MsgProto.Subject)
 			common.Log.Debugf("message: " + msg.MsgProto.Reply)
 			ch <- msg

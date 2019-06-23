@@ -690,7 +690,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						}
 						_, err := awswrapper.AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
 						if err != nil {
-							common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+							common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
 					}
 				}
@@ -722,7 +722,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 						}
 						_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
 						if err != nil {
-							common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %s; udp ports: %s; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+							common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
 					}
 				}
@@ -744,8 +744,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 				}
 
 				if resolvedContainer != nil {
-					common.Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, resolvedContainer)
-					common.Log.Debugf("Attempting to deploy container %s in EC2 region: %s", resolvedContainer, region)
+					common.Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, *resolvedContainer)
+					common.Log.Debugf("Attempting to deploy container %s in EC2 region: %s", *resolvedContainer, region)
 					envOverrides := map[string]interface{}{}
 					if envOk {
 						for k := range env {

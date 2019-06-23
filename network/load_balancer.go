@@ -499,7 +499,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 							db.Save(l)
 							return fmt.Errorf(desc)
 						}
-						common.Log.Debugf("Registered load balanced target for balancer %s on port: %s", l.ID, port)
+						common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
 
 						_, err = awswrapper.CreateListenerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
 						if err != nil {

@@ -526,7 +526,7 @@ func consumeDeleteTerminatedNetworkNodeMsg(msg *stan.Msg) {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		err := errors[0]
-		common.Log.Warningf("Failed to delete terminated network node; %s", common.StringOrNil(err.Error()))
+		common.Log.Warningf("Failed to delete terminated network node; %s", err.Error())
 		consumer.AttemptNack(msg, natsDeleteTerminatedNetworkNodeTimeout)
 		return
 	}
