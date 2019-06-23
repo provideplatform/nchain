@@ -546,7 +546,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 
 	tx := &Transaction{}
 	db := dbconf.DatabaseConnection()
-	db.Where("hash = ?", hash).Find(&tx)
+	db.Where("hash = ? AND status = ?", hash, "pending").Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
 		common.Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s", hash)
 		consumer.Nack(msg)
