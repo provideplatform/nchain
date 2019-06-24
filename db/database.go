@@ -6,8 +6,6 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres" // PostgreSQL dialect
 	dbconf "github.com/kthomas/go-db-config"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
 )
 
 var (
@@ -112,54 +110,54 @@ func migrateSchema() {
 }
 
 // MigrateConfigs attempts to migrate all network/node/load balancer configs and _security configs
-func MigrateConfigs() {
-	db := DatabaseConnection()
-	networks := make([]network.Network, 0)
-	db.Find(&networks)
-	for _, ntwrk := range networks {
-		common.Log.Debugf("Attempting to migrate network config: %s", ntwrk.ID)
-		cfg := ntwrk.ParseConfig()
-		if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
-			if securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{}); securityCfgOk {
-				cloneableCfg["security"] = securityCfg
-				delete(cloneableCfg, "_security")
-				ntwrk.Config = common.MarshalConfig(cfg)
-				db.Save(&ntwrk)
-				common.Log.Debugf("Migrated network _security config: %s", ntwrk.ID)
-			}
-		}
-	}
+// func MigrateConfigs() {
+// 	db := DatabaseConnection()
+// 	networks := make([]network.Network, 0)
+// 	db.Find(&networks)
+// 	for _, ntwrk := range networks {
+// 		common.Log.Debugf("Attempting to migrate network config: %s", ntwrk.ID)
+// 		cfg := ntwrk.ParseConfig()
+// 		if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
+// 			if securityCfg, securityCfgOk := cloneableCfg["_security"].(map[string]interface{}); securityCfgOk {
+// 				cloneableCfg["security"] = securityCfg
+// 				delete(cloneableCfg, "_security")
+// 				ntwrk.Config = common.MarshalConfig(cfg)
+// 				db.Save(&ntwrk)
+// 				common.Log.Debugf("Migrated network _security config: %s", ntwrk.ID)
+// 			}
+// 		}
+// 	}
 
-	nodes := make([]network.NetworkNode, 0)
-	db.Find(&nodes)
-	for _, node := range nodes {
-		common.Log.Debugf("Attempting to migrate network node config: %s", node.ID)
-		cfg := node.ParseConfig()
-		if securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{}); securityCfgOk {
-			cfg["security"] = securityCfg
-			delete(cfg, "_security")
-			node.Config = common.MarshalConfig(cfg)
-			if node.Update() {
-				common.Log.Debugf("Migrated network node _security config: %s", node.ID)
-			}
-		}
-	}
+// 	nodes := make([]network.NetworkNode, 0)
+// 	db.Find(&nodes)
+// 	for _, node := range nodes {
+// 		common.Log.Debugf("Attempting to migrate network node config: %s", node.ID)
+// 		cfg := node.ParseConfig()
+// 		if securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{}); securityCfgOk {
+// 			cfg["security"] = securityCfg
+// 			delete(cfg, "_security")
+// 			node.Config = common.MarshalConfig(cfg)
+// 			if node.Update() {
+// 				common.Log.Debugf("Migrated network node _security config: %s", node.ID)
+// 			}
+// 		}
+// 	}
 
-	loadBalancers := make([]network.LoadBalancer, 0)
-	db.Find(&loadBalancers)
-	for _, lb := range loadBalancers {
-		common.Log.Debugf("Attempting to migrate network load balancer config: %s", lb.ID)
-		cfg := lb.ParseConfig()
-		if securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{}); securityCfgOk {
-			cfg["security"] = securityCfg
-			delete(cfg, "_security")
-			lb.Config = common.MarshalConfig(cfg)
-			if lb.Update() {
-				common.Log.Debugf("Migrated network load balancer _security config: %s", lb.ID)
-			}
-		}
-	}
-}
+// 	loadBalancers := make([]network.LoadBalancer, 0)
+// 	db.Find(&loadBalancers)
+// 	for _, lb := range loadBalancers {
+// 		common.Log.Debugf("Attempting to migrate network load balancer config: %s", lb.ID)
+// 		cfg := lb.ParseConfig()
+// 		if securityCfg, securityCfgOk := cfg["_security"].(map[string]interface{}); securityCfgOk {
+// 			cfg["security"] = securityCfg
+// 			delete(cfg, "_security")
+// 			lb.Config = common.MarshalConfig(cfg)
+// 			if lb.Update() {
+// 				common.Log.Debugf("Migrated network load balancer _security config: %s", lb.ID)
+// 			}
+// 		}
+// 	}
+// }
 
 // DatabaseConnection returns a pooled DB connection
 func DatabaseConnection() *gorm.DB {
