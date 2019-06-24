@@ -141,7 +141,7 @@ func EstablishNATSStreamingConnection() error {
 func GetSharedNatsStreamingConnection() (*stan.Conn, error) {
 	if SharedNatsConnection != nil {
 		conn := (*SharedNatsConnection).NatsConn()
-		if conn != nil && !conn.IsClosed() && !conn.IsDraining() && !conn.IsReconnecting() {
+		if conn != nil && conn.IsConnected() {
 			return SharedNatsConnection, nil
 		}
 	}
