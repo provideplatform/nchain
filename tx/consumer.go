@@ -37,7 +37,7 @@ const natsTxReceiptMaxInFlight = 2048
 const txAckWait = time.Second * 10
 const txCreateAckWait = time.Second * 10
 const txFinalizeAckWait = time.Second * 10
-const txReceiptAckWait = time.Second * 10
+const txReceiptAckWait = time.Second * 5
 
 var waitGroup sync.WaitGroup
 
@@ -492,15 +492,25 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 }
 
+// TODO: consider batching this using a buffered channel for high-volume networks
 func consumeTxFinalizeMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS tx finalize message: %s", msg)
 
 	var params map[string]interface{}
 
+	nack := func(msg *stan.Msg, errmsg string, dropPacket bool) {
+		common.Log.Warningf("Failed to handle NATS tx finalize message; %s", errmsg)
+		if dropPacket {
+			common.Log.Debugf("Dropping tx packet (seq: %d) on the floor; %s", msg.Sequence, errmsg)
+			msg.Ack()
+			return
+		}
+		natsutil.Nack(common.SharedNatsConnection, msg)
+	}
+
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal tx finalize message; %s", err.Error())
-		consumer.Nack(msg)
+		nack(msg, fmt.Sprintf("Failed to umarshal tx finalize message; %s", err.Error()), true)
 		return
 	}
 
@@ -510,37 +520,32 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	hash, hashOk := params["hash"].(string)
 
 	if !blockOk {
-		common.Log.Warningf("Failed to finalize tx; no block provided")
-		consumer.Nack(msg)
+		nack(msg, "Failed to finalize tx; no block provided", true)
 		return
 	}
 	if !blockTimestampStrOk {
-		common.Log.Warningf("Failed to finalize tx; no block timestamp provided")
-		consumer.Nack(msg)
+		nack(msg, "Failed to finalize tx; no block timestamp provided", true)
+
 		return
 	}
 	if !finalizedAtStrOk {
-		common.Log.Warningf("Failed to finalize tx; no finalized at timestamp provided")
-		consumer.Nack(msg)
+		nack(msg, "Failed to finalize tx; no finalized at timestamp provided", true)
 		return
 	}
 	if !hashOk {
-		common.Log.Warningf("Failed to finalize tx; no hash provided")
-		consumer.Nack(msg)
+		nack(msg, "Failed to finalize tx; no hash provided", true)
 		return
 	}
 
 	blockTimestamp, err := time.Parse(time.RFC3339, blockTimestampStr)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal block_timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
-		consumer.Nack(msg)
+		nack(msg, fmt.Sprintf("Failed to unmarshal block_timestamp during NATS %v message handling; %s", msg.Subject, err.Error()), true)
 		return
 	}
 
 	finalizedAt, err := time.Parse(time.RFC3339, finalizedAtStr)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal finalized_at during NATS %v message handling; %s", msg.Subject, err.Error())
-		consumer.Nack(msg)
+		nack(msg, fmt.Sprintf("Failed to unmarshal finalized_at during NATS %v message handling; %s", msg.Subject, err.Error()), true)
 		return
 	}
 
@@ -548,8 +553,8 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 	db.Where("hash = ? AND status = ?", hash, "pending").Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
-		common.Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s", hash)
-		consumer.Nack(msg)
+		// TODO: this is integration point to upsert Wallet & Transaction... need to think thru performance implications & implementation details
+		nack(msg, fmt.Sprintf("Failed to mark block and finalized_at timestamp on tx: %s; tx not found for given hash", hash), true)
 		return
 	}
 
@@ -582,8 +587,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 		}
 	}
 	if len(tx.Errors) > 0 {
-		common.Log.Warningf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", hash, *tx.Errors[0].Message)
-		consumer.Nack(msg)
+		nack(msg, fmt.Sprintf("Failed to set block and finalized_at timestamp on tx: %s; error: %s", hash, *tx.Errors[0].Message), false)
 		return
 	}
 
