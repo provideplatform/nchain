@@ -90,7 +90,7 @@ ecs_deploy()
 
     echo 'Manipulating task defintion...'
     echo $ECS_TASK_DEFINITION > $DEFINITION_FILE
-    sed -E "s/goldmine:[a-zA-Z0-9\.-]+/goldmine:${buildRef}/" "./${DEFINITION_FILE}" > "./${MUNGED_FILE}"
+    sed -E "s/goldmine:[a-zA-Z0-9\.-]+/goldmine:${buildRef}/g" "./${DEFINITION_FILE}" > "./${MUNGED_FILE}"
 
     echo 'Registering task-definition...'
     ECS_TASK_DEFINITION_ID=$(aws ecs register-task-definition --family "${ECS_TASK_DEFINITION_FAMILY}" --cli-input-json "file://${MUNGED_FILE}" | jq '.taskDefinition.taskDefinitionArn' | sed -E 's/.*\/(.*)"$/\1/')
