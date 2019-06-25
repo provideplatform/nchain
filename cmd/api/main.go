@@ -18,7 +18,12 @@ import (
 )
 
 func main() {
-	common.Log.Debugf("Running API main() function")
+	if common.ConsumeNATSStreamingSubscriptions {
+		common.Log.Panicf("Dedicated API instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
+		return
+	}
+
+	common.Log.Debugf("Running dedicated API instance main()")
 
 	consumer.RunAPIUsageDaemon()
 	filter.CacheTxFilters()
