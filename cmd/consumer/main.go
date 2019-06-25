@@ -31,6 +31,7 @@ func main() {
 	common.Log.Debug("Installing signal handlers for dedicated NATS streaming subscription consumer")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	shutdownCtx, cancelF = context.WithCancel(context.Background())
 
 	common.Log.Debugf("Running dedicated NATS streaming subscription consumer main()")
 	timer := time.NewTicker(natsStreamingSubscriptionStatusTickerInterval)
@@ -52,6 +53,7 @@ func main() {
 	}
 
 	common.Log.Debug("Exiting dedicated NATS streaming subscription consumer main()")
+	cancelF()
 }
 
 func shutdown() {
