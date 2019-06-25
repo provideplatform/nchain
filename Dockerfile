@@ -24,8 +24,10 @@ WORKDIR /go/src/github.com/provideapp/goldmine
 
 RUN curl https://glide.sh/get | sh
 RUN glide install
+
 RUN go build -v -o ./bin/goldmine_api ./cmd/api
 RUN go build -v -o ./bin/goldmine_consumer ./cmd/consumer
+RUN ln -s ./bin/goldmine_api goldmine
 
 EXPOSE 8080
-CMD ["./bin/goldmine_api"]
+CMD ["./goldmine"]
