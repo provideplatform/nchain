@@ -18,6 +18,8 @@ import (
 )
 
 func main() {
+	common.Log.Debugf("Running API main() function")
+
 	consumer.RunAPIUsageDaemon()
 	filter.CacheTxFilters()
 

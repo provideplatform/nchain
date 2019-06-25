@@ -76,10 +76,7 @@ echo 'Working Directory =' `pwd`
 echo '....[PRVD] Setting Up....'
 bootstrap_environment
 
-rm ./goldmine 2>/dev/null || true # silence error if not present
-go fix .
-go fmt
-go clean -i
+make clean
 
 glide install
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
@@ -93,7 +90,7 @@ if [ "$RUN_INTEGRATION_SUITE" = "true" ]; then
   DATABASE_USER=postgres DATABASE_PASSWORD=postgres make integration
 fi
 
-go build -v
+make build
 make ecs_deploy
 
 popd &>/dev/null

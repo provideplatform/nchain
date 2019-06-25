@@ -17,6 +17,8 @@ _cgo_defun.c
 _cgo_gotypes.go
 _cgo_export.*
 
+bin/
+
 *.exe
 *.test
 *.prof
@@ -25,9 +27,11 @@ _cgo_export.*
 .tmp/
 *.iml
 
-.gocore-id_rsa
-
 goldmine
+goldmine_api
+goldmine_consumer
+
+.gocore-id_rsa
 .server.crt
 .private.key
 

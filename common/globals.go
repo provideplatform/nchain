@@ -2,6 +2,7 @@ package common
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	awsconf "github.com/kthomas/go-aws-config"
@@ -30,6 +31,8 @@ var (
 	EngineToDefaultPeerListenPortMapping = map[string]uint{"authorityRound": 30303, "handshake": 13038}
 	EngineToDefaultWebsocketPortMapping  = map[string]uint{"authorityRound": 8051}
 	TxFilters                            = map[string][]interface{}{}
+
+	ConsumeNATSStreamingSubscriptions bool
 
 	// SharedNatsConnection is a cached connection used by most NATS Publish calls
 	SharedNatsConnection *stan.Conn
@@ -154,4 +157,6 @@ eZ0L
 	if err != nil {
 		Log.Panicf("Failed to established NATS streaming connection; %s", err.Error())
 	}
+
+	ConsumeNATSStreamingSubscriptions = strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
 }

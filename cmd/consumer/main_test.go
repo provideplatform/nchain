@@ -7,17 +7,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func ptrTo(s string) *string {
-	return &s
-}
-
-func ptrToBool(b bool) *bool {
-	return &b
-}
-
-func TestGoldmine(t *testing.T) {
+func TestGoldmineConsumer(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Goldmine Suite")
+	RunSpecs(t, "Goldmine Consumer Suite")
 }
 
 var _ = Describe("Main", func() {

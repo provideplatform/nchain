@@ -42,6 +42,11 @@ const txReceiptAckWait = time.Second * 5
 var waitGroup sync.WaitGroup
 
 func init() {
+	if !common.ConsumeNATSStreamingSubscriptions {
+		common.Log.Debug("Tx package consumer configured to skip NATS streaming subscription setup")
+		return
+	}
+
 	createNatsTxSubscriptions(&waitGroup)
 	createNatsTxCreateSubscriptions(&waitGroup)
 	createNatsTxFinalizeSubscriptions(&waitGroup)

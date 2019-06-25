@@ -24,6 +24,11 @@ const natsNetworkContractCreateInvocationMaxInFlight = 32
 var waitGroup sync.WaitGroup
 
 func init() {
+	if !common.ConsumeNATSStreamingSubscriptions {
+		common.Log.Debug("Contract package consumer configured to skip NATS streaming subscription setup")
+		return
+	}
+
 	createNatsContractCompilerInvocationSubscriptions(&waitGroup)
 	createNatsNetworkContractCreateInvocationSubscriptions(&waitGroup)
 }

@@ -70,6 +70,11 @@ type natsBlockFinalizedMsg struct {
 var waitGroup sync.WaitGroup
 
 func init() {
+	if !common.ConsumeNATSStreamingSubscriptions {
+		common.Log.Debug("Network package consumer configured to skip NATS streaming subscription setup")
+		return
+	}
+
 	createNatsBlockFinalizedSubscriptions(&waitGroup)
 	createNatsLoadBalancerProvisioningSubscriptions(&waitGroup)
 	createNatsLoadBalancerDeprovisioningSubscriptions(&waitGroup)
