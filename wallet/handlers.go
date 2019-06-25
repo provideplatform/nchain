@@ -67,6 +67,7 @@ func walletsListHandler(c *gin.Context) {
 	}
 
 	query := dbconf.DatabaseConnection()
+	query = query.Joins("JOIN networks ON networks.id=wallets.network_id")
 
 	if c.Query("network_id") != "" {
 		query = query.Where("wallets.network_id = ?", c.Query("network_id"))
@@ -77,6 +78,8 @@ func walletsListHandler(c *gin.Context) {
 	} else if userID != nil {
 		query = query.Where("wallets.user_id = ?", userID)
 	}
+
+	query = query.Where("networks.enabled = ?", true)
 
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
