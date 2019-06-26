@@ -521,11 +521,12 @@ func consumeDeleteTerminatedNetworkNodeMsg(msg *stan.Msg) {
 		return
 	}
 
-	// loadBalancerAssociations := db.Model(&node).Association("LoadBalancers").Count()
-	// if loadBalancerAssociations > 0 {
-	// 	common.Log.Debugf("Unable to delete terminated network node: %s; %d load balancer association(s) pending", node.ID, loadBalancerAssociations)
-	// 	return
-	// }
+	loadBalancerAssociations := db.Model(&node).Association("LoadBalancers").Count()
+	if loadBalancerAssociations > 0 {
+		common.Log.Debugf("Unable to delete terminated network node: %s; %d load balancer association pending", node.ID, loadBalancerAssociations)
+		node.unbalance(db)
+		return
+	}
 
 	result := db.Delete(&node)
 	errors := result.GetErrors()

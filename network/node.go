@@ -1091,17 +1091,7 @@ func (n *NetworkNode) undeploy() error {
 						common.Log.Debugf("Terminated ECS docker container with id: %s", taskID)
 						n.Status = common.StringOrNil("terminated")
 						db.Save(n)
-
-						loadBalancers := make([]*LoadBalancer, 0)
-						db.Model(&n).Association("LoadBalancers").Find(&loadBalancers)
-						for _, balancer := range loadBalancers {
-							common.Log.Debugf("Attempting to unbalance network node %s on load balancer: %s", n.ID, balancer.ID)
-							msg, _ := json.Marshal(map[string]interface{}{
-								"load_balancer_id": balancer.ID.String(),
-								"network_node_id":  n.ID.String(),
-							})
-							common.NATSPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
-						}
+						n.unbalance(db)
 					} else {
 						err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
 						common.Log.Warning(err.Error())
@@ -1134,6 +1124,20 @@ func (n *NetworkNode) undeploy() error {
 		}
 	}
 
+	return nil
+}
+
+func (n *NetworkNode) unbalance(db *gorm.DB) error {
+	loadBalancers := make([]*LoadBalancer, 0)
+	db.Model(&n).Association("LoadBalancers").Find(&loadBalancers)
+	for _, balancer := range loadBalancers {
+		common.Log.Debugf("Attempting to unbalance network node %s on load balancer: %s", n.ID, balancer.ID)
+		msg, _ := json.Marshal(map[string]interface{}{
+			"load_balancer_id": balancer.ID.String(),
+			"network_node_id":  n.ID.String(),
+		})
+		return common.NATSPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
+	}
 	return nil
 }
 
