@@ -34,7 +34,8 @@ func AttemptNack(msg *stan.Msg, timeout int64) {
 func Nack(msg *stan.Msg) {
 	if msg.Redelivered {
 		common.Log.Warningf("Nacking redelivered %d-byte message without checking subject-specific deadletter business logic on subject: %s", msg.Size(), msg.Subject)
-		natsutil.Nack(common.SharedNatsConnection, msg)
+		conn, _ := common.GetSharedNatsStreamingConnection()
+		natsutil.Nack(conn, msg)
 	} else {
 		common.Log.Debugf("Nack() attempted but given NATS message has not yet been redelivered on subject: %s", msg.Subject)
 	}

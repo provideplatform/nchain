@@ -518,7 +518,8 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 			msg.Ack()
 			return
 		}
-		natsutil.Nack(common.SharedNatsConnection, msg)
+		conn, _ := common.GetSharedNatsStreamingConnection()
+		natsutil.Nack(conn, msg)
 	}
 
 	err := json.Unmarshal(msg.Data, &params)
