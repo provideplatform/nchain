@@ -15,6 +15,7 @@ import (
 )
 
 const natsStreamingSubscriptionStatusTickerInterval = 5 * time.Second
+const natsStreamingSubscriptionStatusSleepInterval = 250 * time.Millisecond
 
 var (
 	cancelF     context.CancelFunc
@@ -48,7 +49,7 @@ func main() {
 		case <-shutdownCtx.Done():
 			close(sigs)
 		default:
-			// no-op
+			time.Sleep(natsStreamingSubscriptionStatusSleepInterval)
 		}
 	}
 
