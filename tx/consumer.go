@@ -25,19 +25,27 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
+// TODO: should this be calculated dynamically against average blocktime for the network and subscriptions reestablished?
+
 const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 2048
+const txAckWait = time.Second * 10
+const txMsgTimeout = int64(txAckWait * 10)
+
 const natsTxCreateSubject = "goldmine.tx.create"
 const natsTxCreateMaxInFlight = 2048
+const txCreateAckWait = time.Second * 10
+const txCreateMsgTimeout = int64(txCreateAckWait * 10)
+
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 const natsTxFinalizeMaxInFlight = 2048
+const txFinalizeAckWait = time.Second * 10
+const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 10)
+
 const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
-
-const txAckWait = time.Second * 10
-const txCreateAckWait = time.Second * 10
-const txFinalizeAckWait = time.Second * 10
-const txReceiptAckWait = time.Second * 5
+const txReceiptAckWait = time.Second * 10
+const txReceiptMsgTimeout = int64(txReceiptAckWait * 10)
 
 var waitGroup sync.WaitGroup
 
@@ -191,7 +199,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		msg.Ack()
 	} else {
 		common.Log.Warningf("Failed to execute transaction; tx failed with %d error(s); %s", len(tx.Errors), *tx.Errors[0].Message)
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
 
@@ -490,7 +498,7 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	if err != nil {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, txMsgTimeout)
 	} else {
 		common.Log.Debugf("Executed contract: %s", executionResponse.Response)
 		msg.Ack()
@@ -556,7 +564,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 
 	tx := &Transaction{}
 	db := dbconf.DatabaseConnection()
-	db.Where("hash = ? AND status = ?", hash, "pending").Find(&tx)
+	db.Where("hash = ? AND status IN (?, ?)", hash, "pending", "failed").Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
 		// TODO: this is integration point to upsert Wallet & Transaction... need to think thru performance implications & implementation details
 		nack(msg, fmt.Sprintf("Failed to mark block and finalized_at timestamp on tx: %s; tx not found for given hash", hash), true)
@@ -581,7 +589,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 		tx.BroadcastLatency = &broadcastLatency
 	}
 
-	tx.Status = common.StringOrNil("success")
+	tx.updateStatus(db, "success", nil)
 	result := db.Save(&tx)
 	errors := result.GetErrors()
 	if len(errors) > 0 {
@@ -643,7 +651,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 			tx.updateStatus(db, "failed", common.StringOrNil(desc))
 		}
 
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
 		msg.Ack()
 	}
