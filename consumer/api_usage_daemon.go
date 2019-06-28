@@ -2,9 +2,6 @@ package consumer
 
 import (
 	"encoding/json"
-	"time"
-
-	"github.com/kthomas/go-natsutil"
 
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
@@ -38,11 +35,9 @@ func (d *apiUsageDelegate) Track(apiCall *provide.APICall) {
 }
 
 func (d *apiUsageDelegate) initNatsStreamingConnection() {
-	natsConnection, err := natsutil.GetNatsStreamingConnection(time.Second*10, func(_ stan.Conn, err error) {
-		d.initNatsStreamingConnection()
-	})
+	natsConnection, err := common.GetSharedNatsStreamingConnection()
 	if err != nil {
-		common.Log.Warningf("Failed to establish NATS connection for API usage delegate; %s", err.Error())
+		common.Log.Warningf("Failed to resolve shared NATS connection for API usage delegate; %s", err.Error())
 		return
 	}
 	d.natsConnection = natsConnection
