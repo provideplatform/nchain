@@ -1028,6 +1028,9 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
 								enodeIndex := strings.LastIndex(msg, "enode://")
 								if enodeIndex != -1 {
 									enode := msg[enodeIndex:]
+									if n.IPv4 != nil && n.PrivateIPv4 != nil {
+										enode = strings.Replace(enode, *n.PrivateIPv4, *n.IPv4, 1)
+									}
 									peerURL = common.StringOrNil(enode)
 									cfg["peer_url"] = enode
 									break
