@@ -579,7 +579,8 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 				return errors.New(desc)
 			}
 
-			if daemon, daemonOk := currentNetworkStats[network.ID.String()]; daemonOk {
+			daemon := RequireNetworkStatsDaemon(network)
+			if daemon != nil {
 				if daemon.stats != nil {
 					if daemon.stats.Block > 0 {
 						ticker.Stop()
