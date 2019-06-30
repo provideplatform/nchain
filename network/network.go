@@ -507,63 +507,35 @@ func (n *Network) Validate() bool {
 
 	if n.Config == nil {
 		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Config value should be present"),
-			Status:  common.PtrToInt(10),
-		})
-	}
-
-	if n.Enabled == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Enabled flag can't be nil"),
-			Status:  common.PtrToInt(10),
-		})
-	}
-
-	if n.IsProduction == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("IsProduction flag can't be nil"),
-			Status:  common.PtrToInt(10),
-		})
-	}
-
-	if n.Cloneable == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Cloneable flag can't be nil"),
+			Message: common.StringOrNil("config object should be defined for network"),
 			Status:  common.PtrToInt(10),
 		})
 	}
 
 	if n.Name == nil {
 		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Name can't be nil"),
+			Message: common.StringOrNil("name can't be nil"),
 			Status:  common.PtrToInt(10),
 		})
 	}
 
 	if n.Enabled == nil {
 		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Enabled flag can't be nil"),
+			Message: common.StringOrNil("enabled flag can't be nil"),
 			Status:  common.PtrToInt(10),
 		})
 	}
 
 	if n.IsProduction == nil {
 		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("IsProduction flag can't be nil"),
+			Message: common.StringOrNil("is_production flag can't be nil"),
 			Status:  common.PtrToInt(10),
 		})
 	}
 
 	if n.Cloneable == nil {
 		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Cloneable flag can't be nil"),
-			Status:  common.PtrToInt(10),
-		})
-	}
-
-	if n.Name == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("Name can't be nil"),
+			Message: common.StringOrNil("cloneable flag can't be nil"),
 			Status:  common.PtrToInt(10),
 		})
 	}
@@ -574,7 +546,7 @@ func (n *Network) Validate() bool {
 
 		if err == nil && len(config) == 0 {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config should not be empty"),
+				Message: common.StringOrNil("config should not be empty"),
 				Status:  common.PtrToInt(12),
 			})
 		}
@@ -583,13 +555,13 @@ func (n *Network) Validate() bool {
 			if cfg, cfgOk := config["cloneable_cfg"].(map[string]interface{}); cfgOk {
 				if _, ok := cfg["security"]; !ok {
 					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("Config security value should be present for clonable network"),
+						Message: common.StringOrNil("security object should be present for clonable network configuration"),
 						Status:  common.PtrToInt(11),
 					})
 				}
 			} else {
 				n.Errors = append(n.Errors, &provide.Error{
-					Message: common.StringOrNil("Config cloneable_cfg should not be null"),
+					Message: common.StringOrNil("cloneable_cfg object should not be null on cloneable network configuration"),
 					Status:  common.PtrToInt(11),
 				})
 			}
@@ -599,14 +571,14 @@ func (n *Network) Validate() bool {
 		chainspecURL, chainspecURLOk := config["chainspec_url"].(string)
 		if !chainspecOk && !chainspecURLOk {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config chainspec_url or chainspec should be present"),
+				Message: common.StringOrNil("chainspec_url or chainspec should be present on network configuration"),
 				Status:  common.PtrToInt(11),
 			})
 		} else {
 			if chainspecOk {
 				if chainspec == nil || chainspec == "" {
 					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("Config chainspec value should not be empty"),
+						Message: common.StringOrNil("chainspec object should not be empty on network configuration"),
 						Status:  common.PtrToInt(11),
 					})
 				}
@@ -615,7 +587,7 @@ func (n *Network) Validate() bool {
 				_, err := url.Parse(chainspecURL)
 				if err != nil {
 					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("Config chainspec_url should be a valid URL if provided"),
+						Message: common.StringOrNil("chainspec_url should be a valid URL if provided"),
 						Status:  common.PtrToInt(11),
 					})
 				}
@@ -627,7 +599,7 @@ func (n *Network) Validate() bool {
 			_, err := url.Parse(blockExplorerURL)
 			if err != nil {
 				n.Errors = append(n.Errors, &provide.Error{
-					Message: common.StringOrNil("Config block_explorer_url should be a valid URL if provided"),
+					Message: common.StringOrNil("block_explorer_url should be a valid URL if provided"),
 					Status:  common.PtrToInt(11),
 				})
 			}
@@ -636,12 +608,12 @@ func (n *Network) Validate() bool {
 		chain, chainOk := config["chain"]
 		if !chainOk {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config chain should not be nil"),
+				Message: common.StringOrNil("chain should not be nil"),
 				Status:  common.PtrToInt(11),
 			})
 		} else if chain == nil || chain == "" {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config chain should not be empty"),
+				Message: common.StringOrNil("chain should not be empty"),
 				Status:  common.PtrToInt(11),
 			})
 		}
@@ -661,12 +633,12 @@ func (n *Network) Validate() bool {
 		nativeCurrency, nativeCurrencyOk := config["native_currency"]
 		if !nativeCurrencyOk {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config native_currency should not be nil"),
+				Message: common.StringOrNil("native_currency should not be nil"),
 				Status:  common.PtrToInt(11),
 			})
 		} else if nativeCurrency == nil || nativeCurrency == "" {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config native_currency should not be empty"),
+				Message: common.StringOrNil("native_currency should not be nil"),
 				Status:  common.PtrToInt(11),
 			})
 		}
@@ -674,20 +646,17 @@ func (n *Network) Validate() bool {
 		protocolID, protocolIDOk := config["protocol_id"]
 		if !protocolIDOk {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config protocol_id should not be nil"),
+				Message: common.StringOrNil("protocol_id should not be nil"),
 				Status:  common.PtrToInt(11),
 			})
 		} else if protocolID == nil || protocolID == "" {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config protocol_id should not be empty"),
+				Message: common.StringOrNil("protocol_id should not be empty"),
 				Status:  common.PtrToInt(11),
 			})
 		}
 	}
 
-	// add error if Config is empty
-	// add error if Clonable and Config[:security] is empty
-	// add error if Config is nil
 	return len(n.Errors) == 0
 }
 
