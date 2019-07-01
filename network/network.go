@@ -747,6 +747,9 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 		status, err = provide.EVMGetNetworkStatus(n.ID.String(), n.RpcURL())
 	} else {
 		common.Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
+		status = &provide.NetworkStatus{
+			State: common.StringOrNil("configuring"),
+		}
 	}
 	return status, err
 }
