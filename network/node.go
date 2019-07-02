@@ -33,7 +33,7 @@ const securityGroupTerminationTickerTimeout = time.Minute * 10
 
 const defaultClient = "parity"
 
-var engineToNetworkNodeClientEnvMapping = map[string]string{"authorityRound": "parity", "handshake": "handshake"}
+var engineToNetworkNodeClientEnvMapping = map[string]string{"aura": "parity", "handshake": "handshake"}
 
 func init() {
 	db := dbconf.DatabaseConnection()

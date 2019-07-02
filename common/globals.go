@@ -27,9 +27,9 @@ var (
 	GpgPrivateKey string
 	GpgPassword   string
 
-	EngineToDefaultJSONRPCPortMapping    = map[string]uint{"authorityRound": 8050, "handshake": 13037}
-	EngineToDefaultPeerListenPortMapping = map[string]uint{"authorityRound": 30303, "handshake": 13038}
-	EngineToDefaultWebsocketPortMapping  = map[string]uint{"authorityRound": 8051}
+	EngineToDefaultJSONRPCPortMapping    = map[string]uint{"aura": 8050, "handshake": 13037}
+	EngineToDefaultPeerListenPortMapping = map[string]uint{"aura": 30303, "handshake": 13038}
+	EngineToDefaultWebsocketPortMapping  = map[string]uint{"aura": 8051}
 	TxFilters                            = map[string][]interface{}{}
 
 	ConsumeNATSStreamingSubscriptions bool

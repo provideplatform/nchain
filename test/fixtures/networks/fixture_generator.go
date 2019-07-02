@@ -123,7 +123,7 @@ func NetworkFixtureFieldValuesVariety() (NetworkFixtureFieldValuesArray []*Netwo
 		// 	values: []interface{}{
 		// 		nil,
 		// 		ptrTo(""),
-		// 		ptrTo("authorityRound"),
+		// 		ptrTo("aura"),
 		// 	},
 		// },
 		// &NetworkFixtureFieldValues{
@@ -649,7 +649,7 @@ func defaultConfig() map[string]interface{} {
 		"chainspec_url":      "https://raw.githubusercontent.com/providenetwork/chain-spec/unicorn-v0/spec.json", // required If ethereum network
 		"cloneable_cfg": map[string]interface{}{
 			"security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security
-		"engine_id":           "authorityRound", // required
+		"engine_id":           "aura", // required
 		"is_ethereum_network": true,             // required for ETH
 		"is_load_balanced":    true,             // implies network load balancer count > 0
 		"json_rpc_url":        nil,

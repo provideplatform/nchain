@@ -68,7 +68,7 @@ func ethClonableDisabledConfigNetwork2233122202220() (n *fixtures.FixtureMatcher
 					"chainspec":           chainspecJSON,
 					"chainspec_abi":       chainspecABIJSON,
 					"cloneable_cfg":       map[string]interface{}{}, // If cloneable CFG then security,
-					"engine_id":           "authorityRound",         // required
+					"engine_id":           "aura",         // required
 					"is_ethereum_network": true,                     // required for ETH
 					"is_load_balanced":    true,                     // implies network load balancer count > 0
 					"json_rpc_url":        nil,

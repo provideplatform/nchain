@@ -71,7 +71,7 @@ func ethNonCloneableEnabledChainspecNetwork() (n *fixtures.FixtureMatcher) {
 					"chainspec":           chainspecJSON,
 					"chainspec_abi":       chainspecABIJSON,
 					"cloneable_cfg":       map[string]interface{}{},
-					"engine_id":           "authorityRound", // required
+					"engine_id":           "aura", // required
 					"is_ethereum_network": true,
 					"is_load_balanced":    false,
 					"json_rpc_url":        nil,

@@ -121,7 +121,7 @@ x-total-results-count: 1
                     }
                 },
                 "engine": {
-                    "authorityRound": {
+                    "aura": {
                         "params": {
                             "blockReward": "0xDE0B6B3A7640000",
                             "maximumUncleCount": 0,
@@ -141,7 +141,7 @@ x-total-results-count: 1
                     "difficulty": "0x20000",
                     "gasLimit": "0x7A1200",
                     "seal": {
-                        "authorityRound": {
+                        "aura": {
                             "signature": "0x000000000000000000000000000000000000...",
                             "step": "0x0"
                         }
@@ -323,7 +323,7 @@ x-total-results-count: 1
                     }
                 }
             },
-            "engine_id": "authorityRound",
+            "engine_id": "aura",
             "is_ethereum_network": true,
             "is_load_balanced": false,
             "json_rpc_url": null,
@@ -412,7 +412,7 @@ access-control-allow-origin: *
                 }
             },
             "engine": {
-                "authorityRound": {
+                "aura": {
                     "params": {
                         "blockReward": "0xDE0B6B3A7640000",
                         "maximumUncleCount": 0,
@@ -432,7 +432,7 @@ access-control-allow-origin: *
                 "difficulty": "0x20000",
                 "gasLimit": "0x7A1200",
                 "seal": {
-                    "authorityRound": {
+                    "aura": {
                         "signature": "0x0000000000000000000000000000000000000000000000000000000....",
                         "step": "0x0"
                     }
@@ -553,7 +553,7 @@ access-control-allow-origin: *
                 }
             }
         },
-        "engine_id": "authorityRound",
+        "engine_id": "aura",
         "is_ethereum_network": true,
         "is_load_balanced": false,
         "json_rpc_url": null,
@@ -909,7 +909,7 @@ $ curl -i \
                 }
               },
               "engine": {
-                "authorityRound": {
+                "aura": {
                   "params": {
                     "blockReward": "0xDE0B6B3A7640000",
                     "maximumUncleCount": 0,
@@ -929,7 +929,7 @@ $ curl -i \
                 "difficulty": "0x20000",
                 "gasLimit": "0x7A1200",
                 "seal": {
-                  "authorityRound": {
+                  "aura": {
                     "signature": "0x0000000000000000000000000000000000000000000000...",
                     "step": "0x0"
                   }
@@ -1044,7 +1044,7 @@ $ curl -i \
                 }
               }
             },
-            "engine_id": "authorityRound",
+            "engine_id": "aura",
             "is_ethereum_network": true,
             "is_load_balanced": false,
             "json_rpc_url": null,
@@ -1112,7 +1112,7 @@ access-control-allow-origin: *
         }
       },
       "engine": {
-        "authorityRound": {
+        "aura": {
           "params": {
             "blockReward": "0xDE0B6B3A7640000",
             "maximumUncleCount": 0,
@@ -1132,7 +1132,7 @@ access-control-allow-origin: *
         "difficulty": "0x20000",
         "gasLimit": "0x7A1200",
         "seal": {
-          "authorityRound": {
+          "aura": {
             "signature": "0x000000000000000000000000000000000000000000000000...",
             "step": "0x0"
           }
@@ -1261,7 +1261,7 @@ access-control-allow-origin: *
         }
       }
     },
-    "engine_id": "authorityRound",
+    "engine_id": "aura",
     "is_ethereum_network": true,
     "is_load_balanced": false,
     "json_rpc_url": null,
@@ -1354,7 +1354,7 @@ access-control-allow-credentials: true
     "config": {
       "default_json_rpc_port": null,
       "default_websocket_port": null,
-      "engine_id": "authorityRound",
+      "engine_id": "aura",
       "env": {
         "BOOTNODES": "enode://eb0543bf6c960ad79...",
         "CHAIN": "unicorn-v0",
@@ -1394,11 +1394,11 @@ $ curl -i \
   "network_id": "4617eb8c-4f74-4262-b626-9616ab6fa413",
   "config": {
     "protocol_id": "poa",
-    "engine_id": "authorityRound",
+    "engine_id": "aura",
     "target_id": "aws",
     "provider_id": "docker",
     "role": "validator",
-    "engines": "[{\"id\":\"authorityRound\",\"name\":\"Authority Round\",\"enabled\":true}]",
+    "engines": "[{\"id\":\"aura\",\"name\":\"Authority Round\",\"enabled\":true}]",
     "providers": "[{\"id\":\"ubuntu-vm\",\"name\":\"Ubuntu\",\"...\":\"...\"}]",
     "roles": "[{\"id\":\"peer\",\"name\":\"Peer\",\"config\":{\"...\":\"...\"]}]",
     "credentials": {
@@ -1429,11 +1429,11 @@ $ curl -i \
   "status": "pending",
   "config": {
     "protocol_id": "poa",
-    "engine_id": "authorityRound",
+    "engine_id": "aura",
     "target_id": "aws",
     "provider_id": "docker",
     "role": "validator",
-    "engines": "[{\"id\":\"authorityRound\",\"name\":\"Authority Round\",\"enabled\":true}]",
+    "engines": "[{\"id\":\"aura\",\"name\":\"Authority Round\",\"enabled\":true}]",
     "providers": "[{\"id\":\"ubuntu-vm\",\"name\":\"Ubuntu\",\"img_src_dark\":\"...\"}]",
     "roles": "[{\"id\":\"peer\",\"name\":\"Peer\",\"config\":{...}]",
     "credentials": {
@@ -1486,11 +1486,11 @@ access-control-allow-origin: *
         },
         "default_json_rpc_port": null,
         "default_websocket_port": null,
-        "engine_id": "authorityRound",
+        "engine_id": "aura",
         "engines": [
             {
                 "enabled": true,
-                "id": "authorityRound",
+                "id": "aura",
                 "name": "Authority Round"
             }
         ],
