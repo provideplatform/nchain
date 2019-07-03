@@ -26,7 +26,7 @@ func (d *apiUsageDelegate) Track(apiCall *provide.APICall) {
 			if err != nil {
 				common.Log.Warningf("Failed to asnychronously publish %s; %s", natsAPIUsageEventNotificationSubject, err.Error())
 				d.initNatsStreamingConnection()
-				defer d.Track(apiCall)
+				d.Track(apiCall)
 			}
 		})
 	} else {
