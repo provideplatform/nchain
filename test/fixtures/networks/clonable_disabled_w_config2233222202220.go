@@ -80,8 +80,8 @@ func ethClonableDisabledConfigNetwork2233222202220() (n *fixtures.FixtureMatcher
 					"cloneable_cfg": map[string]interface{}{
 						"security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security,
 					"engine_id":           "aura", // required
-					"is_ethereum_network": true,             // required for ETH
-					"is_load_balanced":    true,             // implies network load balancer count > 0
+					"is_ethereum_network": true,   // required for ETH
+					"is_load_balanced":    true,   // implies network load balancer count > 0
 					"json_rpc_url":        nil,
 					"native_currency":     "PRVD", // required
 					"network_id":          22,     // required

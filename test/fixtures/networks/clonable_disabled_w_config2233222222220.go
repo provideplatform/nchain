@@ -84,7 +84,7 @@ func ethClonableDisabledConfigNetwork2233222222220() (n *fixtures.FixtureMatcher
 					"cloneable_cfg": map[string]interface{}{
 						"security": map[string]interface{}{"egress": "*", "ingress": map[string]interface{}{"0.0.0.0/0": map[string]interface{}{"tcp": []int{5001, 8050, 8051, 8080, 30300}, "udp": []int{30300}}}}}, // If cloneable CFG then security,
 					"engine_id":            "aura", // required
-					"is_ethereum_network":  true,             // required for ETH
+					"is_ethereum_network":  true,   // required for ETH
 					"is_bcoin_network":     true,
 					"is_handshake_network": true,
 					"is_lcoin_network":     true,

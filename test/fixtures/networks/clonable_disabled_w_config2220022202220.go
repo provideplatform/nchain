@@ -68,8 +68,8 @@ func ethClonableDisabledConfigNetwork2220022202220() (n *fixtures.FixtureMatcher
 					"chainspec_url":       nil,
 					"cloneable_cfg":       nil,
 					"engine_id":           "aura", // required
-					"is_ethereum_network": true,             // required for ETH
-					"is_load_balanced":    true,             // implies network load balancer count > 0
+					"is_ethereum_network": true,   // required for ETH
+					"is_load_balanced":    true,   // implies network load balancer count > 0
 					"json_rpc_url":        nil,
 					"native_currency":     "PRVD", // required
 					"network_id":          22,     // required
