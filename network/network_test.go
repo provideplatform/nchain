@@ -112,7 +112,7 @@ var _ = Describe("Network", func() {
 
 	var chPolling chan string
 
-	var networks, rest = testNetworks()
+	var networks, _ = testNetworks()
 
 	Describe("Network", func() {
 		Context("production", func() {})
