@@ -441,6 +441,13 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 						for i, id := range ids {
 							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id.(string), nil, startFromHead, nil, nil, limit, nextToken)
 							if err == nil && logEvents != nil {
+								events := logEvents.Events
+								if !startFromHead {
+									for i := len(events)/2 - 1; i >= 0; i-- {
+										opp := len(events) - 1 - i
+										events[i], events[opp] = events[opp], events[i]
+									}
+								}
 								for i := range logEvents.Events {
 									event := logEvents.Events[i]
 									response.Logs = append(response.Logs, &NodeLog{
