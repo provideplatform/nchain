@@ -423,10 +423,10 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 						db.Save(node)
 						ticker.Stop()
 						return
-					} else {
-						common.Log.Debugf("Block explorer unreachable via webapp port; node id: %s", n.ID)
-						cfg["block_explorer_url"] = nil
 					}
+
+					common.Log.Debugf("Block explorer unreachable via webapp port; node id: %s", n.ID)
+					cfg["block_explorer_url"] = nil
 				}
 			} else if !isLoadBalanced {
 				cfg["block_explorer_url"] = nil
@@ -756,7 +756,7 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 
 // NodeCount retrieves a count of platform-managed network nodes
 func (n *Network) NodeCount() (count *uint64) {
-	dbconf.DatabaseConnection().Model(&Node{}).Where("network_nodes.network_id = ?", n.ID).Count(&count)
+	dbconf.DatabaseConnection().Model(&Node{}).Where("nodes.network_id = ?", n.ID).Count(&count)
 	return count
 }
 
@@ -764,7 +764,7 @@ func (n *Network) NodeCount() (count *uint64) {
 // and currently are listed with a status of 'running'; this method does not currently check real-time availability
 // of these peers-- it is assumed the are still available. FIXME?
 func (n *Network) AvailablePeerCount() (count uint64) {
-	dbconf.DatabaseConnection().Model(&Node{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full', 'validator', 'faucet')", n.ID).Count(&count)
+	dbconf.DatabaseConnection().Model(&Node{}).Where("nodes.network_id = ? AND nodes.status = 'running' AND nodes.role IN ('peer', 'full', 'validator', 'faucet')", n.ID).Count(&count)
 	return count
 }
 
@@ -791,7 +791,7 @@ func (n *Network) BootnodesTxt() (*string, error) {
 
 // Bootnodes retrieves a list of network bootnodes
 func (n *Network) Bootnodes() (nodes []*Node, err error) {
-	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID)
+	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.bootnode = true", n.ID)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
 }
@@ -799,13 +799,13 @@ func (n *Network) Bootnodes() (nodes []*Node, err error) {
 // BootnodesCount returns a count of the number of bootnodes on the network
 func (n *Network) BootnodesCount() (count uint64) {
 	db := dbconf.DatabaseConnection()
-	db.Model(&Node{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
+	db.Model(&Node{}).Where("nodes.network_id = ? AND nodes.bootnode = true", n.ID).Count(&count)
 	return count
 }
 
 // Nodes retrieves a list of network nodes
 func (n *Network) Nodes() (nodes []*Node, err error) {
-	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ?", n.ID)
+	query := dbconf.DatabaseConnection().Where("nodes.network_id = ?", n.ID)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
 }

@@ -38,12 +38,12 @@ var engineToNodeClientEnvMapping = map[string]string{"aura": "parity", "handshak
 func init() {
 	db := dbconf.DatabaseConnection()
 	db.AutoMigrate(&Node{})
-	db.Model(&Node{}).AddIndex("idx_network_nodes_network_id", "network_id")
-	db.Model(&Node{}).AddIndex("idx_network_nodes_user_id", "user_id")
-	db.Model(&Node{}).AddIndex("idx_network_nodes_application_id", "application_id")
-	db.Model(&Node{}).AddIndex("idx_network_nodes_role", "role")
-	db.Model(&Node{}).AddIndex("idx_network_nodes_status", "status")
-	db.Model(&Node{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
+	db.Model(&Node{}).AddIndex("idx_nodes_network_id", "network_id")
+	db.Model(&Node{}).AddIndex("idx_nodes_user_id", "user_id")
+	db.Model(&Node{}).AddIndex("idx_nodes_application_id", "application_id")
+	db.Model(&Node{}).AddIndex("idx_nodes_role", "role")
+	db.Model(&Node{}).AddIndex("idx_nodes_status", "status")
+	db.Model(&Node{}).AddIndex("idx_nodes_bootnode", "bootnode")
 	db.Model(&Node{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 }
 
@@ -64,7 +64,7 @@ type Node struct {
 	Description     *string          `json:"description"`
 	Role            *string          `sql:"not null;default:'peer'" json:"role"`
 	Status          *string          `sql:"not null;default:'init'" json:"status"`
-	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_network_nodes" json:"-"`
+	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_nodes" json:"-"`
 	Config          *json.RawMessage `sql:"type:json" json:"config"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
 }

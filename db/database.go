@@ -39,12 +39,12 @@ func MigrateSchema() {
 		db.Model(&network.Network{}).AddUniqueIndex("idx_chain_id", "chain_id")
 
 		db.AutoMigrate(&network.Node{})
-		db.Model(&network.Node{}).AddIndex("idx_network_nodes_network_id", "network_id")
-		db.Model(&network.Node{}).AddIndex("idx_network_nodes_user_id", "user_id")
-		db.Model(&network.Node{}).AddIndex("idx_network_nodes_application_id", "application_id")
-		db.Model(&network.Node{}).AddIndex("idx_network_nodes_role", "role")
-		db.Model(&network.Node{}).AddIndex("idx_network_nodes_status", "status")
-		db.Model(&network.Node{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
+		db.Model(&network.Node{}).AddIndex("idx_nodes_network_id", "network_id")
+		db.Model(&network.Node{}).AddIndex("idx_nodes_user_id", "user_id")
+		db.Model(&network.Node{}).AddIndex("idx_nodes_application_id", "application_id")
+		db.Model(&network.Node{}).AddIndex("idx_nodes_role", "role")
+		db.Model(&network.Node{}).AddIndex("idx_nodes_status", "status")
+		db.Model(&network.Node{}).AddIndex("idx_nodes_bootnode", "bootnode")
 		db.Model(&network.Node{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&network.LoadBalancer{})
@@ -114,8 +114,8 @@ func MigrateSchema() {
 		db.Model(&token.Token{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
 		db.Model(&token.Token{}).AddForeignKey("sale_contract_id", "contracts(id)", "SET NULL", "CASCADE")
 
-		db.Exec("ALTER TABLE load_balancers_network_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
-		db.Exec("ALTER TABLE load_balancers_network_nodes ADD CONSTRAINT load_balancers_network_node_id_network_nodes_id_foreign FOREIGN KEY (network_node_id) REFERENCES network_nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+		db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+		db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 	})
 }
 

@@ -360,14 +360,14 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	}
 
 	balancerID, balancerIDOk := params["load_balancer_id"].(string)
-	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["network_node_id"].(string)
 
 	if !balancerIDOk {
 		common.Log.Warningf("Failed to load balance network node; no load balancer id provided")
 		consumer.Nack(msg)
 		return
 	}
-	if !networkNodeIDOk {
+	if !nodeIDOk {
 		common.Log.Warningf("Failed to load balance network node; no network node id provided")
 		consumer.Nack(msg)
 		return
@@ -384,9 +384,9 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	}
 
 	node := &Node{}
-	db.Where("id = ?", networkNodeID).Find(&node)
+	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to load balance network node; no network node resolved for id: %s", networkNodeID)
+		common.Log.Warningf("Failed to load balance network node; no network node resolved for id: %s", nodeID)
 		consumer.Nack(msg)
 	}
 
@@ -412,14 +412,14 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	}
 
 	balancerID, balancerIDOk := params["load_balancer_id"].(string)
-	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["network_node_id"].(string)
 
 	if !balancerIDOk {
 		common.Log.Warningf("Failed to unbalance network node; no load balancer id provided")
 		consumer.Nack(msg)
 		return
 	}
-	if !networkNodeIDOk {
+	if !nodeIDOk {
 		common.Log.Warningf("Failed to load balance network node; no network node id provided")
 		consumer.Nack(msg)
 		return
@@ -436,9 +436,9 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	}
 
 	node := &Node{}
-	db.Where("id = ?", networkNodeID).Find(&node)
+	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to remove network node from load balancer; no network node resolved for id: %s", networkNodeID)
+		common.Log.Warningf("Failed to remove network node from load balancer; no network node resolved for id: %s", nodeID)
 		consumer.Nack(msg)
 		return
 	}
@@ -464,9 +464,9 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 		return
 	}
 
-	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["network_node_id"].(string)
 
-	if !networkNodeIDOk {
+	if !nodeIDOk {
 		common.Log.Warningf("Failed to deploy network node; no network node id provided")
 		consumer.Nack(msg)
 		return
@@ -475,9 +475,9 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	node := &Node{}
-	db.Where("id = ?", networkNodeID).Find(&node)
+	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to deploy network node; no network node resolved for id: %s", networkNodeID)
+		common.Log.Warningf("Failed to deploy network node; no network node resolved for id: %s", nodeID)
 		consumer.Nack(msg)
 		return
 	}
@@ -503,9 +503,9 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 		return
 	}
 
-	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["network_node_id"].(string)
 
-	if !networkNodeIDOk {
+	if !nodeIDOk {
 		common.Log.Warningf("Failed to delete terminated network node; no network node id provided")
 		consumer.Nack(msg)
 		return
@@ -514,9 +514,9 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	node := &Node{}
-	db.Where("id = ?", networkNodeID).Find(&node)
+	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to delete terminated network node; no network node resolved for id: %s", networkNodeID)
+		common.Log.Warningf("Failed to delete terminated network node; no network node resolved for id: %s", nodeID)
 		consumer.Nack(msg)
 		return
 	}
@@ -550,9 +550,9 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 		return
 	}
 
-	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["network_node_id"].(string)
 
-	if !networkNodeIDOk {
+	if !nodeIDOk {
 		common.Log.Warningf("Failed to deploy network node; no network node id provided")
 		consumer.Nack(msg)
 		return
@@ -561,9 +561,9 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	node := &Node{}
-	db.Where("id = ?", networkNodeID).Find(&node)
+	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to deploy network node; no network node resolved for id: %s", networkNodeID)
+		common.Log.Warningf("Failed to deploy network node; no network node resolved for id: %s", nodeID)
 		consumer.Nack(msg)
 		return
 	}
@@ -589,9 +589,9 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 		return
 	}
 
-	networkNodeID, networkNodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["network_node_id"].(string)
 
-	if !networkNodeIDOk {
+	if !nodeIDOk {
 		common.Log.Warningf("Failed to deploy network node; no network node id provided")
 		consumer.Nack(msg)
 		return
@@ -600,9 +600,9 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	node := &Node{}
-	db.Where("id = ?", networkNodeID).Find(&node)
+	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve network node; no network node resolved for id: %s", networkNodeID)
+		common.Log.Warningf("Failed to resolve network node; no network node resolved for id: %s", nodeID)
 		consumer.Nack(msg)
 		return
 	}

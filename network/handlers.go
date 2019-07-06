@@ -25,10 +25,10 @@ func InstallNetworksAPI(r *gin.Engine) {
 	r.GET("/api/v1/networks/:id/blocks", networkBlocksListHandler)
 	r.GET("/api/v1/networks/:id/bridges", networkBridgesListHandler)
 	r.GET("/api/v1/networks/:id/connectors", networkConnectorsListHandler)
-	r.GET("/api/v1/networks/:id/nodes", networkNodesListHandler)
+	r.GET("/api/v1/networks/:id/nodes", nodesListHandler)
 	r.POST("/api/v1/networks/:id/nodes", createNodeHandler)
-	r.GET("/api/v1/networks/:id/nodes/:nodeId", networkNodeDetailsHandler)
-	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", networkNodeLogsHandler)
+	r.GET("/api/v1/networks/:id/nodes/:nodeId", nodeDetailsHandler)
+	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", nodeLogsHandler)
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNodeHandler)
 	r.GET("/api/v1/networks/:id/oracles", networkOraclesListHandler)
 	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
@@ -165,7 +165,7 @@ func networkConnectorsListHandler(c *gin.Context) {
 	common.RenderError("not implemented", 501, c)
 }
 
-func networkNodesListHandler(c *gin.Context) {
+func nodesListHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
 	appID := common.AuthorizedSubjectId(c, "application")
 	if userID == nil && appID == nil {
@@ -173,23 +173,23 @@ func networkNodesListHandler(c *gin.Context) {
 		return
 	}
 
-	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ?", c.Param("id"))
+	query := dbconf.DatabaseConnection().Where("nodes.network_id = ?", c.Param("id"))
 
 	if userID != nil {
-		query = query.Where("network_nodes.user_id = ?", userID)
+		query = query.Where("nodes.user_id = ?", userID)
 	}
 
 	if appID != nil {
-		query = query.Where("network_nodes.application_id = ?", appID)
+		query = query.Where("nodes.application_id = ?", appID)
 	}
 
 	var nodes []Node
-	query = query.Order("network_nodes.created_at ASC")
+	query = query.Order("nodes.created_at ASC")
 	provide.Paginate(c, query, &Node{}).Find(&nodes)
 	common.Render(nodes, 200, c)
 }
 
-func networkNodeDetailsHandler(c *gin.Context) {
+func nodeDetailsHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
 	appID := common.AuthorizedSubjectId(c, "application")
 	if userID == nil && appID == nil {
@@ -213,7 +213,7 @@ func networkNodeDetailsHandler(c *gin.Context) {
 	common.Render(node, 200, c)
 }
 
-func networkNodeLogsHandler(c *gin.Context) {
+func nodeLogsHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
 	appID := common.AuthorizedSubjectId(c, "application")
 	if userID == nil && appID == nil {
