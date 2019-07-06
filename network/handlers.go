@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,8 @@ import (
 	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
+
+const defualtNetworkNodeLogRPP = int64(100)
 
 // InstallNetworksAPI installs the handlers using the given gin Engine
 func InstallNetworksAPI(r *gin.Engine) {
@@ -231,7 +234,18 @@ func networkNodeLogsHandler(c *gin.Context) {
 		return
 	}
 
-	logs, err := node.Logs()
+	page := c.Query("page")
+	rpp := c.Query("rpp")
+	var limit int64
+	lim, err := strconv.ParseInt(rpp, 10, 64)
+	if err != nil {
+		common.Log.Debugf("FAILED TO PARSE RPP; %s; rpp=%s", err.Error(), rpp)
+		limit = defualtNetworkNodeLogRPP
+	} else {
+		limit = lim
+	}
+
+	logs, err := node.Logs(false, &limit, common.StringOrNil(page))
 	if err != nil {
 		common.RenderError(fmt.Sprintf("log retrieval failed; %s", err.Error()), 500, c)
 		return

@@ -69,6 +69,22 @@ type NetworkNode struct {
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
 }
 
+// NodeLog represents an abstract API response containing syslog or similar messages
+type NodeLog struct {
+	Timestamp       *int64 `json:"timestamp"`
+	IngestTimestamp *int64 `json:"ingest_timestamp"`
+	Message         string `json:"message"`
+}
+
+// NodeLogsResponse represents an abstract API response containing NodeLogs
+// and pointer tokens to the next set of events in the stream; this is necessary
+// for properly paginating logs
+type NodeLogsResponse struct {
+	Logs      []*NodeLog `json:"logs"`
+	PrevToken *string    `json:"prev_token"`
+	NextToken *string    `json:"next_token"`
+}
+
 func (n *NetworkNode) decryptedConfig() (map[string]interface{}, error) {
 	decryptedParams := map[string]interface{}{}
 	if n.EncryptedConfig != nil {
@@ -389,7 +405,8 @@ func (n *NetworkNode) Reload() {
 }
 
 // Logs exposes the paginated logstream for the underlying node
-func (n *NetworkNode) Logs() (*[]string, error) {
+func (n *NetworkNode) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeLogsResponse, error) {
+	var response *NodeLogsResponse
 	var network = &Network{}
 	dbconf.DatabaseConnection().Model(n).Related(&network)
 	if network == nil || network.ID == uuid.Nil {
@@ -413,20 +430,32 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 			accessKeyID := credentials["aws_access_key_id"].(string)
 			secretAccessKey := credentials["aws_secret_access_key"].(string)
 
+			response = &NodeLogsResponse{
+				Logs: make([]*NodeLog, 0),
+			}
+
 			if providerID, providerIDOk := cfg["provider_id"].(string); providerIDOk {
+
 				if strings.ToLower(providerID) == "docker" {
 					if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
-						logs := make([]string, 0)
-						for i := range ids {
-							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i].(string), nil, false, nil, nil, nil, nil)
+						for i, id := range ids {
+							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id.(string), nil, startFromHead, nil, nil, limit, nextToken)
 							if err == nil && logEvents != nil {
 								for i := range logEvents.Events {
 									event := logEvents.Events[i]
-									logs = append(logs, string(*event.Message))
+									response.Logs = append(response.Logs, &NodeLog{
+										Message:         string(*event.Message),
+										Timestamp:       event.Timestamp,
+										IngestTimestamp: event.IngestionTime,
+									})
+								}
+								if i == len(ids)-1 {
+									response.NextToken = logEvents.NextForwardToken
+									response.PrevToken = logEvents.NextBackwardToken
 								}
 							}
 						}
-						return &logs, nil
+						return response, nil
 					}
 				}
 
@@ -992,7 +1021,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
 		secretAccessKey := credentials["aws_secret_access_key"].(string)
 
 		if strings.ToLower(providerID) == "docker" {
-			logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil)
+			logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil, true, nil, nil, nil, nil)
 			if err == nil {
 				for i := range logs.Events {
 					event := logs.Events[i]
