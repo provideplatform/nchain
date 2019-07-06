@@ -279,7 +279,9 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 	websocketPort := float64(defaultWebsocketPort)
 
 	var securityCfg map[string]interface{}
-	if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
+	if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
+		securityCfg = security
+	} else if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
 		securityCfg, _ = cloneableCfg["security"].(map[string]interface{})
 	}
 	if securityCfg == nil || len(securityCfg) == 0 {
