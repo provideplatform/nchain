@@ -201,7 +201,6 @@ func Networks() []*fixtures.FixtureMatcher {
 		// ethNonCloneableEnabledFullConfigNetwork(), // default
 		// ethNonCloneableEnabledChainspecNetwork(), // TODO: support chainspec text
 		ethClonableDisabledEmptyConfigNetwork(),
-		ethClonableDisabledNilConfigNetwork(),
 		ethClonableDisabledConfigNetwork0(),
 		ethClonableDisabledConfigNetwork1(),
 		// ethClonableDisabledConfigNetwork0222222202220(),
@@ -235,7 +234,6 @@ func Networks() []*fixtures.FixtureMatcher {
 
 		ethClonableDisabledConfigNetwork2233222222220(),
 		ethClonableEnabledEmptyConfigNetwork(),
-		ethClonableEnabledNilConfigNetwork(),
 		ethClonableEnabledConfigNetwork0(),
 		ethClonableEnabledConfigNetwork1(),
 		ethClonableEnabledConfigNetwork2233222222220(),
