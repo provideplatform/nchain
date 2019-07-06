@@ -418,7 +418,7 @@ func (n *NetworkNode) Logs() (*[]string, error) {
 					if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
 						logs := make([]string, 0)
 						for i := range ids {
-							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i].(string), nil)
+							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, ids[i].(string), nil, false, nil, nil, nil, nil)
 							if err == nil && logEvents != nil {
 								for i := range logEvents.Events {
 									event := logEvents.Events[i]
