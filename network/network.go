@@ -111,7 +111,7 @@ func (n *Network) String() string {
 	return "network: name=" + name + " chainID=" + chainID.String() + " errors=" + errorsStr
 }
 
-func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*NetworkNode, error) {
+func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) {
 	mutex, mutexOk := networkGenesisMutex[pending.NetworkID.String()]
 	if !mutexOk {
 		mutex = &sync.Mutex{}
@@ -122,7 +122,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *NetworkNode) ([]*Networ
 	defer mutex.Unlock()
 
 	count := n.BootnodesCount()
-	bootnodes := make([]*NetworkNode, 0)
+	bootnodes := make([]*Node, 0)
 
 	if count == 0 {
 		nodeCfg := pending.ParseConfig()
@@ -260,7 +260,7 @@ func (n *Network) setChainID() {
 // JSON-RPC urls (i.e. web-based IDE), and enriches the network cfg; if no load
 // balancer is provisioned for the account-region-type, a load balancer is provisioned
 // prior to balancing the given node; FIXME-- refactor this
-func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *NetworkNode) {
+func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *Node) {
 	cfg := n.ParseConfig()
 	nodeCfg := node.ParseConfig()
 
@@ -376,7 +376,7 @@ func (n *Network) isLoadBalanced(db *gorm.DB, region, balancerType *string) bool
 
 // resolveAndBalanceExplorerUrls updates the network's configured block
 // explorer urls (i.e. web-based IDE), and enriches the network cfg
-func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) {
+func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 	ticker := time.NewTicker(hostReachabilityInterval)
 	startedAt := time.Now()
 	for {
@@ -401,7 +401,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) 
 
 			common.Log.Debugf("Attempting to resolve and balance block explorer url for network node: %s", n.ID.String())
 
-			var node = &NetworkNode{}
+			var node = &Node{}
 			db.Where("network_id = ? AND status = 'running' AND role IN ('explorer')", n.ID).First(&node)
 
 			if node != nil && node.ID != uuid.Nil {
@@ -440,7 +440,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *NetworkNode) 
 
 // resolveAndBalanceStudioUrls updates the network's configured studio url
 // (i.e. web-based IDE), and enriches the network cfg
-func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
+func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *Node) {
 	ticker := time.NewTicker(hostReachabilityInterval)
 	startedAt := time.Now()
 	for {
@@ -466,7 +466,7 @@ func (n *Network) resolveAndBalanceStudioUrls(db *gorm.DB, node *NetworkNode) {
 			if n.IsEthereumNetwork() {
 				common.Log.Debugf("Attempting to resolve and balance studio IDE url for network node: %s", n.ID.String())
 
-				var node = &NetworkNode{}
+				var node = &Node{}
 				db.Where("network_id = ? AND status = 'running' AND role IN ('studio')", n.ID).First(&node)
 
 				if node != nil && node.ID != uuid.Nil {
@@ -756,7 +756,7 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 
 // NodeCount retrieves a count of platform-managed network nodes
 func (n *Network) NodeCount() (count *uint64) {
-	dbconf.DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ?", n.ID).Count(&count)
+	dbconf.DatabaseConnection().Model(&Node{}).Where("network_nodes.network_id = ?", n.ID).Count(&count)
 	return count
 }
 
@@ -764,7 +764,7 @@ func (n *Network) NodeCount() (count *uint64) {
 // and currently are listed with a status of 'running'; this method does not currently check real-time availability
 // of these peers-- it is assumed the are still available. FIXME?
 func (n *Network) AvailablePeerCount() (count uint64) {
-	dbconf.DatabaseConnection().Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full', 'validator', 'faucet')", n.ID).Count(&count)
+	dbconf.DatabaseConnection().Model(&Node{}).Where("network_nodes.network_id = ? AND network_nodes.status = 'running' AND network_nodes.role IN ('peer', 'full', 'validator', 'faucet')", n.ID).Count(&count)
 	return count
 }
 
@@ -790,7 +790,7 @@ func (n *Network) BootnodesTxt() (*string, error) {
 }
 
 // Bootnodes retrieves a list of network bootnodes
-func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
+func (n *Network) Bootnodes() (nodes []*Node, err error) {
 	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
@@ -799,12 +799,12 @@ func (n *Network) Bootnodes() (nodes []*NetworkNode, err error) {
 // BootnodesCount returns a count of the number of bootnodes on the network
 func (n *Network) BootnodesCount() (count uint64) {
 	db := dbconf.DatabaseConnection()
-	db.Model(&NetworkNode{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
+	db.Model(&Node{}).Where("network_nodes.network_id = ? AND network_nodes.bootnode = true", n.ID).Count(&count)
 	return count
 }
 
 // Nodes retrieves a list of network nodes
-func (n *Network) Nodes() (nodes []*NetworkNode, err error) {
+func (n *Network) Nodes() (nodes []*Node, err error) {
 	query := dbconf.DatabaseConnection().Where("network_nodes.network_id = ?", n.ID)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err

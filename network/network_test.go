@@ -492,11 +492,11 @@ var _ = Describe("Network", func() {
 		alex */
 		Context("with nodes", func() {
 			var nwnn *network.Network
-			var node *network.NetworkNode
-			var runningPeerNode *network.NetworkNode
-			var runningFullNode *network.NetworkNode
-			var runningValidatorNode *network.NetworkNode
-			var runningFaucetNode *network.NetworkNode
+			var node *network.Node
+			var runningPeerNode *network.Node
+			var runningFullNode *network.Node
+			var runningValidatorNode *network.Node
+			var runningFaucetNode *network.Node
 
 			BeforeEach(func() {
 				nwnn = &network.Network{
@@ -535,7 +535,7 @@ var _ = Describe("Network", func() {
 					"role":     "role",
 					"peer_url": "peer_url",
 				}
-				node = &network.NetworkNode{
+				node = &network.Node{
 					NetworkID: nwnn.ID,
 					Bootnode:  true,
 					Role:      common.StringOrNil("role"),
@@ -544,7 +544,7 @@ var _ = Describe("Network", func() {
 				r := node.Create()
 				fmt.Printf("node created: %t\n", r)
 
-				runningPeerNode = &network.NetworkNode{
+				runningPeerNode = &network.Node{
 					NetworkID: nwnn.ID,
 					Bootnode:  true,
 					Status:    common.StringOrNil("running"),
@@ -552,7 +552,7 @@ var _ = Describe("Network", func() {
 					Config:    common.MarshalConfig(map[string]interface{}{"role": "peer"}),
 				}
 				runningPeerNode.Create()
-				runningFullNode = &network.NetworkNode{
+				runningFullNode = &network.Node{
 					NetworkID: nwnn.ID,
 					Bootnode:  true,
 					Status:    common.StringOrNil("running"),
@@ -560,7 +560,7 @@ var _ = Describe("Network", func() {
 					Config:    common.MarshalConfig(map[string]interface{}{"role": "full"}),
 				}
 				runningFullNode.Create()
-				runningValidatorNode = &network.NetworkNode{
+				runningValidatorNode = &network.Node{
 					NetworkID: nwnn.ID,
 					Bootnode:  true,
 					Status:    common.StringOrNil("running"),
@@ -568,7 +568,7 @@ var _ = Describe("Network", func() {
 					Config:    common.MarshalConfig(map[string]interface{}{"role": "validator"}),
 				}
 				runningValidatorNode.Create()
-				runningFaucetNode = &network.NetworkNode{
+				runningFaucetNode = &network.Node{
 					NetworkID: nwnn.ID,
 					Bootnode:  true,
 					Status:    common.StringOrNil("running"),
@@ -582,7 +582,7 @@ var _ = Describe("Network", func() {
 			AfterEach(func() {
 				db := dbconf.DatabaseConnection()
 				clearNetworks(db)
-				db.Delete(network.NetworkNode{})
+				db.Delete(network.Node{})
 			})
 
 			It("should return node", func() {

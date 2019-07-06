@@ -38,14 +38,14 @@ func MigrateSchema() {
 		db.Model(&network.Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
 		db.Model(&network.Network{}).AddUniqueIndex("idx_chain_id", "chain_id")
 
-		db.AutoMigrate(&network.NetworkNode{})
-		db.Model(&network.NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
-		db.Model(&network.NetworkNode{}).AddIndex("idx_network_nodes_user_id", "user_id")
-		db.Model(&network.NetworkNode{}).AddIndex("idx_network_nodes_application_id", "application_id")
-		db.Model(&network.NetworkNode{}).AddIndex("idx_network_nodes_role", "role")
-		db.Model(&network.NetworkNode{}).AddIndex("idx_network_nodes_status", "status")
-		db.Model(&network.NetworkNode{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
-		db.Model(&network.NetworkNode{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+		db.AutoMigrate(&network.Node{})
+		db.Model(&network.Node{}).AddIndex("idx_network_nodes_network_id", "network_id")
+		db.Model(&network.Node{}).AddIndex("idx_network_nodes_user_id", "user_id")
+		db.Model(&network.Node{}).AddIndex("idx_network_nodes_application_id", "application_id")
+		db.Model(&network.Node{}).AddIndex("idx_network_nodes_role", "role")
+		db.Model(&network.Node{}).AddIndex("idx_network_nodes_status", "status")
+		db.Model(&network.Node{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
+		db.Model(&network.Node{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&network.LoadBalancer{})
 		db.Model(&network.LoadBalancer{}).AddIndex("idx_load_balancers_network_id", "network_id")
@@ -138,7 +138,7 @@ func MigrateSchema() {
 // 		}
 // 	}
 
-// 	nodes := make([]network.NetworkNode, 0)
+// 	nodes := make([]network.Node, 0)
 // 	db.Find(&nodes)
 // 	for _, node := range nodes {
 // 		common.Log.Debugf("Attempting to migrate network node config: %s", node.ID)

@@ -29,7 +29,7 @@ import (
 )
 
 var steLock = &sync.Mutex{}
-var ctxLocks = map[string]*network.NetworkNode{}
+var ctxLocks = map[string]*network.Node{}
 
 func TestNodesIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -44,13 +44,13 @@ func dbconn() *gorm.DB {
 	return dbconf.DatabaseConnection()
 }
 
-func nodeExists(role, status string) (*network.NetworkNode, bool) {
-	node := &network.NetworkNode{}
+func nodeExists(role, status string) (*network.Node, bool) {
+	node := &network.Node{}
 	dbconn().Where("role = ? AND status = ?", role, status).Last(&node)
 	return node, node.ID != uuid.Nil
 }
 
-func createValidatorNode(ctx, awsKey, awsSecret, awsRegion string, searchDB bool, awsTasksStartedIds *[2]*string) (node *network.NetworkNode, err error) {
+func createValidatorNode(ctx, awsKey, awsSecret, awsRegion string, searchDB bool, awsTasksStartedIds *[2]*string) (node *network.Node, err error) {
 	steLock.Lock()
 	defer steLock.Unlock()
 
@@ -61,7 +61,7 @@ func createValidatorNode(ctx, awsKey, awsSecret, awsRegion string, searchDB bool
 		return n, err
 	}
 
-	node = &network.NetworkNode{}
+	node = &network.Node{}
 
 	if searchDB {
 		// db.Where("role = ? AND status = ?", ).Last(&node)
@@ -71,7 +71,7 @@ func createValidatorNode(ctx, awsKey, awsSecret, awsRegion string, searchDB bool
 		}
 	}
 
-	// node = &network.NetworkNode{}
+	// node = &network.Node{}
 	ctxLocks[ctxLockKey] = node
 
 	fmt.Printf("locks: %v\n", ctxLocks)
@@ -112,7 +112,7 @@ func createValidatorNode(ctx, awsKey, awsSecret, awsRegion string, searchDB bool
 	return node, nil
 }
 
-func createPeerNode(ctx, awsKey, awsSecret string) (node *network.NetworkNode, err error) {
+func createPeerNode(ctx, awsKey, awsSecret string) (node *network.Node, err error) {
 	steLock.Lock()
 	defer steLock.Unlock()
 
@@ -121,7 +121,7 @@ func createPeerNode(ctx, awsKey, awsSecret string) (node *network.NetworkNode, e
 		err = fmt.Errorf("Already have established a context lock for '%s'; bailing out without deploying subsequent peer node", ctx) // we may find it useful to have a lock-per-context so instead of making it bool I just made another lock which doubles as a lock and a semaphore :)
 		return n, err
 	}
-	node = &network.NetworkNode{Role: common.StringOrNil("peer")}
+	node = &network.Node{Role: common.StringOrNil("peer")}
 
 	// db := dbconf.DatabaseConnection()
 	// db.Where("role = ? AND status = ?", "peer", "running").Last(&node)
@@ -206,7 +206,7 @@ func contextMutexReleased(ctx string, t string) bool {
 	return !lockOk
 }
 
-func removeNode(ctx string, node *network.NetworkNode) (err error) {
+func removeNode(ctx string, node *network.Node) (err error) {
 	node.Reload()
 	node.Delete()
 	// Expect(node.Status).To(gstruct.PointTo(Equal("deprovisioning")))
@@ -292,7 +292,7 @@ func printAWSresources(awsKey, awsSecret, awsRegion, title string) (lbs, sgs, ta
 func printDBResources(db *gorm.DB, title string) (nodeIds, lbIds []*uuid.UUID) {
 	fmt.Printf("\n\n=== DB %v: \n", title)
 
-	nodes := []*network.NetworkNode{}
+	nodes := []*network.Node{}
 	db.Find(&nodes)
 
 	loadBalancers := []*network.LoadBalancer{}
@@ -373,7 +373,7 @@ var _ = Describe("Node", func() {
 	awsSecret := os.Getenv("TEST_AWS_SECRET_ACCESS_KEY")
 	awsRegion := "us-west-2"
 
-	// var nodesGenerated = []*network.NetworkNode{}
+	// var nodesGenerated = []*network.Node{}
 	var awsTasksStartedIds = [2]*string{}
 	var lbStartedIds = []*string{}
 	// var sgStartedIds = []*string{}
@@ -490,7 +490,7 @@ var _ = Describe("Node", func() {
 					fmt.Printf("error: %v\n", err)
 
 					for err != nil {
-						sgNode := &network.NetworkNode{}
+						sgNode := &network.Node{}
 						db.Where("role = ? and status = ?", "peer", "pending").First(&sgNode)
 
 						if sgNode == nil {
@@ -544,7 +544,7 @@ var _ = Describe("Node", func() {
 
 		Context("when a single validator node is created by the master of ceremony", func() {
 			ctxId := "single_validator_node"
-			var validatorNode *network.NetworkNode
+			var validatorNode *network.Node
 			var validatorScenarioCount = 36
 
 			BeforeEach(func() {
@@ -740,7 +740,7 @@ var _ = Describe("Node", func() {
 			})
 
 			Context("when a peer is created and joins the network genesised by our running master of ceremony validator node", func() {
-				var peerNode *network.NetworkNode
+				var peerNode *network.Node
 				var peerNodeConfig map[string]interface{}
 				ctxId2 := "single_peer_node"
 				var peerScenarioCount = 9
@@ -1017,7 +1017,7 @@ var _ = Describe("Node", func() {
 	// 		awsKey := os.Getenv("AWS_KEY")
 	// 		awsSecret := os.Getenv("AWS_SECRET")
 
-	// 		node := &network.NetworkNode{}
+	// 		node := &network.Node{}
 	// 		nodeConfig := fmt.Sprintf(`{"config":{"credentials":{"aws_access_key_id":"%s","aws_secret_access_key":"%s"},"engine_id":"aura","engines":"[{\"id\":\"aura\",\"name\":\"Authority Round\",\"enabled\":true},{\"id\":\"clique\",\"name\":\"Clique\",\"enabled\":true}]","env":{"CHAIN_SPEC_URL":"https://www.dropbox.com/s/515w1hxayztx80e/spec.json?dl=1","ENGINE_SIGNER":"0x1e23ce07ebC8d1f515C5f04101018e8A9Ab9353f","NETWORK_ID":"1537367446","TRACING":"on","PRUNING":"archive","FAT_DB":"on","LOGGING":"verbose","CHAIN":"mk"},"protocol_id":"poa","provider_id":"docker","providers":"[{\"id\":\"docker\",\"name\":\"Docker\",\"img_src_dark\":\"https://s3.amazonaws.com/provide.services/img/docker-dark.png\",\"img_src_light\":\"https://s3.amazonaws.com/provide.services/img/docker-light.png\",\"enabled\":true,\"img_src\":\"/assets/docker-c9b76b9cdf162dd88c2c685c5f2fa45deea5209de420b220f2d35273f33a397a.png\"}]","rc.d":"{\n  \"CHAIN_SPEC_URL\": \"https://www.dropbox.com/s/xuihpmm72o5m9ir/spec.json?dl=1\",\n  \"ENGINE_SIGNER\": \"0x41f4b57D711c93a22F0Ac580a842eac52E4bC505\",\n  \"NETWORK_ID\": \"1537367446\",\n  \"TRACING\": \"on\",\n  \"PRUNING\": \"archive\",\n  \"FAT_DB\": \"on\",\n  \"LOGGING\": \"verbose\",\n  \"CHAIN\": \"kt\"\n}","region":"us-west-2","role":"peer","roles":"[{\"id\":\"peer\",\"name\":\"Peer\",\"config\":{\"allows_multiple_deployment\":true,\"default_rcd\":{\"docker\":{\"provide.network\":\"{\\\"CHAIN_SPEC_URL\\\": null, \\\"JSON_RPC_URL\\\": null, \\\"NETWORK_ID\\\": null}\"},\"ubuntu-vm\":{\"provide.network\":\"#!/bin/bash\\n\\nservice provide.network stop\\nrm -rf /opt/provide.network\\n\\nwget -d --output-document=/opt/spec.json --header=\\\"x-api-authorization: Basic {{ apiAuthorization }}\\\" {{ chainspecUrl }}\\n\\nwget -d --output-document=/opt/bootnodes.txt --header=\\\"x-api-authorization: Basic {{ apiAuthorization }}\\\" {{ bootnodesUrl }}\\n\\nservice provide.network start\\n\"}},\"quickclone_recommended_node_count\":2},\"supported_provider_ids\":[\"ubuntu-vm\",\"docker\"]},{\"id\":\"validator\",\"name\":\"Validator\",\"config\":{\"allows_multiple_deployment\":false,\"default_rcd\":{\"docker\":{\"provide.network\":\"{\\\"CHAIN_SPEC_URL\\\": null, \\\"ENGINE_SIGNER\\\": null, \\\"NETWORK_ID\\\": null, \\\"ENGINE_SIGNER_PRIVATE_KEY\\\": null}\"},\"ubuntu-vm\":{\"provide.network\":\"#!/bin/bash\\n\\nservice provide.network stop\\nrm -rf /opt/provide.network\\n\\nwget -d --output-document=/opt/spec.json --header=\\\"x-api-authorization: Basic {{ apiAuthorization }}\\\" {{ chainspecUrl }}\\n\\nwget -d --output-document=/opt/bootnodes.txt --header=\\\"x-api-authorization: Basic {{ apiAuthorization }}\\\" {{ bootnodesUrl }}\\n\\nservice provide.network start\\n\"}},\"quickclone_recommended_node_count\":1},\"supported_provider_ids\":[\"ubuntu-vm\",\"docker\"]},{\"id\":\"explorer\",\"name\":\"Block Explorer\",\"config\":{\"allows_multiple_deployment\":false,\"default_rcd\":{\"docker\":{\"provide.network\":\"{\\\"JSON_RPC_URL\\\": null}\"}},\"quickclone_recommended_node_count\":1},\"supported_provider_ids\":[\"docker\"]}]","target_id":"aws"},"network_id":"36a5f8e0-bfc1-49f8-a7ba-86457bb52912"}`, awsKey, awsSecret)
 
 	// 		err := json.Unmarshal([]byte(nodeConfig), node)

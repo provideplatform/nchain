@@ -30,11 +30,11 @@ func marshalConfig(opts map[string]interface{}) *json.RawMessage {
 var _ = Describe("Node", func() {
 	Context("no AWS", func() {
 		Describe("First node is created in the network", func() {
-			var node *network.NetworkNode
+			var node *network.Node
 			Describe("Create()", func() {
 				Context("without network", func() {
 					BeforeEach(func() {
-						node = &network.NetworkNode{
+						node = &network.Node{
 							UserID:      nil,
 							Bootnode:    true,
 							Host:        nil,
@@ -51,7 +51,7 @@ var _ = Describe("Node", func() {
 					AfterEach(func() {
 						db := dbconf.DatabaseConnection()
 						db.Delete(network.Network{})
-						db.Delete(network.NetworkNode{})
+						db.Delete(network.Node{})
 					})
 					Context("empty role", func() {
 						It("should set role to peer", func() {
@@ -141,7 +141,7 @@ var _ = Describe("Node", func() {
 			})
 			Context("validate()", func() {
 				BeforeEach(func() {
-					node = &network.NetworkNode{
+					node = &network.Node{
 						UserID:      nil,
 						Bootnode:    true,
 						Host:        nil,

@@ -37,7 +37,7 @@ type LoadBalancer struct {
 	Description     *string          `json:"description"`
 	Region          *string          `json:"region"`
 	Status          *string          `sql:"not null;default:'provisioning'" json:"status"`
-	Nodes           []NetworkNode    `gorm:"many2many:load_balancers_network_nodes" json:"-"`
+	Nodes           []Node    `gorm:"many2many:load_balancers_network_nodes" json:"-"`
 	Config          *json.RawMessage `sql:"type:json" json:"config"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
 }
@@ -434,7 +434,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 	return nil
 }
 
-func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
+func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 	db.Model(l).Association("Nodes").Append(node)
 
 	network := node.relatedNetwork(db)
@@ -548,7 +548,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *NetworkNode) error {
 	return nil
 }
 
-func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *NetworkNode) error {
+func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 	common.Log.Debugf("Attempting to unbalance network node %s from balancer: %s", node.ID, l.ID)
 	cfg := l.ParseConfig()
 	encryptedCfg, _ := l.decryptedConfig()

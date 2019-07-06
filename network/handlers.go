@@ -13,7 +13,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-const defualtNetworkNodeLogRPP = int64(100)
+const defualtNodeLogRPP = int64(100)
 
 // InstallNetworksAPI installs the handlers using the given gin Engine
 func InstallNetworksAPI(r *gin.Engine) {
@@ -26,10 +26,10 @@ func InstallNetworksAPI(r *gin.Engine) {
 	r.GET("/api/v1/networks/:id/bridges", networkBridgesListHandler)
 	r.GET("/api/v1/networks/:id/connectors", networkConnectorsListHandler)
 	r.GET("/api/v1/networks/:id/nodes", networkNodesListHandler)
-	r.POST("/api/v1/networks/:id/nodes", createNetworkNodeHandler)
+	r.POST("/api/v1/networks/:id/nodes", createNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId", networkNodeDetailsHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", networkNodeLogsHandler)
-	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNetworkNodeHandler)
+	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNodeHandler)
 	r.GET("/api/v1/networks/:id/oracles", networkOraclesListHandler)
 	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
 }
@@ -183,9 +183,9 @@ func networkNodesListHandler(c *gin.Context) {
 		query = query.Where("network_nodes.application_id = ?", appID)
 	}
 
-	var nodes []NetworkNode
+	var nodes []Node
 	query = query.Order("network_nodes.created_at ASC")
-	provide.Paginate(c, query, &NetworkNode{}).Find(&nodes)
+	provide.Paginate(c, query, &Node{}).Find(&nodes)
 	common.Render(nodes, 200, c)
 }
 
@@ -197,7 +197,7 @@ func networkNodeDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	var node = &NetworkNode{}
+	var node = &Node{}
 	dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		common.RenderError("network node not found", 404, c)
@@ -221,7 +221,7 @@ func networkNodeLogsHandler(c *gin.Context) {
 		return
 	}
 
-	var node = &NetworkNode{}
+	var node = &Node{}
 	dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		common.RenderError("network node not found", 404, c)
@@ -239,7 +239,7 @@ func networkNodeLogsHandler(c *gin.Context) {
 	var limit int64
 	limit, err := strconv.ParseInt(rpp, 10, 64)
 	if err != nil {
-		limit = defualtNetworkNodeLogRPP
+		limit = defualtNodeLogRPP
 	}
 
 	logs, err := node.Logs(false, &limit, common.StringOrNil(page))
@@ -251,7 +251,7 @@ func networkNodeLogsHandler(c *gin.Context) {
 	common.Render(logs, 200, c)
 }
 
-func createNetworkNodeHandler(c *gin.Context) {
+func createNodeHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
 	appID := common.AuthorizedSubjectId(c, "application")
 	if userID == nil && appID == nil {
@@ -270,7 +270,7 @@ func createNetworkNodeHandler(c *gin.Context) {
 		return
 	}
 
-	node := &NetworkNode{}
+	node := &Node{}
 	err = json.Unmarshal(buf, node)
 	if err != nil {
 		common.RenderError(err.Error(), 422, c)
@@ -305,7 +305,7 @@ func createNetworkNodeHandler(c *gin.Context) {
 	}
 }
 
-func deleteNetworkNodeHandler(c *gin.Context) {
+func deleteNodeHandler(c *gin.Context) {
 	userID := common.AuthorizedSubjectId(c, "user")
 	appID := common.AuthorizedSubjectId(c, "application")
 	if userID == nil && appID == nil {
@@ -313,7 +313,7 @@ func deleteNetworkNodeHandler(c *gin.Context) {
 		return
 	}
 
-	var node = &NetworkNode{}
+	var node = &Node{}
 	dbconf.DatabaseConnection().Where("network_id = ? AND id = ?", c.Param("id"), c.Param("nodeId")).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		common.RenderError("network node not found", 404, c)

@@ -33,24 +33,24 @@ const securityGroupTerminationTickerTimeout = time.Minute * 10
 
 const defaultClient = "parity"
 
-var engineToNetworkNodeClientEnvMapping = map[string]string{"aura": "parity", "handshake": "handshake"}
+var engineToNodeClientEnvMapping = map[string]string{"aura": "parity", "handshake": "handshake"}
 
 func init() {
 	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&NetworkNode{})
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_network_id", "network_id")
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_user_id", "user_id")
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_application_id", "application_id")
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_role", "role")
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_status", "status")
-	db.Model(&NetworkNode{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
-	db.Model(&NetworkNode{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+	db.AutoMigrate(&Node{})
+	db.Model(&Node{}).AddIndex("idx_network_nodes_network_id", "network_id")
+	db.Model(&Node{}).AddIndex("idx_network_nodes_user_id", "user_id")
+	db.Model(&Node{}).AddIndex("idx_network_nodes_application_id", "application_id")
+	db.Model(&Node{}).AddIndex("idx_network_nodes_role", "role")
+	db.Model(&Node{}).AddIndex("idx_network_nodes_status", "status")
+	db.Model(&Node{}).AddIndex("idx_network_nodes_bootnode", "bootnode")
+	db.Model(&Node{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 }
 
-// NetworkNode instances represent nodes of the network to which they belong, acting in a specific role;
-// each NetworkNode may have a set or sets of deployed resources, such as application containers, VMs
+// Node instances represent nodes of the network to which they belong, acting in a specific role;
+// each Node may have a set or sets of deployed resources, such as application containers, VMs
 // or even phyiscal infrastructure
-type NetworkNode struct {
+type Node struct {
 	provide.Model
 	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	UserID          *uuid.UUID       `sql:"type:uuid" json:"user_id"`
@@ -85,7 +85,7 @@ type NodeLogsResponse struct {
 	NextToken *string    `json:"next_token"`
 }
 
-func (n *NetworkNode) decryptedConfig() (map[string]interface{}, error) {
+func (n *Node) decryptedConfig() (map[string]interface{}, error) {
 	decryptedParams := map[string]interface{}{}
 	if n.EncryptedConfig != nil {
 		encryptedConfigJSON, err := common.PGPPubDecrypt(*n.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
@@ -103,7 +103,7 @@ func (n *NetworkNode) decryptedConfig() (map[string]interface{}, error) {
 	return decryptedParams, nil
 }
 
-func (n *NetworkNode) encryptConfig() bool {
+func (n *Node) encryptConfig() bool {
 	if n.EncryptedConfig != nil {
 		encryptedConfig, err := common.PGPPubEncrypt(*n.EncryptedConfig, common.GpgPublicKey)
 		if err != nil {
@@ -118,14 +118,14 @@ func (n *NetworkNode) encryptConfig() bool {
 	return true
 }
 
-func (n *NetworkNode) setEncryptedConfig(params map[string]interface{}) {
+func (n *Node) setEncryptedConfig(params map[string]interface{}) {
 	paramsJSON, _ := json.Marshal(params)
 	_paramsJSON := string(json.RawMessage(paramsJSON))
 	n.EncryptedConfig = &_paramsJSON
 	n.encryptConfig()
 }
 
-func (n *NetworkNode) sanitizeConfig() {
+func (n *Node) sanitizeConfig() {
 	cfg := n.ParseConfig()
 
 	encryptedCfg, err := n.decryptedConfig()
@@ -161,7 +161,7 @@ func (n *NetworkNode) sanitizeConfig() {
 }
 
 // Create and persist a new network node
-func (n *NetworkNode) Create() bool {
+func (n *Node) Create() bool {
 	if !n.Validate() {
 		return false
 	}
@@ -187,7 +187,7 @@ func (n *NetworkNode) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"network_node_id": n.ID.String(),
 				})
-				common.NATSPublish(natsDeployNetworkNodeSubject, msg)
+				common.NATSPublish(natsDeployNodeSubject, msg)
 			}
 			return success
 		}
@@ -196,7 +196,7 @@ func (n *NetworkNode) Create() bool {
 }
 
 // Update an existing network node
-func (n *NetworkNode) Update() bool {
+func (n *Node) Update() bool {
 	if !n.Validate() {
 		return false
 	}
@@ -219,13 +219,13 @@ func (n *NetworkNode) Update() bool {
 }
 
 // setConfig sets the network config in-memory
-func (n *NetworkNode) setConfig(cfg map[string]interface{}) {
+func (n *Node) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	n.Config = &_cfgJSON
 }
 
-func (n *NetworkNode) peerURL() *string {
+func (n *Node) peerURL() *string {
 	cfg := n.ParseConfig()
 	if peerURL, peerURLOk := cfg["peer_url"].(string); peerURLOk {
 		return common.StringOrNil(peerURL)
@@ -235,7 +235,7 @@ func (n *NetworkNode) peerURL() *string {
 }
 
 // privateConfig returns a merged version of the config and encrypted config
-func (n *NetworkNode) privateConfig() map[string]interface{} {
+func (n *Node) privateConfig() map[string]interface{} {
 	config := map[string]interface{}{}
 	if n.Config != nil {
 		err := json.Unmarshal(*n.Config, &config)
@@ -251,7 +251,7 @@ func (n *NetworkNode) privateConfig() map[string]interface{} {
 	return config
 }
 
-func (n *NetworkNode) reachableViaJSONRPC() (bool, uint) {
+func (n *Node) reachableViaJSONRPC() (bool, uint) {
 	cfg := n.ParseConfig()
 	defaultJSONRPCPort := uint(0)
 	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
@@ -265,7 +265,7 @@ func (n *NetworkNode) reachableViaJSONRPC() (bool, uint) {
 	return n.reachableOnPort(port), port
 }
 
-func (n *NetworkNode) reachableViaWebsocket() (bool, uint) {
+func (n *Node) reachableViaWebsocket() (bool, uint) {
 	cfg := n.ParseConfig()
 	defaultWebsocketPort := uint(0)
 	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
@@ -279,7 +279,7 @@ func (n *NetworkNode) reachableViaWebsocket() (bool, uint) {
 	return n.reachableOnPort(port), port
 }
 
-func (n *NetworkNode) reachableOnPort(port uint) bool {
+func (n *Node) reachableOnPort(port uint) bool {
 	if n.Host == nil {
 		return false
 	}
@@ -294,7 +294,7 @@ func (n *NetworkNode) reachableOnPort(port uint) bool {
 	return false
 }
 
-func (n *NetworkNode) relatedNetwork(db *gorm.DB) *Network {
+func (n *Node) relatedNetwork(db *gorm.DB) *Network {
 	var network = &Network{}
 	db.Model(n).Related(&network)
 	if network == nil || network.ID == uuid.Nil {
@@ -304,7 +304,7 @@ func (n *NetworkNode) relatedNetwork(db *gorm.DB) *Network {
 	return network
 }
 
-func (n *NetworkNode) updateStatus(db *gorm.DB, status string, description *string) {
+func (n *Node) updateStatus(db *gorm.DB, status string, description *string) {
 	n.Status = common.StringOrNil(status)
 	n.Description = description
 	result := db.Save(&n)
@@ -319,7 +319,7 @@ func (n *NetworkNode) updateStatus(db *gorm.DB, status string, description *stri
 }
 
 // Validate a network node for persistence
-func (n *NetworkNode) Validate() bool {
+func (n *Node) Validate() bool {
 	cfg := n.ParseConfig()
 	// if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
 	// 	n.Errors = append(n.Errors, &provide.Error{
@@ -376,7 +376,7 @@ func (n *NetworkNode) Validate() bool {
 }
 
 // ParseConfig - parse the network node configuration JSON
-func (n *NetworkNode) ParseConfig() map[string]interface{} {
+func (n *Node) ParseConfig() map[string]interface{} {
 	config := map[string]interface{}{}
 	if n.Config != nil {
 		err := json.Unmarshal(*n.Config, &config)
@@ -389,23 +389,23 @@ func (n *NetworkNode) ParseConfig() map[string]interface{} {
 }
 
 // Delete a network node
-func (n *NetworkNode) Delete() bool {
+func (n *Node) Delete() bool {
 	n.undeploy()
 	msg, _ := json.Marshal(map[string]interface{}{
 		"network_node_id": n.ID.String(),
 	})
-	common.NATSPublish(natsDeleteTerminatedNetworkNodeSubject, msg)
+	common.NATSPublish(natsDeleteTerminatedNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
 // Reload the underlying network node instance
-func (n *NetworkNode) Reload() {
+func (n *Node) Reload() {
 	db := dbconf.DatabaseConnection()
 	db.Model(&n).Find(n)
 }
 
 // Logs exposes the paginated logstream for the underlying node
-func (n *NetworkNode) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeLogsResponse, error) {
+func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeLogsResponse, error) {
 	var response *NodeLogsResponse
 	var network = &Network{}
 	dbconf.DatabaseConnection().Model(n).Related(&network)
@@ -469,7 +469,7 @@ func (n *NetworkNode) Logs(startFromHead bool, limit *int64, nextToken *string) 
 	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
 }
 
-func (n *NetworkNode) deploy(db *gorm.DB) error {
+func (n *Node) deploy(db *gorm.DB) error {
 	if n.Config == nil {
 		msg := fmt.Sprintf("Not attempting to deploy network node without a valid configuration; network node id: %s", n.ID)
 		common.Log.Warning(msg)
@@ -594,7 +594,7 @@ func (n *NetworkNode) deploy(db *gorm.DB) error {
 	}
 }
 
-func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode, db *gorm.DB) error {
+func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	ticker := time.NewTicker(resolveGenesisTickerInterval)
 	startedAt := time.Now()
 	for {
@@ -621,7 +621,7 @@ func (n *NetworkNode) requireGenesis(network *Network, bootnodes []*NetworkNode,
 	}
 }
 
-func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *gorm.DB) error {
+func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	cfg := n.ParseConfig()
 	encryptedCfg, _ := n.decryptedConfig()
 	networkCfg := network.ParseConfig()
@@ -830,7 +830,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					if client, clientOk := networkCfg["client"].(string); clientOk {
 						envOverrides["CLIENT"] = client
 					} else {
-						if defaultClientEnv, defaultClientEnvOk := engineToNetworkNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+						if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
 							envOverrides["CLIENT"] = defaultClientEnv
 						} else {
 							envOverrides["CLIENT"] = defaultClient
@@ -866,8 +866,8 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 					msg, _ := json.Marshal(map[string]interface{}{
 						"network_node_id": n.ID.String(),
 					})
-					common.NATSPublish(natsResolveNetworkNodeHostSubject, msg)
-					common.NATSPublish(natsResolveNetworkNodePeerURLSubject, msg)
+					common.NATSPublish(natsResolveNodeHostSubject, msg)
+					common.NATSPublish(natsResolveNodePeerURLSubject, msg)
 				}
 			}
 		}
@@ -876,7 +876,7 @@ func (n *NetworkNode) _deploy(network *Network, bootnodes []*NetworkNode, db *go
 	return nil
 }
 
-func (n *NetworkNode) resolveHost(db *gorm.DB) error {
+func (n *Node) resolveHost(db *gorm.DB) error {
 	network := n.relatedNetwork(db)
 	if network == nil {
 		return fmt.Errorf("Failed to resolve host for network node %s; no network resolved", n.ID)
@@ -977,7 +977,7 @@ func (n *NetworkNode) resolveHost(db *gorm.DB) error {
 	return nil
 }
 
-func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
+func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	network := n.relatedNetwork(db)
 	if network == nil {
 		return fmt.Errorf("Failed to resolve peer url for network node %s; no network resolved", n.ID)
@@ -1095,7 +1095,7 @@ func (n *NetworkNode) resolvePeerURL(db *gorm.DB) error {
 	return nil
 }
 
-func (n *NetworkNode) undeploy() error {
+func (n *Node) undeploy() error {
 	common.Log.Debugf("Attempting to undeploy network node with id: %s", n.ID)
 
 	db := dbconf.DatabaseConnection()
@@ -1160,7 +1160,7 @@ func (n *NetworkNode) undeploy() error {
 	return nil
 }
 
-func (n *NetworkNode) unbalance(db *gorm.DB) error {
+func (n *Node) unbalance(db *gorm.DB) error {
 	loadBalancers := make([]*LoadBalancer, 0)
 	db.Model(&n).Association("LoadBalancers").Find(&loadBalancers)
 	for _, balancer := range loadBalancers {
@@ -1174,7 +1174,7 @@ func (n *NetworkNode) unbalance(db *gorm.DB) error {
 	return nil
 }
 
-func (n *NetworkNode) unregisterSecurityGroups() error {
+func (n *Node) unregisterSecurityGroups() error {
 	common.Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID)
 
 	cfg := n.ParseConfig()
