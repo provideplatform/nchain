@@ -239,7 +239,6 @@ func networkNodeLogsHandler(c *gin.Context) {
 	var limit int64
 	limit, err := strconv.ParseInt(rpp, 10, 64)
 	if err != nil {
-		common.Log.Debugf("FAILED TO PARSE RPP; %s; rpp=%s", err.Error(), rpp)
 		limit = defualtNetworkNodeLogRPP
 	}
 
