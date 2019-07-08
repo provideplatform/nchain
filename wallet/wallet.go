@@ -62,12 +62,30 @@ func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
 			w.Address = *addr
 			encodedPrivateKey = common.StringOrNil(hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
 		}
+	} else if network.IsBcoinNetwork() {
+		var version byte = 0x00
+		networkCfg := network.ParseConfig()
+		if networkVersion, networkVersionOk := networkCfg["version"].(string); networkVersionOk {
+			versionBytes, err := hex.DecodeString(networkVersion)
+			if err != nil {
+				common.Log.Warningf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
+			} else if len(versionBytes) != 1 {
+				common.Log.Warningf("Unable to generate private key for unsupported bitcoin network version %s for network: %s", networkVersion, w.NetworkID.String())
+			} else {
+				version = versionBytes[0]
+			}
+		}
+
+		addr, privateKey, err := provide.BcoinGenerateKeyPair(version)
+		if err == nil {
+			w.Address = *addr
+			encodedPrivateKey = common.StringOrNil(fmt.Sprintf("%X", privateKey.D))
+		}
 	} else {
 		common.Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", w.NetworkID.String())
 	}
 
 	if encodedPrivateKey != nil {
-		// Encrypt the private key
 		db.Raw("SELECT pgp_pub_encrypt(?, dearmor(?)) as private_key", encodedPrivateKey, common.GpgPublicKey).Scan(&w)
 		common.Log.Debugf("Generated wallet signing address: %s", w.Address)
 	}
