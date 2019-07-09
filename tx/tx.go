@@ -336,7 +336,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *w
 
 	if network.IsEthereumNetwork() {
 		if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-			err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RpcURL(), signedTx)
+			err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 		} else {
 			err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 		}
@@ -346,7 +346,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *w
 				err = t.sign(db, network, wallet)
 				if err == nil {
 					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RpcURL(), signedTx)
+						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 					} else {
 						err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 					}
@@ -392,7 +392,7 @@ func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet
 		if wallet.PrivateKey != nil {
 			privateKey, _ := common.DecryptECDSAPrivateKey(*wallet.PrivateKey, common.GpgPrivateKey, common.GpgPassword)
 			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-			t.SignedTx, t.Hash, err = provide.EVMSignTx(network.ID.String(), network.RpcURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), nonce, uint64(gas))
+			t.SignedTx, t.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), nonce, uint64(gas))
 		} else {
 			err = fmt.Errorf("Unable to sign tx; no private key for wallet: %s", wallet.ID)
 		}
@@ -420,13 +420,13 @@ func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet
 
 func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Wallet) error {
 	if network.IsEthereumNetwork() {
-		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.RpcURL(), *t.Hash, wallet.Address)
+		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.RPCURL(), *t.Hash, wallet.Address)
 		if err != nil {
 			return err
 		}
 
 		common.Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
-		traces, traceErr := provide.EVMTraceTx(network.ID.String(), network.RpcURL(), t.Hash)
+		traces, traceErr := provide.EVMTraceTx(network.ID.String(), network.RPCURL(), t.Hash)
 		if traceErr != nil {
 			common.Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
 			return traceErr
@@ -450,7 +450,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 }
 
 func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Wallet, receipt *types.Receipt) error {
-	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RpcURL())
+	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 	if err != nil {
 		common.Log.Warningf("Unable to handle ethereum tx receipt; %s", err.Error())
 		return err
@@ -576,7 +576,7 @@ func (t *Transaction) RefreshDetails() error {
 	var err error
 	network, _ := t.GetNetwork()
 	if network.IsEthereumNetwork() {
-		t.Traces, err = provide.EVMTraceTx(network.ID.String(), network.RpcURL(), t.Hash)
+		t.Traces, err = provide.EVMTraceTx(network.ID.String(), network.RPCURL(), t.Hash)
 	}
 	if err != nil {
 		return err

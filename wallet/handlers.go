@@ -115,7 +115,7 @@ func walletDetailsHandler(c *gin.Context) {
 		return
 	}
 	network, err := wallet.GetNetwork()
-	if err == nil && network.RpcURL() != "" {
+	if err == nil && network.RPCURL() != "" {
 		tokenId := c.Param("tokenId")
 		if tokenId == "" {
 			wallet.Balance, err = wallet.NativeCurrencyBalance()

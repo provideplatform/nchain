@@ -231,7 +231,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 		if err == nil {
 			if network.IsEthereumNetwork() {
 				if err == nil {
-					block, err := provide.EVMGetBlockByNumber(network.ID.String(), network.RpcURL(), blockFinalizedMsg.Block)
+					block, err := provide.EVMGetBlockByNumber(network.ID.String(), network.RPCURL(), blockFinalizedMsg.Block)
 					if err != nil {
 						err = fmt.Errorf("Failed to fetch block; %s", err.Error())
 					} else if result, resultOk := block.Result.(map[string]interface{}); resultOk {

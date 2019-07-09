@@ -176,7 +176,7 @@ func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
 	var network = &network.Network{}
 	db.Model(w).Related(&network)
 	if network.IsEthereumNetwork() {
-		balance, err = provide.EVMGetNativeBalance(network.ID.String(), network.RpcURL(), w.Address)
+		balance, err = provide.EVMGetNativeBalance(network.ID.String(), network.RPCURL(), w.Address)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
 	}
 	if network.IsEthereumNetwork() {
 		contractAbi, err := token.ReadEthereumContractAbi()
-		balance, err = provide.EVMGetTokenBalance(network.ID.String(), network.RpcURL(), *token.Address, w.Address, contractAbi)
+		balance, err = provide.EVMGetTokenBalance(network.ID.String(), network.RPCURL(), *token.Address, w.Address, contractAbi)
 		if err != nil {
 			return nil, err
 		}

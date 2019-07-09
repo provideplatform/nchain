@@ -87,7 +87,7 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 		Network: network,
 
 		Poll: func(ch chan *provide.NetworkStatus) error {
-			RpcURL := network.RpcURL()
+			RpcURL := network.RPCURL()
 			if RpcURL == "" {
 				err := new(jsonRpcNotSupported)
 				return *err
@@ -169,7 +169,7 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 		Network: network,
 
 		Poll: func(ch chan *provide.NetworkStatus) error {
-			rpcURL := network.RpcURL()
+			rpcURL := network.RPCURL()
 			if rpcURL == "" {
 				err := new(jsonRpcNotSupported)
 				return *err
@@ -563,7 +563,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 
 	chainID := network.ChainID
 	if chainID == nil {
-		_chainID := hexutil.EncodeBig(provide.EVMGetChainID(network.ID.String(), network.RpcURL()))
+		_chainID := hexutil.EncodeBig(provide.EVMGetChainID(network.ID.String(), network.RPCURL()))
 		chainID = &_chainID
 	}
 	sd.stats = &provide.NetworkStatus{

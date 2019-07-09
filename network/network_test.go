@@ -267,7 +267,7 @@ var _ = Describe("Network", func() {
 						Expect(n.Create()).To(mc.MatchBehaviorFor("Double Create"))
 					})
 					It("should return RPC URL", func() {
-						Expect(n.RpcURL()).To(mc.MatchBehaviorFor("RpcURL"))
+						Expect(n.RPCURL()).To(mc.MatchBehaviorFor("RpcURL"))
 					})
 					It("should reload instance", func() {
 						// Expect(n.Reload()).To(mc.MatchBehaviorFor("Reload")) // FIXME
@@ -477,7 +477,7 @@ var _ = Describe("Network", func() {
 
 			Context("RpcUrl()", func() {
 				It("should return LB rpc url", func() {
-					Expect(nlb.RpcURL()).To(Equal("url"))
+					Expect(nlb.RPCURL()).To(Equal("url"))
 				})
 
 			})

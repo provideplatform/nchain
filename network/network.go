@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"sort"
 	"sync"
@@ -36,6 +37,8 @@ func init() {
 	db.Model(&Network{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 	db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
 	db.Model(&Network{}).AddUniqueIndex("idx_chain_id", "chain_id")
+
+	rand.Seed(time.Now().Unix())
 }
 
 type bootnodesInitialized string
@@ -673,11 +676,12 @@ func (n *Network) ParseConfig() map[string]interface{} {
 	return config
 }
 
-func (n *Network) RpcURL() string {
+// RPCURL retrieves a load-balanced RPC URL for the network
+func (n *Network) RPCURL() string {
 	cfg := n.ParseConfig()
 	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil("rpc"))
 	if balancers != nil && len(balancers) > 0 {
-		balancer := balancers[0] // FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
+		balancer := balancers[rand.Intn(len(balancers))] // FIXME-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
 		if url, urlOk := balancerCfg["json_rpc_url"].(string); urlOk {
 			return url
@@ -693,7 +697,7 @@ func (n *Network) websocketURL() string {
 	cfg := n.ParseConfig()
 	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil("rpc"))
 	if balancers != nil && len(balancers) > 0 {
-		balancer := balancers[0] // FIXME-- loadbalance internally here; round-robin is naive-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
+		balancer := balancers[rand.Intn(len(balancers))] // FIXME-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
 		if url, urlOk := balancerCfg["websocket_url"].(string); urlOk {
 			return url
@@ -712,7 +716,7 @@ func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string
 		rpcAPIUser := cfg["rpc_api_user"].(string)
 		rpcAPIKey := cfg["rpc_api_key"].(string)
 		var resp map[string]interface{}
-		err := provide.BcoinInvokeJsonRpcClient(n.ID.String(), n.RpcURL(), rpcAPIUser, rpcAPIKey, method, params, &resp)
+		err := provide.BcoinInvokeJsonRpcClient(n.ID.String(), n.RPCURL(), rpcAPIUser, rpcAPIKey, method, params, &resp)
 		if err != nil {
 			common.Log.Warningf("Failed to invoke JSON-RPC method %s with params: %s; %s", method, params, err.Error())
 			return nil, err
@@ -742,9 +746,9 @@ func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) 
 		if rpcKey, rpcKeyOk := networkCfg["rpc_api_key"].(string); rpcKeyOk {
 			rpcAPIKey = rpcKey
 		}
-		status, err = provide.BcoinGetNetworkStatus(n.ID.String(), n.RpcURL(), rpcAPIUser, rpcAPIKey)
+		status, err = provide.BcoinGetNetworkStatus(n.ID.String(), n.RPCURL(), rpcAPIUser, rpcAPIKey)
 	} else if n.IsEthereumNetwork() {
-		status, err = provide.EVMGetNetworkStatus(n.ID.String(), n.RpcURL())
+		status, err = provide.EVMGetNetworkStatus(n.ID.String(), n.RPCURL())
 	} else {
 		common.Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
 		status = &provide.NetworkStatus{
