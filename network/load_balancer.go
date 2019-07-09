@@ -307,8 +307,8 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 				"0.0.0.0/0": ingressCfg,
 			},
 		}
-		balancerCfg["security"] = securityCfg
 	}
+	balancerCfg["security"] = securityCfg
 
 	targetID, targetOk := balancerCfg["target_id"].(string)
 	providerID, providerOk := balancerCfg["provider_id"].(string)
