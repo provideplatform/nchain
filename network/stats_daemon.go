@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
-	natsutil "github.com/kthomas/go-natsutil"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideservices/provide-go"
@@ -476,7 +475,9 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			Timestamp: lastBlockAt,
 		})
 
-		(*sd.natsConnection).Publish(natsBlockFinalizedSubject, natsPayload)
+		if sd.natsConnection != nil {
+			(*sd.natsConnection).Publish(natsBlockFinalizedSubject, natsPayload)
+		}
 	}
 }
 
@@ -543,7 +544,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.shutdownCtx, sd.cancelF = context.WithCancel(context.Background())
 	sd.queue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
 
-	natsConnection, err := natsutil.GetNatsStreamingConnection(30*time.Second, nil)
+	natsConnection, err := common.GetSharedNatsStreamingConnection()
 	if err != nil {
 		common.Log.Warningf("Failed to establish NATS streaming connection for stats daemon; %s", err.Error())
 	}
