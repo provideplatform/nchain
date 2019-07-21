@@ -13,10 +13,10 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
-	awswrapper "github.com/kthomas/go-aws-wrapper"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/network/orchestration"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -414,60 +414,60 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 	}
 
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
 
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
-	region, regionOk := cfg["region"].(string)
+	_, regionOk := cfg["region"].(string)
 
-	if !targetOk || !providerOk || !credsOk {
+	if !targetOk || !providerOk {
 		return nil, fmt.Errorf("Cannot retrieve logs for network node without a target and provider configuration; target id: %s; provider id: %s", targetID, providerID)
 	}
 
+	orchestrationAPI, err := n.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to retrieve logs for network node %s; %s", n.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return nil, err
+	}
+
 	if regionOk {
-		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
+		response = &NodeLogsResponse{
+			Logs: make([]*NodeLog, 0),
+		}
 
-			response = &NodeLogsResponse{
-				Logs: make([]*NodeLog, 0),
-			}
+		if providerID, providerIDOk := cfg["provider_id"].(string); providerIDOk {
 
-			if providerID, providerIDOk := cfg["provider_id"].(string); providerIDOk {
-
-				if strings.ToLower(providerID) == "docker" {
-					if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
-						for i, id := range ids {
-							logEvents, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id.(string), nil, startFromHead, nil, nil, limit, nextToken)
-							if err == nil && logEvents != nil {
-								events := logEvents.Events
-								if !startFromHead {
-									for i := len(events)/2 - 1; i >= 0; i-- {
-										opp := len(events) - 1 - i
-										events[i], events[opp] = events[opp], events[i]
-									}
-								}
-								for i := range logEvents.Events {
-									event := logEvents.Events[i]
-									response.Logs = append(response.Logs, &NodeLog{
-										Message:         string(*event.Message),
-										Timestamp:       event.Timestamp,
-										IngestTimestamp: event.IngestionTime,
-									})
-								}
-								if i == len(ids)-1 {
-									response.NextToken = logEvents.NextForwardToken
-									response.PrevToken = logEvents.NextBackwardToken
+			if strings.ToLower(providerID) == "docker" {
+				if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
+					for i, id := range ids {
+						logEvents, err := orchestrationAPI.GetContainerLogEvents(id.(string), nil, startFromHead, nil, nil, limit, nextToken)
+						if err == nil && logEvents != nil {
+							events := logEvents.Events
+							if !startFromHead {
+								for i := len(events)/2 - 1; i >= 0; i-- {
+									opp := len(events) - 1 - i
+									events[i], events[opp] = events[opp], events[i]
 								}
 							}
+							for i := range logEvents.Events {
+								event := logEvents.Events[i]
+								response.Logs = append(response.Logs, &NodeLog{
+									Message:         string(*event.Message),
+									Timestamp:       event.Timestamp,
+									IngestTimestamp: event.IngestionTime,
+								})
+							}
+							if i == len(ids)-1 {
+								response.NextToken = logEvents.NextForwardToken
+								response.PrevToken = logEvents.NextBackwardToken
+							}
 						}
-						return response, nil
 					}
+					return response, nil
 				}
-
-				return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; unsupported AWS provider: %s", *network.Name, providerID)
 			}
+
+			return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; unsupported AWS provider: %s", *network.Name, providerID)
 		}
 	} else {
 		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided: %s", *network.Name, providerID)
@@ -641,7 +641,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	role, roleOk := cfg["role"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := cfg["region"].(string)
 	vpc, _ := cfg["vpc_id"].(string)
 	env, envOk := cfg["env"].(map[string]interface{})
@@ -698,14 +697,18 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 	}
 
-	if targetOk && engineOk && providerOk && roleOk && credsOk && regionOk {
-		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
+	orchestrationAPI, err := n.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
 
+	if targetOk && engineOk && providerOk && roleOk && regionOk {
+		if strings.ToLower(targetID) == "aws" {
 			// start security group handling
 			securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-			securityGroup, err := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, nil)
+			securityGroup, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil)
 			securityGroupIds := make([]string, 0)
 
 			if securityGroup != nil {
@@ -728,7 +731,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				switch egress.(type) {
 				case string:
 					if egress.(string) == "*" {
-						_, err := awswrapper.AuthorizeSecurityGroupEgressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+						_, err := orchestrationAPI.AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId)
 						if err != nil {
 							common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 						}
@@ -748,7 +751,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 								udp = append(udp, int64(_udp[i].(float64)))
 							}
 						}
-						_, err := awswrapper.AuthorizeSecurityGroupEgress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						_, err := orchestrationAPI.AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp)
 						if err != nil {
 							common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
@@ -760,7 +763,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				switch ingress.(type) {
 				case string:
 					if ingress.(string) == "*" {
-						_, err := awswrapper.AuthorizeSecurityGroupIngressAllPortsAllProtocols(accessKeyID, secretAccessKey, region, *securityGroup.GroupId)
+						_, err := orchestrationAPI.AuthorizeSecurityGroupIngressAllPortsAllProtocols(*securityGroup.GroupId)
 						if err != nil {
 							common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 						}
@@ -780,7 +783,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 								udp = append(udp, int64(_udp[i].(float64)))
 							}
 						}
-						_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroup.GroupId, cidr, tcp, udp)
+						_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroup.GroupId, cidr, tcp, udp)
 						if err != nil {
 							common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
 						}
@@ -855,7 +858,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					n.sanitizeConfig()
 					db.Save(&n)
 
-					taskIds, err := awswrapper.StartContainer(accessKeyID, secretAccessKey, region, *resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
+					taskIds, err := orchestrationAPI.StartContainer(*resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
 
 					if err != nil || len(taskIds) == 0 {
 						desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *resolvedContainer, region, err.Error())
@@ -890,11 +893,10 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 
 	if !taskIdsOk {
-		return fmt.Errorf("Failed to deploy network node %s; no target_task_ids provided", n.ID)
+		return fmt.Errorf("Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
 	}
 
 	identifiers := make([]string, len(taskIds))
@@ -909,15 +911,18 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	id := identifiers[len(identifiers)-1]
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
-	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
+	_, regionOk := cfg["region"].(string)
 
-	if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk && credsOk {
-		accessKeyID := credentials["aws_access_key_id"].(string)
-		secretAccessKey := credentials["aws_secret_access_key"].(string)
+	orchestrationAPI, err := n.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
 
+	if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk {
 		if strings.ToLower(providerID) == "docker" {
-			containerDetails, err := awswrapper.GetContainerDetails(accessKeyID, secretAccessKey, region, id, nil)
+			containerDetails, err := orchestrationAPI.GetContainerDetails(id, nil)
 			if err == nil {
 				if len(containerDetails.Tasks) > 0 {
 					task := containerDetails.Tasks[0] // FIXME-- should this support exposing all tasks?
@@ -931,7 +936,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 							for i := range attachment.Details {
 								kvp := attachment.Details[i]
 								if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
-									interfaceDetails, err := awswrapper.GetNetworkInterfaceDetails(accessKeyID, secretAccessKey, region, *kvp.Value)
+									interfaceDetails, err := orchestrationAPI.GetNetworkInterfaceDetails(*kvp.Value)
 									if err == nil {
 										if len(interfaceDetails.NetworkInterfaces) > 0 {
 											common.Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
@@ -991,7 +996,6 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
 
 	if !taskIdsOk {
@@ -1020,15 +1024,18 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	targetID, targetOk := cfg["target_id"].(string)
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
-	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
+	_, regionOk := cfg["region"].(string)
 
-	if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk && credsOk {
-		accessKeyID := credentials["aws_access_key_id"].(string)
-		secretAccessKey := credentials["aws_secret_access_key"].(string)
+	orchestrationAPI, err := n.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
 
+	if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk {
 		if strings.ToLower(providerID) == "docker" {
-			logs, err := awswrapper.GetContainerLogEvents(accessKeyID, secretAccessKey, region, id, nil, true, nil, nil, nil, nil)
+			logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
 			if err == nil {
 				for i := range logs.Events {
 					event := logs.Events[i]
@@ -1109,24 +1116,25 @@ func (n *Node) undeploy() error {
 	n.updateStatus(db, "deprovisioning", nil)
 
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
-
 	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
-	region, regionOk := cfg["region"].(string)
+	_, regionOk := cfg["region"].(string)
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
-	if targetOk && providerOk && regionOk && credsOk {
+	orchestrationAPI, err := n.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to undeploy network node %s; %s", n.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
+
+	if targetOk && providerOk && regionOk {
 		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
-
 			if strings.ToLower(providerID) == "docker" && taskIdsOk {
 				for i := range taskIds {
 					taskID := taskIds[i].(string)
 
-					_, err := awswrapper.StopContainer(accessKeyID, secretAccessKey, region, taskID, nil)
+					_, err := orchestrationAPI.StopContainer(taskID, nil)
 					if err == nil {
 						common.Log.Debugf("Terminated ECS docker container with id: %s", taskID)
 						n.Status = common.StringOrNil("terminated")
@@ -1185,23 +1193,24 @@ func (n *Node) unregisterSecurityGroups() error {
 	common.Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID)
 
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
-
 	targetID, targetOk := cfg["target_id"].(string)
-	region, regionOk := cfg["region"].(string)
+	_, regionOk := cfg["region"].(string)
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
-	if targetOk && regionOk && credsOk && securityGroupIdsOk {
+	orchestrationAPI, err := n.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to unregistry security groups for network node %s; %s", n.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
+
+	if targetOk && regionOk && securityGroupIdsOk {
 		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
-
 			for i := range securityGroupIds {
 				securityGroupID := securityGroupIds[i].(string)
 
 				if strings.ToLower(targetID) == "aws" {
-					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID)
+					_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
 					if err != nil {
 						common.Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
 						return err
@@ -1212,4 +1221,39 @@ func (n *Node) unregisterSecurityGroups() error {
 	}
 
 	return nil
+}
+
+// orchestrationAPIClient returns an instance of the node's underlying OrchestrationAPI
+func (n *Node) orchestrationAPIClient() (OrchestrationAPI, error) {
+	cfg := n.ParseConfig()
+	encryptedCfg, _ := n.decryptedConfig()
+	targetID, targetIDOk := cfg["target_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
+	if !targetIDOk {
+		return nil, fmt.Errorf("Failed to resolve orchestration provider for network node: %s", n.ID)
+	}
+	if !regionOk {
+		return nil, fmt.Errorf("Failed to resolve orchestration provider region for network node: %s", n.ID)
+	}
+	if !credsOk {
+		return nil, fmt.Errorf("Failed to resolve orchestration provider credentials for network node: %s", n.ID)
+	}
+
+	var apiClient OrchestrationAPI
+
+	switch targetID {
+	case awsOrchestrationProvider:
+		apiClient = orchestration.InitAWSOrchestrationProvider(credentials, region)
+	case azureOrchestrationProvider:
+		// apiClient = InitAzureOrchestrationProvider(credentials, region)
+		return nil, fmt.Errorf("Azure orchestration provider not yet implemented")
+	case googleOrchestrationProvider:
+		// apiClient = InitGoogleOrchestrationProvider(credentials, region)
+		return nil, fmt.Errorf("Google orchestration provider not yet implemented")
+	default:
+		return nil, fmt.Errorf("Failed to resolve orchestration provider for network node %s", n.ID)
+	}
+
+	return apiClient, nil
 }

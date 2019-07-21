@@ -8,10 +8,10 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"
-	awswrapper "github.com/kthomas/go-aws-wrapper"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/network/orchestration"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -191,6 +191,41 @@ func (l *LoadBalancer) ParseConfig() map[string]interface{} {
 	return config
 }
 
+// orchestrationAPIClient returns an instance of the load balancer's underlying OrchestrationAPI
+func (l *LoadBalancer) orchestrationAPIClient() (OrchestrationAPI, error) {
+	cfg := l.ParseConfig()
+	encryptedCfg, _ := l.decryptedConfig()
+	targetID, targetIDOk := cfg["target_id"].(string)
+	region, regionOk := cfg["region"].(string)
+	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
+	if !targetIDOk {
+		return nil, fmt.Errorf("Failed to resolve orchestration provider for load balancer: %s", l.ID)
+	}
+	if !regionOk {
+		return nil, fmt.Errorf("Failed to resolve orchestration provider region for load balancer: %s", l.ID)
+	}
+	if !credsOk {
+		return nil, fmt.Errorf("Failed to resolve orchestration provider credentials for load balancer: %s", l.ID)
+	}
+
+	var apiClient OrchestrationAPI
+
+	switch targetID {
+	case awsOrchestrationProvider:
+		apiClient = orchestration.InitAWSOrchestrationProvider(credentials, region)
+	case azureOrchestrationProvider:
+		// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
+		return nil, fmt.Errorf("Azure orchestration provider not yet implemented")
+	case googleOrchestrationProvider:
+		// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
+		return nil, fmt.Errorf("Google orchestration provider not yet implemented")
+	default:
+		return nil, fmt.Errorf("Failed to resolve orchestration provider for load balancer %s", l.ID)
+	}
+
+	return apiClient, nil
+}
+
 func (l *LoadBalancer) buildTargetGroupName(port int64) string {
 	return ethcommon.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), port)))[0:31]
 }
@@ -198,26 +233,28 @@ func (l *LoadBalancer) buildTargetGroupName(port int64) string {
 func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to deprovision infrastructure for load balancer with id: %s", l.ID)
 	cfg := l.ParseConfig()
-	encryptedCfg, _ := l.decryptedConfig()
 	l.updateStatus(db, "deprovisioning", l.Description)
 
 	targetID, targetIDOk := cfg["target_id"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := cfg["region"].(string)
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 
-	if !targetIDOk || !credsOk || !regionOk || !arnOk {
+	if !targetIDOk || !regionOk || !arnOk {
 		err := fmt.Errorf("Cannot deprovision load balancer for network node without target, region, credentials and target balancer id configuration; target: %s, region: %s, balancer: %s", targetID, region, targetBalancerArn)
+		common.Log.Warningf(err.Error())
+		return err
+	}
+
+	orchestrationAPI, err := l.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Cannot deprovision load balancer for network node; failed to resolve orchestration API client; %s", err.Error())
 		common.Log.Warningf(err.Error())
 		return err
 	}
 
 	if region != "" {
 		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
-
-			_, err := awswrapper.DeleteLoadBalancerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn))
+			_, err := orchestrationAPI.DeleteLoadBalancerV2(common.StringOrNil(targetBalancerArn))
 			if err != nil {
 				common.Log.Warningf("Failed to delete load balancer: %s; %s", *l.Name, err.Error())
 				return err
@@ -225,7 +262,7 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 
 			if targetGroups, targetGroupsOk := cfg["target_groups"].(map[string]interface{}); targetGroupsOk {
 				for _, targetGroupArn := range targetGroups {
-					_, err := awswrapper.DeleteTargetGroup(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn.(string)))
+					_, err := orchestrationAPI.DeleteTargetGroup(common.StringOrNil(targetGroupArn.(string)))
 					if err != nil {
 						common.Log.Warningf("Failed to delete load balanced target group: %s; %s", targetGroupArn, err.Error())
 						return err
@@ -235,7 +272,7 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 
 			if securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{}); securityGroupIdsOk {
 				for _, securityGroupID := range securityGroupIds {
-					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID.(string))
+					_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID.(string))
 					if err != nil {
 						common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
 						return err
@@ -261,7 +298,6 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 	cfg := n.ParseConfig()
 
 	balancerCfg := l.ParseConfig()
-	balancerEncryptedCfg, _ := l.decryptedConfig()
 
 	var balancerType string
 	if l.Type != nil {
@@ -312,7 +348,6 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 
 	targetID, targetOk := balancerCfg["target_id"].(string)
 	providerID, providerOk := balancerCfg["provider_id"].(string)
-	credentials, credsOk := balancerEncryptedCfg["credentials"].(map[string]interface{})
 	region, regionOk := balancerCfg["region"].(string)
 	vpcID, _ := balancerCfg["vpc_id"].(string)
 
@@ -320,24 +355,28 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 	l.Region = common.StringOrNil(region)
 	db.Save(&l)
 
-	if !targetOk || !providerOk || !credsOk || !regionOk || balancerType == "" {
+	if !targetOk || !providerOk || !regionOk || balancerType == "" {
 		err := fmt.Errorf("Cannot provision load balancer for network node without credentials, a target, provider, region and type configuration; target id: %s; provider id: %s; region: %s, type: %s", targetID, providerID, region, balancerType)
+		common.Log.Warningf(err.Error())
+		return err
+	}
+
+	orchestrationAPI, err := l.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Cannot provision load balancer for network node; failed to resolve orchestration API client; %s", err.Error())
 		common.Log.Warningf(err.Error())
 		return err
 	}
 
 	if region != "" {
 		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
-
 			// start security group handling
 			securityGroupIds := make([]string, 0)
 			var securityGroupID *string
 			securityGroupDesc := fmt.Sprintf("security group for load balancer: %s", l.ID.String())
-			securityGroup, _ := awswrapper.CreateSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID))
+			securityGroup, _ := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID))
 			if securityGroup == nil {
-				securityGroups, err := awswrapper.GetSecurityGroups(accessKeyID, secretAccessKey, region)
+				securityGroups, err := orchestrationAPI.GetSecurityGroups()
 				if err == nil {
 					for _, secGroup := range securityGroups.SecurityGroups {
 						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc {
@@ -377,7 +416,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 							// 	}
 							// }
 
-							_, err := awswrapper.AuthorizeSecurityGroupIngress(accessKeyID, secretAccessKey, region, *securityGroupID, cidr, tcp, udp)
+							_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroupID, cidr, tcp, udp)
 							if err != nil {
 								err := fmt.Errorf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; %d tcp ports; %d udp ports: %s", region, *securityGroupID, len(tcp), len(udp), err.Error())
 								common.Log.Warningf(err.Error())
@@ -391,7 +430,7 @@ func (l *LoadBalancer) provision(db *gorm.DB) error {
 
 			if providerID, providerIDOk := balancerCfg["provider_id"].(string); providerIDOk {
 				if strings.ToLower(providerID) == "docker" {
-					loadBalancersResp, err := awswrapper.CreateLoadBalancerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIds)
+					loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIds)
 					if err != nil {
 						err := fmt.Errorf("Failed to provision AWS load balancer (v2); %s", err.Error())
 						common.Log.Warningf(err.Error())
@@ -441,11 +480,8 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 	network.setIsLoadBalanced(db, true)
 
 	cfg := l.ParseConfig()
-	encryptedCfg, _ := l.decryptedConfig()
-
 	targetID, targetOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 	vpcID, _ := cfg["vpc_id"].(string)
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
@@ -459,10 +495,14 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 			return fmt.Errorf(desc)
 		}
 
-		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && arnOk && securityCfgOk {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
+		orchestrationAPI, err := l.orchestrationAPIClient()
+		if err != nil {
+			err := fmt.Errorf("Failed to load balance network node %s on balancer: %s; %s", node.ID, l.ID, err.Error())
+			common.Log.Warningf(err.Error())
+			return err
+		}
 
+		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && arnOk && securityCfgOk {
 			var targetGroups map[int64]string
 			targetGroups, targetGroupsOk := cfg["target_groups"].(map[int64]string)
 			if !targetGroupsOk {
@@ -487,7 +527,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 							for _, tcpPort := range tcp {
 								targetGroupName := l.buildTargetGroupName(tcpPort)
-								targetGroup, err := awswrapper.CreateTargetGroup(accessKeyID, secretAccessKey, region, common.StringOrNil(vpcID), common.StringOrNil(targetGroupName), common.StringOrNil("HTTP"), tcpPort)
+								targetGroup, err := orchestrationAPI.CreateTargetGroup(common.StringOrNil(vpcID), common.StringOrNil(targetGroupName), common.StringOrNil("HTTP"), tcpPort)
 								if err != nil {
 									desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
 									common.Log.Warning(desc)
@@ -516,7 +556,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 					common.Log.Debugf("Found target groups for load balanced target registration for network node %s on balancer: %s", node.ID, l.ID)
 
 					for port, targetGroupArn := range targetGroups {
-						_, err := awswrapper.RegisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port)
+						_, err := orchestrationAPI.RegisterTarget(common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port)
 						if err != nil {
 							desc := fmt.Sprintf("Failed to add target to load balanced target group in region: %s; %s", region, err.Error())
 							common.Log.Warning(desc)
@@ -526,7 +566,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 						}
 						common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
 
-						_, err = awswrapper.CreateListenerV2(accessKeyID, secretAccessKey, region, common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
+						_, err = orchestrationAPI.CreateListenerV2(common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
 						if err != nil {
 							common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
 						}
@@ -551,18 +591,19 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 	common.Log.Debugf("Attempting to unbalance network node %s from balancer: %s", node.ID, l.ID)
 	cfg := l.ParseConfig()
-	encryptedCfg, _ := l.decryptedConfig()
-
 	targetID, targetOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 	// targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 
-	if strings.ToLower(targetID) == "aws" && targetOk && regionOk && credsOk && securityCfgOk {
-		accessKeyID := credentials["aws_access_key_id"].(string)
-		secretAccessKey := credentials["aws_secret_access_key"].(string)
+	orchestrationAPI, err := l.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to unbalance network node %s on balancer: %s; %s", node.ID, l.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
 
+	if strings.ToLower(targetID) == "aws" && targetOk && regionOk && securityCfgOk {
 		if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
 			switch ingress.(type) {
 			case map[string]interface{}:
@@ -582,7 +623,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 						for portStr, targetGroupArn := range targetGroups {
 							_port, _ := strconv.Atoi(portStr)
 							port := int64(_port)
-							_, err := awswrapper.DeregisterTarget(accessKeyID, secretAccessKey, region, common.StringOrNil(targetGroupArn.(string)), node.PrivateIPv4, &port)
+							_, err := orchestrationAPI.DeregisterTarget(common.StringOrNil(targetGroupArn.(string)), node.PrivateIPv4, &port)
 							if err != nil {
 								desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
 								common.Log.Warning(desc)
@@ -642,28 +683,23 @@ func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to unregister security groups for load balancer with id: %s", l.ID)
 
 	cfg := l.ParseConfig()
-	encryptedCfg, _ := l.decryptedConfig()
-
-	targetID, targetOk := cfg["target_id"].(string)
-	region, regionOk := cfg["region"].(string)
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
-	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
 
-	if targetOk && regionOk && credsOk && securityGroupIdsOk {
-		if strings.ToLower(targetID) == "aws" {
-			accessKeyID := credentials["aws_access_key_id"].(string)
-			secretAccessKey := credentials["aws_secret_access_key"].(string)
+	orchestrationAPI, err := l.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to unregister security groups for load balancer with id: %s; %s", l.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return err
+	}
 
-			for i := range securityGroupIds {
-				securityGroupID := securityGroupIds[i].(string)
+	if securityGroupIdsOk {
+		for i := range securityGroupIds {
+			securityGroupID := securityGroupIds[i].(string)
 
-				if strings.ToLower(targetID) == "aws" {
-					_, err := awswrapper.DeleteSecurityGroup(accessKeyID, secretAccessKey, region, securityGroupID)
-					if err != nil {
-						common.Log.Warningf("Failed to unregister security group for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
-						return err
-					}
-				}
+			_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
+			if err != nil {
+				common.Log.Warningf("Failed to unregister security group for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
+				return err
 			}
 		}
 
