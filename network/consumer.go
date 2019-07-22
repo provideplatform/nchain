@@ -707,7 +707,7 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	err = node.addPeer(peerURL)
 	if err != nil {
 		common.Log.Warningf("Failed to add network peer; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsAddNodePeerTimeout)
 		return
 	}
 
@@ -753,7 +753,7 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	err = node.removePeer(peerURL)
 	if err != nil {
 		common.Log.Warningf("Failed to remove network peer; %s", err.Error())
-		consumer.Nack(msg)
+		consumer.AttemptNack(msg, natsRemoveNodePeerTimeout)
 		return
 	}
 
