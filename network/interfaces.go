@@ -75,6 +75,8 @@ type OrchestrationAPI interface {
 
 // P2PAPI defines an interface for p2p network implementations
 type P2PAPI interface {
+	AcceptNonReservedPeers() error
+	DropNonReservedPeers() error
 	AddPeer(string) error
 	RemovePeer(string) error
 }

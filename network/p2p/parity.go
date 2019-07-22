@@ -18,6 +18,16 @@ func InitParityP2PProvider(rpcURL string) *ParityP2PProvider {
 	}
 }
 
+// AcceptNonReservedPeers allows non-reserved peers to connect
+func (p *ParityP2PProvider) AcceptNonReservedPeers(peerURL string) error {
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, nil)
+}
+
+// DropNonReservedPeers only allows reserved peers to connect; reversed by calling `AcceptNonReservedPeers`
+func (p *ParityP2PProvider) DropNonReservedPeers(peerURL string) error {
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, nil)
+}
+
 // AddPeer adds a peer by its peer url
 func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, nil)
