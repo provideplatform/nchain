@@ -20,25 +20,30 @@ func InitParityP2PProvider(rpcURL string) *ParityP2PProvider {
 
 // AcceptNonReservedPeers allows non-reserved peers to connect
 func (p *ParityP2PProvider) AcceptNonReservedPeers() error {
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, nil)
+	var resp interface{}
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, &resp)
 }
 
 // DropNonReservedPeers only allows reserved peers to connect; reversed by calling `AcceptNonReservedPeers`
 func (p *ParityP2PProvider) DropNonReservedPeers() error {
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, nil)
+	var resp interface{}
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, &resp)
 }
 
 // AddPeer adds a peer by its peer url
 func (p *ParityP2PProvider) AddPeer(peerURL string) error {
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, nil)
+	var resp interface{}
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
 }
 
 // RemovePeer removes a peer by its peer url
 func (p *ParityP2PProvider) RemovePeer(peerURL string) error {
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, nil)
+	var resp interface{}
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, &resp)
 }
 
 // Upgrade executes a pending upgrade
 func (p *ParityP2PProvider) Upgrade() error {
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_executeUpgrade", []interface{}{}, nil)
+	var resp interface{}
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_executeUpgrade", []interface{}{}, &resp)
 }
