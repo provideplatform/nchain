@@ -24,7 +24,7 @@ func (p *ParityP2PProvider) AcceptNonReservedPeers() error {
 }
 
 // DropNonReservedPeers only allows reserved peers to connect; reversed by calling `AcceptNonReservedPeers`
-func (p *ParityP2PProvider) DropNonReservedPeers(peerURL string) error {
+func (p *ParityP2PProvider) DropNonReservedPeers() error {
 	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, nil)
 }
 
