@@ -1,5 +1,5 @@
 hash: 2d0ff63746830c3fa57e8fd2dceca1463ee250891abd57c19a6b5c867277d600
-updated: 2019-07-08T03:32:18.64236-04:00
+updated: 2019-07-22T02:15:58.143402-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: e24eb225f15679bbe54f91bfa7da3b00e59b9768
@@ -174,7 +174,7 @@ imports:
 - name: github.com/nats-io/nuid
   version: 4b96681fa6d28dd0ab5fe79bac63b3a493d9ee94
 - name: github.com/nats-io/stan.go
-  version: c5efdc3e2330fb9c81f34082d0c04a8de817748a
+  version: fe52e0d0a602bcfcb28a1d240edba9c4574a3749
   subpackages:
   - pb
 - name: github.com/onsi/gomega
@@ -196,7 +196,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: c6a3b9cc4acfbf4df565efc18373761037d861af
+  version: 013ff8c7c458fd4f7daa9cf34f13f345a19e3bd9
 - name: github.com/rs/cors
   version: 33ffc0734c60052d8b609f1e2d8ebbadc6cd80d8
 - name: github.com/satori/go.uuid
