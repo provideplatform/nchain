@@ -1057,7 +1057,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk {
 		if strings.ToLower(providerID) == "docker" {
 			logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
-			if err == nil {
+			if err == nil && logs != nil {
 				for i := range logs.Events {
 					event := logs.Events[i]
 					if event.Message != nil {
