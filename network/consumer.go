@@ -48,7 +48,7 @@ const natsDeleteTerminatedNodeMaxInFlight = 64
 const natsDeleteTerminatedNodeInvocationTimeout = time.Minute * 1
 const natsDeleteTerminatedNodeTimeout = int64(1000 * 60 * 10)
 
-const natsResolveNodeHostSubject = "goldmine.node.resolve-host"
+const natsResolveNodeHostSubject = "goldmine.node.host.resolve"
 const natsResolveNodeHostMaxInFlight = 64
 const natsResolveNodeHostInvocationTimeout = time.Second * 10
 const natsResolveNodeHostTimeout = int64(1000 * 60 * 10)
