@@ -19,7 +19,7 @@ func InitParityP2PProvider(rpcURL string) *ParityP2PProvider {
 }
 
 // AcceptNonReservedPeers allows non-reserved peers to connect
-func (p *ParityP2PProvider) AcceptNonReservedPeers(peerURL string) error {
+func (p *ParityP2PProvider) AcceptNonReservedPeers() error {
 	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, nil)
 }
 
