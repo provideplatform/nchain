@@ -163,3 +163,22 @@ func NATSPublish(subject string, msg []byte) error {
 	}
 	return (*natsConnection).Publish(subject, msg)
 }
+
+// NATSPublishAsync async publishes a NATS message to the configured NATS streaming environment
+func NATSPublishAsync(subject string, msg []byte) (*string, error) {
+	natsConnection, err := GetSharedNatsStreamingConnection()
+	if err != nil {
+		Log.Warningf("Failed to retrieve shared NATS streaming connection for Publish; %s", err.Error())
+		return nil, err
+	}
+	guid, err := (*natsConnection).PublishAsync(subject, msg, func(_ string, err error) {
+		if err != nil {
+			Log.Warningf("Failed to asynchronously publish %d-byte NATS streaming message; %s", len(msg), err.Error())
+		}
+	})
+	if err != nil {
+		Log.Warningf("Failed to asynchronously publish %d-byte NATS streaming message; %s", len(msg), err.Error())
+		return nil, err
+	}
+	return StringOrNil(guid), err
+}

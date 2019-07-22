@@ -12,6 +12,10 @@ const awsOrchestrationProvider = "aws"
 const azureOrchestrationProvider = "azure"
 const googleOrchestrationProvider = "gcp"
 
+const bcoinP2PProvider = "bcoin"
+const parityP2PProvider = "parity"
+const quorumP2PProvider = "quorum"
+
 // OrchestrationAPI defines an interface for implementations to orchestrate cloud or on-premise infrastructure
 type OrchestrationAPI interface {
 	CreateLoadBalancer(vpcID *string, name *string, securityGroupIds []string, listeners []*elb.Listener) (response *elb.CreateLoadBalancerOutput, err error)
@@ -67,4 +71,10 @@ type OrchestrationAPI interface {
 	// RegisterTarget(common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port) (interface{}, error)
 	// StartContainer(*resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides) (interface{}, error)
 	// StopContainer(taskID, nil) (interface{}, error)
+}
+
+// P2PAPI defines an interface for p2p network implementations
+type P2PAPI interface {
+	AddPeer(string) error
+	RemovePeer(string) error
 }

@@ -17,6 +17,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network/orchestration"
+	"github.com/provideapp/goldmine/network/p2p"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -251,7 +252,7 @@ func (n *Node) privateConfig() map[string]interface{} {
 	return config
 }
 
-func (n *Node) reachableViaJSONRPC() (bool, uint) {
+func (n *Node) rpcPort() uint {
 	cfg := n.ParseConfig()
 	defaultJSONRPCPort := uint(0)
 	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
@@ -261,7 +262,22 @@ func (n *Node) reachableViaJSONRPC() (bool, uint) {
 	if jsonRPCPortOverride, jsonRPCPortOverrideOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOverrideOk {
 		port = uint(jsonRPCPortOverride)
 	}
+	return port
+}
 
+func (n *Node) rpcURL() *string {
+	if n.Host == nil {
+		return nil
+	}
+	port := n.rpcPort()
+	if port == 0 {
+		return nil
+	}
+	return common.StringOrNil(fmt.Sprintf("http://%s:%d", *n.Host, port)) // FIXME-- allow specification of url scheme in cfg := n.ParseConfig()
+}
+
+func (n *Node) reachableViaJSONRPC() (bool, uint) {
+	port := n.rpcPort()
 	return n.reachableOnPort(port), port
 }
 
@@ -1256,4 +1272,52 @@ func (n *Node) orchestrationAPIClient() (OrchestrationAPI, error) {
 	}
 
 	return apiClient, nil
+}
+
+// p2pAPIClient returns an instance of the node's underlying P2PAPI
+func (n *Node) p2pAPIClient() (P2PAPI, error) {
+	cfg := n.ParseConfig()
+	client, clientOk := cfg["client"].(string)
+	if !clientOk {
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network node: %s", n.ID)
+	}
+	rpcURL := n.rpcURL()
+	if rpcURL == nil {
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network node: %s", n.ID)
+	}
+
+	var apiClient P2PAPI
+
+	switch client {
+	case bcoinP2PProvider:
+		// apiClient = p2p.InitBcoinP2PProvider(*rpcURL)
+		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
+	case parityP2PProvider:
+		apiClient = p2p.InitParityP2PProvider(*rpcURL)
+	case quorumP2PProvider:
+		// apiClient = p2p.InitQuorumP2PProvider(*rpcURL)
+		return nil, fmt.Errorf("Quorum p2p not yet implemented")
+	default:
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network node %s", n.ID)
+	}
+
+	return apiClient, nil
+}
+
+func (n *Node) addPeer(peerURL string) error {
+	apiClient, err := n.p2pAPIClient()
+	if err != nil {
+		common.Log.Warningf("Failed to add peer; %s", err.Error())
+		return err
+	}
+	return apiClient.AddPeer(peerURL)
+}
+
+func (n *Node) removePeer(peerURL string) error {
+	apiClient, err := n.p2pAPIClient()
+	if err != nil {
+		common.Log.Warningf("Failed to remove peer; %s", err.Error())
+		return err
+	}
+	return apiClient.RemovePeer(peerURL)
 }

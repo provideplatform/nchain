@@ -709,6 +709,56 @@ func (n *Network) websocketURL() string {
 	return ""
 }
 
+// addPeer adds the given peer url to the network topology and notifies other peers of the new peer's existence
+func (n *Network) addPeer(peerURL string) error {
+	// FIXME: batch this so networks with lots of nodes still perform well
+	nodes, err := n.Nodes()
+	if err != nil {
+		common.Log.Warningf("Failed to retrieve network nodes for broadcasting peer url addition %s; %s", peerURL, err.Error())
+	}
+
+	common.Log.Debugf("Attempting to broadcast peer url %s for inclusion on network %s by %d nodes", peerURL, n.ID, len(nodes))
+	for _, node := range nodes {
+		params := map[string]interface{}{
+			"network_node_id": node.ID,
+			"peer_url":        peerURL,
+		}
+		payload, _ := json.Marshal(params)
+		_, err := common.NATSPublishAsync(natsAddNodePeerSubject, payload)
+		if err != nil {
+			common.Log.Warningf("Failed to add peer %s to network: %s; %s", peerURL, n.ID, err.Error())
+			return err
+		}
+	}
+	common.Log.Debugf("Broadcast peer url %s for inclusion on network %s by %d nodes", peerURL, n.ID, len(nodes))
+	return nil
+}
+
+// removePeer removes the given peer url to the network topology and notifies other peers of the new peer's existence
+func (n *Network) removePeer(peerURL string) error {
+	// FIXME: batch this so networks with lots of nodes still perform well
+	nodes, err := n.Nodes()
+	if err != nil {
+		common.Log.Warningf("Failed to retrieve network nodes for broadcasting peer url removal %s; %s", peerURL, err.Error())
+	}
+
+	common.Log.Debugf("Attempting to broadcast peer url %s for removal on network %s by %d nodes", peerURL, n.ID, len(nodes))
+	for _, node := range nodes {
+		params := map[string]interface{}{
+			"network_node_id": node.ID,
+			"peer_url":        peerURL,
+		}
+		payload, _ := json.Marshal(params)
+		_, err := common.NATSPublishAsync(natsRemoveNodePeerSubject, payload)
+		if err != nil {
+			common.Log.Warningf("Failed to remove peer %s to network: %s; %s", peerURL, n.ID, err.Error())
+			return err
+		}
+	}
+	common.Log.Debugf("Broadcast peer url %s for removal from network %s by %d nodes", peerURL, n.ID, len(nodes))
+	return nil
+}
+
 // InvokeJSONRPC method with given params
 func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string]interface{}, error) {
 	if n.IsBcoinNetwork() {
@@ -807,13 +857,14 @@ func (n *Network) BootnodesCount() (count uint64) {
 	return count
 }
 
-// Nodes retrieves a list of network nodes
+// Nodes retrieves a list of network nodes; FIXME: support pagination
 func (n *Network) Nodes() (nodes []*Node, err error) {
 	query := dbconf.DatabaseConnection().Where("nodes.network_id = ?", n.ID)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
 }
 
+// IsBcoinNetwork returns true if the network is bcoin-based
 func (n *Network) IsBcoinNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
@@ -824,6 +875,7 @@ func (n *Network) IsBcoinNetwork() bool {
 	return false
 }
 
+// IsEthereumNetwork returns true if the network is EVM-based
 func (n *Network) IsEthereumNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
