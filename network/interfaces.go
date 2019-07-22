@@ -79,4 +79,5 @@ type P2PAPI interface {
 	DropNonReservedPeers() error
 	AddPeer(string) error
 	RemovePeer(string) error
+	Upgrade() error
 }

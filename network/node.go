@@ -986,6 +986,11 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 		return fmt.Errorf("Failed to resolve host for network node with id: %s", n.ID)
 	}
 
+	err = n.dropNonReservedPeers()
+	if err != nil {
+		common.Log.Warningf("Failed to set node to only accept connections from reserved peers; %s", err.Error())
+	}
+
 	cfgJSON, _ := json.Marshal(cfg)
 	*n.Config = json.RawMessage(cfgJSON)
 	n.Status = common.StringOrNil("running")
@@ -1320,4 +1325,31 @@ func (n *Node) removePeer(peerURL string) error {
 		return err
 	}
 	return apiClient.RemovePeer(peerURL)
+}
+
+func (n *Node) acceptNonReservedPeers() error {
+	apiClient, err := n.p2pAPIClient()
+	if err != nil {
+		common.Log.Warningf("Failed to accept non-reserved peers; %s", err.Error())
+		return err
+	}
+	return apiClient.AcceptNonReservedPeers()
+}
+
+func (n *Node) dropNonReservedPeers() error {
+	apiClient, err := n.p2pAPIClient()
+	if err != nil {
+		common.Log.Warningf("Failed to drop non-reserved peers; %s", err.Error())
+		return err
+	}
+	return apiClient.DropNonReservedPeers()
+}
+
+func (n *Node) upgrade() error {
+	apiClient, err := n.p2pAPIClient()
+	if err != nil {
+		common.Log.Warningf("Failed to execute upgrade; %s", err.Error())
+		return err
+	}
+	return apiClient.Upgrade()
 }

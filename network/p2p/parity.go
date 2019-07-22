@@ -37,3 +37,8 @@ func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 func (p *ParityP2PProvider) RemovePeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, nil)
 }
+
+// Upgrade executes a pending upgrade
+func (p *ParityP2PProvider) Upgrade() error {
+	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_executeUpgrade", []interface{}{}, nil)
+}
