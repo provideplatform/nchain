@@ -983,7 +983,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 			return fmt.Errorf(desc)
 		}
 
-		return fmt.Errorf("Failed to resolved host for network node with id: %s", n.ID)
+		return fmt.Errorf("Failed to resolve host for network node with id: %s", n.ID)
 	}
 
 	cfgJSON, _ := json.Marshal(cfg)
@@ -1110,7 +1110,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 			return fmt.Errorf(desc)
 		}
 
-		return fmt.Errorf("Failed to resolved peer url for network node with id: %s", n.ID)
+		return fmt.Errorf("Failed to resolve peer url for network node with id: %s", n.ID)
 	}
 
 	common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
