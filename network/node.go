@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
@@ -737,10 +738,17 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			n.setConfig(cfg)
 
 			if err != nil {
-				desc := fmt.Sprintf("Failed to create security group in EC2 region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return errors.New(desc)
+				if aerr, ok := err.(awserr.Error); ok {
+					switch aerr.Code() {
+					case "InvalidGroup.Duplicate":
+						common.Log.Debugf("Security group %s already exists in EC2 region %s; network node id: %s", securityGroupDesc, region, n.ID.String()
+					default:
+						desc := fmt.Sprintf("Failed to create security group in EC2 region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
+						n.updateStatus(db, "failed", &desc)
+						common.Log.Warning(desc)
+						return errors.New(desc)
+					}
+				}
 			}
 
 			if egress, egressOk := securityCfg["egress"]; egressOk {
