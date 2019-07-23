@@ -679,8 +679,6 @@ func (l *LoadBalancer) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	l.Config = &_cfgJSON
-	common.Log.Debugf("Set lb config... %s", cfg)
-	common.Log.Debugf("Lb config JSON: %s", *l.Config)
 }
 
 func (l *LoadBalancer) updateStatus(db *gorm.DB, status string, description *string) {
