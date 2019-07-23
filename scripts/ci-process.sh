@@ -78,7 +78,7 @@ bootstrap_environment
 
 make clean
 
-glide install
+glide cache-clear && glide install
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
 rm -rf vendor/
 
