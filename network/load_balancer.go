@@ -276,8 +276,15 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 				for _, securityGroupID := range securityGroupIds {
 					_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID.(string))
 					if err != nil {
-						common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
-						return err
+						if aerr, ok := err.(awserr.Error); ok {
+							switch aerr.Code() {
+							case "InvalidGroup.NotFound":
+								common.Log.Debugf("Attempted to delete security group %s which does not exist for balancer: %s", securityGroupID.(string), l.ID)
+							default:
+								common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
+								return err
+							}
+						}
 					}
 				}
 			}
@@ -709,8 +716,15 @@ func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {
 
 			_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
 			if err != nil {
-				common.Log.Warningf("Failed to unregister security group for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
-				return err
+				if aerr, ok := err.(awserr.Error); ok {
+					switch aerr.Code() {
+					case "InvalidGroup.NotFound":
+						common.Log.Debugf("Attempted to unregister security group which does not exist for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
+					default:
+						common.Log.Warningf("Failed to unregister security group for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
+						return err
+					}
+				}
 			}
 		}
 
