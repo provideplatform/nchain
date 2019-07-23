@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
@@ -503,11 +505,10 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 		}
 
 		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && arnOk && securityCfgOk {
-			var targetGroups map[int64]string
-			targetGroups, targetGroupsOk := cfg["target_groups"].(map[int64]string)
+			_, targetGroupsOk := cfg["target_groups"].(map[string]interface{})
 			if !targetGroupsOk {
 				common.Log.Debugf("Attempting to lazily initialize load balanced target groups for network node %s on balancer: %s", node.ID, l.ID)
-				targetGroups = map[int64]string{}
+				targetGroups := map[int64]string{}
 
 				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
 					common.Log.Debugf("Found security group ingress rules to apply to load balanced target group for network node %s on balancer: %s", node.ID, l.ID)
@@ -529,15 +530,23 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 								targetGroupName := l.buildTargetGroupName(tcpPort)
 								targetGroup, err := orchestrationAPI.CreateTargetGroup(common.StringOrNil(vpcID), common.StringOrNil(targetGroupName), common.StringOrNil("HTTP"), tcpPort)
 								if err != nil {
-									desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
-									common.Log.Warning(desc)
-									l.updateStatus(db, "failed", &desc)
-									db.Save(l)
-									return fmt.Errorf(desc)
-								}
-								common.Log.Debugf("Upserted target group %s in region: %s", targetGroupName, region)
-								if len(targetGroup.TargetGroups) == 1 {
-									targetGroups[tcpPort] = *targetGroup.TargetGroups[0].TargetGroupArn
+									if aerr, ok := err.(awserr.Error); ok {
+										switch aerr.Code() {
+										case elbv2.ErrCodeDuplicateTargetGroupNameException:
+											common.Log.Debugf("Load balancer target group %s already exists for balancer %s", targetGroupName, l.ID)
+										default:
+											desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
+											common.Log.Warning(desc)
+											l.updateStatus(db, "failed", &desc)
+											db.Save(l)
+											return fmt.Errorf(desc)
+										}
+									}
+								} else {
+									common.Log.Debugf("Upserted target group %s in region: %s", targetGroupName, region)
+									if len(targetGroup.TargetGroups) == 1 {
+										targetGroups[tcpPort] = *targetGroup.TargetGroups[0].TargetGroupArn
+									}
 								}
 							}
 
@@ -663,6 +672,8 @@ func (l *LoadBalancer) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	l.Config = &_cfgJSON
+	common.Log.Debugf("Set lb config... %s", cfg)
+	common.Log.Debugf("Lb config JSON: %s", *l.Config)
 }
 
 func (l *LoadBalancer) updateStatus(db *gorm.DB, status string, description *string) {
