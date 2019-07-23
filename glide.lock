@@ -1,16 +1,16 @@
-hash: 2d0ff63746830c3fa57e8fd2dceca1463ee250891abd57c19a6b5c867277d600
-updated: 2019-07-22T03:26:00.435755-04:00
+hash: 235884952f7fc0b10cd32bb7c15240c396549b70ff7ef05a372eb650b0aa4dac
+updated: 2019-07-23T00:36:20.563102-04:00
 imports:
 - name: github.com/allegro/bigcache
-  version: e24eb225f15679bbe54f91bfa7da3b00e59b9768
+  version: c00e2be7ad487b8fe06fc1da3d62edd19fb54519
   subpackages:
   - queue
 - name: github.com/aristanetworks/goarista
-  version: 52c2a7864a0891eefaed13a457510c7405a7105b
+  version: ed1100a1c0154be237da0078e86b19c523c8c661
   subpackages:
   - monotime
 - name: github.com/aws/aws-sdk-go
-  version: 67344c7d27430f17e1cb98f5f5ef38109ba317bd
+  version: f0c3a4896814b364322f4057ac976e4b575b1dec
   subpackages:
   - aws
   - aws/awserr
@@ -49,8 +49,9 @@ imports:
   - service/elb
   - service/elbv2
   - service/sts
+  - service/sts/stsiface
 - name: github.com/btcsuite/btcd
-  version: 962a206e94e9151fe41bbd6d6464af4ba7168f50
+  version: c26ffa870fd817666a857af1bf6498fabba1ffe3
   subpackages:
   - btcec
   - btcjson
@@ -115,7 +116,7 @@ imports:
 - name: github.com/golang/mock
   version: 9fa652df1129bef0e734c9cf9bf6dbae9ef3b9fa
 - name: github.com/golang/protobuf
-  version: b285ee9cfc6c881bb20c0d8dc73370ea9b9ec90f
+  version: 6c65a5562fc06764971b7c5d05c76c75e84bdbf7
   subpackages:
   - proto
 - name: github.com/golang/snappy
@@ -133,7 +134,7 @@ imports:
 - name: github.com/jmespath/go-jmespath
   version: c2b33e8439af944379acbdd9c3a5fe0bc44bd8a5
 - name: github.com/json-iterator/go
-  version: 0039f4ac3d5680243e7d0650c581e7ec0885ef5a
+  version: 27518f6661eba504be5a7a9a9f6d9460d892ade3
 - name: github.com/kthomas/exchange-consumer
   version: 4fb83508b3ca56253f6cf167fba80977dbf9e334
 - name: github.com/kthomas/go-amqputil
@@ -147,30 +148,30 @@ imports:
 - name: github.com/kthomas/go-logger
   version: 01c36065851341304751234b081327cf58728dba
 - name: github.com/kthomas/go-natsutil
-  version: 56d7538f4243a3810b3a5b120d097cab8afae2ea
+  version: 9005877cb785bc3569982bdd79698c37d9e96b89
 - name: github.com/kthomas/go-self-signed-cert
   version: a6356df979a5303e6d488550cd7c607a44b66dba
 - name: github.com/kthomas/go.uuid
   version: 28d1fa77e9a4efcba826a2a6c8f5a9ff6cea44a6
 - name: github.com/lib/pq
-  version: 2ff3cb3adc01768e0a552b3a02575a6df38a9bea
+  version: 3427c32cb71afc948325f299f040e53c1dd78979
   subpackages:
   - hstore
   - oid
   - scram
 - name: github.com/mattn/go-isatty
-  version: 1311e847b0cb909da63b5fecfb5370aa66236465
+  version: da60ac76bf7019a8b005f8dd1ad9d1a0e6434155
 - name: github.com/modern-go/concurrent
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
   version: 94122c33edd36123c84d5368cfb2b69df93a0ec8
 - name: github.com/nats-io/nats.go
-  version: 9f4d16fe7c2d5274d584701f59aabaa14a8ddabb
+  version: e2837a2879e82886f6e21715e3a0217fdc46d370
   subpackages:
   - encoders/builtin
   - util
 - name: github.com/nats-io/nkeys
-  version: 1546a3320a8f195a5b5c84aef8309377c2e411d5
+  version: 13b630ddaff0a6fe5e90ddfca4642014f84b4910
 - name: github.com/nats-io/nuid
   version: 4b96681fa6d28dd0ab5fe79bac63b3a493d9ee94
 - name: github.com/nats-io/stan.go
@@ -178,7 +179,7 @@ imports:
   subpackages:
   - pb
 - name: github.com/onsi/gomega
-  version: efe19c39ca106ee4ed42a1b25e1a80a53be4831a
+  version: 2e3b965217103f3054061bd78cb31bca3e94a0da
   subpackages:
   - format
   - gstruct
@@ -198,13 +199,13 @@ imports:
 - name: github.com/provideservices/provide-go
   version: 073e8062e7192453c3465a01598aadd477afebae
 - name: github.com/rs/cors
-  version: 33ffc0734c60052d8b609f1e2d8ebbadc6cd80d8
+  version: db0fe48135e83b5812a5a31be0eea66984b1b521
 - name: github.com/satori/go.uuid
   version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
 - name: github.com/streadway/amqp
   version: 75d898a42a940fbc854dfd1a4199eabdc00cf024
 - name: github.com/syndtr/goleveldb
-  version: c3a204f8e96543bb0cc090385c001078f184fc46
+  version: 02440ea7a28525b3079783ad9c27083994a42366
   subpackages:
   - leveldb
   - leveldb/cache
@@ -219,13 +220,13 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/ugorji/go
-  version: 7865e43e776b01f708871ba4d37a9ed1d3353bfd
+  version: 6bf4380accdce04c2e76f1cd3ae6f2bb5cfa3a13
   subpackages:
   - codec
 - name: github.com/vincent-petithory/dataurl
   version: 9a301d65acbb728fcc3ace14f45f511a4cfeea9c
 - name: golang.org/x/crypto
-  version: 57b3e21c3d5606066a87e63cfe07ec6b9f0db000
+  version: 4def268fd1a49955bfb3dda92fe3db4f924f2285
   subpackages:
   - ed25519
   - ed25519/internal/edwards25519
@@ -234,14 +235,14 @@ imports:
   - scrypt
   - sha3
 - name: golang.org/x/net
-  version: d28f0bde5980168871434b95cfc858db9f2a7a99
+  version: da137c7871d730100384dbcf36e6f8fa493aef5b
   subpackages:
   - html
   - html/atom
   - html/charset
   - websocket
 - name: golang.org/x/sys
-  version: 15dcb6c0061f497a3f66e3ea034b629c6dd4d99e
+  version: fae7ac547cb717d141c433a2a173315e216b64c4
   subpackages:
   - cpu
   - unix
@@ -283,7 +284,7 @@ testImports:
   - watch
   - winfile
 - name: github.com/onsi/ginkgo
-  version: 4cb744166b80afeec15fd0b4446c640a7688cd51
+  version: 19cca4bf3c3f61523629a8f01ac577fc339503b9
   subpackages:
   - config
   - internal/codelocation
