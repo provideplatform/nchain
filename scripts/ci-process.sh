@@ -81,7 +81,7 @@ make clean
 glide mirror set https://golang.org/x/crypto https://github.com/golang/crypto --vcs git
 glide mirror set https://golang.org/x/net https://github.com/golang/net --vcs git
 glide cache-clear
-glide install
+glide --debug install
 
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
 rm -rf vendor/
