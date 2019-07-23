@@ -728,15 +728,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			securityGroup, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil)
 			securityGroupIds := make([]string, 0)
 
-			if securityGroup != nil {
-				securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
-			}
-
-			cfg["security"] = securityCfg
-			cfg["region"] = region
-			cfg["target_security_group_ids"] = securityGroupIds
-			n.setConfig(cfg)
-
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); ok {
 					switch aerr.Code() {
@@ -749,71 +740,81 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 						return errors.New(desc)
 					}
 				}
-			}
+			} else {
+				if securityGroup != nil {
+					securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
+				}
 
-			if egress, egressOk := securityCfg["egress"]; egressOk {
-				switch egress.(type) {
-				case string:
-					if egress.(string) == "*" {
-						_, err := orchestrationAPI.AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId)
-						if err != nil {
-							common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+				cfg["security"] = securityCfg
+				cfg["region"] = region
+				cfg["target_security_group_ids"] = securityGroupIds
+				n.setConfig(cfg)
+
+				if egress, egressOk := securityCfg["egress"]; egressOk {
+					switch egress.(type) {
+					case string:
+						if egress.(string) == "*" {
+							_, err := orchestrationAPI.AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId)
+							if err != nil {
+								common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+							}
+						}
+					case map[string]interface{}:
+						egressCfg := egress.(map[string]interface{})
+						for cidr := range egressCfg {
+							tcp := make([]int64, 0)
+							udp := make([]int64, 0)
+							if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+								for i := range _tcp {
+									tcp = append(tcp, int64(_tcp[i].(float64)))
+								}
+							}
+							if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+								for i := range _udp {
+									udp = append(udp, int64(_udp[i].(float64)))
+								}
+							}
+							_, err := orchestrationAPI.AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp)
+							if err != nil {
+								common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+							}
 						}
 					}
-				case map[string]interface{}:
-					egressCfg := egress.(map[string]interface{})
-					for cidr := range egressCfg {
-						tcp := make([]int64, 0)
-						udp := make([]int64, 0)
-						if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-							for i := range _tcp {
-								tcp = append(tcp, int64(_tcp[i].(float64)))
+				}
+
+				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
+					switch ingress.(type) {
+					case string:
+						if ingress.(string) == "*" {
+							_, err := orchestrationAPI.AuthorizeSecurityGroupIngressAllPortsAllProtocols(*securityGroup.GroupId)
+							if err != nil {
+								common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
 							}
 						}
-						if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-							for i := range _udp {
-								udp = append(udp, int64(_udp[i].(float64)))
+					case map[string]interface{}:
+						ingressCfg := ingress.(map[string]interface{})
+						for cidr := range ingressCfg {
+							tcp := make([]int64, 0)
+							udp := make([]int64, 0)
+							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+								for i := range _tcp {
+									tcp = append(tcp, int64(_tcp[i].(float64)))
+								}
 							}
-						}
-						_, err := orchestrationAPI.AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp)
-						if err != nil {
-							common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+							if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+								for i := range _udp {
+									udp = append(udp, int64(_udp[i].(float64)))
+								}
+							}
+							_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroup.GroupId, cidr, tcp, udp)
+							if err != nil {
+								common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+							}
 						}
 					}
 				}
 			}
-
-			if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-				switch ingress.(type) {
-				case string:
-					if ingress.(string) == "*" {
-						_, err := orchestrationAPI.AuthorizeSecurityGroupIngressAllPortsAllProtocols(*securityGroup.GroupId)
-						if err != nil {
-							common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
-						}
-					}
-				case map[string]interface{}:
-					ingressCfg := ingress.(map[string]interface{})
-					for cidr := range ingressCfg {
-						tcp := make([]int64, 0)
-						udp := make([]int64, 0)
-						if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-							for i := range _tcp {
-								tcp = append(tcp, int64(_tcp[i].(float64)))
-							}
-						}
-						if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-							for i := range _udp {
-								udp = append(udp, int64(_udp[i].(float64)))
-							}
-						}
-						_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroup.GroupId, cidr, tcp, udp)
-						if err != nil {
-							common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-						}
-					}
-				}
-			}
+			// end security group handling
 
 			if strings.ToLower(providerID) == "docker" {
 				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
