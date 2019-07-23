@@ -741,7 +741,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				if aerr, ok := err.(awserr.Error); ok {
 					switch aerr.Code() {
 					case "InvalidGroup.Duplicate":
-						common.Log.Debugf("Security group %s already exists in EC2 region %s; network node id: %s", securityGroupDesc, region, n.ID.String()
+						common.Log.Debugf("Security group %s already exists in EC2 region %s; network node id: %s", securityGroupDesc, region, n.ID.String())
 					default:
 						desc := fmt.Sprintf("Failed to create security group in EC2 region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
 						n.updateStatus(db, "failed", &desc)
