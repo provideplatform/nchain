@@ -1241,8 +1241,15 @@ func (n *Node) unregisterSecurityGroups() error {
 				if strings.ToLower(targetID) == "aws" {
 					_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
 					if err != nil {
-						common.Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
-						return err
+						if aerr, ok := err.(awserr.Error); ok {
+							switch aerr.Code() {
+							case "InvalidGroup.NotFound":
+								common.Log.Debugf("Attempted to unregister security group which does not exist for network node with id: %s; security group id: %s", n.ID, securityGroupID)
+							default:
+								common.Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
+								return err
+							}
+						}
 					}
 				}
 			}
