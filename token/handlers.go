@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
-	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -20,9 +19,9 @@ func InstallTokensAPI(r *gin.Engine) {
 }
 
 func tokensListHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -37,47 +36,47 @@ func tokensListHandler(c *gin.Context) {
 
 	var tokens []Token
 	provide.Paginate(c, query, &Token{}).Find(&tokens)
-	common.Render(tokens, 200, c)
+	provide.Render(tokens, 200, c)
 }
 
 func tokenDetailsHandler(c *gin.Context) {
-	common.RenderError("not implemented", 501, c)
+	provide.RenderError("not implemented", 501, c)
 }
 
 func createTokenHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	token := &Token{}
 	err = json.Unmarshal(buf, token)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	token.ApplicationID = appID
 
 	if token.Create() {
-		common.Render(token, 201, c)
+		provide.Render(token, 201, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = token.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
 func networkTokensListHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -92,5 +91,5 @@ func networkTokensListHandler(c *gin.Context) {
 
 	var tokens []Token
 	provide.Paginate(c, query, &Token{}).Find(&tokens)
-	common.Render(tokens, 200, c)
+	provide.Render(tokens, 200, c)
 }

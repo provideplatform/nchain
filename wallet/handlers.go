@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -21,23 +20,23 @@ func InstallWalletsAPI(r *gin.Engine) {
 }
 
 func createWalletHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	wallet := &Wallet{}
 	err = json.Unmarshal(buf, wallet)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 
@@ -50,19 +49,19 @@ func createWalletHandler(c *gin.Context) {
 	}
 
 	if wallet.Create() {
-		common.Render(wallet, 201, c)
+		provide.Render(wallet, 201, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = wallet.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
 func walletsListHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -90,14 +89,14 @@ func walletsListHandler(c *gin.Context) {
 
 	var wallets []Wallet
 	provide.Paginate(c, query, &Wallet{}).Find(&wallets)
-	common.Render(wallets, 200, c)
+	provide.Render(wallets, 200, c)
 }
 
 func walletDetailsHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -105,13 +104,13 @@ func walletDetailsHandler(c *gin.Context) {
 	var wallet = &Wallet{}
 	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
 	if wallet == nil || wallet.ID == uuid.Nil {
-		common.RenderError("wallet not found", 404, c)
+		provide.RenderError("wallet not found", 404, c)
 		return
 	} else if appID != nil && *wallet.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	} else if userID != nil && *wallet.UserID != *userID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 	network, err := wallet.GetNetwork()
@@ -120,48 +119,48 @@ func walletDetailsHandler(c *gin.Context) {
 		if tokenId == "" {
 			wallet.Balance, err = wallet.NativeCurrencyBalance()
 			if err != nil {
-				common.RenderError(err.Error(), 400, c)
+				provide.RenderError(err.Error(), 400, c)
 				return
 			}
 		} else {
 			wallet.Balance, err = wallet.TokenBalance(c.Param("tokenId"))
 			if err != nil {
-				common.RenderError(err.Error(), 400, c)
+				provide.RenderError(err.Error(), 400, c)
 				return
 			}
 		}
 	}
 
-	common.Render(wallet, 200, c)
+	provide.Render(wallet, 200, c)
 }
 
 func walletBalanceHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	var wallet = &Wallet{}
 	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&wallet)
 	if wallet == nil || wallet.ID == uuid.Nil {
-		common.RenderError("wallet not found", 404, c)
+		provide.RenderError("wallet not found", 404, c)
 		return
 	} else if appID != nil && *wallet.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	} else if userID != nil && *wallet.UserID != *userID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 	balance, err := wallet.TokenBalance(c.Param("tokenId"))
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 	response := map[string]*big.Int{
 		c.Param("tokenId"): balance,
 	}
-	common.Render(response, 200, c)
+	provide.Render(response, 200, c)
 }

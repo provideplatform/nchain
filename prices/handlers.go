@@ -2,7 +2,7 @@ package prices
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/provideapp/goldmine/common"
+	provide "github.com/provideservices/provide-go"
 )
 
 // InstallPricesAPI installs the handlers using the given gin Engine
@@ -11,5 +11,5 @@ func InstallPricesAPI(r *gin.Engine) {
 }
 
 func pricesHandler(c *gin.Context) {
-	common.Render(CurrentPrices, 200, c)
+	provide.Render(CurrentPrices, 200, c)
 }

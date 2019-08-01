@@ -23,10 +23,10 @@ func InstallContractsAPI(r *gin.Engine) {
 }
 
 func contractsListHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -37,7 +37,7 @@ func contractsListHandler(c *gin.Context) {
 		appUUID, err := uuid.FromString(appIDString)
 		if err != nil {
 			msg := fmt.Sprintf("malformed application_id provided; %s", err.Error())
-			common.RenderError(msg, 422, c)
+			provide.RenderError(msg, 422, c)
 			return
 		}
 		appID = &appUUID
@@ -61,14 +61,14 @@ func contractsListHandler(c *gin.Context) {
 
 	var contracts []Contract
 	provide.Paginate(c, query, &Contract{}).Find(&contracts)
-	common.Render(contracts, 200, c)
+	provide.Render(contracts, 200, c)
 }
 
 func contractDetailsHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -90,33 +90,33 @@ func contractDetailsHandler(c *gin.Context) {
 	}
 
 	if contract == nil || contract.ID == uuid.Nil {
-		common.RenderError("contract not found", 404, c)
+		provide.RenderError("contract not found", 404, c)
 		return
 	} else if appID != nil && *contract.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
-	common.Render(contract, 200, c)
+	provide.Render(contract, 200, c)
 }
 
 func createContractHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	contract := &Contract{}
 	err = json.Unmarshal(buf, contract)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	contract.ApplicationID = appID
@@ -137,21 +137,21 @@ func createContractHandler(c *gin.Context) {
 
 	if contract.Create() {
 		if rawSourceOk {
-			common.Render(contract, 202, c)
+			provide.Render(contract, 202, c)
 		} else {
-			common.Render(contract, 201, c)
+			provide.Render(contract, 201, c)
 		}
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = contract.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
 func networkContractsListHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -173,14 +173,14 @@ func networkContractsListHandler(c *gin.Context) {
 	var contracts []Contract
 	query = query.Order("contracts.created_at ASC")
 	provide.Paginate(c, query, &Contract{}).Find(&contracts)
-	common.Render(contracts, 200, c)
+	provide.Render(contracts, 200, c)
 }
 
 // FIXME-- DRY this up
 func networkContractDetailsHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -199,9 +199,9 @@ func networkContractDetailsHandler(c *gin.Context) {
 	}
 
 	if contract == nil || contract.ID == uuid.Nil {
-		common.RenderError("contract not found", 404, c)
+		provide.RenderError("contract not found", 404, c)
 		return
 	}
 
-	common.Render(contract, 200, c)
+	provide.Render(contract, 200, c)
 }

@@ -17,7 +17,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// InstallTxAPI installs the handlers using the given gin Engine
+// InstallTransactionsAPI installs the handlers using the given gin Engine
 func InstallTransactionsAPI(r *gin.Engine) {
 	r.GET("/api/v1/transactions", transactionsListHandler)
 	r.POST("/api/v1/transactions", createTransactionHandler)
@@ -30,10 +30,10 @@ func InstallTransactionsAPI(r *gin.Engine) {
 }
 
 func transactionsListHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -68,7 +68,7 @@ func transactionsListHandler(c *gin.Context) {
 		if from != nil && from.ID != uuid.Nil {
 			query = query.Where("transactions.wallet_id = ?", from.ID)
 		} else {
-			common.RenderError("from address not resolved to a known signer", 404, c)
+			provide.RenderError("from address not resolved to a known signer", 404, c)
 		}
 	}
 
@@ -83,27 +83,27 @@ func transactionsListHandler(c *gin.Context) {
 	var txs []Transaction
 	query = query.Order("created_at DESC")
 	provide.Paginate(c, query, &Transaction{}).Find(&txs)
-	common.Render(txs, 200, c)
+	provide.Render(txs, 200, c)
 }
 
 func createTransactionHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	tx := &Transaction{}
 	err = json.Unmarshal(buf, tx)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 
@@ -114,32 +114,32 @@ func createTransactionHandler(c *gin.Context) {
 
 	if tx.Signer != nil {
 		if tx.WalletID != nil {
-			common.RenderError("provided signer and wallet_id to tx creation, which is ambiguous", 400, c)
+			provide.RenderError("provided signer and wallet_id to tx creation, which is ambiguous", 400, c)
 			return
 		}
 
 		wallet := &wallet.Wallet{}
 		db.Where("address = ?", tx.Signer).Find(&wallet)
 		if wallet == nil || wallet.ID == uuid.Nil {
-			common.RenderError("failed to resolve signer address to wallet", 404, c)
+			provide.RenderError("failed to resolve signer address to wallet", 404, c)
 			return
 		}
 		tx.WalletID = &wallet.ID
 	}
 
 	if tx.Create(db) {
-		common.Render(tx, 201, c)
+		provide.Render(tx, 201, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = tx.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
 func transactionDetailsHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -150,25 +150,25 @@ func transactionDetailsHandler(c *gin.Context) {
 	if tx == nil || tx.ID == uuid.Nil {
 		db.Where("ref = ?", c.Param("id")).Find(&tx)
 		if tx == nil || tx.ID == uuid.Nil {
-			common.RenderError("transaction not found", 404, c)
+			provide.RenderError("transaction not found", 404, c)
 			return
 		}
 	} else if appID != nil && tx.ApplicationID != nil && *tx.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 	err := tx.RefreshDetails()
 	if err != nil {
-		common.RenderError("internal server error", 500, c)
+		provide.RenderError("internal server error", 500, c)
 		return
 	}
-	common.Render(tx, 200, c)
+	provide.Render(tx, 200, c)
 }
 
 func networkTransactionsListHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -186,34 +186,34 @@ func networkTransactionsListHandler(c *gin.Context) {
 	var txs []Transaction
 	query = query.Order("created_at DESC")
 	provide.Paginate(c, query, &Transaction{}).Find(&txs)
-	common.Render(txs, 200, c)
+	provide.Render(txs, 200, c)
 }
 
 func networkTransactionDetailsHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	var tx = &Transaction{}
 	dbconf.DatabaseConnection().Where("network_id = ? AND id = ?", c.Param("id"), c.Param("transactionId")).Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
-		common.RenderError("transaction not found", 404, c)
+		provide.RenderError("transaction not found", 404, c)
 		return
 	}
 	err := tx.RefreshDetails()
 	if err != nil {
-		common.RenderError("internal server error", 500, c)
+		provide.RenderError("internal server error", 500, c)
 		return
 	}
-	common.Render(tx, 200, c)
+	provide.Render(tx, 200, c)
 }
 
 func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -222,7 +222,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	params := map[string]interface{}{}
 	err := json.Unmarshal(buf, &params)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	publicKey, publicKeyOk := params["public_key"].(string)
@@ -241,13 +241,13 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 
 	err = json.Unmarshal(buf, execution)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
 		if execution.Wallet != nil {
 			err := fmt.Errorf("invalid request specifying a wallet_id and wallet")
-			common.RenderError(err.Error(), 422, c)
+			provide.RenderError(err.Error(), 422, c)
 			return
 		}
 		wal.SetID(*execution.WalletID)
@@ -272,7 +272,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 
 	if ntwrk == nil || ntwrk.ID == uuid.Nil {
-		common.RenderError("network not found for arbitrary contract execution", 404, c)
+		provide.RenderError("network not found for arbitrary contract execution", 404, c)
 		return
 	}
 
@@ -281,7 +281,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		common.RenderError("failed to marshal ephemeral contract params containing ABI", 422, c)
+		provide.RenderError("failed to marshal ephemeral contract params containing ABI", 422, c)
 		return
 	}
 	paramsMsg := json.RawMessage(paramsJSON)
@@ -302,11 +302,11 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 
 	resp, err := ephemeralContract.ExecuteFromTx(execution, walletFn, txCreateFn)
 	if err == nil {
-		common.Render(resp, 202, c)
+		provide.Render(resp, 202, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = []string{err.Error()}
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
@@ -314,7 +314,7 @@ func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[
 	network := &network.Network{}
 	db.Where("id = ?", networkID).Find(&network)
 	if network == nil || network.ID == uuid.Nil {
-		common.RenderError("not found", 404, c)
+		provide.RenderError("not found", 404, c)
 		return
 	}
 	method := params["method"].(string)
@@ -330,29 +330,29 @@ func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[
 		}
 	}
 	if !authorizedMethod {
-		common.RenderError(fmt.Sprintf("forbidden rpc method %s", method), 403, c)
+		provide.RenderError(fmt.Sprintf("forbidden rpc method %s", method), 403, c)
 		return
 	}
 	common.Log.Debugf("%s", params)
 	resp, err := network.InvokeJSONRPC(method, params["params"].([]interface{}))
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
-	common.Render(resp, 200, c)
+	provide.Render(resp, 200, c)
 }
 
 func contractExecutionHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
@@ -360,7 +360,7 @@ func contractExecutionHandler(c *gin.Context) {
 	err = json.Unmarshal(buf, &params)
 	if err != nil {
 		err = fmt.Errorf("Failed to parse JSON-RPC params; %s", err.Error())
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
@@ -373,7 +373,7 @@ func contractExecutionHandler(c *gin.Context) {
 		rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
 		if err != nil {
 			err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
-			common.RenderError(err.Error(), 400, c)
+			provide.RenderError(err.Error(), 400, c)
 			return
 		}
 		common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
@@ -392,7 +392,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 	if contractObj == nil || contractObj.ID == uuid.Nil {
 		if appID != nil {
-			common.RenderError("contract not found", 404, c)
+			provide.RenderError("contract not found", 404, c)
 			return
 		}
 
@@ -400,7 +400,7 @@ func contractExecutionHandler(c *gin.Context) {
 		contractArbitraryExecutionHandler(c, db, buf)
 		return
 	} else if appID != nil && *contractObj.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
@@ -415,7 +415,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 	err = json.Unmarshal(buf, execution)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	execution.Contract = contractObj
@@ -423,7 +423,7 @@ func contractExecutionHandler(c *gin.Context) {
 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
 		if execution.Wallet != nil {
 			err := fmt.Errorf("invalid request specifying a wallet_id and wallet")
-			common.RenderError(err.Error(), 422, c)
+			provide.RenderError(err.Error(), 422, c)
 			return
 		}
 		wallet := &wallet.Wallet{}
@@ -432,7 +432,7 @@ func contractExecutionHandler(c *gin.Context) {
 	} else if common.StringOrNil(*execution.WalletAddress) != nil {
 		if execution.Wallet != nil {
 			err := fmt.Errorf("invalid request specifying a wallet_address and wallet")
-			common.RenderError(err.Error(), 422, c)
+			provide.RenderError(err.Error(), 422, c)
 			return
 		}
 		wallet := &wallet.Wallet{}
@@ -462,7 +462,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 	executionResponse, err := execution.ExecuteFromTx(walletFn, txCreateFn)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 
@@ -471,14 +471,14 @@ func contractExecutionHandler(c *gin.Context) {
 		executionResponse = map[string]interface{}{
 			"response": executionResponse.(*contract.ContractExecutionResponse).Response,
 		}
-		common.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
+		provide.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
 	default:
 		confidence := invokeTxFilters(appID, buf, db)
 		executionResponse = map[string]interface{}{
 			"confidence": confidence,
 			"ref":        executionResponse.(*contract.ContractExecution).Ref,
 		}
-		common.Render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+		provide.Render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 	}
 }
 

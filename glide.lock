@@ -1,16 +1,16 @@
 hash: 235884952f7fc0b10cd32bb7c15240c396549b70ff7ef05a372eb650b0aa4dac
-updated: 2019-07-23T00:36:20.563102-04:00
+updated: 2019-07-31T22:29:11.247422-04:00
 imports:
 - name: github.com/allegro/bigcache
-  version: c00e2be7ad487b8fe06fc1da3d62edd19fb54519
+  version: bbf64ae21fc5555f4e9752825ee9ffe13b1e5fa0
   subpackages:
   - queue
 - name: github.com/aristanetworks/goarista
-  version: ed1100a1c0154be237da0078e86b19c523c8c661
+  version: f44d68189fd70d5ee96bf3ccd56a53224febfc50
   subpackages:
   - monotime
 - name: github.com/aws/aws-sdk-go
-  version: f0c3a4896814b364322f4057ac976e4b575b1dec
+  version: 3280460bf5b10e5eaa897f59ceb96b8dacff7a12
   subpackages:
   - aws
   - aws/awserr
@@ -154,13 +154,13 @@ imports:
 - name: github.com/kthomas/go.uuid
   version: 28d1fa77e9a4efcba826a2a6c8f5a9ff6cea44a6
 - name: github.com/lib/pq
-  version: 3427c32cb71afc948325f299f040e53c1dd78979
+  version: 2ff3cb3adc01768e0a552b3a02575a6df38a9bea
   subpackages:
   - hstore
   - oid
   - scram
 - name: github.com/mattn/go-isatty
-  version: da60ac76bf7019a8b005f8dd1ad9d1a0e6434155
+  version: 1311e847b0cb909da63b5fecfb5370aa66236465
 - name: github.com/modern-go/concurrent
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
@@ -171,11 +171,11 @@ imports:
   - encoders/builtin
   - util
 - name: github.com/nats-io/nkeys
-  version: 13b630ddaff0a6fe5e90ddfca4642014f84b4910
+  version: 1546a3320a8f195a5b5c84aef8309377c2e411d5
 - name: github.com/nats-io/nuid
   version: 4b96681fa6d28dd0ab5fe79bac63b3a493d9ee94
 - name: github.com/nats-io/stan.go
-  version: fe52e0d0a602bcfcb28a1d240edba9c4574a3749
+  version: 8e4a9131d26a2846cfccedc1a65548d9ace4b104
   subpackages:
   - pb
 - name: github.com/onsi/gomega
@@ -197,11 +197,9 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: 073e8062e7192453c3465a01598aadd477afebae
+  version: 5ce04ab972df41e666858809f8e86f2167172ba8
 - name: github.com/rs/cors
-  version: db0fe48135e83b5812a5a31be0eea66984b1b521
-- name: github.com/satori/go.uuid
-  version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
+  version: 33ffc0734c60052d8b609f1e2d8ebbadc6cd80d8
 - name: github.com/streadway/amqp
   version: 75d898a42a940fbc854dfd1a4199eabdc00cf024
 - name: github.com/syndtr/goleveldb
@@ -220,7 +218,7 @@ imports:
   - leveldb/table
   - leveldb/util
 - name: github.com/ugorji/go
-  version: 6bf4380accdce04c2e76f1cd3ae6f2bb5cfa3a13
+  version: 02994ffebd8e7ef482130d13b570c8be0968b790
   subpackages:
   - codec
 - name: github.com/vincent-petithory/dataurl
@@ -242,7 +240,7 @@ imports:
   - html/charset
   - websocket
 - name: golang.org/x/sys
-  version: fae7ac547cb717d141c433a2a173315e216b64c4
+  version: 04f50cda93cbb67f2afa353c52f342100e80e625
   subpackages:
   - cpu
   - unix

@@ -52,5 +52,5 @@ func main() {
 }
 
 func statusHandler(c *gin.Context) {
-	common.Render(nil, 204, c)
+	provide.Render(nil, 204, c)
 }

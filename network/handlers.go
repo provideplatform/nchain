@@ -35,74 +35,74 @@ func InstallNetworksAPI(r *gin.Engine) {
 }
 
 func createNetworkHandler(c *gin.Context) {
-	appID := common.AuthorizedSubjectId(c, "application")
-	userID := common.AuthorizedSubjectId(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	network := &Network{}
 	err = json.Unmarshal(buf, network)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	network.ApplicationID = appID
 	network.UserID = userID
 
 	if network.Create() {
-		common.Render(network, 201, c)
+		provide.Render(network, 201, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = network.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
 func updateNetworkHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
+	userID := provide.AuthorizedSubjectID(c, "user")
 	if userID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	network := &Network{}
 	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
 	if network.ID == uuid.Nil {
-		common.RenderError("network not found", 404, c)
+		provide.RenderError("network not found", 404, c)
 		return
 	}
 
 	if userID != nil && network.UserID != nil && *userID != *network.UserID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
 	err = json.Unmarshal(buf, network)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 
 	if network.Update() {
-		common.Render(nil, 204, c)
+		provide.Render(nil, 204, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = network.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
@@ -119,14 +119,14 @@ func networksListHandler(c *gin.Context) {
 	if strings.ToLower(c.Query("public")) == "true" {
 		query = query.Where("networks.application_id IS NULL AND networks.user_id IS NULL")
 	} else {
-		appID := common.AuthorizedSubjectId(c, "application")
+		appID := provide.AuthorizedSubjectID(c, "application")
 		if appID != nil {
 			query = query.Where("networks.application_id = ?", appID)
 		} else {
 			query = query.Where("networks.application_id IS NULL")
 		}
 
-		userID := common.AuthorizedSubjectId(c, "user")
+		userID := provide.AuthorizedSubjectID(c, "user")
 		if userID != nil {
 			query = query.Where("networks.user_id = ?", userID)
 		} else {
@@ -136,40 +136,40 @@ func networksListHandler(c *gin.Context) {
 
 	query = query.Order("networks.created_at ASC")
 	provide.Paginate(c, query, &Network{}).Find(&networks)
-	common.Render(networks, 200, c)
+	provide.Render(networks, 200, c)
 }
 
 func networkDetailsHandler(c *gin.Context) {
 	var network = &Network{}
 	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
 	if network == nil || network.ID == uuid.Nil {
-		common.RenderError("network not found", 404, c)
+		provide.RenderError("network not found", 404, c)
 		return
 	}
-	common.Render(network, 200, c)
+	provide.Render(network, 200, c)
 }
 
 func networkAddressesListHandler(c *gin.Context) {
-	common.RenderError("not implemented", 501, c)
+	provide.RenderError("not implemented", 501, c)
 }
 
 func networkBlocksListHandler(c *gin.Context) {
-	common.RenderError("not implemented", 501, c)
+	provide.RenderError("not implemented", 501, c)
 }
 
 func networkBridgesListHandler(c *gin.Context) {
-	common.RenderError("not implemented", 501, c)
+	provide.RenderError("not implemented", 501, c)
 }
 
 func networkConnectorsListHandler(c *gin.Context) {
-	common.RenderError("not implemented", 501, c)
+	provide.RenderError("not implemented", 501, c)
 }
 
 func nodesListHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
-	appID := common.AuthorizedSubjectId(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
@@ -186,51 +186,51 @@ func nodesListHandler(c *gin.Context) {
 	var nodes []Node
 	query = query.Order("nodes.created_at ASC")
 	provide.Paginate(c, query, &Node{}).Find(&nodes)
-	common.Render(nodes, 200, c)
+	provide.Render(nodes, 200, c)
 }
 
 func nodeDetailsHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
-	appID := common.AuthorizedSubjectId(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	var node = &Node{}
 	dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.RenderError("network node not found", 404, c)
+		provide.RenderError("network node not found", 404, c)
 		return
 	} else if userID != nil && *node.UserID != *userID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	} else if appID != nil && *node.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
-	common.Render(node, 200, c)
+	provide.Render(node, 200, c)
 }
 
 func nodeLogsHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
-	appID := common.AuthorizedSubjectId(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	var node = &Node{}
 	dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.RenderError("network node not found", 404, c)
+		provide.RenderError("network node not found", 404, c)
 		return
 	} else if userID != nil && *node.UserID != *userID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	} else if appID != nil && *node.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
@@ -244,36 +244,36 @@ func nodeLogsHandler(c *gin.Context) {
 
 	logs, err := node.Logs(false, &limit, common.StringOrNil(page))
 	if err != nil {
-		common.RenderError(fmt.Sprintf("log retrieval failed; %s", err.Error()), 500, c)
+		provide.RenderError(fmt.Sprintf("log retrieval failed; %s", err.Error()), 500, c)
 		return
 	}
 
-	common.Render(logs, 200, c)
+	provide.Render(logs, 200, c)
 }
 
 func createNodeHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
-	appID := common.AuthorizedSubjectId(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	networkID, err := uuid.FromString(c.Param("id"))
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 	}
 
 	buf, err := c.GetRawData()
 	if err != nil {
-		common.RenderError(err.Error(), 400, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
 	node := &Node{}
 	err = json.Unmarshal(buf, node)
 	if err != nil {
-		common.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 	node.Status = common.StringOrNil("pending")
@@ -284,72 +284,72 @@ func createNodeHandler(c *gin.Context) {
 	var network = &Network{}
 	dbconf.DatabaseConnection().Model(node).Related(&network)
 	if network == nil || network.ID == uuid.Nil {
-		common.RenderError("network not found", 404, c)
+		provide.RenderError("network not found", 404, c)
 		return
 	}
 
 	if network.UserID != nil && userID != nil && *network.UserID != *userID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	} else if appID != nil && *node.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
 	if node.Create() {
-		common.Render(node, 201, c)
+		provide.Render(node, 201, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = node.Errors
-		common.Render(obj, 422, c)
+		provide.Render(obj, 422, c)
 	}
 }
 
 func deleteNodeHandler(c *gin.Context) {
-	userID := common.AuthorizedSubjectId(c, "user")
-	appID := common.AuthorizedSubjectId(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
-		common.RenderError("unauthorized", 401, c)
+		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
 	var node = &Node{}
 	dbconf.DatabaseConnection().Where("network_id = ? AND id = ?", c.Param("id"), c.Param("nodeId")).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.RenderError("network node not found", 404, c)
+		provide.RenderError("network node not found", 404, c)
 		return
 	}
 	if userID != nil && node.UserID != nil && *userID != *node.UserID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	} else if appID != nil && node.ApplicationID != nil && *node.ApplicationID != *appID {
-		common.RenderError("forbidden", 403, c)
+		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
 	if !node.Delete() {
-		common.RenderError("network node not deleted", 500, c)
+		provide.RenderError("network node not deleted", 500, c)
 		return
 	}
-	common.Render(nil, 204, c)
+	provide.Render(nil, 204, c)
 }
 
 func networkStatusHandler(c *gin.Context) {
 	var network = &Network{}
 	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
 	if network == nil || network.ID == uuid.Nil {
-		common.RenderError("network not found", 404, c)
+		provide.RenderError("network not found", 404, c)
 		return
 	}
 	status, err := network.Status(false)
 	if err != nil {
 		msg := fmt.Sprintf("failed to retrieve network status; %s", err.Error())
-		common.RenderError(msg, 500, c)
+		provide.RenderError(msg, 500, c)
 		return
 	}
-	common.Render(status, 200, c)
+	provide.Render(status, 200, c)
 }
 
 func networkOraclesListHandler(c *gin.Context) {
-	common.RenderError("not implemented", 501, c)
+	provide.RenderError("not implemented", 501, c)
 }
