@@ -45,6 +45,42 @@ type LoadBalancer struct {
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
 }
 
+func MigrateEncryptedLBConfigs() {
+	db := dbconf.DatabaseConnection()
+	var lbs []LoadBalancer
+	db.Find(&lbs)
+	for _, lb := range lbs {
+		err := lb.migrateEncryptedConfig(db)
+		if err != nil {
+			common.Log.Warningf("Failed to migrate load balancer config: %s", err.Error())
+		}
+	}
+	common.Log.Debugf("Migrated encrypted configuration for %d load balancers...", len(lbs))
+}
+
+func (l *LoadBalancer) migrateEncryptedConfig(db *gorm.DB) error {
+	decryptedParams := map[string]interface{}{}
+	if l.EncryptedConfig != nil {
+		encryptedConfigJSON, err := common.PSQLPGPPubDecrypt(*l.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		if err != nil {
+			return err
+		}
+
+		l.setEncryptedConfig(decryptedParams)
+		result := db.Save(&l)
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			return errors[0]
+		}
+	}
+	return nil
+}
+
 func (l *LoadBalancer) decryptedConfig() (map[string]interface{}, error) {
 	decryptedParams := map[string]interface{}{}
 	if l.EncryptedConfig != nil {
