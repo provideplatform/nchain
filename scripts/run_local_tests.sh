@@ -199,6 +199,9 @@ for d in "${pkgs[@]}" ; do
   pkg=$(echo $d | sed 's/\/*$//g')
   
   if [ "$RACE" = "true" ]; then
+    GGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
+    GGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
+    GGP_PASSWORD=$PGP_PASSPHRASE \
     PGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
     PGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
@@ -225,6 +228,9 @@ for d in "${pkgs[@]}" ; do
                        -ginkgo.trace \
                        -tags="$TAGS"
   else
+    GGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
+    GGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
+    GGP_PASSWORD=$PGP_PASSPHRASE \
     PGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
     PGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
