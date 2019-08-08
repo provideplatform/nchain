@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -9,6 +10,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network"
@@ -38,6 +40,43 @@ type Wallet struct {
 	AccessedAt    *time.Time `json:"accessed_at"`
 }
 
+func MigrateEncryptedPrivateKeys() {
+	db := dbconf.DatabaseConnection()
+	var wallets []Wallet
+	db.Find(&wallets)
+	for _, w := range wallets {
+		err := w.migrateEncryptedPrivateKey(db)
+		if err != nil {
+			common.Log.Panicf("Failed to migrate encrypted wallet private key: %s", err.Error())
+		}
+	}
+	common.Log.Debugf("Migrated encrypted private key for %d wallets...", len(wallets))
+}
+
+func (w *Wallet) migrateEncryptedPrivateKey(db *gorm.DB) error {
+	if w.PrivateKey != nil {
+		decryptedPrivateKey, err := common.PSQLPGPPubDecrypt(*w.PrivateKey, common.GpgPrivateKey, common.GpgPassword)
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt private key; %s", err.Error())
+			return err
+		}
+		encryptedPrivateKey, err := pgputil.PGPPubEncrypt(decryptedPrivateKey)
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
+			return err
+		}
+		w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
+
+		result := db.Save(&w)
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			return errors[0]
+		}
+	}
+	return nil
+}
+
+// SetID sets the wallet id in-memory
 func (w *Wallet) SetID(walletID uuid.UUID) {
 	if w.ID != uuid.Nil {
 		common.Log.Warningf("Attempted to change a wallet id in memory; wallet id not changed: %s", w.ID)
@@ -46,49 +85,75 @@ func (w *Wallet) SetID(walletID uuid.UUID) {
 	w.ID = walletID
 }
 
-func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) {
+func (w *Wallet) generate(db *gorm.DB, gpgPublicKey string) error {
 	network, _ := w.GetNetwork()
 
 	if w.NetworkID == uuid.Nil {
-		common.Log.Warningf("Unable to generate private key for wallet without an associated network")
-		return
+		err := errors.New("Unable to generate private key for wallet without an associated network")
+		common.Log.Warning(err.Error())
+		return err
 	}
 
 	var encodedPrivateKey *string
 
 	if network.IsEthereumNetwork() {
 		addr, privateKey, err := provide.EVMGenerateKeyPair()
-		if err == nil {
-			w.Address = *addr
-			encodedPrivateKey = common.StringOrNil(hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+		if err != nil {
+			err := fmt.Errorf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
+			common.Log.Warning(err.Error())
+			return err
 		}
+
+		w.Address = *addr
+		encodedPrivateKey = common.StringOrNil(hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
 	} else if network.IsBcoinNetwork() {
 		var version byte = 0x00
 		networkCfg := network.ParseConfig()
 		if networkVersion, networkVersionOk := networkCfg["version"].(string); networkVersionOk {
 			versionBytes, err := hex.DecodeString(networkVersion)
 			if err != nil {
-				common.Log.Warningf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
+				err := fmt.Errorf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
+				common.Log.Warning(err.Error())
+				return err
 			} else if len(versionBytes) != 1 {
-				common.Log.Warningf("Unable to generate private key for unsupported bitcoin network version %s for network: %s", networkVersion, w.NetworkID.String())
+				err := fmt.Errorf("Unable to generate private key for unsupported bitcoin network version %s for network: %s", networkVersion, w.NetworkID.String())
+				common.Log.Warning(err.Error())
+				return err
 			} else {
 				version = versionBytes[0]
 			}
 		}
 
 		addr, privateKey, err := provide.BcoinGenerateKeyPair(version)
-		if err == nil {
-			w.Address = *addr
-			encodedPrivateKey = common.StringOrNil(fmt.Sprintf("%X", privateKey.D))
+		if err != nil {
+			err := fmt.Errorf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
+			common.Log.Warning(err.Error())
+			return err
 		}
+
+		w.Address = *addr
+		encodedPrivateKey = common.StringOrNil(fmt.Sprintf("%X", privateKey.D))
 	} else {
-		common.Log.Warningf("Unable to generate private key for wallet using unsupported network: %s", w.NetworkID.String())
+		err := fmt.Errorf("Unable to generate private key for wallet using unsupported network: %s", w.NetworkID.String())
+		common.Log.Warning(err.Error())
+		return err
 	}
 
 	if encodedPrivateKey != nil {
-		db.Raw("SELECT pgp_pub_encrypt(?, dearmor(?)) as private_key", encodedPrivateKey, common.GpgPublicKey).Scan(&w)
+		encryptedPrivateKey, err := pgputil.PGPPubEncrypt([]byte(*encodedPrivateKey))
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
+			return err
+		}
+		w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
 		common.Log.Debugf("Generated wallet signing address: %s", w.Address)
+	} else {
+		err := errors.New("Unable to generate private key for wallet due to an unhandled error")
+		common.Log.Warning(err.Error())
+		return err
 	}
+
+	return nil
 }
 
 // GetNetwork - retrieve the associated transaction network

@@ -88,42 +88,6 @@ type NodeLogsResponse struct {
 	NextToken *string    `json:"next_token"`
 }
 
-func MigrateEncryptedNodeConfigs() {
-	db := dbconf.DatabaseConnection()
-	var nodes []Node
-	db.Find(&nodes)
-	for _, n := range nodes {
-		err := n.migrateEncryptedConfig(db)
-		if err != nil {
-			common.Log.Panicf("Failed to migrate node config: %s", err.Error())
-		}
-	}
-	common.Log.Debugf("Migrated encrypted configuration for %d nodes...", len(nodes))
-}
-
-func (n *Node) migrateEncryptedConfig(db *gorm.DB) error {
-	decryptedParams := map[string]interface{}{}
-	if n.EncryptedConfig != nil {
-		encryptedConfigJSON, err := common.PSQLPGPPubDecrypt(*n.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
-		if err != nil {
-			return err
-		}
-
-		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
-		if err != nil {
-			return err
-		}
-
-		n.setEncryptedConfig(decryptedParams)
-		result := db.Save(&n)
-		errors := result.GetErrors()
-		if len(errors) > 0 {
-			return errors[0]
-		}
-	}
-	return nil
-}
-
 func (n *Node) decryptedConfig() (map[string]interface{}, error) {
 	decryptedParams := map[string]interface{}{}
 	if n.EncryptedConfig != nil {
