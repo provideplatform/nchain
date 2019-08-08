@@ -4,12 +4,14 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	selfsignedcert "github.com/kthomas/go-self-signed-cert"
@@ -53,6 +55,25 @@ func ShouldServeTLS() bool {
 		return true
 	}
 	return false
+}
+
+// PSQLPGPPubDecrypt decrypts data previously encrypted using pgp_pub_encrypt
+func PSQLPGPPubDecrypt(encryptedVal, gpgPrivateKey, gpgPassword string) ([]byte, error) {
+	results := make([]byte, 1)
+	db := dbconf.DatabaseConnection()
+	rows, err := db.Raw("SELECT pgp_pub_decrypt(?, dearmor(?), ?) as val", encryptedVal, gpgPrivateKey, gpgPassword).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if rows.Next() {
+		rows.Scan(&results)
+		return results, nil
+	}
+	return nil, errors.New("Failed to decrypt record from encrypted storage")
 }
 
 // PanicIfEmpty panics if the given string is empty
