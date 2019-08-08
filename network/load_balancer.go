@@ -11,6 +11,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network/orchestration"
@@ -44,10 +45,46 @@ type LoadBalancer struct {
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
 }
 
+func MigrateEncryptedLBConfigs() {
+	db := dbconf.DatabaseConnection()
+	var lbs []LoadBalancer
+	db.Find(&lbs)
+	for _, lb := range lbs {
+		err := lb.migrateEncryptedConfig(db)
+		if err != nil {
+			common.Log.Panicf("Failed to migrate load balancer config: %s", err.Error())
+		}
+	}
+	common.Log.Debugf("Migrated encrypted configuration for %d load balancers...", len(lbs))
+}
+
+func (l *LoadBalancer) migrateEncryptedConfig(db *gorm.DB) error {
+	decryptedParams := map[string]interface{}{}
+	if l.EncryptedConfig != nil {
+		encryptedConfigJSON, err := common.PSQLPGPPubDecrypt(*l.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		if err != nil {
+			return err
+		}
+
+		l.setEncryptedConfig(decryptedParams)
+		result := db.Save(&l)
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			return errors[0]
+		}
+	}
+	return nil
+}
+
 func (l *LoadBalancer) decryptedConfig() (map[string]interface{}, error) {
 	decryptedParams := map[string]interface{}{}
 	if l.EncryptedConfig != nil {
-		encryptedConfigJSON, err := common.PGPPubDecrypt(*l.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		encryptedConfigJSON, err := pgputil.PGPPubDecrypt([]byte(*l.EncryptedConfig))
 		if err != nil {
 			common.Log.Warningf("Failed to decrypt encrypted load balancer config; %s", err.Error())
 			return decryptedParams, err
@@ -64,7 +101,7 @@ func (l *LoadBalancer) decryptedConfig() (map[string]interface{}, error) {
 
 func (l *LoadBalancer) encryptConfig() bool {
 	if l.EncryptedConfig != nil {
-		encryptedConfig, err := common.PGPPubEncrypt(*l.EncryptedConfig, common.GpgPublicKey)
+		encryptedConfig, err := pgputil.PGPPubEncrypt([]byte(*l.EncryptedConfig))
 		if err != nil {
 			common.Log.Warningf("Failed to encrypt load balancer config; %s", err.Error())
 			l.Errors = append(l.Errors, &provide.Error{
@@ -72,7 +109,7 @@ func (l *LoadBalancer) encryptConfig() bool {
 			})
 			return false
 		}
-		l.EncryptedConfig = encryptedConfig
+		l.EncryptedConfig = common.StringOrNil(string(encryptedConfig))
 	}
 	return true
 }

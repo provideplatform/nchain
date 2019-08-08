@@ -13,6 +13,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+	pgputil "github.com/kthomas/go-pgputil"
 	selfsignedcert "github.com/kthomas/go-self-signed-cert"
 	stan "github.com/nats-io/stan.go"
 )
@@ -28,24 +29,18 @@ func buildListenAddr() string {
 }
 
 // DecryptECDSAPrivateKey - read the wallet-specific ECDSA private key; required for signing transactions on behalf of the wallet
-func DecryptECDSAPrivateKey(encryptedKey, gpgPrivateKey, gpgEncryptionKey string) (*ecdsa.PrivateKey, error) {
-	results := make([]byte, 1)
-	db := dbconf.DatabaseConnection()
-	rows, err := db.Raw("SELECT pgp_pub_decrypt(?, dearmor(?), ?) as private_key", encryptedKey, gpgPrivateKey, gpgEncryptionKey).Rows()
-	defer rows.Close()
+func DecryptECDSAPrivateKey(encryptedKey, pgpPrivateKey, pgpEncryptionKey string) (*ecdsa.PrivateKey, error) {
+	result, err := pgputil.PGPPubDecrypt([]byte(encryptedKey))
 	if err != nil {
+		Log.Warningf("Failed to read ecdsa private key from encrypted storage; %s", err.Error())
 		return nil, err
 	}
-	if rows.Next() {
-		rows.Scan(&results)
-		privateKeyBytes, err := hex.DecodeString(string(results))
-		if err != nil {
-			Log.Warningf("Failed to read ecdsa private key from encrypted storage; %s", err.Error())
-			return nil, err
-		}
-		return ethcrypto.ToECDSA(privateKeyBytes)
+	privateKeyBytes, err := hex.DecodeString(string(result))
+	if err != nil {
+		Log.Warningf("Failed to decode ecdsa private key after retrieval from encrypted storage; %s", err.Error())
+		return nil, err
 	}
-	return nil, errors.New("Failed to decode ecdsa private key after retrieval from encrypted storage")
+	return ethcrypto.ToECDSA(privateKeyBytes)
 }
 
 // ShouldServeTLS returns true if the API should be served over TLS
@@ -62,8 +57,8 @@ func ShouldServeTLS() bool {
 	return false
 }
 
-// PGPPubDecrypt decrypts data previously encrypted using pgp_pub_encrypt
-func PGPPubDecrypt(encryptedVal, gpgPrivateKey, gpgPassword string) ([]byte, error) {
+// PSQLPGPPubDecrypt decrypts data previously encrypted using pgp_pub_encrypt
+func PSQLPGPPubDecrypt(encryptedVal, gpgPrivateKey, gpgPassword string) ([]byte, error) {
 	results := make([]byte, 1)
 	db := dbconf.DatabaseConnection()
 	rows, err := db.Raw("SELECT pgp_pub_decrypt(?, dearmor(?), ?) as val", encryptedVal, gpgPrivateKey, gpgPassword).Rows()
@@ -79,14 +74,6 @@ func PGPPubDecrypt(encryptedVal, gpgPrivateKey, gpgPassword string) ([]byte, err
 		return results, nil
 	}
 	return nil, errors.New("Failed to decrypt record from encrypted storage")
-}
-
-// PGPPubEncrypt encrypts data using using pgp_pub_encrypt
-func PGPPubEncrypt(unencryptedVal, gpgPublicKey string) (*string, error) {
-	out := []string{}
-	db := dbconf.DatabaseConnection()
-	db.Raw("SELECT pgp_pub_encrypt(?, dearmor(?))", unencryptedVal, gpgPublicKey).Pluck("val", &out)
-	return StringOrNil(out[0]), nil
 }
 
 // PanicIfEmpty panics if the given string is empty

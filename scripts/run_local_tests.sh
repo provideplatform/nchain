@@ -31,7 +31,7 @@ PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true
 PGPASSWORD=${DATABASE_PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
 PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
 
-GPG_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
+PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBF1Db+IBEAC0nRf3s6rls6jhWeWWTAJY8Nn4+qPUbSu0ZOx1DAqOHHxYAek1
 TOuogsXaFPRtRL5mO+0aRIDjqo6GKp9IC8k6XFlJ/+LU1C09O5XOkbzhVoHtTHOY
@@ -84,7 +84,7 @@ jNfRxN+DUEJNER0oZUTEeEno3BfRYkpQ/EZjtQ9muVh2S8UVL06OV0f5deOxicP4
 =HwI4
 -----END PGP PUBLIC KEY BLOCK-----'
 
-GPG_PRIVATE_KEY='-----BEGIN PGP PRIVATE KEY BLOCK-----
+PGP_PRIVATE_KEY='-----BEGIN PGP PRIVATE KEY BLOCK-----
 
 lQdGBF1Db+IBEAC0nRf3s6rls6jhWeWWTAJY8Nn4+qPUbSu0ZOx1DAqOHHxYAek1
 TOuogsXaFPRtRL5mO+0aRIDjqo6GKp9IC8k6XFlJ/+LU1C09O5XOkbzhVoHtTHOY
@@ -192,7 +192,7 @@ dWaI2DVuGDp6xMrNtmWiOvoZry3/WceLuIqfrUyGhJCaIvepCsX2eg==
 =1A2t
 -----END PGP PRIVATE KEY BLOCK-----'
 
-GPG_PASSWORD=password
+PGP_PASSPHRASE=password
 
 pkgs=(bridge common connector consumer contract db filter network oracle prices token tx wallet)
 for d in "${pkgs[@]}" ; do

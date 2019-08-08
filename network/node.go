@@ -15,6 +15,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network/orchestration"
@@ -87,10 +88,46 @@ type NodeLogsResponse struct {
 	NextToken *string    `json:"next_token"`
 }
 
+func MigrateEncryptedNodeConfigs() {
+	db := dbconf.DatabaseConnection()
+	var nodes []Node
+	db.Find(&nodes)
+	for _, n := range nodes {
+		err := n.migrateEncryptedConfig(db)
+		if err != nil {
+			common.Log.Panicf("Failed to migrate node config: %s", err.Error())
+		}
+	}
+	common.Log.Debugf("Migrated encrypted configuration for %d nodes...", len(nodes))
+}
+
+func (n *Node) migrateEncryptedConfig(db *gorm.DB) error {
+	decryptedParams := map[string]interface{}{}
+	if n.EncryptedConfig != nil {
+		encryptedConfigJSON, err := common.PSQLPGPPubDecrypt(*n.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		if err != nil {
+			return err
+		}
+
+		n.setEncryptedConfig(decryptedParams)
+		result := db.Save(&n)
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			return errors[0]
+		}
+	}
+	return nil
+}
+
 func (n *Node) decryptedConfig() (map[string]interface{}, error) {
 	decryptedParams := map[string]interface{}{}
 	if n.EncryptedConfig != nil {
-		encryptedConfigJSON, err := common.PGPPubDecrypt(*n.EncryptedConfig, common.GpgPrivateKey, common.GpgPassword)
+		encryptedConfigJSON, err := pgputil.PGPPubDecrypt([]byte(*n.EncryptedConfig))
 		if err != nil {
 			common.Log.Warningf("Failed to decrypt encrypted network node config; %s", err.Error())
 			return decryptedParams, err
@@ -107,7 +144,7 @@ func (n *Node) decryptedConfig() (map[string]interface{}, error) {
 
 func (n *Node) encryptConfig() bool {
 	if n.EncryptedConfig != nil {
-		encryptedConfig, err := common.PGPPubEncrypt(*n.EncryptedConfig, common.GpgPublicKey)
+		encryptedConfig, err := pgputil.PGPPubEncrypt([]byte(*n.EncryptedConfig))
 		if err != nil {
 			common.Log.Warningf("Failed to encrypt network node config; %s", err.Error())
 			n.Errors = append(n.Errors, &provide.Error{
@@ -115,7 +152,7 @@ func (n *Node) encryptConfig() bool {
 			})
 			return false
 		}
-		n.EncryptedConfig = encryptedConfig
+		n.EncryptedConfig = common.StringOrNil(string(encryptedConfig))
 	}
 	return true
 }
