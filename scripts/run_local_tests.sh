@@ -199,9 +199,9 @@ for d in "${pkgs[@]}" ; do
   pkg=$(echo $d | sed 's/\/*$//g')
   
   if [ "$RACE" = "true" ]; then
-    GPG_PUBLIC_KEY=$GPG_PUBLIC_KEY \
-    GPG_PRIVATE_KEY=$GPG_PRIVATE_KEY \
-    GPG_PASSWORD=$GPG_PASSWORD \
+    PGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
+    PGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
+    PGP_PASSWORD=$PGP_PASSWORD \
     NATS_TOKEN=testtoken \
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
     NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
@@ -225,9 +225,9 @@ for d in "${pkgs[@]}" ; do
                        -ginkgo.trace \
                        -tags="$TAGS"
   else
-    GPG_PUBLIC_KEY=$GPG_PUBLIC_KEY \
-    GPG_PRIVATE_KEY=$GPG_PRIVATE_KEY \
-    GPG_PASSWORD=$GPG_PASSWORD \
+    GPG_PUBLIC_KEY=$PGP_PUBLIC_KEY \
+    GPG_PRIVATE_KEY=$PGP_PRIVATE_KEY \
+    GPG_PASSWORD=$PGP_PASSWORD \
     NATS_TOKEN=testtoken \
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
     NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
