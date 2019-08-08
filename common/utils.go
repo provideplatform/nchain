@@ -29,7 +29,7 @@ func buildListenAddr() string {
 }
 
 // DecryptECDSAPrivateKey - read the wallet-specific ECDSA private key; required for signing transactions on behalf of the wallet
-func DecryptECDSAPrivateKey(encryptedKey, pgpPrivateKey, pgpEncryptionKey string) (*ecdsa.PrivateKey, error) {
+func DecryptECDSAPrivateKey(encryptedKey string) (*ecdsa.PrivateKey, error) {
 	result, err := pgputil.PGPPubDecrypt([]byte(encryptedKey))
 	if err != nil {
 		Log.Warningf("Failed to read ecdsa private key from encrypted storage; %s", err.Error())

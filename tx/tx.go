@@ -390,7 +390,7 @@ func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet
 		}
 
 		if wallet.PrivateKey != nil {
-			privateKey, _ := common.DecryptECDSAPrivateKey(*wallet.PrivateKey, common.GpgPrivateKey, common.GpgPassword)
+			privateKey, _ := common.DecryptECDSAPrivateKey(*wallet.PrivateKey)
 			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
 			t.SignedTx, t.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), nonce, uint64(gas))
 		} else {

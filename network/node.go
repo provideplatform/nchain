@@ -542,7 +542,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 								addr, privateKey, err = provide.EVMGenerateKeyPair()
 							} else {
 								encryptedKey := common.StringOrNil(out[0])
-								privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey, common.GpgPrivateKey, common.GpgPassword)
+								privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey)
 								if err == nil {
 									common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
 								} else {
