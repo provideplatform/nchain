@@ -29,13 +29,6 @@ var (
 
 	requireTLS bool
 
-	// GpgPublicKey is the public key used for PGP encryption
-	GpgPublicKey string
-	// GpgPrivateKey is the private key used for PGP encryption
-	GpgPrivateKey string
-	// GpgPassword is the password used for PGP encryption
-	GpgPassword string
-
 	// EngineToDefaultJSONRPCPortMapping contains a set of sane defaults for signing enginers and default JSON-RPC ports
 	EngineToDefaultJSONRPCPortMapping = map[string]uint{"aura": 8050, "handshake": 13037}
 	// EngineToDefaultPeerListenPortMapping contains a set of sane defaults for signing enginers and default p2p ports
@@ -69,29 +62,10 @@ func init() {
 
 	DefaultAWSConfig = awsconf.GetConfig()
 
-	requireGPG()
-
 	err := EstablishNATSStreamingConnection()
 	if err != nil {
 		Log.Panicf("Failed to established NATS streaming connection; %s", err.Error())
 	}
 
 	ConsumeNATSStreamingSubscriptions = strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
-}
-
-func requireGPG() {
-	GpgPublicKey = strings.Replace(os.Getenv("GPG_PUBLIC_KEY"), `\n`, "\n", -1)
-	if GpgPublicKey == "" {
-		Log.Panicf("Failed to parse GPG public key")
-	}
-
-	GpgPrivateKey = strings.Replace(os.Getenv("GPG_PRIVATE_KEY"), `\n`, "\n", -1)
-	if GpgPrivateKey == "" {
-		Log.Panicf("Failed to parse GPG private key")
-	}
-
-	GpgPassword = os.Getenv("GPG_PASSWORD")
-	if GpgPassword == "" {
-		Log.Panicf("Failed to parse GPG password")
-	}
 }

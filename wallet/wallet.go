@@ -40,42 +40,6 @@ type Wallet struct {
 	AccessedAt    *time.Time `json:"accessed_at"`
 }
 
-func MigrateEncryptedPrivateKeys() {
-	db := dbconf.DatabaseConnection()
-	var wallets []Wallet
-	db.Find(&wallets)
-	for _, w := range wallets {
-		err := w.migrateEncryptedPrivateKey(db)
-		if err != nil {
-			common.Log.Warningf("Failed to migrate encrypted wallet private key: %s", err.Error())
-		}
-	}
-	common.Log.Debugf("Migrated encrypted private key for %d wallets...", len(wallets))
-}
-
-func (w *Wallet) migrateEncryptedPrivateKey(db *gorm.DB) error {
-	if w.PrivateKey != nil {
-		decryptedPrivateKey, err := common.PSQLPGPPubDecrypt(*w.PrivateKey, common.GpgPrivateKey, common.GpgPassword)
-		if err != nil {
-			common.Log.Warningf("Failed to decrypt private key; %s", err.Error())
-			return err
-		}
-		encryptedPrivateKey, err := pgputil.PGPPubEncrypt(decryptedPrivateKey)
-		if err != nil {
-			common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
-			return err
-		}
-		w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
-
-		result := db.Save(&w)
-		errors := result.GetErrors()
-		if len(errors) > 0 {
-			return errors[0]
-		}
-	}
-	return nil
-}
-
 // SetID sets the wallet id in-memory
 func (w *Wallet) SetID(walletID uuid.UUID) {
 	if w.ID != uuid.Nil {

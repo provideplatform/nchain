@@ -44,10 +44,6 @@ func main() {
 
 	r.GET("/status", statusHandler)
 
-	go network.MigrateEncryptedLBConfigs()
-	go network.MigrateEncryptedNodeConfigs()
-	go wallet.MigrateEncryptedPrivateKeys()
-
 	if common.ShouldServeTLS() {
 		r.RunTLS(common.ListenAddr, common.CertificatePath, common.PrivateKeyPath)
 	} else {
