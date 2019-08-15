@@ -12,7 +12,7 @@ const apiUsageDaemonBufferSize = 1024 * 25
 const apiUsageDaemonFlushInterval = 10000
 
 const natsAPIUsageEventNotificationSubject = "api.usage.event"
-const natsAPIUsageEventNotificationMaxInFlight = 32
+const natsAPIUsageEventNotificationMaxInFlight = 1024
 
 type apiUsageDelegate struct {
 	natsConnection *stan.Conn
