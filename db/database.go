@@ -133,6 +133,8 @@ func SeedNetworks() {
 	for _, sqlcmd := range lines {
 		db.Exec(sqlcmd)
 	}
+
+	common.Log.Debugf("Migrated seed networks")
 }
 
 // DatabaseConnection returns a pooled DB connection
