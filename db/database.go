@@ -2,6 +2,7 @@ package db
 
 import (
 	"io/ioutil"
+	"strings"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -128,7 +129,10 @@ func SeedNetworks() {
 	common.Log.PanicOnError(err, "Failed to seed networks")
 
 	db := dbconf.DatabaseConnection()
-	db.Exec(string(rawsql))
+	lines := strings.Split(string(rawsql), "\n")
+	for _, sqlcmd := range lines {
+		db.Exec(sqlcmd)
+	}
 }
 
 // DatabaseConnection returns a pooled DB connection
