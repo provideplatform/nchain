@@ -10,6 +10,7 @@ build: clean
 	go fmt ./...
 	go build -v -o ./.bin/goldmine_api ./cmd/api
 	go build -v -o ./.bin/goldmine_consumer ./cmd/consumer
+	go build -v -o ./.bin/goldmine_migrate ./cmd/migrate
 
 ecs_deploy:
 	./scripts/ecs_deploy.sh
@@ -19,6 +20,9 @@ install: clean
 
 lint:
 	./scripts/lint.sh
+
+migrations: build run_dependencies
+	./scripts/run_local_migrations.sh
 
 run_local: build run_dependencies
 	./scripts/run_local.sh
