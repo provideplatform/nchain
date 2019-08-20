@@ -1,4 +1,4 @@
-.PHONY: build clean ecs_deploy install integration lint run_dependencies run_local run_local_api run_local_consumer stop_dependencies stop_local test
+.PHONY: build clean ecs_deploy install integration lint migrations run_dependencies run_local run_local_api run_local_consumer stop_dependencies stop_local test
 
 clean:
 	rm -rf ./.bin 2>/dev/null || true
