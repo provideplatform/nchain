@@ -30,6 +30,7 @@ bin/
 goldmine
 goldmine_api
 goldmine_consumer
+goldmine_migrate
 
 .gocore-id_rsa
 .server.crt
