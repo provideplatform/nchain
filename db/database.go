@@ -124,7 +124,7 @@ func MigrateSchema() {
 
 // SeedNetworks inserts the network seeds from networks.sql
 func SeedNetworks() {
-	rawsql, err := ioutil.ReadFile("./networks.sql")
+	rawsql, err := ioutil.ReadFile("./db/networks.sql")
 	common.Log.PanicOnError(err, "Failed to seed networks")
 
 	db := dbconf.DatabaseConnection()
