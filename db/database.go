@@ -1,12 +1,14 @@
 package db
 
 import (
+	"io/ioutil"
 	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres" // PostgreSQL dialect
 	dbconf "github.com/kthomas/go-db-config"
 	"github.com/provideapp/goldmine/bridge"
+	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/connector"
 	"github.com/provideapp/goldmine/contract"
 	"github.com/provideapp/goldmine/filter"
@@ -118,6 +120,15 @@ func MigrateSchema() {
 		db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 		db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 	})
+}
+
+// SeedNetworks inserts the network seeds from networks.sql
+func SeedNetworks() {
+	rawsql, err := ioutil.ReadFile("./networks.sql")
+	common.Log.PanicOnError(err, "Failed to seed networks")
+
+	db := dbconf.DatabaseConnection()
+	db.Exec(string(rawsql))
 }
 
 // DatabaseConnection returns a pooled DB connection
