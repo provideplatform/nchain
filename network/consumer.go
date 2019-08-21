@@ -18,55 +18,55 @@ import (
 const natsBlockFinalizedSubject = "goldmine.block.finalized"
 const natsBlockFinalizedSubjectMaxInFlight = 64
 const natsBlockFinalizedInvocationTimeout = time.Minute * 1
-const natsBlockFinalizedTimeout = int64(1000 * 60 * 10)
+const natsBlockFinalizedTimeout = int64(time.Minute * 10)
 
 const natsLoadBalancerInvocationTimeout = time.Second * 15
 
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 const natsLoadBalancerDeprovisioningMaxInFlight = 64
-const natsLoadBalancerDeprovisioningTimeout = int64(1000 * 60 * 10)
+const natsLoadBalancerDeprovisioningTimeout = int64(time.Minute * 10)
 
 const natsLoadBalancerProvisioningSubject = "goldmine.loadbalancer.provision"
 const natsLoadBalancerProvisioningMaxInFlight = 64
-const natsLoadBalancerProvisioningTimeout = int64(1000 * 60 * 10)
+const natsLoadBalancerProvisioningTimeout = int64(time.Minute * 10)
 
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerBalanceNodeMaxInFlight = 64
-const natsLoadBalancerBalanceNodeTimeout = int64(1000 * 60 * 10)
+const natsLoadBalancerBalanceNodeTimeout = int64(time.Minute * 10)
 
 const natsLoadBalancerUnbalanceNodeSubject = "goldmine.node.unbalance"
 const natsLoadBalancerUnbalanceNodeMaxInFlight = 64
-const natsLoadBalancerUnbalanceNodeTimeout = int64(1000 * 60 * 10)
+const natsLoadBalancerUnbalanceNodeTimeout = int64(time.Minute * 10)
 
 const natsDeployNodeSubject = "goldmine.node.deploy"
 const natsDeployNodeMaxInFlight = 64
 const natsDeployNodeInvocationTimeout = time.Minute * 1
-const natsDeployNodeTimeout = int64(1000 * 60 * 10)
+const natsDeployNodeTimeout = int64(time.Minute * 10)
 
 const natsDeleteTerminatedNodeSubject = "goldmine.node.delete"
 const natsDeleteTerminatedNodeMaxInFlight = 64
 const natsDeleteTerminatedNodeInvocationTimeout = time.Minute * 1
-const natsDeleteTerminatedNodeTimeout = int64(1000 * 60 * 10)
+const natsDeleteTerminatedNodeTimeout = int64(time.Minute * 10)
 
 const natsResolveNodeHostSubject = "goldmine.node.host.resolve"
 const natsResolveNodeHostMaxInFlight = 64
 const natsResolveNodeHostInvocationTimeout = time.Second * 10
-const natsResolveNodeHostTimeout = int64(1000 * 60 * 10)
+const natsResolveNodeHostTimeout = int64(time.Minute * 10)
 
 const natsResolveNodePeerURLSubject = "goldmine.node.peer.resolve"
 const natsResolveNodePeerURLMaxInFlight = 64
 const natsResolveNodePeerURLInvocationTimeout = time.Second * 10
-const natsResolveNodePeerURLTimeout = int64(1000 * 60 * 10)
+const natsResolveNodePeerURLTimeout = int64(time.Minute * 10)
 
 const natsAddNodePeerSubject = "goldmine.node.peer.add"
 const natsAddNodePeerMaxInFlight = 64
 const natsAddNodePeerInvocationTimeout = time.Second * 10
-const natsAddNodePeerTimeout = int64(1000 * 60 * 10)
+const natsAddNodePeerTimeout = int64(time.Minute * 10)
 
 const natsRemoveNodePeerSubject = "goldmine.node.peer.remove"
 const natsRemoveNodePeerMaxInFlight = 64
 const natsRemoveNodePeerInvocationTimeout = time.Second * 10
-const natsRemoveNodePeerTimeout = int64(1000 * 60 * 10)
+const natsRemoveNodePeerTimeout = int64(time.Minute * 10)
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 
