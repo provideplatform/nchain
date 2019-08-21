@@ -24,9 +24,9 @@ var (
 
 // AttemptNack tries to Nack the given message if it meets basic time-based deadlettering
 func AttemptNack(msg *stan.Msg, timeout int64) {
-	if natsutil.ShouldDeadletter(msg, timeout) {
-		common.Log.Debugf("Nacking redelivered %d-byte message after %dms timeout: %s", msg.Size(), timeout, msg.Subject)
-		Nack(msg)
+	conn, err := common.GetSharedNatsStreamingConnection()
+	if err == nil {
+		natsutil.AttemptNack(conn, msg, timeout)
 	}
 }
 
