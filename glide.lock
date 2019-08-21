@@ -1,5 +1,5 @@
-hash: fd2a97ec304bfaad58fc6086c2c55d83bf1fec9630c32ceeafe55d669d09fb79
-updated: 2019-08-21T00:20:02.221898-04:00
+hash: 7efd5b7718748514d64bd1afb40a74972a8e347474bfd26af16f341db5e0b51c
+updated: 2019-08-21T01:59:26.982428-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -76,8 +76,12 @@ imports:
   version: 699df6a3acf6867538e50931511e9dc403da108a
 - name: github.com/dgrijalva/jwt-go
   version: 06ea1031745cb8b3dab3f6a236daf2b0aa468b7e
+- name: github.com/elastic/gosigar
+  version: cd0724355811a9fbc473732c9218496c4a27abe9
+  subpackages:
+  - sys/windows
 - name: github.com/ethereum/go-ethereum
-  version: 428eabe28d1077356b16f25828d78d8693a766bb
+  version: 039a9c36226eafaf07942ecfb6082a90945ea86a
   subpackages:
   - accounts/abi
   - common
@@ -119,8 +123,6 @@ imports:
   version: 4c88cc3f1a34ffade77b79abc53335d1e511f25b
   subpackages:
   - proto
-- name: github.com/golang/snappy
-  version: 2a8bb927dd31d8daada140a5d09578521ce5c36a
 - name: github.com/google/logger
   version: 03bdf7bcb2c4d98c8fdbf62f1473fb1303ca1c1d
 - name: github.com/gorilla/websocket
@@ -196,29 +198,20 @@ imports:
   - matchers/support/goraph/node
   - matchers/support/goraph/util
   - types
+- name: github.com/pkg/errors
+  version: 27936f6d90f9c8e1145f11ed52ffffbfdb9e0af7
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: 5ce04ab972df41e666858809f8e86f2167172ba8
+  version: 281078f7477433ad2df5469a64b5588a446d27a7
 - name: github.com/rs/cors
   version: db0fe48135e83b5812a5a31be0eea66984b1b521
+- name: github.com/steakknife/bloomfilter
+  version: 6819c0d2a57025e1700378ee59b7382d71987f14
+- name: github.com/steakknife/hamming
+  version: c99c65617cd3d686aea8365fe563d6542f01d940
 - name: github.com/streadway/amqp
   version: 75d898a42a940fbc854dfd1a4199eabdc00cf024
-- name: github.com/syndtr/goleveldb
-  version: 02440ea7a28525b3079783ad9c27083994a42366
-  subpackages:
-  - leveldb
-  - leveldb/cache
-  - leveldb/comparer
-  - leveldb/errors
-  - leveldb/filter
-  - leveldb/iterator
-  - leveldb/journal
-  - leveldb/memdb
-  - leveldb/opt
-  - leveldb/storage
-  - leveldb/table
-  - leveldb/util
 - name: github.com/ugorji/go
   version: e118e2d506a6b252f6b85f2e2f2ac1bfed82f1b8
   subpackages:
@@ -247,7 +240,6 @@ imports:
   - html
   - html/atom
   - html/charset
-  - websocket
 - name: golang.org/x/sys
   version: 04f50cda93cbb67f2afa353c52f342100e80e625
   subpackages:

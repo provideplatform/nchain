@@ -252,7 +252,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 				for i := range abiMethod.Outputs {
 					typestr := fmt.Sprintf("%s", abiMethod.Outputs[i].Type)
 					common.Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
-					typ, err := abi.NewType(typestr)
+					typ, err := abi.NewType(typestr, nil)
 					if err != nil {
 						return nil, nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
 					}

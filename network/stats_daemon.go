@@ -427,7 +427,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			return
 		}
 
-		lastBlockAt := header.Time.Uint64() * 1000.0
+		lastBlockAt := header.Time * 1000.0
 		sd.stats.LastBlockAt = &lastBlockAt
 
 		sd.stats.Meta["last_block_header"] = header

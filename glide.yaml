@@ -8,7 +8,7 @@ import:
 - package: github.com/dgrijalva/jwt-go
   version: ~3.2.0
 - package: github.com/ethereum/go-ethereum
-  version: 428eabe28
+  version: 039a9c362
   subpackages:
   - accounts/abi
   - common
