@@ -199,7 +199,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		msg.Ack()
 	} else {
 		common.Log.Warningf("Failed to execute transaction; tx failed with %d error(s); %s", len(tx.Errors), *tx.Errors[0].Message)
-		natsutil.AttemptNack(msg, txCreateMsgTimeout)
+		consumer.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
 
@@ -498,7 +498,7 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	if err != nil {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
-		natsutil.AttemptNack(msg, txMsgTimeout)
+		consumer.AttemptNack(msg, txMsgTimeout)
 	} else {
 		common.Log.Debugf("Executed contract: %s", executionResponse.Response)
 		msg.Ack()
@@ -652,7 +652,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 			tx.updateStatus(db, "failed", common.StringOrNil(desc))
 		}
 
-		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+		consumer.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
 		msg.Ack()
 	}
