@@ -304,7 +304,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 
 	if err != nil {
 		common.Log.Warningf("Failed to handle block finalized message; %s", err.Error())
-		consumer.AttemptNack(msg, natsBlockFinalizedTimeout)
+		natsutil.AttemptNack(msg, natsBlockFinalizedTimeout)
 	} else {
 		msg.Ack()
 	}
@@ -341,7 +341,7 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 	err = balancer.provision(dbconf.DatabaseConnection())
 	if err != nil {
 		common.Log.Warningf("Failed to provision load balancer; %s", err.Error())
-		consumer.AttemptNack(msg, natsLoadBalancerProvisioningTimeout)
+		natsutil.AttemptNack(msg, natsLoadBalancerProvisioningTimeout)
 	} else {
 		common.Log.Debugf("Load balancer provisioning succeeded; ACKing NATS message for balancer: %s", balancer.ID)
 		msg.Ack()
@@ -379,7 +379,7 @@ func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
 	err = balancer.deprovision(dbconf.DatabaseConnection())
 	if err != nil {
 		common.Log.Warningf("Failed to deprovision load balancer; %s", err.Error())
-		consumer.AttemptNack(msg, natsLoadBalancerDeprovisioningTimeout)
+		natsutil.AttemptNack(msg, natsLoadBalancerDeprovisioningTimeout)
 	} else {
 		common.Log.Debugf("Load balancer deprovisioning succeeded; ACKing NATS message for balancer: %s", balancer.ID)
 		msg.Ack()
@@ -431,7 +431,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	err = balancer.balanceNode(db, node)
 	if err != nil {
 		common.Log.Warningf("Failed to balance node on load balancer; %s", err.Error())
-		consumer.AttemptNack(msg, natsLoadBalancerBalanceNodeTimeout)
+		natsutil.AttemptNack(msg, natsLoadBalancerBalanceNodeTimeout)
 	} else {
 		common.Log.Debugf("Load balancer node balancing succeeded; ACKing NATS message: %s", balancer.ID)
 		msg.Ack()
@@ -484,7 +484,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	err = balancer.unbalanceNode(db, node)
 	if err != nil {
 		common.Log.Warningf("Failed to remove node from load balancer; %s", err.Error())
-		consumer.AttemptNack(msg, natsLoadBalancerUnbalanceNodeTimeout)
+		natsutil.AttemptNack(msg, natsLoadBalancerUnbalanceNodeTimeout)
 	} else {
 		common.Log.Debugf("Load balancer node removal succeeded; ACKing NATS message: %s", balancer.ID)
 		msg.Ack()
@@ -523,7 +523,7 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 	err = node.deploy(db)
 	if err != nil {
 		common.Log.Warningf("Failed to deploy network node; %s", err.Error())
-		consumer.AttemptNack(msg, natsDeployNodeTimeout)
+		natsutil.AttemptNack(msg, natsDeployNodeTimeout)
 		return
 	}
 
@@ -577,7 +577,7 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 	if len(errors) > 0 {
 		err := errors[0]
 		common.Log.Warningf("Failed to delete terminated network node; %s", err.Error())
-		consumer.AttemptNack(msg, natsDeleteTerminatedNodeTimeout)
+		natsutil.AttemptNack(msg, natsDeleteTerminatedNodeTimeout)
 		return
 	}
 
@@ -616,7 +616,7 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 	err = node.resolveHost(db)
 	if err != nil {
 		common.Log.Warningf("Failed to resolve network node host; %s", err.Error())
-		consumer.AttemptNack(msg, natsResolveNodeHostTimeout)
+		natsutil.AttemptNack(msg, natsResolveNodeHostTimeout)
 		return
 	}
 
@@ -655,7 +655,7 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	err = node.resolvePeerURL(db)
 	if err != nil {
 		common.Log.Warningf("Failed to resolve network node peer url; %s", err.Error())
-		consumer.AttemptNack(msg, natsResolveNodePeerURLTimeout)
+		natsutil.AttemptNack(msg, natsResolveNodePeerURLTimeout)
 		return
 	}
 
@@ -707,7 +707,7 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	err = node.addPeer(peerURL)
 	if err != nil {
 		common.Log.Warningf("Failed to add network peer; %s", err.Error())
-		consumer.AttemptNack(msg, natsAddNodePeerTimeout)
+		natsutil.AttemptNack(msg, natsAddNodePeerTimeout)
 		return
 	}
 
@@ -753,7 +753,7 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	err = node.removePeer(peerURL)
 	if err != nil {
 		common.Log.Warningf("Failed to remove network peer; %s", err.Error())
-		consumer.AttemptNack(msg, natsRemoveNodePeerTimeout)
+		natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
 		return
 	}
 
