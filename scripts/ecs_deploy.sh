@@ -67,11 +67,11 @@ docker_build()
     sudo docker build -t provide/goldmine .
 
     echo 'Docker tag...'
-    sudo docker tag provide/goldmine:latest "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+    sudo docker tag provide/goldmine:latest "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
 
     echo 'Docker push...'
     $(aws ecr get-login --no-include-email --region us-east-1)
-    sudo docker push "085843810865.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+    sudo docker push "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
 }
 
 ecs_deploy()
@@ -99,7 +99,7 @@ ecs_deploy()
     aws ecs update-service --cluster "${ECS_CLUSTER}" --service "${ECS_SERVICE_NAME}" --task-definition "${ECS_TASK_DEFINITION_ID}"
 }
 
-if [[ -z "${ECR_REPOSITORY_NAME}" || -z "${ECS_CLUSTER}" || -z "${ECS_TASK_DEFINITION_FAMILY}" || -z "${ECS_SERVICE_NAME}" ]]
+if [[ -z "${AWS_ACCOUNT_ID}" || -z "${ECR_REPOSITORY_NAME}" || -z "${ECS_CLUSTER}" || -z "${ECS_TASK_DEFINITION_FAMILY}" || -z "${ECS_SERVICE_NAME}" ]]
 then
     echo 'Skipping deployment due to missing environment configuration.'
 else
