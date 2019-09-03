@@ -216,10 +216,10 @@ func parseCompiledContracts(compilerOutputJSON []byte) (compiledContracts map[st
 
 func buildCompileCommand(source, compilerVersion string, optimizerRuns int) string {
 	if os.Getenv("SOLC_BIN") != "" {
-		return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF\n)\" | %s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, os.Getenv("SOLC_BIN"), optimizerRuns)
+		return fmt.Sprintf("cat << 'EOF' | %s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -\n%s\nEOF", os.Getenv("SOLC_BIN"), optimizerRuns, strings.Replace(source, "`", "", -1))
 	}
 	// TODO: run optimizer over certain sources if identified for frequent use via contract-internal CREATE opcodes
-	return fmt.Sprintf("echo -n \"$(cat <<-EOF\n%s\nEOF\n)\" | /usr/local/bin/solc-v%s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -", source, compilerVersion, optimizerRuns)
+	return fmt.Sprintf("cat << 'EOF' | /usr/local/bin/solc-v%s --optimize --optimize-runs %d --pretty-json --metadata-literal --combined-json abi,asm,ast,bin,bin-runtime,compact-format,devdoc,hashes,interface,metadata,opcodes,srcmap,srcmap-runtime,userdoc -\n%s\nEOF", compilerVersion, optimizerRuns, strings.Replace(source, "`", "", -1))
 }
 
 // compileContract compiles a smart contract or truffle project from source.
