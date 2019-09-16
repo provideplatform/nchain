@@ -52,13 +52,13 @@ func (c *Connector) decryptedConfig() (map[string]interface{}, error) {
 	if c.EncryptedConfig != nil {
 		encryptedConfigJSON, err := pgputil.PGPPubDecrypt([]byte(*c.EncryptedConfig))
 		if err != nil {
-			common.Log.Warningf("Failed to decrypt encrypted load balancer config; %s", err.Error())
+			common.Log.Warningf("Failed to decrypt encrypted connector config; %s", err.Error())
 			return decryptedParams, err
 		}
 
 		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
 		if err != nil {
-			common.Log.Warningf("Failed to unmarshal decrypted load balancer config; %s", err.Error())
+			common.Log.Warningf("Failed to unmarshal decrypted connector config; %s", err.Error())
 			return decryptedParams, err
 		}
 	}
@@ -69,7 +69,7 @@ func (c *Connector) encryptConfig() bool {
 	if c.EncryptedConfig != nil {
 		encryptedConfig, err := pgputil.PGPPubEncrypt([]byte(*c.EncryptedConfig))
 		if err != nil {
-			common.Log.Warningf("Failed to encrypt load balancer config; %s", err.Error())
+			common.Log.Warningf("Failed to encrypt connector config; %s", err.Error())
 			c.Errors = append(c.Errors, &provide.Error{
 				Message: common.StringOrNil(err.Error()),
 			})
