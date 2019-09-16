@@ -136,16 +136,16 @@ func (n *Node) sanitizeConfig() {
 		encryptedCfg = map[string]interface{}{}
 	}
 
+	if credentials, credentialsOk := cfg["credentials"]; credentialsOk {
+		encryptedCfg["credentials"] = credentials
+		delete(cfg, "credentials")
+	}
+
 	if env, envOk := cfg["env"].(map[string]interface{}); envOk {
 		encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
 		if !encryptedEnvOk {
 			encryptedEnv = map[string]interface{}{}
 			encryptedCfg["env"] = encryptedEnv
-		}
-
-		if credentials, credentialsOk := cfg["credentials"]; credentialsOk {
-			encryptedCfg["credentials"] = credentials
-			delete(cfg, "credentials")
 		}
 
 		if engineSignerKeyJSON, engineSignerKeyJSONOk := env["ENGINE_SIGNER_KEY_JSON"]; engineSignerKeyJSONOk {

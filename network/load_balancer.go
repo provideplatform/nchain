@@ -98,6 +98,24 @@ func (l *LoadBalancer) sanitizeConfig() {
 		delete(cfg, "credentials")
 	}
 
+	if env, envOk := cfg["env"].(map[string]interface{}); envOk {
+		encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
+		if !encryptedEnvOk {
+			encryptedEnv = map[string]interface{}{}
+			encryptedCfg["env"] = encryptedEnv
+		}
+
+		if engineSignerKeyJSON, engineSignerKeyJSONOk := env["ENGINE_SIGNER_KEY_JSON"]; engineSignerKeyJSONOk {
+			encryptedEnv["ENGINE_SIGNER_KEY_JSON"] = engineSignerKeyJSON
+			delete(env, "ENGINE_SIGNER_KEY_JSON")
+		}
+
+		if engineSignerPrivateKey, engineSignerPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"]; engineSignerPrivateKeyOk {
+			encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"] = engineSignerPrivateKey
+			delete(env, "ENGINE_SIGNER_PRIVATE_KEY")
+		}
+	}
+
 	l.setConfig(cfg)
 	l.setEncryptedConfig(encryptedCfg)
 }
