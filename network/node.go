@@ -528,6 +528,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 	env, envOk := cfg["env"].(map[string]interface{})
 	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
 
+	// TODO: move the following to P2PAPI.requireBootnotes()
 	bootnodes, err := network.requireBootnodes(db, n)
 	if err != nil {
 		switch err.(type) {
@@ -626,6 +627,11 @@ func (n *Node) deploy(db *gorm.DB) error {
 }
 
 func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) error {
+	if n.Role != nil && *n.Role == nodeRoleIPFS {
+		common.Log.Debugf("Short-circuiting genesis block resolution for IPFS node: %s", n.ID)
+		return n._deploy(network, bootnodes, db)
+	}
+
 	ticker := time.NewTicker(resolveGenesisTickerInterval)
 	startedAt := time.Now()
 	for {
