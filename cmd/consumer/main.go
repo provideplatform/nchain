@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/provideapp/goldmine/common"
+	_ "github.com/provideapp/goldmine/connector"
 	_ "github.com/provideapp/goldmine/contract"
 	_ "github.com/provideapp/goldmine/network"
 	_ "github.com/provideapp/goldmine/tx"

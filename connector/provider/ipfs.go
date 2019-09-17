@@ -61,19 +61,17 @@ func (p *IPFSProvider) Deprovision() error {
 
 	nodes := make([]*network.Node, 0)
 	p.model.Association("Nodes").Find(&nodes)
-	if len(nodes) == 0 {
-		for _, balancer := range loadBalancers {
-			msg, _ := json.Marshal(map[string]interface{}{
-				"load_balancer_id": balancer.ID,
-			})
-			common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
-		}
-	} else {
-		for _, node := range nodes {
-			common.Log.Debugf("Attempting to deprovision node %s on connector: %s", node.ID, p.connectorID)
-			p.model.Association("Nodes").Delete(node)
-			node.Delete()
-		}
+	for _, node := range nodes {
+		common.Log.Debugf("Attempting to deprovision node %s on connector: %s", node.ID, p.connectorID)
+		p.model.Association("Nodes").Delete(node)
+		node.Delete()
+	}
+
+	for _, balancer := range loadBalancers {
+		msg, _ := json.Marshal(map[string]interface{}{
+			"load_balancer_id": balancer.ID,
+		})
+		common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
 	}
 
 	return nil
@@ -92,10 +90,10 @@ func (p *IPFSProvider) Provision() error {
 		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Append(loadBalancer)
 
-		// err := p.ProvisionNode()
-		// if err != nil {
-		// 	common.Log.Warning(err.Error())
-		// }
+		err := p.ProvisionNode()
+		if err != nil {
+			common.Log.Warning(err.Error())
+		}
 	} else {
 		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
 	}

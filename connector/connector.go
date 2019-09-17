@@ -2,10 +2,12 @@ package connector
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
@@ -48,6 +50,8 @@ type Connector struct {
 	NetworkID       uuid.UUID              `sql:"not null;type:uuid" json:"network_id"`
 	Name            *string                `sql:"not null" json:"name"`
 	Type            *string                `sql:"not null" json:"type"`
+	Status          *string                `sql:"not null;default:'init'" json:"status"`
+	Description     *string                `json:"description"`
 	Config          *json.RawMessage       `sql:"type:json" json:"config"`
 	EncryptedConfig *string                `sql:"type:bytea" json:"-"`
 	AccessedAt      *time.Time             `json:"accessed_at"`
@@ -145,6 +149,8 @@ func (c *Connector) sanitizeConfig() {
 }
 
 func (c *Connector) deprovision() error {
+	c.updateStatus(dbconf.DatabaseConnection(), "deprovisioning", nil)
+
 	apiClient, err := c.connectorAPI()
 	if err != nil {
 		return fmt.Errorf("Failed to resolve connector API for %s connector: %s; %s", *c.Type, c.ID, err.Error())
@@ -157,6 +163,9 @@ func (c *Connector) deprovision() error {
 }
 
 func (c *Connector) provision() error {
+	db := dbconf.DatabaseConnection()
+	c.updateStatus(db, "provisioning", nil)
+
 	runDefaultProvisioner := false
 	cfg := c.ParseConfig()
 
@@ -172,17 +181,36 @@ func (c *Connector) provision() error {
 	if runDefaultProvisioner {
 		apiClient, err := c.connectorAPI()
 		if err != nil {
-			return fmt.Errorf("Failed to resolve connector API for connector: %s; %s", c.ID, err.Error())
+			msg := fmt.Sprintf("Failed to resolve connector API for connector: %s; %s", c.ID, err.Error())
+			c.updateStatus(db, "failed", &msg)
+			return errors.New(msg)
 		}
 		err = apiClient.Provision()
 		if err != nil {
-			return fmt.Errorf("Failed to provision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+			msg := fmt.Sprintf("Failed to provision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+			c.updateStatus(db, "failed", &msg)
+			return errors.New(msg)
 		}
 	} else {
 		common.Log.Debugf("Default provisioner not being run for connector: %s", c.ID)
+		c.updateStatus(db, "active", nil)
 	}
 
 	return nil
+}
+
+func (c *Connector) updateStatus(db *gorm.DB, status string, description *string) {
+	c.Status = common.StringOrNil(status)
+	c.Description = description
+	result := db.Save(&c)
+	errors := result.GetErrors()
+	if len(errors) > 0 {
+		for _, err := range errors {
+			c.Errors = append(c.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+		}
+	}
 }
 
 // Create and persist a new Connector
@@ -209,10 +237,10 @@ func (c *Connector) Create() bool {
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
 			if success {
-				err := c.provision()
-				if err != nil {
-					common.Log.Warningf("Failed to provision connector: %s; %s", c.ID, err.Error())
-				}
+				msg, _ := json.Marshal(map[string]interface{}{
+					"connector_id": c.ID,
+				})
+				common.NATSPublish(natsConnectorProvisioningSubject, msg)
 			}
 			return success
 		}
