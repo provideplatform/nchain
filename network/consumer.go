@@ -338,7 +338,7 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 		return
 	}
 
-	err = balancer.provision(dbconf.DatabaseConnection())
+	err = balancer.Provision(dbconf.DatabaseConnection())
 	if err != nil {
 		common.Log.Warningf("Failed to provision load balancer; %s", err.Error())
 		consumer.AttemptNack(msg, natsLoadBalancerProvisioningTimeout)
@@ -376,7 +376,7 @@ func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
 		return
 	}
 
-	err = balancer.deprovision(dbconf.DatabaseConnection())
+	err = balancer.Deprovision(dbconf.DatabaseConnection())
 	if err != nil {
 		common.Log.Warningf("Failed to deprovision load balancer; %s", err.Error())
 		consumer.AttemptNack(msg, natsLoadBalancerDeprovisioningTimeout)

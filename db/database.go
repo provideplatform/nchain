@@ -120,6 +120,12 @@ func MigrateSchema() {
 
 		db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 		db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+
+		db.Exec("ALTER TABLE connectors_load_balancers ADD CONSTRAINT connectors_load_balancers_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+		db.Exec("ALTER TABLE connectors_load_balancers ADD CONSTRAINT connectors_load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+
+		db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+		db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 	})
 }
 

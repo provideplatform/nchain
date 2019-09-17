@@ -26,6 +26,9 @@ func init() {
 	db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_status", "status")
 	db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_type", "type")
 	db.Model(&LoadBalancer{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+
+	db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+	db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 }
 
 // LoadBalancer instances represent a physical or virtual load balancer of a specific type (i.e., JSON-RPC) which belongs to a network
@@ -251,7 +254,8 @@ func (l *LoadBalancer) buildTargetGroupName(port int64) string {
 	return ethcommon.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), port)))[0:31]
 }
 
-func (l *LoadBalancer) deprovision(db *gorm.DB) error {
+// Deprovision underlying infrastructure for the load balancer instance
+func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to deprovision infrastructure for load balancer with id: %s", l.ID)
 	cfg := l.ParseConfig()
 	l.updateStatus(db, "deprovisioning", l.Description)
@@ -319,7 +323,8 @@ func (l *LoadBalancer) deprovision(db *gorm.DB) error {
 	return nil
 }
 
-func (l *LoadBalancer) provision(db *gorm.DB) error {
+// Provision underlying infrastructure for the load balancer instance
+func (l *LoadBalancer) Provision(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to provision infrastructure for load balancer with id: %s", l.ID)
 	n := &Network{}
 	db.Model(&l).Related(&n)

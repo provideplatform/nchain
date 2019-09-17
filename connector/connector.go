@@ -2,6 +2,7 @@ package connector
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/connector/provider"
+	"github.com/provideapp/goldmine/network"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -19,19 +22,37 @@ func init() {
 	db.Model(&Connector{}).AddIndex("idx_connectors_network_id", "network_id")
 	db.Model(&Connector{}).AddIndex("idx_connectors_type", "type")
 	db.Model(&Connector{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+	db.Model(&Connector{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+
+	db.Exec("ALTER TABLE connectors_load_balancers ADD CONSTRAINT connectors_load_balancers_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+	db.Exec("ALTER TABLE connectors_load_balancers ADD CONSTRAINT connectors_load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+
+	db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+	db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+}
+
+// ConnectorAPI defines an interface for connector provisioning and deprovisioning
+type ConnectorAPI interface {
+	Deprovision() error
+	Provision() error
+
+	DeprovisionNode() error
+	ProvisionNode() error
 }
 
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;
 // in the future it may represent a logical connection to services of other types
 type Connector struct {
 	provide.Model
-	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	Name            *string          `sql:"not null" json:"name"`
-	Type            *string          `sql:"not null" json:"type"`
-	Config          *json.RawMessage `sql:"type:json" json:"config"`
-	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
-	AccessedAt      *time.Time       `json:"accessed_at"`
+	ApplicationID   *uuid.UUID             `sql:"type:uuid" json:"application_id"`
+	NetworkID       uuid.UUID              `sql:"not null;type:uuid" json:"network_id"`
+	Name            *string                `sql:"not null" json:"name"`
+	Type            *string                `sql:"not null" json:"type"`
+	Config          *json.RawMessage       `sql:"type:json" json:"config"`
+	EncryptedConfig *string                `sql:"type:bytea" json:"-"`
+	AccessedAt      *time.Time             `json:"accessed_at"`
+	LoadBalancer    []network.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
+	Nodes           []network.Node         `gorm:"many2many:connectors_nodes" json:"-"`
 }
 
 // ParseConfig - parse the original JSON params used for Connector creation
@@ -110,6 +131,30 @@ func (c *Connector) sanitizeConfig() {
 	c.setEncryptedConfig(encryptedCfg)
 }
 
+func (c *Connector) deprovision() error {
+	apiClient, err := c.connectorAPI()
+	if err != nil {
+		return fmt.Errorf("Failed to resolve connector API for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+	err = apiClient.Deprovision()
+	if err != nil {
+		return fmt.Errorf("Failed to deprovision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+	return nil
+}
+
+func (c *Connector) provision() error {
+	apiClient, err := c.connectorAPI()
+	if err != nil {
+		return fmt.Errorf("Failed to resolve connector API for connector: %s; %s", c.ID, err.Error())
+	}
+	err = apiClient.Provision()
+	if err != nil {
+		return fmt.Errorf("Failed to provision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+	return nil
+}
+
 // Create and persist a new Connector
 func (c *Connector) Create() bool {
 	db := dbconf.DatabaseConnection()
@@ -132,7 +177,11 @@ func (c *Connector) Create() bool {
 			}
 		}
 		if !db.NewRecord(c) {
-			return rowsAffected > 0
+			success := rowsAffected > 0
+			if success {
+				c.provision()
+			}
+			return success
 		}
 	}
 	return false
@@ -166,5 +215,28 @@ func (c *Connector) Delete() bool {
 			})
 		}
 	}
-	return len(c.Errors) == 0
+	success := len(c.Errors) == 0
+	if success {
+		c.deprovision()
+	}
+	return success
+}
+
+// connectorAPI returns an instance of the connector's underlying ConnectorAPI
+func (c *Connector) connectorAPI() (ConnectorAPI, error) {
+	if c.Type == nil {
+		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
+	}
+
+	db := dbconf.DatabaseConnection()
+	var apiClient ConnectorAPI
+
+	switch *c.Type {
+	case provider.IPFSConnectorProvider:
+		apiClient = provider.InitIPFSProvider(c.ID, db.Model(c), c.ParseConfig())
+	default:
+		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
+	}
+
+	return apiClient, nil
 }
