@@ -51,7 +51,7 @@ type Connector struct {
 	Config          *json.RawMessage       `sql:"type:json" json:"config"`
 	EncryptedConfig *string                `sql:"type:bytea" json:"-"`
 	AccessedAt      *time.Time             `json:"accessed_at"`
-	LoadBalancer    []network.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
+	LoadBalancers   []network.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
 	Nodes           []network.Node         `gorm:"many2many:connectors_nodes" json:"-"`
 }
 
@@ -101,6 +101,19 @@ func (c *Connector) encryptConfig() bool {
 	return true
 }
 
+func (c *Connector) mergedConfig() map[string]interface{} {
+	cfg := c.ParseConfig()
+	encryptedConfig, err := c.decryptedConfig()
+	if err != nil {
+		encryptedConfig = map[string]interface{}{}
+	}
+
+	for k := range encryptedConfig {
+		cfg[k] = encryptedConfig[k]
+	}
+	return cfg
+}
+
 func (c *Connector) setConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
 	_cfgJSON := json.RawMessage(cfgJSON)
@@ -144,14 +157,31 @@ func (c *Connector) deprovision() error {
 }
 
 func (c *Connector) provision() error {
-	apiClient, err := c.connectorAPI()
-	if err != nil {
-		return fmt.Errorf("Failed to resolve connector API for connector: %s; %s", c.ID, err.Error())
+	runDefaultProvisioner := false
+	cfg := c.ParseConfig()
+
+	switch *c.Type {
+	case provider.IPFSConnectorProvider:
+		_, gatewayURLOk := cfg["gateway_url"].(string)
+		_, rpcURLOk := cfg["rpc_url"].(string)
+		runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
+	default:
+		// no-op
 	}
-	err = apiClient.Provision()
-	if err != nil {
-		return fmt.Errorf("Failed to provision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+
+	if runDefaultProvisioner {
+		apiClient, err := c.connectorAPI()
+		if err != nil {
+			return fmt.Errorf("Failed to resolve connector API for connector: %s; %s", c.ID, err.Error())
+		}
+		err = apiClient.Provision()
+		if err != nil {
+			return fmt.Errorf("Failed to provision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+		}
+	} else {
+		common.Log.Debugf("Default provisioner not being run for connector: %s", c.ID)
 	}
+
 	return nil
 }
 
@@ -178,21 +208,10 @@ func (c *Connector) Create() bool {
 		}
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
-			if success && c.Type != nil {
-				runDefaultProvisioner := false
-				cfg := c.ParseConfig()
-
-				switch *c.Type {
-				case provider.IPFSConnectorProvider:
-					_, gatewayURLOk := cfg["gateway_url"].(string)
-					_, rpcURLOk := cfg["rpc_url"].(string)
-					runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
-				default:
-					// no-op
-				}
-
-				if runDefaultProvisioner {
-					c.provision()
+			if success {
+				err := c.provision()
+				if err != nil {
+					common.Log.Warningf("Failed to provision connector: %s; %s", c.ID, err.Error())
 				}
 			}
 			return success
@@ -219,6 +238,11 @@ func (c *Connector) Validate() bool {
 
 // Delete a connector
 func (c *Connector) Delete() bool {
+	err := c.deprovision()
+	if err != nil {
+		return false
+	}
+
 	db := dbconf.DatabaseConnection()
 	result := db.Delete(c)
 	errors := result.GetErrors()
@@ -229,11 +253,7 @@ func (c *Connector) Delete() bool {
 			})
 		}
 	}
-	success := len(c.Errors) == 0
-	if success {
-		c.deprovision()
-	}
-	return success
+	return len(c.Errors) == 0
 }
 
 // connectorAPI returns an instance of the connector's underlying ConnectorAPI
@@ -247,7 +267,7 @@ func (c *Connector) connectorAPI() (ConnectorAPI, error) {
 
 	switch *c.Type {
 	case provider.IPFSConnectorProvider:
-		apiClient = provider.InitIPFSProvider(c.ID, &c.NetworkID, c.ApplicationID, db.Model(c), c.ParseConfig())
+		apiClient = provider.InitIPFSProvider(c.ID, &c.NetworkID, c.ApplicationID, db.Model(c), c.mergedConfig())
 	default:
 		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
 	}

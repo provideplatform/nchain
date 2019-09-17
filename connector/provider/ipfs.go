@@ -30,8 +30,8 @@ type IPFSProvider struct {
 // InitIPFSProvider initializes and returns the IPFS connector API provider
 func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *IPFSProvider {
 	region, regionOk := config["region"].(string)
-	apiPort, apiPortOk := config["api_port"].(int)
-	gatewayPort, gatewayPortOk := config["gateway_port"].(int)
+	apiPort, apiPortOk := config["api_port"].(float64)
+	gatewayPort, gatewayPortOk := config["gateway_port"].(float64)
 	if connectorID == uuid.Nil || !regionOk || !apiPortOk || !gatewayPortOk || networkID == nil || *networkID == uuid.Nil {
 		return nil
 	}
@@ -42,8 +42,8 @@ func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID
 		networkID:     networkID,
 		applicationID: applicationID,
 		region:        common.StringOrNil(region),
-		apiPort:       apiPort,
-		gatewayPort:   gatewayPort,
+		apiPort:       int(apiPort),
+		gatewayPort:   int(gatewayPort),
 	}
 }
 
@@ -96,9 +96,10 @@ func (p *IPFSProvider) Provision() error {
 	}
 
 	if loadBalancer.Create() {
+		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Append(loadBalancer)
 	} else {
-		return fmt.Errorf("Failed to provision load balancer on connector: %s", p.connectorID)
+		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
 	}
 
 	return nil
@@ -119,8 +120,8 @@ func (p *IPFSProvider) ProvisionNode() error {
 	}
 
 	if node.Create() {
+		common.Log.Debugf("Created node %s on connector: %s", node.ID, p.connectorID)
 		p.model.Association("Nodes").Append(node)
-
 	} else {
 		return fmt.Errorf("Failed to provision node on connector: %s", p.connectorID)
 	}

@@ -125,6 +125,11 @@ func (l *LoadBalancer) sanitizeConfig() {
 
 // Create and persist a new load balancer
 func (l *LoadBalancer) Create() bool {
+	if l.Name == nil {
+		lbUUID, _ := uuid.NewV4()
+		l.Name = common.StringOrNil(fmt.Sprintf("%s", lbUUID.String()[0:31]))
+	}
+
 	if !l.Validate() {
 		return false
 	}
@@ -473,12 +478,15 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 					for _, loadBalancer := range loadBalancersResp.LoadBalancers {
 						balancerCfg["load_balancer_name"] = l.Name
 						balancerCfg["load_balancer_url"] = loadBalancer.DNSName
-						balancerCfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
-						balancerCfg["json_rpc_port"] = jsonRPCPort
-						balancerCfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
-						balancerCfg["websocket_port"] = websocketPort
 						balancerCfg["target_balancer_id"] = loadBalancer.LoadBalancerArn
 						balancerCfg["vpc_id"] = loadBalancer.VpcId
+
+						if loadBalancer.Type != nil && *loadBalancer.Type == "rpc" {
+							balancerCfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
+							balancerCfg["json_rpc_port"] = jsonRPCPort
+							balancerCfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *loadBalancer.DNSName, websocketPort)
+							balancerCfg["websocket_port"] = websocketPort
+						}
 
 						l.Host = loadBalancer.DNSName
 						l.setConfig(balancerCfg)
