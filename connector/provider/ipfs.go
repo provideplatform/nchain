@@ -2,7 +2,6 @@ package provider
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -59,13 +58,9 @@ func (p *IPFSProvider) Deprovision() error {
 	nodes := make([]*network.Node, 0)
 	p.model.Association("Nodes").Find(&nodes)
 	for _, node := range nodes {
-		if node.Delete() {
-			common.Log.Debugf("Removed node %s on connector: %s", node.ID, p.connectorID)
-		} else {
-			msg := fmt.Sprintf("Failed to deprovision node %s on connector: %s", node.ID, p.connectorID)
-			common.Log.Warningf(msg)
-			return errors.New(msg)
-		}
+		common.Log.Debugf("Attempting to deprovision node %s on connector: %s", node.ID, p.connectorID)
+		p.model.Association("Nodes").Delete(node)
+		node.Delete()
 	}
 
 	loadBalancers := make([]*network.LoadBalancer, 0)
@@ -73,14 +68,8 @@ func (p *IPFSProvider) Deprovision() error {
 	for _, balancer := range loadBalancers {
 		// TODO: should this be async to wait for nodes to be deprovisioned?
 		common.Log.Debugf("Attempting to deprovision load balancer %s on connector: %s", balancer.ID, p.connectorID)
-		err := balancer.Deprovision(db)
-		if err != nil {
-			msg := fmt.Sprintf("Failed to deprovision load balancer %s on connector: %s; %s", balancer.ID, p.connectorID, err.Error())
-			common.Log.Warningf(msg)
-			return errors.New(msg)
-		} else {
-			p.model.Association("LoadBalancers").Delete(balancer)
-		}
+		p.model.Association("LoadBalancers").Delete(balancer)
+		balancer.Deprovision(db)
 	}
 
 	return nil
