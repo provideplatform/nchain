@@ -247,7 +247,7 @@ func (c *Connector) connectorAPI() (ConnectorAPI, error) {
 
 	switch *c.Type {
 	case provider.IPFSConnectorProvider:
-		apiClient = provider.InitIPFSProvider(c.ID, db.Model(c), c.ParseConfig())
+		apiClient = provider.InitIPFSProvider(c.ID, &c.NetworkID, c.ApplicationID, db.Model(c), c.ParseConfig())
 	default:
 		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
 	}
