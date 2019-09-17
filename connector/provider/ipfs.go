@@ -12,6 +12,7 @@ import (
 )
 
 const IPFSConnectorProvider = "ipfs"
+const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 
 // IPFSProvider is a connector.ConnectorAPI implementing orchestration for IPFS
@@ -118,6 +119,16 @@ func (p *IPFSProvider) ProvisionNode() error {
 	if node.Create() {
 		common.Log.Debugf("Created node %s on connector: %s", node.ID, p.connectorID)
 		p.model.Association("Nodes").Append(node)
+
+		loadBalancers := make([]*network.LoadBalancer, 0)
+		p.model.Association("LoadBalancers").Find(&loadBalancers)
+		for _, balancer := range loadBalancers {
+			msg, _ := json.Marshal(map[string]interface{}{
+				"load_balancer_id": balancer.ID.String(),
+				"network_node_id":  node.ID.String(),
+			})
+			common.NATSPublish(natsLoadBalancerBalanceNodeSubject, msg)
+		}
 	} else {
 		return fmt.Errorf("Failed to provision node on connector: %s", p.connectorID)
 	}
