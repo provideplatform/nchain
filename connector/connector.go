@@ -178,8 +178,22 @@ func (c *Connector) Create() bool {
 		}
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
-			if success {
-				c.provision()
+			if success && c.Type != nil {
+				runDefaultProvisioner := false
+				cfg := c.ParseConfig()
+
+				switch *c.Type {
+				case provider.IPFSConnectorProvider:
+					_, gatewayURLOk := cfg["gateway_url"].(string)
+					_, rpcURLOk := cfg["rpc_url"].(string)
+					runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
+				default:
+					// no-op
+				}
+
+				if runDefaultProvisioner {
+					c.provision()
+				}
 			}
 			return success
 		}
