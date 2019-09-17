@@ -6,13 +6,13 @@ import (
 
 	"github.com/jinzhu/gorm"
 
-	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network"
 )
 
 const IPFSConnectorProvider = "ipfs"
+const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 
 // IPFSProvider is a connector.ConnectorAPI implementing orchestration for IPFS
 type IPFSProvider struct {
@@ -53,23 +53,27 @@ func (p *IPFSProvider) rawConfig() *json.RawMessage {
 }
 
 func (p *IPFSProvider) Deprovision() error {
-	db := dbconf.DatabaseConnection()
-
-	nodes := make([]*network.Node, 0)
-	p.model.Association("Nodes").Find(&nodes)
-	for _, node := range nodes {
-		common.Log.Debugf("Attempting to deprovision node %s on connector: %s", node.ID, p.connectorID)
-		p.model.Association("Nodes").Delete(node)
-		node.Delete()
-	}
-
 	loadBalancers := make([]*network.LoadBalancer, 0)
 	p.model.Association("LoadBalancers").Find(&loadBalancers)
 	for _, balancer := range loadBalancers {
-		// TODO: should this be async to wait for nodes to be deprovisioned?
-		common.Log.Debugf("Attempting to deprovision load balancer %s on connector: %s", balancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Delete(balancer)
-		balancer.Deprovision(db)
+	}
+
+	nodes := make([]*network.Node, 0)
+	p.model.Association("Nodes").Find(&nodes)
+	if len(nodes) == 0 {
+		for _, balancer := range loadBalancers {
+			msg, _ := json.Marshal(map[string]interface{}{
+				"load_balancer_id": balancer.ID,
+			})
+			common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
+		}
+	} else {
+		for _, node := range nodes {
+			common.Log.Debugf("Attempting to deprovision node %s on connector: %s", node.ID, p.connectorID)
+			p.model.Association("Nodes").Delete(node)
+			node.Delete()
+		}
 	}
 
 	return nil
@@ -88,10 +92,10 @@ func (p *IPFSProvider) Provision() error {
 		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Append(loadBalancer)
 
-		err := p.ProvisionNode()
-		if err != nil {
-			common.Log.Warning(err.Error())
-		}
+		// err := p.ProvisionNode()
+		// if err != nil {
+		// 	common.Log.Warning(err.Error())
+		// }
 	} else {
 		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
 	}
