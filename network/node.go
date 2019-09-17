@@ -36,6 +36,12 @@ const securityGroupTerminationTickerTimeout = time.Minute * 10
 
 const defaultClient = "parity"
 
+const nodeRoleBlockExplorer = "explorer"
+const nodeRoleFull = "full"
+const nodeRolePeer = "peer"
+const nodeRoleValidator = "validator"
+const nodeRoleIPFS = "ipfs"
+
 var engineToNodeClientEnvMapping = map[string]string{"aura": "parity", "handshake": "handshake"}
 
 func init() {
@@ -1008,12 +1014,10 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 	role, roleOk := cfg["role"].(string)
 	if roleOk {
-		if role == "explorer" {
+		if role == nodeRoleBlockExplorer {
 			go network.resolveAndBalanceExplorerUrls(db, n)
-		} else if role == "faucet" {
-			common.Log.Warningf("Faucet role not yet supported")
-		} else if role == "studio" {
-			go network.resolveAndBalanceStudioUrls(db, n)
+		} else if role == nodeRoleIPFS {
+			go network.resolveAndBalanceIPFSUrls(db, n)
 		}
 	}
 
@@ -1043,7 +1047,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	role, roleOk := cfg["role"].(string)
-	if !roleOk || role != "peer" && role != "full" && role != "validator" {
+	if !roleOk || role != nodeRolePeer && role != nodeRoleFull && role != nodeRoleValidator {
 		return nil
 	}
 
@@ -1056,6 +1060,8 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	_, regionOk := cfg["region"].(string)
+
+	// TODO: use P2PAPI ResolvePeerURL()
 
 	orchestrationAPI, err := n.orchestrationAPIClient()
 	if err != nil {
@@ -1133,8 +1139,9 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	*n.Config = json.RawMessage(cfgJSON)
 	db.Save(&n)
 
-	if role == "peer" || role == "full" || role == "validator" || role == "faucet" {
+	if role == nodeRolePeer || role == nodeRoleFull || role == nodeRoleValidator {
 		go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
+		// TODO: determine if the node is running IPFS; if so: go network.resolveAndBalanceIPFSUrls(db, n)
 	}
 
 	return nil
