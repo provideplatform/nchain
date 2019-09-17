@@ -17,29 +17,33 @@ const IPFSConnectorProvider = "ipfs"
 
 // IPFSProvider is a connector.ConnectorAPI implementing orchestration for IPFS
 type IPFSProvider struct {
-	connectorID uuid.UUID
-	model       *gorm.DB
-	config      map[string]interface{}
-	region      *string
-	apiPort     int
-	gatewayPort int
+	connectorID   uuid.UUID
+	model         *gorm.DB
+	config        map[string]interface{}
+	networkID     *uuid.UUID
+	applicationID *uuid.UUID
+	region        *string
+	apiPort       int
+	gatewayPort   int
 }
 
 // InitIPFSProvider initializes and returns the IPFS connector API provider
-func InitIPFSProvider(connectorID uuid.UUID, model *gorm.DB, config map[string]interface{}) *IPFSProvider {
+func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *IPFSProvider {
 	region, regionOk := config["region"].(string)
 	apiPort, apiPortOk := config["api_port"].(int)
 	gatewayPort, gatewayPortOk := config["gateway_port"].(int)
-	if connectorID == uuid.Nil || !regionOk || !apiPortOk || !gatewayPortOk {
+	if connectorID == uuid.Nil || !regionOk || !apiPortOk || !gatewayPortOk || networkID == nil || *networkID == uuid.Nil {
 		return nil
 	}
 	return &IPFSProvider{
-		connectorID: connectorID,
-		model:       model,
-		config:      config,
-		region:      common.StringOrNil(region),
-		apiPort:     apiPort,
-		gatewayPort: gatewayPort,
+		connectorID:   connectorID,
+		model:         model,
+		config:        config,
+		networkID:     networkID,
+		applicationID: applicationID,
+		region:        common.StringOrNil(region),
+		apiPort:       apiPort,
+		gatewayPort:   gatewayPort,
 	}
 }
 
@@ -84,7 +88,7 @@ func (p *IPFSProvider) Deprovision() error {
 
 func (p *IPFSProvider) Provision() error {
 	loadBalancer := &network.LoadBalancer{
-		Name:        common.StringOrNil(fmt.Sprintf("IPFS Connector Load Balancer")),
+		NetworkID:   *p.networkID,
 		Type:        common.StringOrNil(IPFSConnectorProvider),
 		Description: common.StringOrNil(fmt.Sprintf("IPFS Connector Load Balancer")),
 		Region:      p.region,
@@ -109,7 +113,9 @@ func (p *IPFSProvider) DeprovisionNode() error {
 
 func (p *IPFSProvider) ProvisionNode() error {
 	node := &network.Node{
-		Config: p.rawConfig(),
+		NetworkID:     *p.networkID,
+		ApplicationID: p.applicationID,
+		Config:        p.rawConfig(),
 	}
 
 	if node.Create() {
