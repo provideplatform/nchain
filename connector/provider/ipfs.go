@@ -87,6 +87,11 @@ func (p *IPFSProvider) Provision() error {
 	if loadBalancer.Create() {
 		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Append(loadBalancer)
+
+		err := p.ProvisionNode()
+		if err != nil {
+			common.Log.Warning(err.Error())
+		}
 	} else {
 		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
 	}
