@@ -875,19 +875,32 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 						}
 					}
 
-					if client, clientOk := networkCfg["client"].(string); clientOk {
-						envOverrides["CLIENT"] = client
-					} else {
-						if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
-							envOverrides["CLIENT"] = defaultClientEnv
+					networkClient, networkClientOk := networkCfg["client"].(string)
+					if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
+						if networkClientOk {
+							envOverrides["CLIENT"] = networkClient
 						} else {
-							envOverrides["CLIENT"] = defaultClient
+							if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+								envOverrides["CLIENT"] = defaultClientEnv
+							} else {
+								envOverrides["CLIENT"] = defaultClient
+							}
 						}
+					} else if networkClientOk {
+						client := envOverrides["CLIENT"].(string)
+						common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
 					}
 
-					if chain, chainOk := networkCfg["chain"].(string); chainOk {
-						envOverrides["CHAIN"] = chain
+					networkChain, networkChainOk := networkCfg["chain"].(string)
+					if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
+						if networkChainOk {
+							envOverrides["CHAIN"] = networkChain
+						}
+					} else if networkChainOk {
+						chain := envOverrides["CHAIN"].(string)
+						common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
 					}
+
 					overrides := map[string]interface{}{
 						"environment": envOverrides,
 					}
