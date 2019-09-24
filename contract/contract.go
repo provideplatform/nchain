@@ -72,76 +72,6 @@ func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
 	return artifact
 }
 
-// Compile the contract if possible
-func (c *Contract) Compile() (*provide.CompiledArtifact, error) {
-	var artifact *provide.CompiledArtifact
-	var err error
-
-	params := c.ParseParams()
-	lang, langOk := params["lang"].(string)
-	if !langOk {
-		return nil, fmt.Errorf("Failed to parse wallet id for solidity source compile; %s", err.Error())
-	}
-	rawSource, rawSourceOk := params["raw_source"].(string)
-	if !rawSourceOk {
-		return nil, fmt.Errorf("Failed to compile contract; no source code resolved")
-	}
-	common.Log.Debugf("Attempting to compile %d-byte raw source code; lang: %s", len(rawSource), lang)
-	db := dbconf.DatabaseConnection()
-
-	var walletID *uuid.UUID
-	if _walletID, walletIdOk := params["wallet_id"].(string); walletIdOk {
-		__walletID, err := uuid.FromString(_walletID)
-		walletID = &__walletID
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse wallet id for solidity source compile; %s", err.Error())
-		}
-	}
-
-	var network = &network.Network{}
-	db.Model(c).Related(&network)
-
-	argv := make([]interface{}, 0)
-	if _argv, argvOk := params["argv"].([]interface{}); argvOk {
-		argv = _argv
-	}
-
-	if network.IsEthereumNetwork() {
-		optimizerRuns := 200
-		if _optimizerRuns, optimizerRunsOk := params["optimizer_runs"].(int); optimizerRunsOk {
-			optimizerRuns = _optimizerRuns
-		}
-
-		artifact, err = compileSolidity(*c.Name, rawSource, argv, optimizerRuns)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to compile solidity source; %s", err.Error())
-		}
-	}
-
-	artifactJSON, _ := json.Marshal(artifact)
-	deployableArtifactJSON := json.RawMessage(artifactJSON)
-
-	publishedAt := time.Now() // HACK-- is this a hack? we aren't actually publishing a goldmine.tx message but this still feels reasonable for e2e instrumentation...
-
-	params = map[string]interface{}{
-		"contract_id":  c.ID,
-		"data":         artifact.Bytecode,
-		"wallet_id":    walletID,
-		"value":        0,
-		"params":       deployableArtifactJSON,
-		"published_at": publishedAt,
-	}
-
-	txCreationMsg, err := json.Marshal(params)
-	if err != nil {
-		common.Log.Warningf("Failed to marshal params for tx creation; %s", err.Error())
-	}
-
-	common.NATSPublish(natsTxCreateSubject, txCreationMsg)
-
-	return artifact, nil
-}
-
 // GetNetwork - retrieve the associated contract network
 func (c *Contract) GetNetwork() (*network.Network, error) {
 	db := dbconf.DatabaseConnection()
@@ -253,13 +183,19 @@ func (c *Contract) Create() bool {
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
 			if success {
-				params := c.ParseParams()
-				_, rawSourceOk := params["raw_source"].(string)
-				if rawSourceOk {
-					msg, _ := json.Marshal(map[string]interface{}{
-						"contract_id": c.ID.String(),
+				compiledArtifact := c.CompiledArtifact()
+				if compiledArtifact != nil {
+					artifactJSON, _ := json.Marshal(compiledArtifact)
+					deployableArtifactJSON := json.RawMessage(artifactJSON)
+					txCreationMsg, _ := json.Marshal(map[string]interface{}{
+						"contract_id":  c.ID,
+						"data":         compiledArtifact.Bytecode,
+						"wallet_id":    c.Address,
+						"value":        0,
+						"params":       deployableArtifactJSON,
+						"published_at": time.Now(),
 					})
-					common.NATSPublish(natsContractCompilerInvocationSubject, msg)
+					common.NATSPublish(natsTxCreateSubject, txCreationMsg)
 				}
 			}
 			return success

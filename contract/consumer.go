@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
@@ -13,12 +12,8 @@ import (
 	"github.com/provideapp/goldmine/consumer"
 )
 
-const natsContractCompilerInvocationTimeout = time.Minute * 1
-const natsContractCompilerInvocationSubject = "goldmine.contract.compiler-invocation"
-const natsContractCompilerInvocationMaxInFlight = 32
-
 const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
-const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
+const natsNetworkContractCreateInvocationSubject = "goldmine.contract.create"
 const natsNetworkContractCreateInvocationMaxInFlight = 32
 
 var waitGroup sync.WaitGroup
@@ -29,71 +24,19 @@ func init() {
 		return
 	}
 
-	createNatsContractCompilerInvocationSubscriptions(&waitGroup)
 	createNatsNetworkContractCreateInvocationSubscriptions(&waitGroup)
-}
-
-func createNatsContractCompilerInvocationSubscriptions(wg *sync.WaitGroup) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
-			natsContractCompilerInvocationTimeout,
-			natsContractCompilerInvocationSubject,
-			natsContractCompilerInvocationSubject,
-			consumeContractCompilerInvocationMsg,
-			natsContractCompilerInvocationTimeout,
-			natsContractCompilerInvocationMaxInFlight,
-		)
-	}
 }
 
 func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsStreamingSubscription(wg,
-			natsContractCompilerInvocationTimeout,
+			natsNetworkContractCreateInvocationTimeout,
 			natsNetworkContractCreateInvocationSubject,
 			natsNetworkContractCreateInvocationSubject,
 			consumeNetworkContractCreateInvocationMsg,
 			natsNetworkContractCreateInvocationTimeout,
 			natsNetworkContractCreateInvocationMaxInFlight,
 		)
-	}
-}
-
-func consumeContractCompilerInvocationMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS contract compiler invocation message: %s", msg)
-
-	var params map[string]interface{}
-	err := json.Unmarshal(msg.Data, &params)
-	if err != nil {
-		common.Log.Warningf("Failed to umarshal contract compiler invocation message; %s", err.Error())
-		consumer.Nack(msg)
-		return
-	}
-
-	contractID, contractIDOk := params["contract_id"].(string)
-	if !contractIDOk {
-		common.Log.Warning("Failed to compile contract; contract_id not provided")
-		consumer.Nack(msg)
-		return
-	}
-
-	contract := &Contract{}
-	db := dbconf.DatabaseConnection()
-	db.Where("id = ?", contractID).Find(&contract)
-
-	if contract == nil || contract.ID == uuid.Nil {
-		common.Log.Warningf("Failed to compile contract; no contract resolved for %s", contractID)
-		consumer.Nack(msg)
-		return
-	}
-
-	_, err = contract.Compile()
-	if err != nil {
-		common.Log.Warningf("Failed to compile contract; %s", err.Error())
-		consumer.Nack(msg)
-	} else {
-		common.Log.Debugf("Contract compiler invocation succeeded; ACKing NATS message for contract: %s", contract.ID)
-		msg.Ack()
 	}
 }
 
