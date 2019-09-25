@@ -1,5 +1,5 @@
 hash: 7efd5b7718748514d64bd1afb40a74972a8e347474bfd26af16f341db5e0b51c
-updated: 2019-08-21T12:04:35.675455-04:00
+updated: 2019-09-25T02:45:56.25612-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -126,7 +126,7 @@ imports:
 - name: github.com/google/logger
   version: 03bdf7bcb2c4d98c8fdbf62f1473fb1303ca1c1d
 - name: github.com/gorilla/websocket
-  version: 66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d
+  version: c3e18be99d19e6b3e8f1559eea2c161a665c4b6b
 - name: github.com/jinzhu/gorm
   version: 836fb2c19d84dac7b0272958dfb9af7cf0d0ade4
   subpackages:
@@ -144,7 +144,7 @@ imports:
 - name: github.com/kthomas/go-aws-config
   version: b7870ac562affcec9bca207a432af6e5bf0e4b3e
 - name: github.com/kthomas/go-aws-wrapper
-  version: e7ee3da56842f267e43690d871f581ea76e3c3e8
+  version: e00dcbdae4563683d3ac9379d2add5759af5285f
 - name: github.com/kthomas/go-db-config
   version: fe566ecb4d7e3e2e1cf39d3a739e1ecfbec912f8
 - name: github.com/kthomas/go-logger

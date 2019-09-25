@@ -558,6 +558,23 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 			if !targetGroupsOk {
 				common.Log.Debugf("Attempting to lazily initialize load balanced target groups for network node %s on balancer: %s", node.ID, l.ID)
 
+				var healthCheckPort *int64
+				var healthCheckStatusCode *int64
+				var healthCheckPath *string
+				if healthCheck, healthCheckOk := securityCfg["health_check"].(map[string]interface{}); healthCheckOk {
+					if hcPort, hcPortOk := healthCheck["port"].(float64); hcPortOk {
+						_hcPort := int64(hcPort)
+						healthCheckPort = &_hcPort
+					}
+					if hcStatusCode, hcStatusCodeOk := healthCheck["status_code"].(float64); hcStatusCodeOk {
+						_hcStatusCode := int64(hcStatusCode)
+						healthCheckStatusCode = &_hcStatusCode
+					}
+					if hcPath, hcPathOk := healthCheck["path"].(string); hcPathOk {
+						healthCheckPath = common.StringOrNil(hcPath)
+					}
+				}
+
 				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
 					common.Log.Debugf("Found security group ingress rules to apply to load balanced target group for network node %s on balancer: %s", node.ID, l.ID)
 
@@ -576,7 +593,15 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 							for _, tcpPort := range tcp {
 								targetGroupName := l.buildTargetGroupName(tcpPort)
-								targetGroup, err := orchestrationAPI.CreateTargetGroup(common.StringOrNil(vpcID), common.StringOrNil(targetGroupName), common.StringOrNil("HTTP"), tcpPort)
+								targetGroup, err := orchestrationAPI.CreateTargetGroup(
+									common.StringOrNil(vpcID),
+									common.StringOrNil(targetGroupName),
+									common.StringOrNil("HTTP"),
+									tcpPort,
+									healthCheckPort,
+									healthCheckStatusCode,
+									healthCheckPath,
+								)
 								if err != nil {
 									if aerr, ok := err.(awserr.Error); ok {
 										switch aerr.Code() {

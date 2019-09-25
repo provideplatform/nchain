@@ -104,8 +104,8 @@ func (p *AWSOrchestrationProvider) GetTargetGroup(targetGroupName string) (respo
 }
 
 // CreateTargetGroup needs docs
-func (p *AWSOrchestrationProvider) CreateTargetGroup(vpcID *string, name, protocol *string, port int64) (response *elbv2.CreateTargetGroupOutput, err error) {
-	return awswrapper.CreateTargetGroup(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, protocol, port)
+func (p *AWSOrchestrationProvider) CreateTargetGroup(vpcID *string, name, protocol *string, port int64, healthCheckPort, healthCheckStatusCode *int64, healthCheckPath *string) (response *elbv2.CreateTargetGroupOutput, err error) {
+	return awswrapper.CreateTargetGroup(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, protocol, port, healthCheckPort, healthCheckStatusCode, healthCheckPath)
 
 }
 

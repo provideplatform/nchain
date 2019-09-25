@@ -28,7 +28,7 @@ type OrchestrationAPI interface {
 	GetLoadBalancersV2(loadBalancerArn *string, loadBalancerName *string) (response *elbv2.DescribeLoadBalancersOutput, err error)
 
 	GetTargetGroup(targetGroupName string) (response *elbv2.DescribeTargetGroupsOutput, err error)
-	CreateTargetGroup(vpcID *string, name, protocol *string, port int64) (response *elbv2.CreateTargetGroupOutput, err error)
+	CreateTargetGroup(vpcID *string, name, protocol *string, port int64, healthCheckPort, healthCheckStatusCode *int64, healthCheckPath *string) (response *elbv2.CreateTargetGroupOutput, err error)
 	DeleteTargetGroup(targetGroupARN *string) (response *elbv2.DeleteTargetGroupOutput, err error)
 	RegisterTarget(targetGroupARN, ipAddress *string, port *int64) (response *elbv2.RegisterTargetsOutput, err error)
 	DeregisterTarget(targetGroupARN, ipAddress *string, port *int64) (response *elbv2.DeregisterTargetsOutput, err error)
