@@ -19,7 +19,6 @@ func InstallContractsAPI(r *gin.Engine) {
 	r.POST("/api/v1/contracts", createContractHandler)
 	r.GET("/api/v1/networks/:id/contracts", networkContractsListHandler)
 	r.GET("/api/v1/networks/:id/contracts/:contractId", networkContractDetailsHandler)
-
 }
 
 func contractsListHandler(c *gin.Context) {

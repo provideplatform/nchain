@@ -63,10 +63,14 @@ func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
 	artifact := &provide.CompiledArtifact{}
 	params := c.ParseParams()
 	if params != nil {
-		err := json.Unmarshal(*c.Params, &artifact)
-		if err != nil {
-			common.Log.Warningf("Failed to unmarshal contract params to compiled artifact; %s", err.Error())
-			return nil
+		if compiledArtifact, compiledArtifactOk := params["compiled_artifact"].(map[string]interface{}); compiledArtifactOk {
+			compiledArtifactJSON, _ := json.Marshal(compiledArtifact)
+			compiledArtifactRawJSON := json.RawMessage(compiledArtifactJSON)
+			err := json.Unmarshal(compiledArtifactRawJSON, &artifact)
+			if err != nil {
+				common.Log.Warningf("Failed to unmarshal contract params to compiled artifact; %s", err.Error())
+				return nil
+			}
 		}
 	}
 	return artifact
@@ -185,13 +189,18 @@ func (c *Contract) Create() bool {
 			if success {
 				compiledArtifact := c.CompiledArtifact()
 				if compiledArtifact != nil {
+					params := c.ParseParams()
+					value := uint64(0)
+					if val, valOk := params["value"].(float64); valOk {
+						value = uint64(val)
+					}
 					artifactJSON, _ := json.Marshal(compiledArtifact)
 					deployableArtifactJSON := json.RawMessage(artifactJSON)
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
 						"contract_id":  c.ID,
 						"data":         compiledArtifact.Bytecode,
-						"wallet_id":    c.Address,
-						"value":        0,
+						"wallet_id":    common.StringOrNil(params["wallet_id"].(string)),
+						"value":        value,
 						"params":       deployableArtifactJSON,
 						"published_at": time.Now(),
 					})
