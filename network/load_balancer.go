@@ -18,6 +18,10 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
+const loadBalancerTypeBlockExplorer = "explorer"
+const loadBalancerTypeRPC = "rpc"
+const loadBalancerTypeIPFS = "ipfs"
+
 func init() {
 	db := dbconf.DatabaseConnection()
 	db.AutoMigrate(&LoadBalancer{})
@@ -520,7 +524,9 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 	db.Model(l).Association("Nodes").Append(node)
 
 	network := node.relatedNetwork(db)
-	network.setIsLoadBalanced(db, true)
+	if l.Type != nil && *l.Type == loadBalancerTypeRPC {
+		network.setIsLoadBalanced(db, true)
+	}
 
 	cfg := l.ParseConfig()
 	targetID, targetOk := cfg["target_id"].(string)
@@ -546,10 +552,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 		}
 
 		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && arnOk && securityCfgOk {
+			targetGroups := map[int64]string{}
+
 			_, targetGroupsOk := cfg["target_groups"].(map[string]interface{})
 			if !targetGroupsOk {
 				common.Log.Debugf("Attempting to lazily initialize load balanced target groups for network node %s on balancer: %s", node.ID, l.ID)
-				targetGroups := map[int64]string{}
 
 				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
 					common.Log.Debugf("Found security group ingress rules to apply to load balanced target group for network node %s on balancer: %s", node.ID, l.ID)
@@ -578,8 +585,6 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 										default:
 											desc := fmt.Sprintf("Failed to configure load balanced target group in region: %s; %s", region, err.Error())
 											common.Log.Warning(desc)
-											l.updateStatus(db, "failed", &desc)
-											db.Save(l)
 											return fmt.Errorf(desc)
 										}
 									}
@@ -601,33 +606,37 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 					common.Log.Warning(desc)
 					return fmt.Errorf(desc)
 				}
-
-				if targetGroups, targetGroupsOk := cfg["target_groups"].(map[int64]string); targetGroupsOk {
-					common.Log.Debugf("Found target groups for load balanced target registration for network node %s on balancer: %s", node.ID, l.ID)
-
-					for port, targetGroupArn := range targetGroups {
-						_, err := orchestrationAPI.RegisterTarget(common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port)
-						if err != nil {
-							desc := fmt.Sprintf("Failed to add target to load balanced target group in region: %s; %s", region, err.Error())
-							common.Log.Warning(desc)
-							l.updateStatus(db, "failed", &desc)
-							db.Save(l)
-							return fmt.Errorf(desc)
-						}
-						common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
-
-						_, err = orchestrationAPI.CreateListenerV2(common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
-						if err != nil {
-							common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
-						}
-						common.Log.Debugf("Upserted listener for load balanced target group %s in region: %s", targetGroupArn, region)
+			} else {
+				common.Log.Debugf("Attempting to read previously-initialized load balanced target groups for network node %s on balancer: %s", node.ID, l.ID)
+				if cfgTargetGroups, cfgTargetGroupsOk := cfg["target_groups"].(map[string]interface{}); cfgTargetGroupsOk {
+					for portStr, targetGroupArn := range cfgTargetGroups {
+						_port, _ := strconv.Atoi(portStr)
+						port := int64(_port)
+						targetGroups[port] = targetGroupArn.(string)
 					}
-				} else {
-					desc := fmt.Sprintf("Failed to resolve load balanced target groups needed for listener creation in region: %s", region)
+				}
+			}
+
+			common.Log.Debugf("Resolved %d target group(s) for load balanced target registration for network node %s on balancer: %s", len(targetGroups), node.ID, l.ID)
+			for port, targetGroupArn := range targetGroups {
+				_, err := orchestrationAPI.RegisterTarget(common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port)
+				if err != nil {
+					desc := fmt.Sprintf("Failed to add target to load balanced target group in region: %s; %s", region, err.Error())
 					common.Log.Warning(desc)
 					return fmt.Errorf(desc)
 				}
+				common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
+
+				_, err = orchestrationAPI.CreateListenerV2(common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
+				if err != nil {
+					common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
+				}
+				common.Log.Debugf("Upserted listener for load balanced target group %s in region: %s", targetGroupArn, region)
 			}
+
+			// desc := fmt.Sprintf("Failed to resolve load balanced target groups needed for listener creation in region: %s", region)
+			// common.Log.Warning(desc)
+			// return fmt.Errorf(desc)
 		}
 	} else {
 		desc := fmt.Sprintf("Failed to resolve host configuration for lazy initialization of load balanced target group in region: %s", region)
@@ -701,8 +710,10 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 		})
 		common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
 
-		network := node.relatedNetwork(db)
-		network.setIsLoadBalanced(db, network.isLoadBalanced(db, nil, nil))
+		if l.Type != nil && *l.Type == loadBalancerTypeRPC {
+			network := node.relatedNetwork(db)
+			network.setIsLoadBalanced(db, network.isLoadBalanced(db, nil, nil))
+		}
 	}
 
 	return nil

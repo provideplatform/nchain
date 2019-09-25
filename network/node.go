@@ -769,7 +769,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 						if egress.(string) == "*" {
 							_, err := orchestrationAPI.AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId)
 							if err != nil {
-								common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+								if aerr, ok := err.(awserr.Error); ok {
+									switch aerr.Code() {
+									case "InvalidPermission.Duplicate":
+										common.Log.Debugf("Attempted to authorize duplicate security group egress across all ports and protocols in EC2 %s region; security group id: %s", region, *securityGroup.GroupId)
+									default:
+										common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+									}
+								}
 							}
 						}
 					case map[string]interface{}:
@@ -789,7 +796,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 							}
 							_, err := orchestrationAPI.AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp)
 							if err != nil {
-								common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+								if aerr, ok := err.(awserr.Error); ok {
+									switch aerr.Code() {
+									case "InvalidPermission.Duplicate":
+										common.Log.Debugf("Attempted to authorize duplicate security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d", region, *securityGroup.GroupId, tcp, udp)
+									default:
+										common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+									}
+								}
 							}
 						}
 					}
@@ -801,7 +815,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 						if ingress.(string) == "*" {
 							_, err := orchestrationAPI.AuthorizeSecurityGroupIngressAllPortsAllProtocols(*securityGroup.GroupId)
 							if err != nil {
-								common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+								if aerr, ok := err.(awserr.Error); ok {
+									switch aerr.Code() {
+									case "InvalidPermission.Duplicate":
+										common.Log.Debugf("Attempted to authorize duplicate security group ingress across all ports and protocols in EC2 %s region; security group id: %s", region, *securityGroup.GroupId)
+									default:
+										common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
+									}
+								}
 							}
 						}
 					case map[string]interface{}:
@@ -821,7 +842,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 							}
 							_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroup.GroupId, cidr, tcp, udp)
 							if err != nil {
-								common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+								if aerr, ok := err.(awserr.Error); ok {
+									switch aerr.Code() {
+									case "InvalidPermission.Duplicate":
+										common.Log.Debugf("Attempted to authorize duplicate security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d", region, *securityGroup.GroupId, tcp, udp)
+									default:
+										common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
+									}
+								}
 							}
 						}
 					}
@@ -905,6 +933,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 						"environment": envOverrides,
 					}
 					cfg["env"] = envOverrides
+
 					n.setConfig(cfg)
 					n.sanitizeConfig()
 					db.Save(&n)

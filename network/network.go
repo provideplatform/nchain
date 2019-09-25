@@ -20,10 +20,6 @@ import (
 const hostReachabilityTimeout = time.Minute * 5
 const hostReachabilityInterval = time.Millisecond * 2500
 
-const networkRoleBlockExplorer = "explorer"
-const networkRoleIPFS = "ipfs"
-const networkRoleRPC = "rpc"
-
 const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
 
 var networkGenesisMutex = map[string]*sync.Mutex{}
@@ -274,7 +270,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 			cfg := n.ParseConfig()
 			nodeCfg := node.ParseConfig()
 
-			isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil(networkRoleBlockExplorer))
+			isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil(loadBalancerTypeBlockExplorer))
 
 			if time.Now().Sub(startedAt) >= hostReachabilityTimeout {
 				common.Log.Warningf("Failed to resolve and balance explorer urls for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
@@ -342,7 +338,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 		db.Where("network_id = ? AND status = 'running' AND role IN ('peer', 'full', 'validator', 'faucet')", n.ID).First(&node)
 	}
 
-	isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil(networkRoleRPC))
+	isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil(loadBalancerTypeRPC))
 
 	if node != nil && node.ID != uuid.Nil {
 		var lb *LoadBalancer
@@ -358,7 +354,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 				NetworkID: n.ID,
 				Name:      common.StringOrNil(lbName),
 				Region:    common.StringOrNil(region),
-				Type:      common.StringOrNil(networkRoleRPC),
+				Type:      common.StringOrNil(loadBalancerTypeRPC),
 			}
 			lb.setConfig(balancerCfg)
 			if lb.Create() {
@@ -367,9 +363,9 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 				err = fmt.Errorf("Failed to provision load balancer in region: %s; %s", region, *lb.Errors[0].Message)
 				common.Log.Warning(err.Error())
 			}
-			isLoadBalanced = n.isLoadBalanced(db, common.StringOrNil(region), common.StringOrNil(networkRoleRPC))
+			isLoadBalanced = n.isLoadBalanced(db, common.StringOrNil(region), common.StringOrNil(loadBalancerTypeRPC))
 		} else {
-			balancers, err := n.LoadBalancers(db, common.StringOrNil(region), common.StringOrNil(networkRoleRPC))
+			balancers, err := n.LoadBalancers(db, common.StringOrNil(region), common.StringOrNil(loadBalancerTypeRPC))
 			if err != nil {
 				common.Log.Warningf("Failed to retrieve rpc load balancers in region: %s; %s", region, err.Error())
 			} else {
@@ -435,7 +431,7 @@ func (n *Network) resolveAndBalanceIPFSUrls(db *gorm.DB, node *Node) {
 		db.Where("network_id = ? AND status = 'running' AND role IN ('ipfs')", n.ID).First(&node)
 	}
 
-	isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil(networkRoleIPFS))
+	isLoadBalanced := n.isLoadBalanced(db, common.StringOrNil(nodeCfg["region"].(string)), common.StringOrNil(loadBalancerTypeIPFS))
 
 	if node != nil && node.ID != uuid.Nil {
 		var lb *LoadBalancer
@@ -451,7 +447,7 @@ func (n *Network) resolveAndBalanceIPFSUrls(db *gorm.DB, node *Node) {
 				NetworkID: n.ID,
 				Name:      common.StringOrNil(lbName),
 				Region:    common.StringOrNil(region),
-				Type:      common.StringOrNil(networkRoleRPC),
+				Type:      common.StringOrNil(loadBalancerTypeRPC),
 			}
 			lb.setConfig(balancerCfg)
 			if lb.Create() {
@@ -460,9 +456,9 @@ func (n *Network) resolveAndBalanceIPFSUrls(db *gorm.DB, node *Node) {
 				err = fmt.Errorf("Failed to provision load balancer in region: %s; %s", region, *lb.Errors[0].Message)
 				common.Log.Warning(err.Error())
 			}
-			isLoadBalanced = n.isLoadBalanced(db, common.StringOrNil(region), common.StringOrNil(networkRoleIPFS))
+			isLoadBalanced = n.isLoadBalanced(db, common.StringOrNil(region), common.StringOrNil(loadBalancerTypeIPFS))
 		} else {
-			balancers, err := n.LoadBalancers(db, common.StringOrNil(region), common.StringOrNil(networkRoleIPFS))
+			balancers, err := n.LoadBalancers(db, common.StringOrNil(region), common.StringOrNil(loadBalancerTypeIPFS))
 			if err != nil {
 				common.Log.Warningf("Failed to retrieve IPFS load balancers in region: %s; %s", region, err.Error())
 			} else {
@@ -682,7 +678,7 @@ func (n *Network) ParseConfig() map[string]interface{} {
 // RPCURL retrieves a load-balanced RPC URL for the network
 func (n *Network) RPCURL() string {
 	cfg := n.ParseConfig()
-	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil(networkRoleRPC))
+	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil(loadBalancerTypeRPC))
 	if balancers != nil && len(balancers) > 0 {
 		balancer := balancers[rand.Intn(len(balancers))] // FIXME-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
@@ -698,7 +694,7 @@ func (n *Network) RPCURL() string {
 
 func (n *Network) websocketURL() string {
 	cfg := n.ParseConfig()
-	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil(networkRoleRPC))
+	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil(loadBalancerTypeRPC))
 	if balancers != nil && len(balancers) > 0 {
 		balancer := balancers[rand.Intn(len(balancers))] // FIXME-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
