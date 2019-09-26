@@ -356,6 +356,8 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 	ref := execution.Ref
 	value := execution.Value
 
+	network.RequireNetworkStatsDaemon(n)
+
 	tx = &Transaction{
 		ApplicationID: c.ApplicationID,
 		UserID:        nil,
