@@ -199,6 +199,36 @@ func (c *Connector) provision() error {
 	return nil
 }
 
+func (c *Connector) apiPort() uint {
+	cfg := c.ParseConfig()
+	port := uint(0)
+	if apiPort, apiPortOk := cfg["api_port"].(float64); apiPortOk {
+		port = uint(apiPort)
+	}
+	return port
+}
+
+func (c *Connector) apiURL(db *gorm.DB) *string {
+	port := c.apiPort()
+	if port == 0 {
+		return nil
+	}
+
+	var host *string
+	loadBalancers := make([]*network.LoadBalancer, 0)
+	db.Model(c).Association("LoadBalancers").Find(&loadBalancers)
+	if len(loadBalancers) == 1 {
+		host = loadBalancers[0].Host
+	} else if len(loadBalancers) > 1 {
+		common.Log.Warningf("Ambiguous loadbalancing configuration for connector: %s; no api url resolved", c.ID)
+	}
+
+	if host == nil {
+		return nil
+	}
+	return common.StringOrNil(fmt.Sprintf("http://%s:%d", *host, port)) // FIXME-- allow specification of url scheme in cfg := c.ParseConfig()
+}
+
 func (c *Connector) updateStatus(db *gorm.DB, status string, description *string) {
 	c.Status = common.StringOrNil(status)
 	c.Description = description
