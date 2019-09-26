@@ -229,6 +229,31 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 	return common.StringOrNil(fmt.Sprintf("http://%s:%d", *host, port)) // FIXME-- allow specification of url scheme in cfg := c.ParseConfig()
 }
 
+func (c *Connector) denormalizeConfig() error {
+	if c.Type != nil {
+		switch *c.Type {
+		case provider.IPFSConnectorProvider:
+			return c.resolveAPIURL()
+		default:
+			// no-op
+		}
+	}
+	return nil
+}
+
+func (c *Connector) resolveAPIURL() error {
+	db := dbconf.DatabaseConnection()
+	apiURL := c.apiURL(db)
+	if apiURL == nil {
+		return fmt.Errorf("Failed to resolve API url for connector: %s", c.ID)
+	}
+	cfg := c.ParseConfig()
+	cfg["api_url"] = apiURL
+	c.setConfig(cfg)
+	db.Save(&c)
+	return nil
+}
+
 func (c *Connector) updateStatus(db *gorm.DB, status string, description *string) {
 	c.Status = common.StringOrNil(status)
 	c.Description = description

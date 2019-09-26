@@ -12,6 +12,8 @@ import (
 )
 
 const IPFSConnectorProvider = "ipfs"
+
+const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 
@@ -90,6 +92,11 @@ func (p *IPFSProvider) Provision() error {
 	if loadBalancer.Create() {
 		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Append(loadBalancer)
+
+		msg, _ := json.Marshal(map[string]interface{}{
+			"connector_id": p.connectorID,
+		})
+		common.NATSPublish(natsConnectorDenormalizeConfigSubject, msg)
 
 		err := p.ProvisionNode()
 		if err != nil {
