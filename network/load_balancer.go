@@ -487,7 +487,7 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 						balancerCfg["target_balancer_id"] = loadBalancer.LoadBalancerArn
 						balancerCfg["vpc_id"] = loadBalancer.VpcId
 
-						if loadBalancer.Type != nil && *loadBalancer.Type == loadBalancerTypeRPC {
+						if l.Type != nil && *l.Type == loadBalancerTypeRPC {
 							common.Log.Debugf("Setting JSON-RPC and websocket URLs on load balancer: %s", l.ID)
 							balancerCfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
 							balancerCfg["json_rpc_port"] = jsonRPCPort
