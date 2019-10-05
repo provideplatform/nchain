@@ -297,8 +297,7 @@ func (sd *StatsDaemon) consume() []error {
 func (sd *StatsDaemon) ingest(response interface{}) {
 	defer func() {
 		if r := recover(); r != nil {
-			common.Log.Debugf("Recovered from failed stats daemon message ingestion attempt; %s", r)
-			//sd.ingest(response)
+			common.Log.Warningf("Recovered from failed stats daemon message ingestion attempt; %s", r)
 		}
 	}()
 
