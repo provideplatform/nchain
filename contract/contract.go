@@ -191,21 +191,23 @@ func (c *Contract) Create() bool {
 				compiledArtifact := c.CompiledArtifact()
 				if compiledArtifact != nil {
 					params := c.ParseParams()
+					delete(params, "compiled_artifact")
 					value := uint64(0)
 					if val, valOk := params["value"].(float64); valOk {
 						value = uint64(val)
 					}
-					artifactJSON, _ := json.Marshal(compiledArtifact)
-					deployableArtifactJSON := json.RawMessage(artifactJSON)
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
 						"contract_id":  c.ID,
 						"data":         compiledArtifact.Bytecode,
 						"wallet_id":    common.StringOrNil(params["wallet_id"].(string)),
 						"value":        value,
-						"params":       deployableArtifactJSON,
+						"params":       params,
 						"published_at": time.Now(),
 					})
-					natsutil.NatsPublish(natsTxCreateSubject, txCreationMsg)
+					err := natsutil.NatsPublish(natsTxCreateSubject, txCreationMsg)
+					if err != nil {
+						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
+					}
 				}
 			}
 			return success
