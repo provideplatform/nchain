@@ -66,7 +66,7 @@ func NatsGuaranteeDelivery(sub string) {
 		//deliveries = map[string][]*stan.Msg{}
 		// RunConsumers()
 
-		natsConn, _ := common.GetSharedNatsStreamingConnection()
+		natsConn, _ := natsutil.GetSharedNatsStreamingConnection()
 
 		// TODO: use a mutex if we need to detect > 1 delivery on sub
 

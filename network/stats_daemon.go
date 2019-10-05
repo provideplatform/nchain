@@ -516,11 +516,6 @@ func EvictNetworkStatsDaemon(network *Network) error {
 // the given network; if no stats daemon instance has been started for the network,
 // the instance is configured and started immediately, caching real-time network stats.
 func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
-	// if network.AvailablePeerCount() == 0 {
-	// 	common.Log.Debugf("Stats daemon instance not initialized for network: %s; no available peers", *network.Name)
-	// 	return nil
-	// }
-
 	var daemon *StatsDaemon
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
 		common.Log.Debugf("Cached stats daemon instance found for network: %s; id: %s", *network.Name, network.ID)
@@ -547,12 +542,6 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.log = lg.Clone()
 	sd.shutdownCtx, sd.cancelF = context.WithCancel(context.Background())
 	sd.queue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
-
-	//natsConnection, err := common.GetSharedNatsStreamingConnection()
-	//if err != nil {
-	//	common.Log.Warningf("Failed to establish NATS streaming connection for stats daemon; %s", err.Error())
-	//}
-	//sd.natsConnection = natsConnection
 
 	if network.IsBcoinNetwork() {
 		sd.dataSource = BcoinNetworkStatsDataSourceFactory(network)
