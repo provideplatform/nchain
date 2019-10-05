@@ -60,6 +60,7 @@ var PollingToStrChFunc pollingToStrChFuncType = func(
 	return nil
 }
 
+// NatsGuaranteeDelivery is a harness utility to test the delivery of a speciifc NATS message
 func NatsGuaranteeDelivery(sub string) {
 
 	go func() {
@@ -76,9 +77,9 @@ func NatsGuaranteeDelivery(sub string) {
 		// wg := sync.WaitGroup{}
 		// wg.Add(1)
 
-		defer (*natsConn).Close()
+		defer natsConn.Close()
 
-		natsSub, err := (*natsConn).QueueSubscribe(sub, sub, func(msg *stan.Msg) {
+		natsSub, err := natsConn.QueueSubscribe(sub, sub, func(msg *stan.Msg) {
 			common.Log.Debugf("subject: " + msg.MsgProto.Subject)
 			common.Log.Debugf("message: " + msg.MsgProto.Reply)
 			ch <- msg
