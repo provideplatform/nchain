@@ -3,6 +3,7 @@ package test
 import (
 	"time"
 
+	natsutil "github.com/kthomas/go-natsutil"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
 )
