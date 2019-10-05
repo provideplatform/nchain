@@ -10,13 +10,12 @@ import (
 	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	selfsignedcert "github.com/kthomas/go-self-signed-cert"
-	stan "github.com/nats-io/stan.go"
 )
 
 var natsStreamingConnectionMutex sync.Mutex
+var natsStreamingConnectionDrainTimeout = 10 * time.Second
 
 func buildListenAddr() string {
 	listenPort := os.Getenv("PORT")
@@ -85,66 +84,4 @@ func MarshalConfig(opts map[string]interface{}) *json.RawMessage {
 	cfgJSON, _ := json.Marshal(opts)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	return &_cfgJSON
-}
-
-// EstablishNATSStreamingConnection establishes (if conn is nil) or reestablishes the given NATS streaming connection
-func EstablishNATSStreamingConnection() error {
-	natsStreamingConnectionMutex.Lock()
-	defer natsStreamingConnectionMutex.Unlock()
-
-	natsConnection, err := natsutil.GetNatsStreamingConnection(30*time.Second, func(conn stan.Conn, err error) {
-		EstablishNATSStreamingConnection()
-	})
-	if err != nil {
-		Log.Warningf("Failed to establish NATS connection; %s", err.Error())
-		return err
-	}
-	SharedNatsConnection = natsConnection
-	return nil
-}
-
-// GetSharedNatsStreamingConnection retrieves the NATS streaming connection
-func GetSharedNatsStreamingConnection() (*stan.Conn, error) {
-	if SharedNatsConnection != nil {
-		conn := (*SharedNatsConnection).NatsConn()
-		if conn != nil && conn.IsConnected() {
-			return SharedNatsConnection, nil
-		}
-	}
-
-	err := EstablishNATSStreamingConnection()
-	if err != nil {
-		Log.Warningf("Failed to establish NATS connection; %s", err.Error())
-		return SharedNatsConnection, err
-	}
-	return SharedNatsConnection, nil
-}
-
-// NATSPublish a NATS message to the configured NATS streaming environment
-func NATSPublish(subject string, msg []byte) error {
-	natsConnection, err := GetSharedNatsStreamingConnection()
-	if err != nil {
-		Log.Warningf("Failed to retrieve shared NATS streaming connection for Publish; %s", err.Error())
-		return err
-	}
-	return (*natsConnection).Publish(subject, msg)
-}
-
-// NATSPublishAsync async publishes a NATS message to the configured NATS streaming environment
-func NATSPublishAsync(subject string, msg []byte) (*string, error) {
-	natsConnection, err := GetSharedNatsStreamingConnection()
-	if err != nil {
-		Log.Warningf("Failed to retrieve shared NATS streaming connection for Publish; %s", err.Error())
-		return nil, err
-	}
-	guid, err := (*natsConnection).PublishAsync(subject, msg, func(_ string, err error) {
-		if err != nil {
-			Log.Warningf("Failed to asynchronously publish %d-byte NATS streaming message; %s", len(msg), err.Error())
-		}
-	})
-	if err != nil {
-		Log.Warningf("Failed to asynchronously publish %d-byte NATS streaming message; %s", len(msg), err.Error())
-		return nil, err
-	}
-	return StringOrNil(guid), err
 }

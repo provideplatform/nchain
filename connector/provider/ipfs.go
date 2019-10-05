@@ -6,11 +6,13 @@ import (
 
 	"github.com/jinzhu/gorm"
 
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network"
 )
 
+// IPFSConnectorProvider "ipfs"
 const IPFSConnectorProvider = "ipfs"
 
 const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
@@ -74,7 +76,7 @@ func (p *IPFSProvider) Deprovision() error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": balancer.ID,
 		})
-		common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
+		natsutil.NatsPublish(natsLoadBalancerDeprovisioningSubject, msg)
 	}
 
 	return nil
@@ -96,7 +98,7 @@ func (p *IPFSProvider) Provision() error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID,
 		})
-		common.NATSPublish(natsConnectorDenormalizeConfigSubject, msg)
+		natsutil.NatsPublish(natsConnectorDenormalizeConfigSubject, msg)
 
 		err := p.ProvisionNode()
 		if err != nil {
@@ -134,7 +136,7 @@ func (p *IPFSProvider) ProvisionNode() error {
 				"load_balancer_id": balancer.ID.String(),
 				"network_node_id":  node.ID.String(),
 			})
-			common.NATSPublish(natsLoadBalancerBalanceNodeSubject, msg)
+			natsutil.NatsPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}
 	} else {
 		return fmt.Errorf("Failed to provision node on connector: %s", p.connectorID)

@@ -18,7 +18,6 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/consumer"
 	"github.com/provideapp/goldmine/contract"
 	"github.com/provideapp/goldmine/network"
 	"github.com/provideapp/goldmine/wallet"
@@ -121,7 +120,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal tx finalize message; %s", err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -134,32 +133,32 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !dataOk {
 		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !walletIDOk {
 		common.Log.Warningf("Failed to unmarshal wallet_id during NATS %v message handling", msg.Subject)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !valueOk {
 		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !paramsOk {
 		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !publishedAtOk {
 		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -170,14 +169,14 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	walletUUID, err := uuid.FromString(walletID)
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal wallet_id during NATS %v message handling; %s", msg.Subject, err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal wallet_id during NATS %v message handling; %s", msg.Subject, err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -199,7 +198,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		msg.Ack()
 	} else {
 		common.Log.Warningf("Failed to execute transaction; tx failed with %d error(s); %s", len(tx.Errors), *tx.Errors[0].Message)
-		consumer.AttemptNack(msg, txCreateMsgTimeout)
+		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
 
@@ -444,13 +443,13 @@ func consumeTxMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, execution)
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal contract execution during NATS tx message handling")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	if execution.ContractID == nil {
 		common.Log.Errorf("Invalid tx message; missing contract_id")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -466,7 +465,7 @@ func consumeTxMsg(msg *stan.Msg) {
 		}
 		if execution.Wallet != nil && *executionWalletID != *execution.WalletID {
 			common.Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
-			consumer.Nack(msg)
+			natsutil.Nack(msg)
 			return
 		}
 		wallet := &wallet.Wallet{}
@@ -483,7 +482,7 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 	if cntract == nil || cntract.ID == uuid.Nil {
 		common.Log.Errorf("Unable to execute contract; contract not found: %s", cntract.ID)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -500,7 +499,7 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	if err != nil {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
-		consumer.AttemptNack(msg, txMsgTimeout)
+		natsutil.AttemptNack(msg, txMsgTimeout)
 	} else {
 		common.Log.Debugf("Executed contract: %s", executionResponse.Response)
 		msg.Ack()
@@ -520,8 +519,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 			msg.Ack()
 			return
 		}
-		conn, _ := common.GetSharedNatsStreamingConnection()
-		natsutil.Nack(conn, msg)
+		natsutil.Nack(msg)
 	}
 
 	err := json.Unmarshal(msg.Data, &params)
@@ -622,7 +620,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		desc := fmt.Sprintf("Failed to umarshal tx receipt message; %s", err.Error())
 		common.Log.Warningf(desc)
 		tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -633,7 +631,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		desc := fmt.Sprintf("Failed to resolve tx network; %s", err.Error())
 		common.Log.Warningf(desc)
 		tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -642,7 +640,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		desc := fmt.Sprintf("Failed to resolve tx wallet; %s", err.Error())
 		common.Log.Warningf(desc)
 		tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -654,7 +652,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 			tx.updateStatus(db, "failed", common.StringOrNil(desc))
 		}
 
-		consumer.AttemptNack(msg, txReceiptMsgTimeout)
+		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
 		msg.Ack()
 	}

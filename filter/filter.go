@@ -114,7 +114,7 @@ func (f *Filter) Invoke(txPayload []byte) *float64 {
 		"payload": txPayload,
 	}
 	natsPayload, _ := json.Marshal(natsMsg)
-	common.NATSPublish(natsStreamingTxFilterExecSubjectPrefix, natsPayload)
+	natsutil.NatsPublish(natsStreamingTxFilterExecSubjectPrefix, natsPayload)
 
 	natsConn, _ := natsutil.GetNatsConnection(os.Getenv("NATS_URL"), 30*time.Second)
 	defer natsConn.Close()

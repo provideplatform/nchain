@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network"
@@ -105,5 +106,5 @@ func (e *ContractExecution) ExecuteFromTx(
 	e.PublishedAt = &publishedAt
 
 	txMsg, _ := json.Marshal(e)
-	return e, common.NATSPublish(natsTxSubject, txMsg)
+	return e, natsutil.NatsPublish(natsTxSubject, txMsg)
 }

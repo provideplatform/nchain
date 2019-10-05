@@ -9,6 +9,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -295,7 +296,7 @@ func (c *Connector) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"connector_id": c.ID,
 				})
-				common.NATSPublish(natsConnectorProvisioningSubject, msg)
+				natsutil.NatsPublish(natsConnectorProvisioningSubject, msg)
 			}
 			return success
 		}

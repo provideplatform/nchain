@@ -15,6 +15,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -196,7 +197,7 @@ func (n *Node) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"network_node_id": n.ID.String(),
 				})
-				common.NATSPublish(natsDeployNodeSubject, msg)
+				natsutil.NatsPublish(natsDeployNodeSubject, msg)
 			}
 			return success
 		}
@@ -418,7 +419,7 @@ func (n *Node) Delete() bool {
 	msg, _ := json.Marshal(map[string]interface{}{
 		"network_node_id": n.ID.String(),
 	})
-	common.NATSPublish(natsDeleteTerminatedNodeSubject, msg)
+	natsutil.NatsPublish(natsDeleteTerminatedNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
@@ -956,8 +957,8 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					msg, _ := json.Marshal(map[string]interface{}{
 						"network_node_id": n.ID.String(),
 					})
-					common.NATSPublish(natsResolveNodeHostSubject, msg)
-					common.NATSPublish(natsResolveNodePeerURLSubject, msg)
+					natsutil.NatsPublish(natsResolveNodeHostSubject, msg)
+					natsutil.NatsPublish(natsResolveNodePeerURLSubject, msg)
 				}
 			}
 		}
@@ -1270,7 +1271,7 @@ func (n *Node) unbalance(db *gorm.DB) error {
 			"load_balancer_id": balancer.ID.String(),
 			"network_node_id":  n.ID.String(),
 		})
-		return common.NATSPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
+		return natsutil.NatsPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
 	}
 	return nil
 }

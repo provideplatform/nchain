@@ -11,6 +11,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -159,7 +160,7 @@ func (l *LoadBalancer) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"load_balancer_id": l.ID,
 				})
-				common.NATSPublish(natsLoadBalancerProvisioningSubject, msg)
+				natsutil.NatsPublish(natsLoadBalancerProvisioningSubject, msg)
 			}
 			return success
 		}
@@ -734,7 +735,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": l.ID,
 		})
-		common.NATSPublish(natsLoadBalancerDeprovisioningSubject, msg)
+		natsutil.NatsPublish(natsLoadBalancerDeprovisioningSubject, msg)
 
 		if l.Type != nil && *l.Type == loadBalancerTypeRPC {
 			network := node.relatedNetwork(db)

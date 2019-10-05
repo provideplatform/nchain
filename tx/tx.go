@@ -16,6 +16,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/contract"
@@ -191,7 +192,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					err = t.broadcast(db, ntwrk, wllt)
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
-						common.NATSPublish(natsTxReceiptSubject, txReceiptMsg)
+						natsutil.NatsPublish(natsTxReceiptSubject, txReceiptMsg)
 					} else {
 						desc := err.Error()
 						t.updateStatus(db, "failed", &desc)

@@ -1,5 +1,5 @@
 hash: 7efd5b7718748514d64bd1afb40a74972a8e347474bfd26af16f341db5e0b51c
-updated: 2019-10-04T20:38:20.498275-04:00
+updated: 2019-10-05T01:54:10.75333-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -146,11 +146,11 @@ imports:
 - name: github.com/kthomas/go-aws-wrapper
   version: e00dcbdae4563683d3ac9379d2add5759af5285f
 - name: github.com/kthomas/go-db-config
-  version: fe566ecb4d7e3e2e1cf39d3a739e1ecfbec912f8
+  version: 6f8768ecee4cbe269d12ebac16b3e918541fe5cc
 - name: github.com/kthomas/go-logger
   version: 01c36065851341304751234b081327cf58728dba
 - name: github.com/kthomas/go-natsutil
-  version: 75ec65b3729c004072a15f12b934af22ffb3090a
+  version: c26ab647994ea03915531e3c8b60e4ac9a6d21a5
 - name: github.com/kthomas/go-pgputil
   version: 747b287b2049fef1ec0fc0b69f5e5dcfd1cdb5d9
 - name: github.com/kthomas/go-self-signed-cert
@@ -203,7 +203,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: ae0c48bdc2c5400b36dc1d291dcea42ecff22606
+  version: 1043c99595c80a4d9b6dc2c92122de57b9134e5f
 - name: github.com/rs/cors
   version: db0fe48135e83b5812a5a31be0eea66984b1b521
 - name: github.com/steakknife/bloomfilter

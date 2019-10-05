@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network"
@@ -204,7 +205,7 @@ func (c *Contract) Create() bool {
 						"params":       deployableArtifactJSON,
 						"published_at": time.Now(),
 					})
-					common.NATSPublish(natsTxCreateSubject, txCreationMsg)
+					natsutil.NatsPublish(natsTxCreateSubject, txCreationMsg)
 				}
 			}
 			return success

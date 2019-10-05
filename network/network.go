@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
@@ -187,7 +188,7 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 						}
 
 						payload, _ := json.Marshal(params)
-						common.NATSPublish(natsNetworkContractCreateInvocationSubject, payload)
+						natsutil.NatsPublish(natsNetworkContractCreateInvocationSubject, payload)
 					}
 				}
 			}
@@ -382,7 +383,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 				"load_balancer_id": lb.ID.String(),
 				"network_node_id":  node.ID.String(),
 			})
-			common.NATSPublish(natsLoadBalancerBalanceNodeSubject, msg)
+			natsutil.NatsPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		} else {
 			if reachable, port := node.reachableViaJSONRPC(); reachable {
 				common.Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
@@ -475,7 +476,7 @@ func (n *Network) resolveAndBalanceIPFSUrls(db *gorm.DB, node *Node) {
 				"load_balancer_id": lb.ID.String(),
 				"network_node_id":  node.ID.String(),
 			})
-			common.NATSPublish(natsLoadBalancerBalanceNodeSubject, msg)
+			natsutil.NatsPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}
 	}
 }
@@ -723,7 +724,7 @@ func (n *Network) addPeer(peerURL string) error {
 			"peer_url":        peerURL,
 		}
 		payload, _ := json.Marshal(params)
-		_, err := common.NATSPublishAsync(natsAddNodePeerSubject, payload)
+		_, err := natsutil.NatsPublishAsync(natsAddNodePeerSubject, payload)
 		if err != nil {
 			common.Log.Warningf("Failed to add peer %s to network: %s; %s", peerURL, n.ID, err.Error())
 			return err
@@ -748,7 +749,7 @@ func (n *Network) removePeer(peerURL string) error {
 			"peer_url":        peerURL,
 		}
 		payload, _ := json.Marshal(params)
-		_, err := common.NATSPublishAsync(natsRemoveNodePeerSubject, payload)
+		_, err := natsutil.NatsPublishAsync(natsRemoveNodePeerSubject, payload)
 		if err != nil {
 			common.Log.Warningf("Failed to remove peer %s to network: %s; %s", peerURL, n.ID, err.Error())
 			return err

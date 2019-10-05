@@ -7,7 +7,7 @@ import (
 
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
-	stan "github.com/nats-io/stan.go"
+	natsutil "github.com/kthomas/go-natsutil"
 )
 
 const reachabilityTimeout = time.Millisecond * 2500
@@ -41,9 +41,6 @@ var (
 
 	// ConsumeNATSStreamingSubscriptions is a flag the indicates if the goldmine instance is running in API or consumer mode
 	ConsumeNATSStreamingSubscriptions bool
-
-	// SharedNatsConnection is a cached connection used by most NATS Publish calls
-	SharedNatsConnection *stan.Conn
 )
 
 func init() {
@@ -62,7 +59,7 @@ func init() {
 
 	DefaultAWSConfig = awsconf.GetConfig()
 
-	err := EstablishNATSStreamingConnection()
+	err := natsutil.EstablishSharedNatsStreamingConnection()
 	if err != nil {
 		Log.Panicf("Failed to established NATS streaming connection; %s", err.Error())
 	}

@@ -20,7 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
-	stan "github.com/nats-io/stan.go"
+	natsutil "github.com/kthomas/go-natsutil"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideservices/provide-go"
 )
@@ -47,10 +47,10 @@ type NetworkStatsDataSource struct {
 
 // StatsDaemon struct
 type StatsDaemon struct {
-	attempt        uint32
-	backoff        int64
-	dataSource     *NetworkStatsDataSource
-	natsConnection *stan.Conn
+	attempt    uint32
+	backoff    int64
+	dataSource *NetworkStatsDataSource
+	// natsConnection *stan.Conn
 
 	log *logger.Logger
 
@@ -87,8 +87,8 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 		Network: network,
 
 		Poll: func(ch chan *provide.NetworkStatus) error {
-			RpcURL := network.RPCURL()
-			if RpcURL == "" {
+			rpcURL := network.RPCURL()
+			if rpcURL == "" {
 				err := new(jsonRpcNotSupported)
 				return *err
 			}
@@ -98,7 +98,7 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 				case <-ticker.C:
 					status, err := network.Status(true)
 					if err != nil {
-						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", RpcURL, err)
+						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
 						ticker.Stop()
 						return nil
 					}
@@ -295,6 +295,13 @@ func (sd *StatsDaemon) consume() []error {
 }
 
 func (sd *StatsDaemon) ingest(response interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			common.Log.Debugf("Recovered from failed stats daemon message ingestion attempt; %s", r)
+			//sd.ingest(response)
+		}
+	}()
+
 	if sd.dataSource.Network.IsBcoinNetwork() {
 		sd.ingestBcoin(response)
 	} else if sd.dataSource.Network.IsLcoinNetwork() {
@@ -475,9 +482,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			Timestamp: lastBlockAt,
 		})
 
-		if sd.natsConnection != nil {
-			(*sd.natsConnection).Publish(natsBlockFinalizedSubject, natsPayload)
-		}
+		natsutil.NatsPublish(natsBlockFinalizedSubject, natsPayload)
 	}
 }
 
@@ -544,11 +549,11 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
 	sd.shutdownCtx, sd.cancelF = context.WithCancel(context.Background())
 	sd.queue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
 
-	natsConnection, err := common.GetSharedNatsStreamingConnection()
-	if err != nil {
-		common.Log.Warningf("Failed to establish NATS streaming connection for stats daemon; %s", err.Error())
-	}
-	sd.natsConnection = natsConnection
+	//natsConnection, err := common.GetSharedNatsStreamingConnection()
+	//if err != nil {
+	//	common.Log.Warningf("Failed to establish NATS streaming connection for stats daemon; %s", err.Error())
+	//}
+	//sd.natsConnection = natsConnection
 
 	if network.IsBcoinNetwork() {
 		sd.dataSource = BcoinNetworkStatsDataSourceFactory(network)

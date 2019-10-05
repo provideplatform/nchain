@@ -10,7 +10,6 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/consumer"
 )
 
 const natsConnectorDeprovisioningSubject = "goldmine.connector.provision"
@@ -87,14 +86,14 @@ func consumeConnectorProvisioningMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector provisioning message; %s", err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to provision connector; no connector id provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -104,14 +103,14 @@ func consumeConnectorProvisioningMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to provision connector; no connector resolved for id: %s", connectorID)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	err = connector.provision()
 	if err != nil {
 		common.Log.Warningf("Failed to provision connector; %s", err.Error())
-		consumer.AttemptNack(msg, natsConnectorProvisioningTimeout)
+		natsutil.AttemptNack(msg, natsConnectorProvisioningTimeout)
 	} else {
 		common.Log.Debugf("Connector provisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
@@ -125,14 +124,14 @@ func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector deprovisioning message; %s", err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to deprovision connector; no connector id provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -142,14 +141,14 @@ func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to deprovision connector; no connector resolved for id: %s", connectorID)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	err = connector.deprovision()
 	if err != nil {
 		common.Log.Warningf("Failed to deprovision connector; %s", err.Error())
-		consumer.AttemptNack(msg, natsConnectorDeprovisioningTimeout)
+		natsutil.AttemptNack(msg, natsConnectorDeprovisioningTimeout)
 	} else {
 		common.Log.Debugf("Connector deprovisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
@@ -163,14 +162,14 @@ func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector denormalize config message; %s", err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to denormalize connector config; no connector id provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -180,14 +179,14 @@ func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to denormalize connector config; no connector resolved for id: %s", connectorID)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
 	err = connector.denormalizeConfig()
 	if err != nil {
 		common.Log.Warningf("Failed to denormalize connector config; %s", err.Error())
-		consumer.AttemptNack(msg, natsConnectorDenormalizeConfigTimeout)
+		natsutil.AttemptNack(msg, natsConnectorDenormalizeConfigTimeout)
 	} else {
 		common.Log.Debugf("Connector config denormalized; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()

@@ -9,7 +9,6 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/consumer"
 )
 
 const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
@@ -47,7 +46,7 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal network contract creation invocation message; %s", err.Error())
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 
@@ -59,22 +58,22 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 
 	if !addrOk {
 		common.Log.Warningf("Failed to create network contract; no contract address provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !networkIDOk || networkUUIDErr != nil {
 		common.Log.Warningf("Failed to create network contract; invalid or no network id provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !contractNameOk {
 		common.Log.Warningf("Failed to create network contract; no contract name provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	if !abiOk {
 		common.Log.Warningf("Failed to create network contract; no ABI provided")
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 		return
 	}
 	contract := &Contract{
@@ -92,6 +91,6 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 		msg.Ack()
 	} else {
 		common.Log.Warningf("Failed to persist network contract with address: %s", addr)
-		consumer.Nack(msg)
+		natsutil.Nack(msg)
 	}
 }
