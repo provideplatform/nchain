@@ -1,5 +1,5 @@
 hash: 7efd5b7718748514d64bd1afb40a74972a8e347474bfd26af16f341db5e0b51c
-updated: 2019-09-25T02:45:56.25612-04:00
+updated: 2019-10-04T20:38:20.498275-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -128,7 +128,7 @@ imports:
 - name: github.com/gorilla/websocket
   version: c3e18be99d19e6b3e8f1559eea2c161a665c4b6b
 - name: github.com/jinzhu/gorm
-  version: 836fb2c19d84dac7b0272958dfb9af7cf0d0ade4
+  version: 81c17a7e2529c59efc4e74c5b32c1fb71fb12fa2
   subpackages:
   - dialects/postgres
 - name: github.com/jinzhu/inflection
@@ -203,7 +203,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: 281078f7477433ad2df5469a64b5588a446d27a7
+  version: ae0c48bdc2c5400b36dc1d291dcea42ecff22606
 - name: github.com/rs/cors
   version: db0fe48135e83b5812a5a31be0eea66984b1b521
 - name: github.com/steakknife/bloomfilter
