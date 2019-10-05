@@ -2,17 +2,20 @@ package consumer
 
 import (
 	"encoding/json"
+	"time"
 
-	stan "github.com/nats-io/stan.go"
+	"github.com/kthomas/go-natsutil"
+	"github.com/labstack/gommon/log"
+	"github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
 
-const apiUsageDaemonBufferSize = 1024 * 25
+const apiUsageDaemonBufferSize = 256
 const apiUsageDaemonFlushInterval = 10000
 
 const natsAPIUsageEventNotificationSubject = "api.usage.event"
-const natsAPIUsageEventNotificationMaxInFlight = 1024
+const natsAPIUsageEventNotificationFlushTimeout = time.Second * 10
 
 type apiUsageDelegate struct {
 	natsConnection *stan.Conn
@@ -20,13 +23,20 @@ type apiUsageDelegate struct {
 
 // Track receives an API call from the API daemon's underlying buffered channel for local processing
 func (d *apiUsageDelegate) Track(apiCall *provide.APICall) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debug("Recovered from failed API call tracking attempt; reattempting...")
+			d.Track(apiCall)
+		}
+	}()
+
 	payload, _ := json.Marshal(apiCall)
 	if d != nil && d.natsConnection != nil {
 		(*d.natsConnection).PublishAsync(natsAPIUsageEventNotificationSubject, payload, func(_ string, err error) {
 			if err != nil {
 				common.Log.Warningf("Failed to asnychronously publish %s; %s", natsAPIUsageEventNotificationSubject, err.Error())
 				d.initNatsStreamingConnection()
-				d.Track(apiCall)
+				defer d.Track(apiCall)
 			}
 		})
 	} else {
@@ -35,9 +45,11 @@ func (d *apiUsageDelegate) Track(apiCall *provide.APICall) {
 }
 
 func (d *apiUsageDelegate) initNatsStreamingConnection() {
-	natsConnection, err := common.GetSharedNatsStreamingConnection()
+	natsConnection, err := natsutil.GetNatsStreamingConnection(natsAPIUsageEventNotificationFlushTimeout, func(_ stan.Conn, err error) {
+		d.initNatsStreamingConnection()
+	})
 	if err != nil {
-		common.Log.Warningf("Failed to resolve shared NATS connection for API usage delegate; %s", err.Error())
+		common.Log.Warningf("Failed to establish NATS connection for API usage delegate; %s", err.Error())
 		return
 	}
 	d.natsConnection = natsConnection
