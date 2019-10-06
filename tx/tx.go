@@ -538,7 +538,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 				continue
 			}
 
-			common.Log.Debugf("Observed contract-internal CREATE opcode resulting in deployed contract at address: %s; tx hash: %s", *contractAddr, *t.Hash)
+			common.Log.Debugf("Observed contract-internal CREATE opcode resulting in deployed contract at address: %s; tx hash: %s; code: %s", *contractAddr, *t.Hash, *contractCode)
 
 			for _, dep := range artifact.Deps {
 				dependency := dep.(map[string]interface{})
