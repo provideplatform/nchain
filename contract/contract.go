@@ -145,7 +145,12 @@ func (c *Contract) ExecuteEthereumContract(
 func (c *Contract) ReadEthereumContractAbi() (*abi.ABI, error) {
 	var _abi *abi.ABI
 	params := c.ParseParams()
-	if contractAbi, ok := params["abi"]; ok {
+	contractAbi, contractAbiOk := params["abi"]
+	if !contractAbiOk {
+		contractAbi = c.CompiledArtifact()
+	}
+
+	if contractAbi != nil {
 		abistr, err := json.Marshal(contractAbi)
 		if err != nil {
 			common.Log.Warningf("Failed to marshal ABI from contract params to json; %s", err.Error())
