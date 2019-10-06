@@ -538,6 +538,8 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 				continue
 			}
 
+			common.Log.Debugf("Observed contract-internal CREATE opcode resulting in deployed contract at address: %s; tx hash: %s", *contractAddr, *t.Hash)
+
 			for _, dep := range artifact.Deps {
 				dependency := dep.(map[string]interface{})
 				name := dependency["name"].(string)
@@ -547,7 +549,12 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 				}
 
 				if strings.HasSuffix(*contractCode, fingerprint) {
-					params, _ := json.Marshal(dependency)
+					common.Log.Debugf("Observed fingerprinted dependency as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", *contractAddr, fingerprint, *t.Hash)
+
+					params, _ := json.Marshal(map[string]interface{}{
+						"wallet_id":         wallet.ID,
+						"compiled_artifact": dependency,
+					})
 					rawParams := json.RawMessage(params)
 					internalContract := &contract.Contract{
 						ApplicationID: t.ApplicationID,
