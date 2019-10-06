@@ -539,16 +539,16 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 				continue
 			}
 
-			for name, dep := range artifact.Deps {
+			for _, dep := range artifact.Deps {
 				dependency := dep.(map[string]interface{})
+				name := dependency["name"].(string)
 				fingerprint := dependency["fingerprint"].(string)
 				if fingerprint == "" {
 					continue
 				}
 
-				fingerprintSuffix := fmt.Sprintf("%s0029", fingerprint)
-				if strings.HasSuffix(*contractCode, fingerprintSuffix) {
-					params, _ := json.Marshal(dep)
+				if strings.HasSuffix(*contractCode, fingerprint) {
+					params, _ := json.Marshal(dependency)
 					rawParams := json.RawMessage(params)
 					internalContract := &contract.Contract{
 						ApplicationID: t.ApplicationID,
