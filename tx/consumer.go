@@ -119,7 +119,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal tx finalize message; %s", err.Error())
+		common.Log.Warningf("Failed to umarshal tx creation message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}

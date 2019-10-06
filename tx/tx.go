@@ -444,7 +444,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 			common.Log.Warningf("Failed to handle fetched ethereum tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
 			return err
 		}
-		t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse))
+		t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse), receipt)
 	}
 
 	return nil
@@ -503,7 +503,6 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 		} else {
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
 			kontract.Address = common.StringOrNil(receipt.ContractAddress.Hex())
-			kontract.Params = t.Params
 			db.Save(&kontract)
 			kontract.ResolveTokenContract(db, network, &wallet.Address, client, receipt, tokenCreateFn)
 		}
@@ -511,7 +510,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 	return nil
 }
 
-func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Wallet, traces *provide.EthereumTxTraceResponse) {
+func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Wallet, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {
 		common.Log.Debugf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")
@@ -561,7 +560,30 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 					}
 					if internalContract.Create() {
 						common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
-						// contract.resolveTokenContract(db, network, wallet, client, receipt)
+						client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
+						if err != nil {
+							common.Log.Warningf("Unable to attempt token creation for contract-internal tx; %s", err.Error())
+							return
+						}
+						internalContract.ResolveTokenContract(db, network, &wallet.Address, client, receipt,
+							func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
+								common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+
+								tok := &token.Token{
+									ApplicationID: c.ApplicationID,
+									NetworkID:     c.NetworkID,
+									ContractID:    &c.ID,
+									Name:          common.StringOrNil(name),
+									Symbol:        common.StringOrNil(symbol),
+									Decimals:      decimals.Uint64(),
+									Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
+								}
+
+								createdToken = tok.Create()
+								tokenID = tok.ID
+								errs = tok.Errors
+								return
+							})
 					} else {
 						common.Log.Warningf("Failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
 					}
