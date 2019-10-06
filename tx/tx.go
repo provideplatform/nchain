@@ -548,6 +548,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 					continue
 				}
 
+				common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", name, fingerprint, *contractAddr, *t.Hash)
 				if strings.HasSuffix(*contractCode, fingerprint) {
 					common.Log.Debugf("Observed fingerprinted dependency as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", *contractAddr, fingerprint, *t.Hash)
 
