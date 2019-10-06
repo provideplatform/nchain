@@ -147,7 +147,10 @@ func (c *Contract) ReadEthereumContractAbi() (*abi.ABI, error) {
 	params := c.ParseParams()
 	contractAbi, contractAbiOk := params["abi"]
 	if !contractAbiOk {
-		contractAbi = c.CompiledArtifact()
+		artifact := c.CompiledArtifact()
+		if artifact != nil {
+			contractAbi = artifact.ABI
+		}
 	}
 
 	if contractAbi != nil {
