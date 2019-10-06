@@ -195,7 +195,7 @@ func (c *Contract) Create() bool {
 
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
-			if success {
+			if success && c.ContractID == nil { // when ContractID is non-nil, the deployment happened in a contract-internal tx
 				compiledArtifact := c.CompiledArtifact()
 				if compiledArtifact != nil {
 					params := c.ParseParams()
