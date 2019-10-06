@@ -372,9 +372,13 @@ func (c *Contract) ResolveTokenContract(db *gorm.DB, network *network.Network, w
 					return
 				}
 
-				params := c.ParseParams()
-				if contractAbi, ok := params["abi"]; ok {
-					abistr, err := json.Marshal(contractAbi)
+				artifact := c.CompiledArtifact()
+				if artifact == nil {
+					common.Log.Warningf("Failed to resolve compiled artifact during attempt to resolve ERC20 token for contract: %s", c.ID)
+					return
+				}
+				if artifact.ABI != nil {
+					abistr, err := json.Marshal(artifact.ABI)
 					if err != nil {
 						common.Log.Warningf("Failed to marshal contract abi to json...  %s", err.Error())
 					}
