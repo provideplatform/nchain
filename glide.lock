@@ -1,5 +1,5 @@
 hash: 7efd5b7718748514d64bd1afb40a74972a8e347474bfd26af16f341db5e0b51c
-updated: 2019-10-05T22:28:47.684639-04:00
+updated: 2019-10-09T18:06:04.663578-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -10,7 +10,7 @@ imports:
   subpackages:
   - monotime
 - name: github.com/aws/aws-sdk-go
-  version: 86a34f25bffb999476ddcf9b03c22c43ce31720b
+  version: dedeb6b7e75f6b3710a4255266d5ba480e8bfb26
   subpackages:
   - aws
   - aws/awserr
@@ -32,6 +32,7 @@ imports:
   - aws/signer/v4
   - internal/ini
   - internal/sdkio
+  - internal/sdkmath
   - internal/sdkrand
   - internal/sdkuri
   - internal/shareddefaults
@@ -112,7 +113,7 @@ imports:
 - name: github.com/go-stack/stack
   version: 2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a
 - name: github.com/gogo/protobuf
-  version: 28a6bbf47e48e0b2220b2a244750b660c83d4942
+  version: 69adf3ecd52d1754cc42d7464c449e50d4b79521
   subpackages:
   - gogoproto
   - proto
@@ -158,7 +159,7 @@ imports:
 - name: github.com/kthomas/go.uuid
   version: 28d1fa77e9a4efcba826a2a6c8f5a9ff6cea44a6
 - name: github.com/lib/pq
-  version: 3427c32cb71afc948325f299f040e53c1dd78979
+  version: 931b5ae4c24e6810c8c82ab4734904de3df1c3dc
   subpackages:
   - hstore
   - oid
@@ -177,13 +178,13 @@ imports:
 - name: github.com/nats-io/nkeys
   version: 13b630ddaff0a6fe5e90ddfca4642014f84b4910
 - name: github.com/nats-io/nuid
-  version: 4b96681fa6d28dd0ab5fe79bac63b3a493d9ee94
+  version: 57049d7fef86eeb53bdc1c0c347b370b8905d5fa
 - name: github.com/nats-io/stan.go
-  version: b13717edafc47e61e7999c9c8a078b173852655f
+  version: 74ff03f767e3a906de9f92c35ef0ee6c96c127f0
   subpackages:
   - pb
 - name: github.com/onsi/gomega
-  version: 2e3b965217103f3054061bd78cb31bca3e94a0da
+  version: bdebf9e0ece900259084cfa4121b97ce1a540939
   subpackages:
   - format
   - gstruct
@@ -203,7 +204,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: 3585a13a4c09b86fbd542bac5374b7d3f17fabbd
+  version: 28fed84c32d449e5a1e5c03db3376f1f7016fc94
 - name: github.com/rs/cors
   version: db0fe48135e83b5812a5a31be0eea66984b1b521
 - name: github.com/steakknife/bloomfilter
@@ -211,7 +212,7 @@ imports:
 - name: github.com/steakknife/hamming
   version: c99c65617cd3d686aea8365fe563d6542f01d940
 - name: github.com/streadway/amqp
-  version: 75d898a42a940fbc854dfd1a4199eabdc00cf024
+  version: edfb9018d2714e4ec54dbaba37dbfef2bdadf0e4
 - name: github.com/ugorji/go
   version: e118e2d506a6b252f6b85f2e2f2ac1bfed82f1b8
   subpackages:
@@ -235,7 +236,7 @@ imports:
   - scrypt
   - sha3
 - name: golang.org/x/net
-  version: ca1201d0de80cfde86cb01aea620983605dfe99b
+  version: d66e71096ffb9f08f36d9aefcae80ce319de6d68
   subpackages:
   - html
   - html/atom
@@ -249,7 +250,7 @@ imports:
   - windows/registry
   - windows/svc/eventlog
 - name: golang.org/x/text
-  version: 342b2e1fbaa52c93f31447ad2c6abc048c63e475
+  version: 3d0f7978add91030e5e8976ff65ccdd828286cba
   subpackages:
   - encoding
   - encoding/charmap
@@ -283,7 +284,7 @@ testImports:
   - watch
   - winfile
 - name: github.com/onsi/ginkgo
-  version: 19cca4bf3c3f61523629a8f01ac577fc339503b9
+  version: d90e0dcda42f29d3e7ab0bb5d52451df252bf709
   subpackages:
   - config
   - internal/codelocation
