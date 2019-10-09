@@ -604,6 +604,10 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 
 // RefreshDetails populates transaction details which were not necessarily available upon broadcast, including network-specific metadata and VM execution tracing if applicable
 func (t *Transaction) RefreshDetails() error {
+	if t.Hash == nil {
+		return nil
+	}
+
 	var err error
 	network, _ := t.GetNetwork()
 	if network.IsEthereumNetwork() {
