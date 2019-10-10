@@ -1,7 +1,6 @@
 package tx
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -202,149 +201,208 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 }
 
-func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Network, methodDescriptor string, method string, abiMethod *abi.Method, params []interface{}) (*interface{}, *interface{}, error) {
+func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
 	var err error
-	if abiMethod != nil {
-		common.Log.Debugf("Attempting to encode %d parameters %s prior to executing method %s on contract: %s", len(params), params, methodDescriptor, c.ID)
-		invocationSig, err := provide.EVMEncodeABI(abiMethod, params...)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
-		}
+	var result []byte
+	var receipt map[string]interface{}
+	var response map[string]interface{}
+	out := map[string]interface{}{}
 
-		data := fmt.Sprintf("0x%s", ethcommon.Bytes2Hex(invocationSig))
-		tx.Data = &data
+	if network.IsEthereumNetwork() {
+		if abiMethod != nil {
 
-		if abiMethod.Const {
-			common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
-			network, _ := tx.GetNetwork()
-			client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
-			msg := tx.asEthereumCallMsg(0, 0)
-			result, err := client.CallContract(context.TODO(), msg, nil)
+			common.Log.Debugf("Attempting to encode %d parameters %s prior to executing method %s on contract: %s", len(params), params, methodDescriptor, c.ID)
+			invocationSig, err := provide.EVMEncodeABI(abiMethod, params...)
 			if err != nil {
-				err = fmt.Errorf("Failed to read constant method %s on contract: %s; %s", method, c.ID, err.Error())
-				return nil, nil, err
+				return nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 			}
-			var out interface{}
+
+			data := fmt.Sprintf("0x%s", ethcommon.Bytes2Hex(invocationSig))
+			tx.Data = &data
+
+			if abiMethod.Const {
+				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
+				client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
+				msg := tx.asEthereumCallMsg(0, 0)
+				result, err = client.CallContract(context.TODO(), msg, nil)
+				if err != nil {
+					err = fmt.Errorf("Failed to read constant method %s on contract: %s; %s", method, c.ID, err.Error())
+					return nil, err
+				}
+			} else {
+				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
+				db := dbconf.DatabaseConnection()
+
+				var txResponse *contract.ContractExecutionResponse
+				if tx.Create(db) {
+					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
+					if tx.Response != nil {
+						txResponse = tx.Response
+					}
+				} else {
+					common.Log.Debugf("Failed tx errors: %s", *tx.Errors[0].Message)
+					txParams := tx.ParseParams()
+					publicKey, publicKeyOk := txParams["public_key"].(interface{})
+					privateKey, privateKeyOk := txParams["private_key"].(interface{})
+					gas, gasOk := txParams["gas"].(float64)
+					if !gasOk {
+						gas = float64(0)
+					}
+					var nonce *uint64
+					if nonceFloat, nonceOk := txParams["nonce"].(float64); nonceOk {
+						nonceUint := uint64(nonceFloat)
+						nonce = &nonceUint
+					}
+					delete(txParams, "private_key")
+					tx.setParams(txParams)
+
+					if publicKeyOk && privateKeyOk {
+						common.Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
+						tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas))
+						if err == nil {
+							if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
+								err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+							} else {
+								err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
+								common.Log.Warning(err.Error())
+							}
+						}
+
+						if err != nil {
+							err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
+							common.Log.Warning(err.Error())
+						}
+					} else {
+						err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
+						common.Log.Warning(err.Error())
+					}
+				}
+
+				if txResponse != nil {
+					common.Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
+
+					if txResponse.Traces != nil {
+						if traces, tracesOk := txResponse.Traces.(*provide.EthereumTxTraceResponse); tracesOk {
+							common.Log.Debugf("EVM tracing included in tx response")
+							if len(traces.Result) > 0 {
+								traceResult := traces.Result[0].Result
+								if traceResult.Output != nil {
+									result = []byte(*traceResult.Output)
+								}
+							}
+						}
+					} else {
+						common.Log.Warningf("UNHANDLED TX RESPONSE...; %s", tx.Response.Receipt)
+
+						common.Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
+						switch (txResponse.Receipt).(type) {
+						case []byte:
+							common.Log.Warningf("BYTE ARRAY RECEIPT??; %s", tx.Response)
+
+							result = (txResponse.Receipt).([]byte)
+							json.Unmarshal(result, &receipt)
+						case types.Receipt:
+							common.Log.Warningf("PARSED RECEIPT??; %s", tx.Response)
+
+							// client, _ := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
+							txReceipt := txResponse.Receipt.(*types.Receipt)
+							txReceiptJSON, _ := json.Marshal(txReceipt)
+							json.Unmarshal(txReceiptJSON, &receipt)
+							// txdeets, _, err := client.TransactionByHash(context.TODO(), txReceipt.TxHash)
+							// if err != nil {
+							// 	err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
+							// 	common.Log.Warning(err.Error())
+							// 	return nil, err
+							// }
+							// txdeetsJSON, _ := json.Marshal(txdeets)
+							// json.Unmarshal(txdeetsJSON, &out)
+							out["receipt"] = receipt
+							return out, nil
+						default:
+							// no-op
+							common.Log.Warningf("Unhandled transaction receipt type; %s", tx.Response.Receipt)
+						}
+					}
+
+					return out, nil
+				}
+			}
+
 			if len(abiMethod.Outputs) == 1 {
-				err = abiMethod.Outputs.Unpack(&out, result)
+				typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
+				common.Log.Debugf("Reflectively adding type hint for unpacking %s in return value", typestr)
+				// typ, _ := abi.NewType(typestr, nil)
+				// outptr := reflect.New(typ.Type).Interface()
+				var outptr interface{}
+				err = abiMethod.Outputs.Unpack(&outptr, result)
 				if err == nil {
-					typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
 					common.Log.Debugf("Attempting to marshal %s result of constant contract execution of %s on contract: %s", typestr, methodDescriptor, c.ID)
-					switch out.(type) {
+					switch outptr.(type) {
 					case [32]byte:
-						arrbytes, _ := out.([32]byte)
-						out = string(bytes.Trim(arrbytes[:], "\x00"))
+						arrbytes, _ := outptr.([32]byte)
+						out["response"] = string(arrbytes[:]) //string(bytes.Trim(arrbytes[:], "\x00"))
 					case [][32]byte:
-						arrbytesarr, _ := out.([][32]byte)
+						arrbytesarr, _ := outptr.([][32]byte)
 						vals := make([]string, len(arrbytesarr))
 						for i, item := range arrbytesarr {
-							vals[i] = string(bytes.Trim(item[:], "\x00"))
+							vals[i] = string(item[:]) //string(bytes.Trim(item[:], "\x00"))
 						}
-						out = vals
+						out["response"] = vals
 					default:
 						common.Log.Debugf("Noop during marshaling of constant contract execution of %s on contract: %s", methodDescriptor, c.ID)
+						out["response"] = outptr
 					}
 				}
 			} else if len(abiMethod.Outputs) > 1 {
-				// handle tuple
+				response := map[string]interface{}{}
+				// err = abiMethod.Outputs.UnpackIntoMap(response, result)
+				// common.Log.Debugf("unpacked map: %s", response)
+
 				vals := make([]interface{}, len(abiMethod.Outputs))
 				for i := range abiMethod.Outputs {
 					typestr := fmt.Sprintf("%s", abiMethod.Outputs[i].Type)
 					common.Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
 					typ, err := abi.NewType(typestr, nil)
 					if err != nil {
-						return nil, nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
+						return nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
 					}
 					vals[i] = reflect.New(typ.Type).Interface()
 				}
-				err = abiMethod.Outputs.Unpack(&vals, result)
-				out = vals
-				common.Log.Debugf("Unpacked %v returned values from read of constant %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
+				// err = abiMethod.Outputs.Unpack(&vals, result)
+				// if err == nil {
+				// 	for i := range vals {
+				// 		response[abiMethod.Outputs[i].Name] = vals[i]
+				// 	}
+				// }
+				for i := range vals {
+					response[abiMethod.Outputs[i].Name] = vals[i]
+				}
+				out["response_map"] = response
+				out["response"] = vals
+				common.Log.Debugf("Unpacked %v returned values from execution of method %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
 				if vals != nil && len(vals) == abiMethod.Outputs.LengthNonIndexed() {
 					err = nil
 				}
 			}
+
 			if err != nil {
-				return nil, nil, fmt.Errorf("Failed to read constant %s on contract: %s (signature with encoded parameters: %s); %s", methodDescriptor, c.ID, *tx.Data, err.Error())
+				return nil, fmt.Errorf("Failed to unpack contract execution response for contract: %s; method: %s; signature with encoded parameters: %s; %s", c.ID, methodDescriptor, *tx.Data, err.Error())
 			}
-			return nil, &out, nil
+
+			if response != nil {
+				out["response"] = response
+			}
+			if receipt != nil {
+				out["receipt"] = receipt
+			}
+
+			return out, nil
 		}
 
-		db := dbconf.DatabaseConnection()
-
-		var txResponse *contract.ContractExecutionResponse
-		if tx.Create(db) {
-			common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
-			if tx.Response != nil {
-				txResponse = tx.Response
-			}
-		} else {
-			common.Log.Debugf("Failed tx errors: %s", *tx.Errors[0].Message)
-			txParams := tx.ParseParams()
-			publicKey, publicKeyOk := txParams["public_key"].(interface{})
-			privateKey, privateKeyOk := txParams["private_key"].(interface{})
-			gas, gasOk := txParams["gas"].(float64)
-			if !gasOk {
-				gas = float64(0)
-			}
-			var nonce *uint64
-			if nonceFloat, nonceOk := txParams["nonce"].(float64); nonceOk {
-				nonceUint := uint64(nonceFloat)
-				nonce = &nonceUint
-			}
-			delete(txParams, "private_key")
-			tx.setParams(txParams)
-
-			if publicKeyOk && privateKeyOk {
-				common.Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
-				tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas))
-				if err == nil {
-					if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
-						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
-					} else {
-						err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
-						common.Log.Warning(err.Error())
-					}
-				}
-
-				if err != nil {
-					err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
-					common.Log.Warning(err.Error())
-				}
-			} else {
-				err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
-				common.Log.Warning(err.Error())
-			}
-		}
-
-		if txResponse != nil {
-			common.Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
-
-			var out interface{}
-			switch (txResponse.Receipt).(type) {
-			case []byte:
-				out = (txResponse.Receipt).([]byte)
-				common.Log.Debugf("Received response: %s", out)
-			case types.Receipt:
-				client, _ := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
-				receipt := txResponse.Receipt.(*types.Receipt)
-				txdeets, _, err := client.TransactionByHash(context.TODO(), receipt.TxHash)
-				if err != nil {
-					err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
-					common.Log.Warning(err.Error())
-					return nil, nil, err
-				}
-				out = txdeets
-			default:
-				// no-op
-				common.Log.Warningf("Unhandled transaction receipt type; %s", tx.Response.Receipt)
-			}
-			return &out, nil, nil
-		}
-	} else {
 		err = fmt.Errorf("Failed to execute method %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)
 	}
-	return nil, nil, err
+
+	return nil, err
 }
 
 func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
@@ -372,16 +430,15 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 		tx.PublishedAt = publishedAt
 	}
 
-	var receipt *interface{}
-	var response *interface{}
+	var response map[string]interface{}
 
-	txResponseCallback := func(c *contract.Contract, network *network.Network, methodDescriptor string, method string, abiMethod *abi.Method, params []interface{}) (*interface{}, *interface{}, error) {
+	txResponseCallback := func(c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
 		return txResponsefunc(tx, c, network, methodDescriptor, method, abiMethod, params)
 	}
 
 	var err error
 	if n.IsEthereumNetwork() {
-		receipt, response, err = c.ExecuteEthereumContract(n, txResponseCallback, method, params)
+		response, err = c.ExecuteEthereumContract(n, txResponseCallback, method, params)
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *n.Name)
 	}
@@ -401,7 +458,7 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 	if tx.Response == nil {
 		tx.Response = &contract.ContractExecutionResponse{
 			Response:    response,
-			Receipt:     receipt,
+			Receipt:     response,
 			Traces:      tx.Traces,
 			Transaction: tx,
 			Ref:         ref,
@@ -501,9 +558,9 @@ func consumeTxMsg(msg *stan.Msg) {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
 		natsutil.AttemptNack(msg, txMsgTimeout)
 	} else {
-		logmsg := fmt.Sprintf("Executed contract: %s", cntract.Address)
+		logmsg := fmt.Sprintf("Executed contract: %s", *cntract.Address)
 		if executionResponse != nil && executionResponse.Response != nil {
-			logmsg = fmt.Sprintf("%s; response: %s", executionResponse.Response)
+			logmsg = fmt.Sprintf("%s; response: %s", logmsg, executionResponse.Response)
 		}
 		common.Log.Debug(logmsg)
 

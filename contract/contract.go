@@ -101,8 +101,9 @@ func (c *Contract) ParseParams() map[string]interface{} {
 	return params
 }
 
-// ExecuteEthereumContract to execute an ethereum contract; returns the tx receipt and retvals; if the method is constant, the receipt will be nil.
-// If the methid is non-constant, the retvals will be nil.
+// ExecuteEthereumContract execute an ethereum contract; returns the tx receipt or retvals,
+// depending on if the execution is asynchronous or not. If the method is non-constant, the
+// response is the tx receipt. When the method is constant, retvals are returned.
 func (c *Contract) ExecuteEthereumContract(
 	network *network.Network,
 	txResponseCallback func(
@@ -111,9 +112,9 @@ func (c *Contract) ExecuteEthereumContract(
 		string, // methodDescriptor
 		string, // method
 		*abi.Method, // abiMethod
-		[]interface{}) (*interface{}, *interface{}, error), // params
+		[]interface{}) (map[string]interface{}, error), // params
 	method string,
-	params []interface{}) (*interface{}, *interface{}, error) { // given tx has been built but broadcast has not yet been attempted
+	params []interface{}) (map[string]interface{}, error) { // given tx has been built but broadcast has not yet been attempted
 	defer func() {
 		go func() {
 			accessedAt := time.Now()
@@ -123,10 +124,14 @@ func (c *Contract) ExecuteEthereumContract(
 		}()
 	}()
 
+	if !network.IsEthereumNetwork() {
+		return nil, fmt.Errorf("Failed to execute EVM-based smart contract method %s on contract: %s; target network invalid", method, c.ID)
+	}
+
 	var err error
 	_abi, err := c.ReadEthereumContractAbi()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
+		return nil, fmt.Errorf("Failed to execute contract method %s on contract: %s; no ABI resolved: %s", method, c.ID, err.Error())
 	}
 	var methodDescriptor = fmt.Sprintf("method %s", method)
 	var abiMethod *abi.Method
@@ -224,105 +229,6 @@ func (c *Contract) Create() bool {
 
 	return false
 }
-
-// Execute a transaction on the contract instance using a specific signer, value, method and params
-// func (c *Contract) Execute(execution *ContractExecution) (*ContractExecutionResponse, error) {
-// 	var err error
-// 	db := dbconf.DatabaseConnection()
-// 	var network = &Network{}
-// 	db.Model(c).Related(&network)
-
-// 	ref := execution.Ref
-// 	wallet := execution.Wallet
-// 	value := execution.Value
-// 	method := execution.Method
-// 	params := execution.Params
-// 	gas := execution.Gas
-// 	nonce := execution.Nonce
-// 	publishedAt := execution.PublishedAt
-
-// 	txParams := map[string]interface{}{}
-
-// 	walletID := &uuid.Nil
-// 	if wallet != nil {
-// 		if wallet.ID != uuid.Nil {
-// 			walletID = &wallet.ID
-// 		} else if wallet.Address != "" {
-// 			tmpWallet := &Wallet{}
-// 			db.Where("address = ?", wallet.Address).Find(&tmpWallet)
-// 			if tmpWallet != nil && tmpWallet.ID != uuid.Nil {
-// 				walletID = &tmpWallet.ID
-// 			}
-// 		}
-// 		if common.StringOrNil(wallet.Address) != nil && wallet.PrivateKey != nil {
-// 			txParams["public_key"] = wallet.Address
-// 			txParams["private_key"] = wallet.PrivateKey
-// 		}
-// 	}
-
-// 	if gas == nil {
-// 		gas64 := float64(0)
-// 		gas = &gas64
-// 	}
-// 	txParams["gas"] = gas
-
-// 	if nonce != nil {
-// 		txParams["nonce"] = *nonce
-// 	}
-
-// 	txParamsJSON, _ := json.Marshal(txParams)
-// 	_txParamsJSON := json.RawMessage(txParamsJSON)
-
-// 	tx := &Transaction{
-// 		ApplicationID: c.ApplicationID,
-// 		UserID:        nil,
-// 		NetworkID:     c.NetworkID,
-// 		WalletID:      walletID,
-// 		To:            c.Address,
-// 		Value:         &TxValue{value: value},
-// 		Params:        &_txParamsJSON,
-// 		Ref:           ref,
-// 	}
-
-// 	if publishedAt != nil {
-// 		tx.PublishedAt = publishedAt
-// 	}
-
-// 	var receipt *interface{}
-// 	var response *interface{}
-
-// 	if network.IsEthereumNetwork() {
-// 		receipt, response, err = c.ExecuteEthereumContract(network, tx, method, params)
-// 	} else {
-// 		err = fmt.Errorf("unsupported network: %s", *network.Name)
-// 	}
-
-// 	if err != nil {
-// 		desc := err.Error()
-// 		tx.updateStatus(db, "failed", &desc)
-// 		return nil, fmt.Errorf("Unable to execute %s contract; %s", *network.Name, err.Error())
-// 	}
-
-// 	accessedAt := time.Now()
-// 	go func() {
-// 		c.AccessedAt = &accessedAt
-// 		db.Save(c)
-// 	}()
-
-// 	if tx.Response == nil {
-// 		tx.Response = &ContractExecutionResponse{
-// 			Response:    response,
-// 			Receipt:     receipt,
-// 			Traces:      tx.Traces,
-// 			Transaction: tx,
-// 			Ref:         ref,
-// 		}
-// 	} else if tx.Response.Transaction == nil {
-// 		tx.Response.Transaction = tx
-// 	}
-
-// 	return tx.Response, nil
-// }
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
 func (c *Contract) ExecuteFromTx(

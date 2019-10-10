@@ -54,7 +54,7 @@ type Transaction struct {
 	Data             *string                             `json:"data"`
 	Hash             *string                             `json:"hash"`
 	Status           *string                             `sql:"not null;default:'pending'" json:"status"`
-	Params           *json.RawMessage                    `sql:"-" json:"params"`
+	Params           *json.RawMessage                    `sql:"-" json:"params,omitempty"`
 	Response         *contract.ContractExecutionResponse `sql:"-" json:"-"`
 	SignedTx         interface{}                         `sql:"-" json:"-"`
 	Traces           interface{}                         `sql:"-" json:"traces"`
