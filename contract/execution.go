@@ -41,63 +41,38 @@ type ContractExecutionResponse struct {
 
 const natsTxSubject = "goldmine.tx"
 
-// Execute an ephemeral ContractExecution
-// func (e *ContractExecution) Execute() (interface{}, error) {
-// 	var _abi *abi.ABI
-// 	if execABI, abiOk := e.ABI.(abi.ABI); abiOk {
-// 		_abi = &execABI
-// 	} else if e.Contract != nil {
-// 		execABI, err := e.Contract.readEthereumContractAbi()
-// 		if err != nil {
-// 			network, err := e.Contract.GetNetwork()
-// 			if err != nil || network.isEthereumNetwork() {
-// 				common.Log.Warningf("Cannot attempt EVM-based contract execution without ABI")
-// 				return nil, err
-// 			}
-// 		}
-// 		_abi = execABI
-// 	}
-
-// 	if _abi != nil {
-// 		if mthd, ok := _abi.Methods[e.Method]; ok {
-// 			if mthd.Const {
-// 				return e.Contract.Execute(e)
-// 			}
-// 		}
-// 	}
-
-// 	publishedAt := time.Now()
-// 	e.PublishedAt = &publishedAt
-
-// 	txMsg, _ := json.Marshal(e)
-// 	natsConnection := getNatsStreamingConnection()
-// 	return e, natsConnection.Publish(natsTxSubject, txMsg)
-// }
-
-// Execute an ephemeral ContractExecution in Transaction context
+// ExecuteFromTx allows ephemeral contract execution
 func (e *ContractExecution) ExecuteFromTx(
 	walletFn func(interface{}, map[string]interface{}) *uuid.UUID,
 	txCreateFn func(*Contract, *network.Network, *uuid.UUID, *ContractExecution, *json.RawMessage) (*ContractExecutionResponse, error),
 ) (interface{}, error) {
-	var _abi *abi.ABI
-	if execABI, abiOk := e.ABI.(abi.ABI); abiOk {
-		_abi = &execABI
-	} else if e.Contract != nil {
-		execABI, err := e.Contract.ReadEthereumContractAbi()
-		if err != nil {
-			network, err := e.Contract.GetNetwork()
-			if err != nil || network.IsEthereumNetwork() {
-				common.Log.Warningf("Cannot attempt EVM-based contract execution without ABI")
-				return nil, err
-			}
-		}
-		_abi = execABI
+	network, err := e.Contract.GetNetwork()
+	if err != nil {
+		common.Log.Warningf("Cannot attempt contract execution; %s", err.Error())
+		return nil, err
 	}
 
-	if _abi != nil {
-		if mthd, ok := _abi.Methods[e.Method]; ok {
-			if mthd.Const {
-				return e.Contract.ExecuteFromTx(e, walletFn, txCreateFn)
+	if network.IsEthereumNetwork() {
+		var _abi *abi.ABI
+		if execABI, abiOk := e.ABI.(abi.ABI); abiOk {
+			_abi = &execABI
+		} else if e.Contract != nil {
+			execABI, err := e.Contract.ReadEthereumContractAbi()
+			if err != nil {
+
+				if err != nil || network.IsEthereumNetwork() {
+					common.Log.Warningf("Cannot attempt EVM-based contract execution without ABI")
+					return nil, err
+				}
+			}
+			_abi = execABI
+		}
+
+		if _abi != nil {
+			if mthd, ok := _abi.Methods[e.Method]; ok {
+				if mthd.Const {
+					return e.Contract.ExecuteFromTx(e, walletFn, txCreateFn)
+				}
 			}
 		}
 	}

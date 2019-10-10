@@ -501,7 +501,12 @@ func consumeTxMsg(msg *stan.Msg) {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
 		natsutil.AttemptNack(msg, txMsgTimeout)
 	} else {
-		common.Log.Debugf("Executed contract: %s", executionResponse.Response)
+		logmsg := fmt.Sprintf("Executed contract: %s", cntract.Address)
+		if executionResponse != nil && executionResponse.Response != nil {
+			logmsg = fmt.Sprintf("%s; response: %s", executionResponse.Response)
+		}
+		common.Log.Debug(logmsg)
+
 		msg.Ack()
 	}
 }
