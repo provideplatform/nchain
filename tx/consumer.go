@@ -292,18 +292,12 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 							}
 						}
 					} else {
-						common.Log.Warningf("UNHANDLED TX RESPONSE...; %s", tx.Response.Receipt)
-
 						common.Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
 						switch (txResponse.Receipt).(type) {
 						case []byte:
-							common.Log.Warningf("BYTE ARRAY RECEIPT??; %s", tx.Response)
-
 							result = (txResponse.Receipt).([]byte)
 							json.Unmarshal(result, &receipt)
 						case types.Receipt:
-							common.Log.Warningf("PARSED RECEIPT??; %s", tx.Response)
-
 							// client, _ := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 							txReceipt := txResponse.Receipt.(*types.Receipt)
 							txReceiptJSON, _ := json.Marshal(txReceipt)
