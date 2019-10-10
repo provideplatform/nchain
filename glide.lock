@@ -1,5 +1,5 @@
-hash: 7efd5b7718748514d64bd1afb40a74972a8e347474bfd26af16f341db5e0b51c
-updated: 2019-10-09T18:06:04.663578-04:00
+hash: 06e76e7b797fdb2c540ec8b4b260b107188e3941a62d3405851d9b7f6982af9d
+updated: 2019-10-09T18:33:57.837323-04:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -82,7 +82,7 @@ imports:
   subpackages:
   - sys/windows
 - name: github.com/ethereum/go-ethereum
-  version: 039a9c36226eafaf07942ecfb6082a90945ea86a
+  version: a73f3f45183a347864a1c941930d6f26c6f06ac2
   subpackages:
   - accounts/abi
   - common
@@ -204,7 +204,7 @@ imports:
 - name: github.com/provideservices/provide-chainpoint
   version: ad02d0ad7c3f813f52cb96aff811528eacac31b2
 - name: github.com/provideservices/provide-go
-  version: 28fed84c32d449e5a1e5c03db3376f1f7016fc94
+  version: 83f90c28e21bf102c0151d77aec36698adc6c56c
 - name: github.com/rs/cors
   version: db0fe48135e83b5812a5a31be0eea66984b1b521
 - name: github.com/steakknife/bloomfilter
