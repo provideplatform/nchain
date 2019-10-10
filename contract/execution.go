@@ -59,11 +59,8 @@ func (e *ContractExecution) ExecuteFromTx(
 		} else if e.Contract != nil {
 			execABI, err := e.Contract.ReadEthereumContractAbi()
 			if err != nil {
-
-				if err != nil || network.IsEthereumNetwork() {
-					common.Log.Warningf("Cannot attempt EVM-based contract execution without ABI")
-					return nil, err
-				}
+				common.Log.Warningf("Cannot attempt EVM-based contract execution without ABI")
+				return nil, err
 			}
 			_abi = execABI
 		}
