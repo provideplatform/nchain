@@ -28,6 +28,7 @@ func InstallNetworksAPI(r *gin.Engine) {
 	r.GET("/api/v1/networks/:id/nodes", nodesListHandler)
 	r.POST("/api/v1/networks/:id/nodes", createNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId", nodeDetailsHandler)
+	r.PUT("/api/v1/networks/:id/nodes/:nodeId", updateNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", nodeLogsHandler)
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNodeHandler)
 	r.GET("/api/v1/networks/:id/oracles", networkOraclesListHandler)
@@ -298,6 +299,55 @@ func createNodeHandler(c *gin.Context) {
 
 	if node.Create() {
 		provide.Render(node, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = node.Errors
+		provide.Render(obj, 422, c)
+	}
+}
+
+func updateNodeHandler(c *gin.Context) {
+	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if userID == nil && appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	var node = &Node{}
+	dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		provide.RenderError("network node not found", 404, c)
+		return
+	} else if userID != nil && *node.UserID != *userID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if appID != nil && *node.ApplicationID != *appID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	var initialStatus string
+	if node.Status != nil {
+		initialStatus = *node.Status
+	}
+
+	err = json.Unmarshal(buf, node)
+	if err != nil {
+		provide.RenderError(err.Error(), 422, c)
+		return
+	}
+
+	node.Status = common.StringOrNil(initialStatus)
+
+	if node.Update() {
+		provide.Render(nil, 204, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = node.Errors
