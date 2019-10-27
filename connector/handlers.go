@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/goldmine/network"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -15,6 +16,8 @@ func InstallConnectorsAPI(r *gin.Engine) {
 	r.POST("/api/v1/connectors", createConnectorHandler)
 	r.GET("/api/v1/connectors/:id", connectorDetailsHandler)
 	r.DELETE("/api/v1/connectors/:id", deleteConnectorHandler)
+
+	r.GET("/api/v1/connectors/:id/nodes", connectorNodesListHandler)
 }
 
 func connectorsListHandler(c *gin.Context) {
@@ -88,4 +91,29 @@ func deleteConnectorHandler(c *gin.Context) {
 		return
 	}
 	provide.Render(nil, 204, c)
+}
+
+func connectorNodesListHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+	connector := &Connector{}
+
+	query := db.Where("connectors.application_id = ?", appID).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		provide.RenderError("connector not found", 404, c)
+		return
+	}
+
+	if appID != nil {
+		query = query.Where("nodes.application_id = ?", appID)
+	}
+
+	nodes := make([]*network.Node, 0)
+	db.Model(&connector).Association("Nodes").Find(&nodes)
+	provide.Render(nodes, 200, c)
 }
