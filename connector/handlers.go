@@ -36,7 +36,23 @@ func connectorsListHandler(c *gin.Context) {
 }
 
 func connectorDetailsHandler(c *gin.Context) {
-	provide.RenderError("not implemented", 501, c)
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	var connector = &Connector{}
+	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		provide.RenderError("connector not found", 404, c)
+		return
+	}
+	if *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	provide.Render(connector, 200, c)
 }
 
 func createConnectorHandler(c *gin.Context) {
