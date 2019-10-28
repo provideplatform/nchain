@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -324,16 +323,17 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 			}
 
 			if len(abiMethod.Outputs) == 1 {
-				var outptr interface{}
+				// var outptr interface{}
 				typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
 				common.Log.Debugf("Reflectively adding type hint for unpacking %s in return value", typestr)
-				isTuple := strings.Index(typestr, "(") == 0
-				if isTuple {
-					tupleLen := len(strings.Split(typestr, ","))
-					outptr = make([]interface{}, tupleLen)
-				}
-				// typ, _ := abi.NewType(typestr, nil)
-				// outptr := reflect.New(typ.Type).Interface()
+				// isTuple := strings.Index(typestr, "(") == 0
+				// if isTuple {
+				// 	common.Log.Debugf("Processing tuple for type-hinted retval: %s", typestr)
+				// 	tupleLen := len(strings.Split(typestr, ","))
+				// 	outptr = make([]interface{}, tupleLen)
+				// }
+				typ, _ := abi.NewType(typestr, nil)
+				outptr := reflect.New(typ.Type).Interface()
 
 				err = abiMethod.Outputs.Unpack(&outptr, result)
 				if err == nil {
