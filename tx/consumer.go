@@ -328,10 +328,6 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 				// typ, _ := abi.NewType(typestr, nil)
 				// outptr := reflect.New(typ.Type).Interface()
 				var outptr interface{}
-				if len(abiMethod.Outputs) > 1 {
-					// tuple... needs []interface
-					outptr = make([]interface{}, len(abiMethod.Outputs))
-				}
 				err = abiMethod.Outputs.Unpack(&outptr, result)
 				if err == nil {
 					common.Log.Debugf("Attempting to marshal %s result of constant contract execution of %s on contract: %s", typestr, methodDescriptor, c.ID)
