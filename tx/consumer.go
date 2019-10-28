@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -323,11 +324,17 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 			}
 
 			if len(abiMethod.Outputs) == 1 {
+				var outptr interface{}
 				typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
 				common.Log.Debugf("Reflectively adding type hint for unpacking %s in return value", typestr)
+				isTuple := strings.Index(typestr, "(") == 0
+				if isTuple {
+					tupleLen := len(strings.Split(typestr, ","))
+					outptr = make([]interface{}, tupleLen)
+				}
 				// typ, _ := abi.NewType(typestr, nil)
 				// outptr := reflect.New(typ.Type).Interface()
-				var outptr interface{}
+
 				err = abiMethod.Outputs.Unpack(&outptr, result)
 				if err == nil {
 					common.Log.Debugf("Attempting to marshal %s result of constant contract execution of %s on contract: %s", typestr, methodDescriptor, c.ID)
