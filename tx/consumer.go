@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"reflect"
 	"sync"
 	"time"
 
@@ -205,7 +204,6 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 	var err error
 	var result []byte
 	var receipt map[string]interface{}
-	var response map[string]interface{}
 	out := map[string]interface{}{}
 
 	if network.IsEthereumNetwork() {
@@ -230,7 +228,6 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 					return nil, err
 				}
 			} else {
-				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				db := dbconf.DatabaseConnection()
 
 				var txResponse *contract.ContractExecutionResponse
@@ -322,77 +319,16 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 				}
 			}
 
-			if len(abiMethod.Outputs) == 1 {
-				// var outptr interface{}
-				typestr := fmt.Sprintf("%s", abiMethod.Outputs[0].Type)
-				common.Log.Debugf("Reflectively adding type hint for unpacking %s in return value", typestr)
-				// isTuple := strings.Index(typestr, "(") == 0
-				// if isTuple {
-				// 	common.Log.Debugf("Processing tuple for type-hinted retval: %s", typestr)
-				// 	tupleLen := len(strings.Split(typestr, ","))
-				// 	outptr = make([]interface{}, tupleLen)
-				// }
-				typ, _ := abi.NewType(typestr, nil)
-				outptr := reflect.New(typ.Type).Interface()
-
-				err = abiMethod.Outputs.Unpack(&outptr, result)
-				if err == nil {
-					common.Log.Debugf("Attempting to marshal %s result of constant contract execution of %s on contract: %s", typestr, methodDescriptor, c.ID)
-					switch outptr.(type) {
-					case [32]byte:
-						arrbytes, _ := outptr.([32]byte)
-						out["response"] = string(arrbytes[:]) //string(bytes.Trim(arrbytes[:], "\x00"))
-					case [][32]byte:
-						arrbytesarr, _ := outptr.([][32]byte)
-						vals := make([]string, len(arrbytesarr))
-						for i, item := range arrbytesarr {
-							vals[i] = string(item[:]) //string(bytes.Trim(item[:], "\x00"))
-						}
-						out["response"] = vals
-					default:
-						common.Log.Debugf("Noop during marshaling of constant contract execution of %s on contract: %s", methodDescriptor, c.ID)
-						out["response"] = outptr
-					}
-				}
-			} else if len(abiMethod.Outputs) > 1 {
-				response := map[string]interface{}{}
-				// err = abiMethod.Outputs.UnpackIntoMap(response, result)
-				// common.Log.Debugf("unpacked map: %s", response)
-
-				vals := make([]interface{}, len(abiMethod.Outputs))
-				for i := range abiMethod.Outputs {
-					typestr := fmt.Sprintf("%s", abiMethod.Outputs[i].Type)
-					common.Log.Debugf("Reflectively adding type hint for unpacking %s in return values slot %v", typestr, i)
-					typ, err := abi.NewType(typestr, nil)
-					if err != nil {
-						return nil, fmt.Errorf("Failed to reflectively add appropriately-typed %s value for in return values slot %v); %s", typestr, i, err.Error())
-					}
-					vals[i] = reflect.New(typ.Type).Interface()
-				}
-				// err = abiMethod.Outputs.Unpack(&vals, result)
-				// if err == nil {
-				// 	for i := range vals {
-				// 		response[abiMethod.Outputs[i].Name] = vals[i]
-				// 	}
-				// }
-				for i := range vals {
-					response[abiMethod.Outputs[i].Name] = vals[i]
-				}
-				out["response_map"] = response
-				out["response"] = vals
-				common.Log.Debugf("Unpacked %v returned values from execution of method %s on contract: %s; values: %s", len(vals), methodDescriptor, c.ID, vals)
-				if vals != nil && len(vals) == abiMethod.Outputs.LengthNonIndexed() {
-					err = nil
-				}
-			}
-
+			outptr, err := abiMethod.Outputs.UnpackValues(result)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to unpack contract execution response for contract: %s; method: %s; signature with encoded parameters: %s; %s", c.ID, methodDescriptor, *tx.Data, err.Error())
 			}
-
-			if response != nil {
-				out["response"] = response
+			if len(outptr) == 1 {
+				out["response"] = outptr[0]
+			} else {
+				out["response"] = outptr
 			}
+
 			if receipt != nil {
 				out["receipt"] = receipt
 			}
