@@ -408,25 +408,34 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 }
 
 func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-	db := dbconf.DatabaseConnection()
 	tmpWallet := &wallet.Wallet{}
-	wallet := w.(*wallet.Wallet)
-	// params := txParams
-	if wallet != nil {
-		// need reflection to work with wallet here, or...
-		if wallet.ID != uuid.Nil {
-			return &wallet.ID
-		} else if wallet.Address != "" {
+
+	switch w.(type) {
+	case *wallet.Wallet:
+		wallet := w.(*wallet.Wallet)
+		walletID := wallet.ID
+		if walletID != uuid.Nil {
+			return &walletID
+		}
+		if wallet.Address != "" {
+			db := dbconf.DatabaseConnection()
 			db.Where("address = ?", wallet.Address).Find(&tmpWallet)
 			if tmpWallet != nil && tmpWallet.ID != uuid.Nil {
 				return &tmpWallet.ID
 			}
+			common.Log.Warningf("Failed to resolve managed wallet for address: %s", wallet.Address)
 		}
 		if common.StringOrNil(wallet.Address) != nil && wallet.PrivateKey != nil {
 			txParams["public_key"] = wallet.Address
 			txParams["private_key"] = wallet.PrivateKey
 		}
+	case map[string]interface{}:
+		common.Log.Debugf("Resolved wallet mapping: %s", w)
+	default:
+		common.Log.Warningf("No wallet uuid resolved during attempted contract execution; contract execution address: %s", txParams["to"])
 	}
+	// params := txParams
+
 	return &uuid.Nil
 }
 
@@ -486,7 +495,15 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 
 	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-		return wfunc(w.(*wallet.Wallet), txParams)
+		switch w.(type) {
+		case *wallet.Wallet:
+			return wfunc(w, txParams)
+		case map[string]interface{}:
+			common.Log.Debugf("Resolved wallet mapping: %s", w)
+		default:
+			common.Log.Warningf("No wallet uuid resolved during attempted contract execution; contract id: %s", cntract.ID)
+		}
+		return nil
 	}
 
 	executionResponse, err := cntract.ExecuteFromTx(execution, walletFn, txCreateFn)
