@@ -173,7 +173,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal wallet_id during NATS %v message handling; %s", msg.Subject, err.Error())
+		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
 		natsutil.Nack(msg)
 		return
 	}
