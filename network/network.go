@@ -68,7 +68,7 @@ type Network struct {
 
 // NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
 func NetworkListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.cloneable, networks.enabled, networks.chain_id, networks.network_id, networks.sidechain_id")
+	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.cloneable, networks.enabled, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
 }
 
 // Create and persist a new network

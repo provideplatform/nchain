@@ -138,6 +138,12 @@ func networksListHandler(c *gin.Context) {
 
 	query = query.Order("networks.created_at ASC")
 	provide.Paginate(c, query, &Network{}).Find(&networks)
+	for _, ntwrk := range networks {
+		cfg := ntwrk.ParseConfig()
+		delete(cfg, "chainspec")
+		delete(cfg, "chainspec_abi")
+		ntwrk.setConfig(cfg)
+	}
 	provide.Render(networks, 200, c)
 }
 
