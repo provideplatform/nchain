@@ -3,8 +3,10 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/elbv2"
@@ -19,6 +21,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
+const loadBalancerReachabilityTimeout = time.Millisecond * 2500
 const loadBalancerTypeBlockExplorer = "explorer"
 const loadBalancerTypeRPC = "rpc"
 const loadBalancerTypeIPFS = "ipfs"
@@ -223,6 +226,22 @@ func (l *LoadBalancer) ParseConfig() map[string]interface{} {
 		}
 	}
 	return config
+}
+
+// ReachableOnPort returns true if the load balancer is available on the named port
+func (l *LoadBalancer) ReachableOnPort(port uint) bool {
+	if l.IPv4 == nil {
+		return false
+	}
+	addr := fmt.Sprintf("%s:%v", *l.IPv4, port)
+	conn, err := net.DialTimeout("tcp", addr, loadBalancerReachabilityTimeout) // FIXME-- use configured protocol instead of assuming tcp
+	if err == nil {
+		common.Log.Debugf("%s:%v is reachable", *l.IPv4, port)
+		defer conn.Close()
+		return true
+	}
+	common.Log.Debugf("%s:%v is unreachable", *l.IPv4, port)
+	return false
 }
 
 // orchestrationAPIClient returns an instance of the load balancer's underlying OrchestrationAPI

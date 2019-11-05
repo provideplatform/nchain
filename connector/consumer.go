@@ -12,15 +12,20 @@ import (
 	"github.com/provideapp/goldmine/common"
 )
 
-const natsConnectorDeprovisioningSubject = "goldmine.connector.provision"
+const natsConnectorDeprovisioningSubject = "goldmine.connector.deprovision"
 const natsConnectorDeprovisioningMaxInFlight = 64
 const natsConnectorDeprovisioningTimeout = int64(time.Minute * 10)
 const natsConnectorDeprovisioningInvocationTimeout = time.Second * 15
 
-const natsConnectorProvisioningSubject = "goldmine.connector.deprovision"
+const natsConnectorProvisioningSubject = "goldmine.connector.provision"
 const natsConnectorProvisioningMaxInFlight = 64
 const natsConnectorProvisioningTimeout = int64(time.Minute * 10)
 const natsConnectorProvisioningInvocationTimeout = time.Second * 15
+
+const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability.resolve"
+const natsConnectorResolveReachabilityMaxInFlight = 64
+const natsConnectorResolveReachabilityTimeout = int64(time.Minute * 10)
+const natsConnectorResolveReachabilityInvocationTimeout = time.Second * 10
 
 const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
 const natsConnectorDenormalizeConfigMaxInFlight = 64
@@ -36,6 +41,7 @@ func init() {
 	}
 
 	createNatsConnectorProvisioningSubscriptions(&waitGroup)
+	createNatsConnectorResolveReachabilitySubscriptions(&waitGroup)
 	createNatsConnectorDeprovisioningSubscriptions(&waitGroup)
 	createNatsConnectorDenormalizeConfigSubscriptions(&waitGroup)
 }
@@ -49,6 +55,19 @@ func createNatsConnectorProvisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorProvisioningMsg,
 			natsConnectorProvisioningInvocationTimeout,
 			natsConnectorProvisioningMaxInFlight,
+		)
+	}
+}
+
+func createNatsConnectorResolveReachabilitySubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsConnectorResolveReachabilityInvocationTimeout,
+			natsConnectorResolveReachabilitySubject,
+			natsConnectorResolveReachabilitySubject,
+			consumeConnectorResolveReachabilityMsg,
+			natsConnectorResolveReachabilityInvocationTimeout,
+			natsConnectorResolveReachabilityMaxInFlight,
 		)
 	}
 }
@@ -190,5 +209,43 @@ func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
 	} else {
 		common.Log.Debugf("Connector config denormalized; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
+	}
+}
+
+func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
+	common.Log.Debugf("Consuming NATS connector resolve reachability message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal connector resolve reachability message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	connectorID, connectorIDOk := params["connector_id"].(string)
+	if !connectorIDOk {
+		common.Log.Warningf("Failed to resolve connector reachability; no connector id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	connector := &Connector{}
+	db.Where("id = ?", connectorID).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		common.Log.Warningf("Failed to resolve connector reachability; no connector resolved for id: %s", connectorID)
+		natsutil.Nack(msg)
+		return
+	}
+
+	if connector.reachable() {
+		common.Log.Debugf("Connector reachability resolved; ACKing NATS message for connector: %s", connector.ID)
+		connector.updateStatus(db, "available", nil)
+		msg.Ack()
+	} else {
+		common.Log.Debugf("Connector is not reachable: %s", connector.ID)
+		natsutil.AttemptNack(msg, natsConnectorResolveReachabilityTimeout)
 	}
 }

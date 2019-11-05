@@ -16,6 +16,7 @@ import (
 const IPFSConnectorProvider = "ipfs"
 
 const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
+const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability.resolve"
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 
@@ -57,6 +58,7 @@ func (p *IPFSProvider) rawConfig() *json.RawMessage {
 	return &_cfgJSON
 }
 
+// Deprovision undeploys all associated nodes and load balancers and removes them from the IPFS connector
 func (p *IPFSProvider) Deprovision() error {
 	loadBalancers := make([]*network.LoadBalancer, 0)
 	p.model.Association("LoadBalancers").Find(&loadBalancers)
@@ -82,6 +84,7 @@ func (p *IPFSProvider) Deprovision() error {
 	return nil
 }
 
+// Provision configures a new load balancer and the initial IPFS nodes and associates the resources with the IPFS connector
 func (p *IPFSProvider) Provision() error {
 	loadBalancer := &network.LoadBalancer{
 		NetworkID:   *p.networkID,
@@ -111,6 +114,7 @@ func (p *IPFSProvider) Provision() error {
 	return nil
 }
 
+// DeprovisionNode undeploys an existing node removes it from the IPFS connector
 func (p *IPFSProvider) DeprovisionNode() error {
 	node := &network.Node{}
 	p.model.Association("Nodes").Find(node)
@@ -118,6 +122,7 @@ func (p *IPFSProvider) DeprovisionNode() error {
 	return nil
 }
 
+// ProvisionNode deploys and load balances a new node and associates it with the IPFS connector
 func (p *IPFSProvider) ProvisionNode() error {
 	node := &network.Node{
 		NetworkID:     *p.networkID,
@@ -138,9 +143,27 @@ func (p *IPFSProvider) ProvisionNode() error {
 			})
 			natsutil.NatsPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}
+
+		msg, _ := json.Marshal(map[string]interface{}{
+			"connector_id": p.connectorID.String(),
+		})
+		natsutil.NatsPublish(natsConnectorResolveReachabilitySubject, msg)
 	} else {
 		return fmt.Errorf("Failed to provision node on connector: %s", p.connectorID)
 	}
 
 	return nil
+}
+
+// Reachable returns true if the IPFS API provider is available
+func (p *IPFSProvider) Reachable() bool {
+	loadBalancers := make([]*network.LoadBalancer, 0)
+	p.model.Association("LoadBalancers").Find(&loadBalancers)
+	for _, loadBalancer := range loadBalancers {
+		if loadBalancer.ReachableOnPort(uint(p.apiPort)) {
+			return true
+		}
+	}
+	common.Log.Debugf("Connector is unreachable: %s", p.connectorID)
+	return false
 }

@@ -41,6 +41,8 @@ type ConnectorAPI interface {
 
 	DeprovisionNode() error
 	ProvisionNode() error
+
+	Reachable() bool
 }
 
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;
@@ -357,4 +359,16 @@ func (c *Connector) connectorAPI() (ConnectorAPI, error) {
 	}
 
 	return apiClient, nil
+}
+
+// reachable returns true if any of the associated loadbalancers are reachable on the configured port;
+// if no loadbalancers are configured, the connector is considered reachable if any configured nodes are
+// reachable. reachability for the connector should not be interpreted as high availability. this is useful
+// for determining if a connector has transitioned from provisioning -> available...
+func (c *Connector) reachable() bool {
+	apiClient, err := c.connectorAPI()
+	if err != nil {
+		common.Log.Warningf("Failed to test connector reachability; unable to resolve connector API for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+	return apiClient.Reachable()
 }
