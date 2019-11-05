@@ -108,7 +108,7 @@ func updateNetworkHandler(c *gin.Context) {
 }
 
 func networksListHandler(c *gin.Context) {
-	var networks []Network
+	var networks []*Network
 	query := NetworkListQuery()
 	query = query.Where("networks.enabled = true")
 
