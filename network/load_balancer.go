@@ -230,17 +230,22 @@ func (l *LoadBalancer) ParseConfig() map[string]interface{} {
 
 // ReachableOnPort returns true if the load balancer is available on the named port
 func (l *LoadBalancer) ReachableOnPort(port uint) bool {
-	if l.IPv4 == nil {
+	var addr *string
+	if l.IPv4 != nil {
+		addr = l.IPv4
+	} else if l.Host != nil {
+		addr = l.Host
+	}
+	if addr == nil {
 		return false
 	}
-	addr := fmt.Sprintf("%s:%v", *l.IPv4, port)
-	conn, err := net.DialTimeout("tcp", addr, loadBalancerReachabilityTimeout) // FIXME-- use configured protocol instead of assuming tcp
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%v", *addr, port), loadBalancerReachabilityTimeout) // FIXME-- use configured protocol instead of assuming tcp
 	if err == nil {
-		common.Log.Debugf("%s:%v is reachable", *l.IPv4, port)
+		common.Log.Debugf("%s:%v is reachable", *addr, port)
 		defer conn.Close()
 		return true
 	}
-	common.Log.Debugf("%s:%v is unreachable", *l.IPv4, port)
+	common.Log.Debugf("%s:%v is unreachable", *addr, port)
 	return false
 }
 
