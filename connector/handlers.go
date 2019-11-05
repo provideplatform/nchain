@@ -119,7 +119,8 @@ func connectorNodesListHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 	connector := &Connector{}
 
-	query := db.Where("connectors.application_id = ?", appID).Find(&connector)
+	query := network.NodeListQuery()
+	query = query.Where("connectors.application_id = ?", appID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		provide.RenderError("connector not found", 404, c)
 		return
