@@ -50,7 +50,7 @@ type Contract struct {
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which deployed the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
 	Address       *string          `sql:"not null" json:"address"`
-	Params        *json.RawMessage `sql:"type:json" json:"params"`
+	Params        *json.RawMessage `sql:"type:json" json:"params,omitempty"`
 	AccessedAt    *time.Time       `json:"accessed_at"`
 }
 

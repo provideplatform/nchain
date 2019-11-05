@@ -49,7 +49,7 @@ type LoadBalancer struct {
 	Region          *string          `json:"region"`
 	Status          *string          `sql:"not null;default:'provisioning'" json:"status"`
 	Nodes           []Node           `gorm:"many2many:load_balancers_nodes" json:"-"`
-	Config          *json.RawMessage `sql:"type:json" json:"config"`
+	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
 }
 

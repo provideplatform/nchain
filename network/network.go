@@ -59,15 +59,17 @@ type Network struct {
 	IsProduction  *bool                  `sql:"not null" json:"is_production"`
 	Cloneable     *bool                  `sql:"not null" json:"cloneable"`
 	Enabled       *bool                  `sql:"not null" json:"enabled"`
-	ChainID       *string                `json:"chain_id"`                     // protocol-specific chain id
-	SidechainID   *uuid.UUID             `sql:"type:uuid" json:"sidechain_id"` // network id used as the transactional sidechain (or null)
-	NetworkID     *uuid.UUID             `sql:"type:uuid" json:"network_id"`   // network id used as the parent
-	Config        *json.RawMessage       `sql:"type:json not null" json:"config"`
-	Stats         *provide.NetworkStatus `sql:"-" json:"stats"`
+	ChainID       *string                `json:"chain_id"`                               // protocol-specific chain id
+	SidechainID   *uuid.UUID             `sql:"type:uuid" json:"sidechain_id,omitempty"` // network id used as the transactional sidechain (or null)
+	NetworkID     *uuid.UUID             `sql:"type:uuid" json:"network_id"`             // network id used as the parent
+	Config        *json.RawMessage       `sql:"type:json not null" json:"config,omitempty"`
+	Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
 
-// config["network_id"] is unique
-// config["protocol_id"] is "poa"
+// NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
+func NetworkListQuery() *gorm.DB {
+	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.cloneable, networks.enabled, networks.chain_id, networks.network_id, networks.sidechain_id")
+}
 
 // Create and persist a new network
 func (n *Network) Create() bool {

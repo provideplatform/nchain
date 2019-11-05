@@ -109,7 +109,8 @@ func updateNetworkHandler(c *gin.Context) {
 
 func networksListHandler(c *gin.Context) {
 	var networks []Network
-	query := dbconf.DatabaseConnection().Where("networks.enabled = true")
+	query := NetworkListQuery()
+	query = query.Where("networks.enabled = true")
 
 	if strings.ToLower(c.Query("cloneable")) == "true" {
 		query = query.Where("networks.cloneable = true")
@@ -174,7 +175,8 @@ func nodesListHandler(c *gin.Context) {
 		return
 	}
 
-	query := dbconf.DatabaseConnection().Where("nodes.network_id = ?", c.Param("id"))
+	query := NodeListQuery()
+	query = query.Where("nodes.network_id = ?", c.Param("id"))
 
 	if userID != nil {
 		query = query.Where("nodes.user_id = ?", userID)

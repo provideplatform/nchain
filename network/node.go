@@ -65,7 +65,7 @@ type Node struct {
 	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
 	UserID          *uuid.UUID       `sql:"type:uuid" json:"user_id"`
 	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	Bootnode        bool             `sql:"not null;default:'false'" json:"is_bootnode"`
+	Bootnode        bool             `sql:"not null;default:'false'" json:"-"`
 	Host            *string          `json:"host"`
 	IPv4            *string          `json:"ipv4"`
 	IPv6            *string          `json:"ipv6"`
@@ -75,8 +75,13 @@ type Node struct {
 	Role            *string          `sql:"not null;default:'peer'" json:"role"`
 	Status          *string          `sql:"not null;default:'init'" json:"status"`
 	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_nodes" json:"-"`
-	Config          *json.RawMessage `sql:"type:json" json:"config"`
+	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+}
+
+// NodeListQuery returns a DB query configured to select columns suitable for a paginated API response
+func NodeListQuery() *gorm.DB {
+	return dbconf.DatabaseConnection().Select("nodes.id, nodes.created_at, nodes.network_id, nodes.user_id, nodes.application_id, nodes.host, nodes.ipv4, nodes.ipv6, nodes.private_ipv4, nodes.private_ipv6, nodes.description, nodes.role, nodes.status")
 }
 
 // NodeLog represents an abstract API response containing syslog or similar messages
