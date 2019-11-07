@@ -544,8 +544,8 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 			for _, dep := range artifact.Deps {
 				dependency := dep.(map[string]interface{})
 				name := dependency["name"].(string)
-				fingerprint := dependency["fingerprint"].(string)
-				if fingerprint == "" {
+				fingerprint, fingerprintOk := dependency["fingerprint"].(string)
+				if !fingerprintOk {
 					continue
 				}
 
