@@ -192,6 +192,10 @@ func loadBalancersListHandler(c *gin.Context) {
 		query = query.Where("load_balancers.application_id = ?", appID)
 	}
 
+	if c.Query("region") != "" {
+		query = query.Where("load_balancers.region = ?", c.Query("region"))
+	}
+
 	var loadBalancers []LoadBalancer
 	query = query.Order("load_balancers.created_at ASC")
 	provide.Paginate(c, query, &Node{}).Find(&loadBalancers)

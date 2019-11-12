@@ -130,6 +130,10 @@ func connectorLoadBalancersListHandler(c *gin.Context) {
 		query = query.Where("load_balancers.application_id = ?", appID)
 	}
 
+	if c.Query("region") != "" {
+		query = query.Where("load_balancers.region = ?", c.Query("region"))
+	}
+
 	loadBalancers := make([]*network.LoadBalancer, 0)
 	db.Model(&connector).Association("LoadBalancers").Find(&loadBalancers)
 	provide.Render(loadBalancers, 200, c)
