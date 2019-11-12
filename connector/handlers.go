@@ -17,6 +17,7 @@ func InstallConnectorsAPI(r *gin.Engine) {
 	r.GET("/api/v1/connectors/:id", connectorDetailsHandler)
 	r.DELETE("/api/v1/connectors/:id", deleteConnectorHandler)
 
+	r.GET("/api/v1/connectors/:id/load_balancers", connectorLoadBalancersListHandler)
 	r.GET("/api/v1/connectors/:id/nodes", connectorNodesListHandler)
 }
 
@@ -107,6 +108,31 @@ func deleteConnectorHandler(c *gin.Context) {
 		return
 	}
 	provide.Render(nil, 204, c)
+}
+
+func connectorLoadBalancersListHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+	connector := &Connector{}
+
+	query := db.Where("connectors.application_id = ?", appID).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		provide.RenderError("connector not found", 404, c)
+		return
+	}
+
+	if appID != nil {
+		query = query.Where("load_balancers.application_id = ?", appID)
+	}
+
+	loadBalancers := make([]*network.LoadBalancer, 0)
+	db.Model(&connector).Association("LoadBalancers").Find(&loadBalancers)
+	provide.Render(loadBalancers, 200, c)
 }
 
 func connectorNodesListHandler(c *gin.Context) {
