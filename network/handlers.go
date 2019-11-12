@@ -195,6 +195,12 @@ func loadBalancersListHandler(c *gin.Context) {
 	if c.Query("region") != "" {
 		query = query.Where("load_balancers.region = ?", c.Query("region"))
 	}
+	if c.Query("status") != "" {
+		query = query.Where("load_balancers.status = ?", c.Query("status"))
+	}
+	if c.Query("type") != "" {
+		query = query.Where("load_balancers.type = ?", c.Query("type"))
+	}
 
 	var loadBalancers []LoadBalancer
 	query = query.Order("load_balancers.created_at ASC")
