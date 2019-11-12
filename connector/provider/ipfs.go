@@ -87,11 +87,12 @@ func (p *IPFSProvider) Deprovision() error {
 // Provision configures a new load balancer and the initial IPFS nodes and associates the resources with the IPFS connector
 func (p *IPFSProvider) Provision() error {
 	loadBalancer := &network.LoadBalancer{
-		NetworkID:   *p.networkID,
-		Type:        common.StringOrNil(IPFSConnectorProvider),
-		Description: common.StringOrNil(fmt.Sprintf("IPFS Connector Load Balancer")),
-		Region:      p.region,
-		Config:      p.rawConfig(),
+		NetworkID:     *p.networkID,
+		ApplicationID: p.applicationID,
+		Type:          common.StringOrNil(IPFSConnectorProvider),
+		Description:   common.StringOrNil(fmt.Sprintf("IPFS Connector Load Balancer")),
+		Region:        p.region,
+		Config:        p.rawConfig(),
 	}
 
 	if loadBalancer.Create() {
