@@ -43,6 +43,7 @@ func init() {
 type LoadBalancer struct {
 	provide.Model
 	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id,omitempty"`
 	Name            *string          `sql:"not null" json:"name"`
 	Type            *string          `sql:"not null" json:"type"`
 	Host            *string          `json:"host"`
@@ -54,6 +55,11 @@ type LoadBalancer struct {
 	Nodes           []Node           `gorm:"many2many:load_balancers_nodes" json:"-"`
 	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+}
+
+// LoadBalancerListQuery returns a DB query configured to select columns suitable for a paginated API response
+func LoadBalancerListQuery() *gorm.DB {
+	return dbconf.DatabaseConnection().Select("load_balancers.id, load_balancers.created_at, load_balancers.network_id, load_balancers.application_id, load_balancers.name, load_balancers.type, load_balancers.host, load_balancers.ipv4, load_balancers.ipv6, load_balancers.description, load_balancers.region, load_balancers.status, load_balancers.config")
 }
 
 func (l *LoadBalancer) decryptedConfig() (map[string]interface{}, error) {

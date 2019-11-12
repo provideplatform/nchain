@@ -25,14 +25,20 @@ func InstallNetworksAPI(r *gin.Engine) {
 	r.GET("/api/v1/networks/:id/blocks", networkBlocksListHandler)
 	r.GET("/api/v1/networks/:id/bridges", networkBridgesListHandler)
 	r.GET("/api/v1/networks/:id/connectors", networkConnectorsListHandler)
+	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
+
+	r.GET("/api/v1/networks/:id/load_balancers", loadBalancersListHandler)
+	r.GET("/api/v1/networks/:id/load_balancers/:loadBalancerId", loadBalancerDetailsHandler)
+	r.PUT("/api/v1/networks/:id/load_balancers/:loadBalancerId", updateLoadBalancerHandler)
+
 	r.GET("/api/v1/networks/:id/nodes", nodesListHandler)
 	r.POST("/api/v1/networks/:id/nodes", createNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId", nodeDetailsHandler)
 	r.PUT("/api/v1/networks/:id/nodes/:nodeId", updateNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", nodeLogsHandler)
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNodeHandler)
+
 	r.GET("/api/v1/networks/:id/oracles", networkOraclesListHandler)
-	r.GET("/api/v1/networks/:id/status", networkStatusHandler)
 }
 
 func createNetworkHandler(c *gin.Context) {
@@ -173,6 +179,83 @@ func networkConnectorsListHandler(c *gin.Context) {
 	provide.RenderError("not implemented", 501, c)
 }
 
+func loadBalancersListHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	query := LoadBalancerListQuery()
+	query = query.Where("load_balancers.network_id = ?", c.Param("id"))
+	if appID != nil {
+		query = query.Where("load_balancers.application_id = ?", appID)
+	}
+
+	var loadBalancers []LoadBalancer
+	query = query.Order("load_balancers.created_at ASC")
+	provide.Paginate(c, query, &Node{}).Find(&loadBalancers)
+	provide.Render(loadBalancers, 200, c)
+}
+
+func loadBalancerDetailsHandler(c *gin.Context) {
+	provide.RenderError("not implemented", 501, c)
+}
+
+func updateLoadBalancerHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	var loadBalancer = &LoadBalancer{}
+	query := dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("loadBalancerId"), c.Param("id"))
+	if appID != nil {
+		query = query.Where("load_balancers.application_id = ?", appID)
+	}
+	query.Find(&loadBalancer)
+
+	if loadBalancer == nil || loadBalancer.ID == uuid.Nil {
+		provide.RenderError("load balancer not found", 404, c)
+		return
+	} else if appID != nil && loadBalancer.ApplicationID != nil && *loadBalancer.ApplicationID != *appID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if loadBalancer.ApplicationID == nil {
+		// shouldn't be able to reach this branch, here for now to be safe
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	var initialStatus string
+	if loadBalancer.Status != nil {
+		initialStatus = *loadBalancer.Status
+	}
+
+	err = json.Unmarshal(buf, loadBalancer)
+	if err != nil {
+		provide.RenderError(err.Error(), 422, c)
+		return
+	}
+
+	loadBalancer.Status = common.StringOrNil(initialStatus)
+
+	if loadBalancer.Update() {
+		provide.Render(nil, 204, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = loadBalancer.Errors
+		provide.Render(obj, 422, c)
+	}
+}
+
 func nodesListHandler(c *gin.Context) {
 	userID := provide.AuthorizedSubjectID(c, "user")
 	appID := provide.AuthorizedSubjectID(c, "application")
@@ -214,7 +297,10 @@ func nodeDetailsHandler(c *gin.Context) {
 	} else if userID != nil && *node.UserID != *userID {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if appID != nil && *node.ApplicationID != *appID {
+	} else if appID != nil && node.ApplicationID != nil && *node.ApplicationID != *appID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
