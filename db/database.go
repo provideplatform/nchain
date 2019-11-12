@@ -58,7 +58,6 @@ func MigrateSchema() {
 		db.Model(&network.LoadBalancer{}).AddIndex("idx_load_balancers_status", "status")
 		db.Model(&network.LoadBalancer{}).AddIndex("idx_load_balancers_type", "type")
 		db.Model(&network.LoadBalancer{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-		db.Model(&network.LoadBalancer{}).AddForeignKey("application_id", "applications(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&wallet.Wallet{})
 		db.Model(&wallet.Wallet{}).AddIndex("idx_wallets_application_id", "application_id")

@@ -35,7 +35,6 @@ func init() {
 	db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_status", "status")
 	db.Model(&LoadBalancer{}).AddIndex("idx_load_balancers_type", "type")
 	db.Model(&LoadBalancer{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&LoadBalancer{}).AddForeignKey("application_id", "applications(id)", "SET NULL", "CASCADE")
 
 	db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 	db.Exec("ALTER TABLE load_balancers_nodes ADD CONSTRAINT load_balancers_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
