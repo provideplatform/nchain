@@ -206,7 +206,7 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 				id, _ := uuid.NewV4()
 				payload := map[string]interface{}{
 					"method":  "eth_subscribe",
-					"params":  []string{"logs", "newHeads"},
+					"params":  []string{"newHeads"},
 					"id":      id.String(),
 					"jsonrpc": "2.0",
 				}
