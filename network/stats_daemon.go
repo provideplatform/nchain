@@ -21,6 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
 	natsutil "github.com/kthomas/go-natsutil"
+	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideservices/provide-go"
 )
@@ -202,14 +203,11 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 				common.Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
 			} else {
 				defer wsConn.Close()
-				var chainID string
-				if network.ChainID != nil {
-					chainID = *network.ChainID
-				}
+				id, _ := uuid.NewV4()
 				payload := map[string]interface{}{
 					"method":  "eth_subscribe",
-					"params":  []string{"newHeads"},
-					"id":      chainID,
+					"params":  []string{"logs", "newHeads"},
+					"id":      id.String(),
 					"jsonrpc": "2.0",
 				}
 				if err := wsConn.WriteJSON(payload); err != nil {
