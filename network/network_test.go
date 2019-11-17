@@ -526,7 +526,7 @@ var _ = Describe("Network", func() {
 						"network_id":          22,     // required
 						"protocol_id":         "poa",  // required
 						"websocket_url":       nil}),
-					Stats: nil}
+				}
 
 				nwnn.Create()
 
@@ -606,9 +606,6 @@ var _ = Describe("Network", func() {
 			It("should return AvailablePeerCount", func() {
 				Expect(nwnn.AvailablePeerCount()).To(Equal(uint64(4)))
 			})
-			It("should return network status", func() {
-				Expect(nwnn.Status(true)).NotTo(BeNil())
-			})
 		})
 		Context("without assotiation", func() {
 			var nwa *network.Network
@@ -643,7 +640,7 @@ var _ = Describe("Network", func() {
 						"network_id":          22,     // required
 						"protocol_id":         "poa",  // required
 						"websocket_url":       nil}),
-					Stats: nil}
+				}
 				nwa.Create()
 
 			})

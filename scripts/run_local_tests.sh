@@ -3,14 +3,6 @@
 set -e
 echo "" > coverage.txt
 
-if [[ -z "${NATS_SERVER_PORT}" ]]; then
-  NATS_SERVER_PORT=4221
-fi
-
-if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
-  NATS_STREAMING_SERVER_PORT=4222
-fi
-
 if [[ -z "${DATABASE_USER}" ]]; then
   DATABASE_USER=goldmine
 fi
@@ -19,12 +11,24 @@ if [[ -z "${DATABASE_PASSWORD}" ]]; then
   DATABASE_PASSWORD=goldmine
 fi
 
-if [[ -z "${TAGS}" ]]; then
-  TAGS=unit
+if [[ -z "${NATS_SERVER_PORT}" ]]; then
+  NATS_SERVER_PORT=4221
+fi
+
+if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
+  NATS_STREAMING_SERVER_PORT=4222
+fi
+
+if [[ -z "${REDIS_SERVER_PORT}" ]]; then
+  REDIS_SERVER_PORT=6379
 fi
 
 if [[ -z "${RACE}" ]]; then
   RACE=true
+fi
+
+if [[ -z "${TAGS}" ]]; then
+  TAGS=unit
 fi
 
 PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
@@ -216,6 +220,7 @@ for d in "${pkgs[@]}" ; do
     DATABASE_USER=${DATABASE_USER} \
     DATABASE_PASSWORD=${DATABASE_PASSWORD} \
     LOG_LEVEL=DEBUG \
+    REDIS_HOSTS=localhost:${REDIS_SERVER_PORT} \
     TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
     TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
     go test "./${pkg}" -v \
@@ -245,6 +250,7 @@ for d in "${pkgs[@]}" ; do
     DATABASE_USER=${DATABASE_USER} \
     DATABASE_PASSWORD=${DATABASE_PASSWORD} \
     LOG_LEVEL=DEBUG \
+    REDIS_HOSTS=localhost:${REDIS_SERVER_PORT} \
     TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
     TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
     go test "./${pkg}" -v \

@@ -9,6 +9,15 @@ else
     sudo apt-get -y install postgresql
 fi
 
+if hash psql 2>/dev/null
+then
+    echo 'Using' `redis-server --version`
+else
+    echo 'Installing redis-server'
+    sudo apt-get update
+    sudo apt-get -y install redis-server
+fi
+
 if hash gnatsd 2>/dev/null
 then
     echo 'Using' `gnatsd --version`
@@ -33,6 +42,11 @@ if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
   NATS_STREAMING_SERVER_PORT=4222
 fi
 
+if [[ -z "${REDIS_SERVER_PORT}" ]]; then
+  REDIS_SERVER_PORT=6379
+fi
+
 gnatsd -auth testtoken -p ${NATS_SERVER_PORT} > /dev/null 2>&1 &
 nats-streaming-server -cid provide -auth testtoken -p ${NATS_STREAMING_SERVER_PORT} > /dev/null 2>&1 &
 pg_ctl -D /usr/local/var/postgres start > /dev/null 2>&1 &
+redis-server --port ${REDIS_SERVER_PORT} > /dev/null 2>&1 &
