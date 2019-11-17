@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	redisutil "github.com/kthomas/go-redisutil"
+
 	provide "github.com/provideservices/provide-go"
 
 	"github.com/provideapp/goldmine/common"
@@ -16,6 +18,10 @@ import (
 	"github.com/provideapp/goldmine/tx"
 	"github.com/provideapp/goldmine/wallet"
 )
+
+func init() {
+	redisutil.RequireRedis()
+}
 
 func main() {
 	if common.ConsumeNATSStreamingSubscriptions {

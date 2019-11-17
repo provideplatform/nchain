@@ -27,22 +27,22 @@ import (
 const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 2048
 const txAckWait = time.Second * 10
-const txMsgTimeout = int64(txAckWait * 10)
+const txMsgTimeout = int64(txAckWait * 3)
 
 const natsTxCreateSubject = "goldmine.tx.create"
 const natsTxCreateMaxInFlight = 2048
 const txCreateAckWait = time.Second * 10
-const txCreateMsgTimeout = int64(txCreateAckWait * 10)
+const txCreateMsgTimeout = int64(txCreateAckWait * 5)
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
-const natsTxFinalizeMaxInFlight = 2048
+const natsTxFinalizeMaxInFlight = 4096
 const txFinalizeAckWait = time.Second * 10
-const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 10)
+const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 3)
 
 const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 10
-const txReceiptMsgTimeout = int64(txReceiptAckWait * 10)
+const txReceiptMsgTimeout = int64(txReceiptAckWait * 3)
 
 var waitGroup sync.WaitGroup
 
@@ -349,8 +349,6 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 	params := execution.Params
 	ref := execution.Ref
 	value := execution.Value
-
-	network.RequireNetworkStatsDaemon(n)
 
 	tx = &Transaction{
 		ApplicationID: c.ApplicationID,

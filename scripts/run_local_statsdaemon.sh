@@ -177,14 +177,13 @@ K8zK4j7n+BYl+7y1dzOQw4CadsDi5whgNcg2QUxuTlW+TQ5VBvdUl9wpTSygD88H
 xH2b0OBcVjYsgRnQ9OZpQ+kIPaFhaWChnfEArCmhrOEgOnhfkr6YGDHFenfT3/RA
 PUl1cxrvY7BHh4obNa6Bf8ECAwEAAQ==
 -----END PUBLIC KEY-----' \
-CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true \
+CONSUME_NATS_STREAMING_SUBSCRIPTIONS=false \
 NATS_CLUSTER_ID=provide \
-NATS_CONNECT_TIMEOUT=5s \
 NATS_TOKEN=testtoken \
 NATS_URL=nats://localhost:4221 \
 NATS_STREAMING_URL=nats://localhost:4222 \
-NATS_STREAMING_CONCURRENCY=1 \
 NATS_FORCE_TLS=false \
+GIN_MODE=release \
 DATABASE_LOGGING=false \
 DATABASE_USER=goldmine \
 DATABASE_PASSWORD=goldmine \
@@ -193,4 +192,4 @@ DATABASE_HOST=localhost \
 LOG_LEVEL=DEBUG \
 REDIS_HOSTS=localhost:6379 \
 REDIS_DB_INDEX=1 \
-./.bin/goldmine_consumer #dlv debug #./goldmine
+./.bin/goldmine_statsdaemon

@@ -651,14 +651,10 @@ func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) 
 				return errors.New(desc)
 			}
 
-			daemon := RequireNetworkStatsDaemon(network)
-			if daemon != nil {
-				if daemon.stats != nil {
-					if daemon.stats.Block > 0 {
-						ticker.Stop()
-						return n._deploy(network, bootnodes, db)
-					}
-				}
+			stats, _ := network.Stats()
+			if stats != nil && stats.Block > 0 {
+				ticker.Stop()
+				return n._deploy(network, bootnodes, db)
 			}
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
@@ -52,23 +53,43 @@ func (err bootnodesInitialized) Error() string {
 // a heirarchy of blockchain networks
 type Network struct {
 	provide.Model
-	ApplicationID *uuid.UUID             `sql:"type:uuid" json:"application_id"`
-	UserID        *uuid.UUID             `sql:"type:uuid" json:"user_id"`
-	Name          *string                `sql:"not null" json:"name"`
-	Description   *string                `json:"description"`
-	IsProduction  *bool                  `sql:"not null" json:"is_production"`
-	Cloneable     *bool                  `sql:"not null" json:"cloneable"`
-	Enabled       *bool                  `sql:"not null" json:"enabled"`
-	ChainID       *string                `json:"chain_id"`                               // protocol-specific chain id
-	SidechainID   *uuid.UUID             `sql:"type:uuid" json:"sidechain_id,omitempty"` // network id used as the transactional sidechain (or null)
-	NetworkID     *uuid.UUID             `sql:"type:uuid" json:"network_id"`             // network id used as the parent
-	Config        *json.RawMessage       `sql:"type:json not null" json:"config,omitempty"`
-	Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	Name          *string          `sql:"not null" json:"name"`
+	Description   *string          `json:"description"`
+	IsProduction  *bool            `sql:"not null" json:"is_production"`
+	Cloneable     *bool            `sql:"not null" json:"cloneable"`
+	Enabled       *bool            `sql:"not null" json:"enabled"`
+	ChainID       *string          `json:"chain_id"`                               // protocol-specific chain id
+	SidechainID   *uuid.UUID       `sql:"type:uuid" json:"sidechain_id,omitempty"` // network id used as the transactional sidechain (or null)
+	NetworkID     *uuid.UUID       `sql:"type:uuid" json:"network_id"`             // network id used as the parent
+	Config        *json.RawMessage `sql:"type:json not null" json:"config,omitempty"`
+	// Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
 
 // NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
 func NetworkListQuery() *gorm.DB {
 	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.cloneable, networks.enabled, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
+}
+
+// StatsKey returns the network stats key for the given network id, which is guaranteed to be
+// unique-per-network; the stats key represents the namespace where real-time stats for the
+// network are cached
+func StatsKey(networkID uuid.UUID) string {
+	return fmt.Sprintf("network.%s.stats", networkID.String())
+}
+
+// Stats returns the network stats for the given network id without a network instance
+func Stats(networkID uuid.UUID) (*provide.NetworkStatus, error) {
+	statsKey := StatsKey(networkID)
+	rawstats, err := redisutil.Get(statsKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve cached network stats from key: %s; %s", statsKey, err.Error())
+	}
+
+	stats := &provide.NetworkStatus{}
+	json.Unmarshal([]byte(*rawstats), stats)
+	return stats, nil
 }
 
 // Create and persist a new network
@@ -207,6 +228,17 @@ func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
 	}
 	n.setConfig(cfg)
 	db.Save(&n)
+}
+
+// Stats returns the network stats
+func (n *Network) Stats() (*provide.NetworkStatus, error) {
+	return Stats(n.ID)
+}
+
+// StatsKey returns a key, which is guaranteed to be unique-per-network, which
+// represents the namespace where real-time stats for the network are cached
+func (n *Network) StatsKey() string {
+	return StatsKey(n.ID)
 }
 
 // Reload the underlying network instance
@@ -414,10 +446,6 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 		*n.Config = json.RawMessage(cfgJSON)
 
 		db.Save(n)
-
-		if n.AvailablePeerCount() == 0 {
-			EvictNetworkStatsDaemon(n)
-		}
 	}
 }
 
@@ -695,7 +723,8 @@ func (n *Network) RPCURL() string {
 	return ""
 }
 
-func (n *Network) websocketURL() string {
+// WebsocketURL retrieves a load-balanced websocket URL for the network
+func (n *Network) WebsocketURL() string {
 	cfg := n.ParseConfig()
 	balancers, _ := n.LoadBalancers(dbconf.DatabaseConnection(), nil, common.StringOrNil(loadBalancerTypeRPC))
 	if balancers != nil && len(balancers) > 0 {
@@ -778,36 +807,6 @@ func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string
 	}
 
 	return nil, fmt.Errorf("JSON-RPC invocation not supported by network %s", n.ID)
-}
-
-// Status retrieves metadata and metrics specific to the given network;
-// when force is true, it forces a JSON-RPC request to be made to retrieve
-// the latest status; when false, cached network stats are returned if available
-func (n *Network) Status(force bool) (status *provide.NetworkStatus, err error) {
-	if cachedStatus, ok := currentNetworkStats[n.ID.String()]; ok && !force {
-		return cachedStatus.stats, nil
-	}
-	RequireNetworkStatsDaemon(n)
-	if n.IsBcoinNetwork() {
-		networkCfg := n.ParseConfig()
-		var rpcAPIUser string
-		var rpcAPIKey string
-		if rpcUser, rpcUserOk := networkCfg["rpc_api_user"].(string); rpcUserOk {
-			rpcAPIUser = rpcUser
-		}
-		if rpcKey, rpcKeyOk := networkCfg["rpc_api_key"].(string); rpcKeyOk {
-			rpcAPIKey = rpcKey
-		}
-		status, err = provide.BcoinGetNetworkStatus(n.ID.String(), n.RPCURL(), rpcAPIUser, rpcAPIKey)
-	} else if n.IsEthereumNetwork() {
-		status, err = provide.EVMGetNetworkStatus(n.ID.String(), n.RPCURL())
-	} else {
-		common.Log.Warningf("Unable to determine status of unsupported network: %s", *n.Name)
-		status = &provide.NetworkStatus{
-			State: common.StringOrNil("configuring"),
-		}
-	}
-	return status, err
 }
 
 // NodeCount retrieves a count of platform-managed network nodes

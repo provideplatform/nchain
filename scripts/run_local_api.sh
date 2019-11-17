@@ -190,4 +190,6 @@ DATABASE_PASSWORD=goldmine \
 DATABASE_NAME=goldmine_sandbox \
 DATABASE_HOST=localhost \
 LOG_LEVEL=DEBUG \
+REDIS_HOSTS=localhost:6379 \
+REDIS_DB_INDEX=1 \
 ./.bin/goldmine_api #dlv debug #./goldmine

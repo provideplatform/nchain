@@ -12,9 +12,11 @@ RUN glide install
 RUN go build -v -o ./bin/goldmine_api ./cmd/api
 RUN go build -v -o ./bin/goldmine_consumer ./cmd/consumer
 RUN go build -v -o ./bin/goldmine_migrate ./cmd/migrate
+RUN go build -v -o ./bin/goldmine_statsdaemon ./cmd/statsdaemon
 RUN ln -s ./bin/goldmine_api goldmine
 RUN ln -s ./bin/goldmine_consumer goldmine_consumer
 RUN ln -s ./bin/goldmine_migrate goldmine_migrate
+RUN ln -s ./bin/goldmine_statsdaemon goldmine_statsdaemon
 
 EXPOSE 8080
 ENTRYPOINT ["./goldmine"]

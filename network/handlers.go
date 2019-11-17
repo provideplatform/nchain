@@ -489,19 +489,18 @@ func deleteNodeHandler(c *gin.Context) {
 }
 
 func networkStatusHandler(c *gin.Context) {
-	var network = &Network{}
-	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
-	if network == nil || network.ID == uuid.Nil {
-		provide.RenderError("network not found", 404, c)
+	networkID, err := uuid.FromString(c.Param("id"))
+	if err != nil {
+		provide.RenderError("invalid network id provided", 400, c)
 		return
 	}
-	status, err := network.Status(false)
+	stats, err := Stats(networkID)
 	if err != nil {
 		msg := fmt.Sprintf("failed to retrieve network status; %s", err.Error())
-		provide.RenderError(msg, 500, c)
+		provide.RenderError(msg, 404, c)
 		return
 	}
-	provide.Render(status, 200, c)
+	provide.Render(stats, 200, c)
 }
 
 func networkOraclesListHandler(c *gin.Context) {

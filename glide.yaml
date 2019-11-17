@@ -25,6 +25,8 @@ import:
   version: ~1.9.2
   subpackages:
   - dialects/postgres
+- package: github.com/go-redis/redis
+  version: ~6.15.6
 - package: github.com/kthomas/exchange-consumer
 - package: github.com/kthomas/go-aws-config
 - package: github.com/kthomas/go-aws-wrapper
@@ -34,6 +36,8 @@ import:
 - package: github.com/kthomas/go-natsutil
   version: master
 - package: github.com/kthomas/go-pgputil
+- package: github.com/kthomas/go-redisutil
+  version: master
 - package: github.com/kthomas/go.uuid
   version: master
 - package: github.com/nats-io/stan.go

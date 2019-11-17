@@ -1,4 +1,4 @@
-.PHONY: build clean ecs_deploy install integration lint migrations run_local run_local_api run_local_consumer run_local_dependencies stop_local_dependencies stop_local test
+.PHONY: build clean ecs_deploy install integration lint migrations run_local run_local_api run_local_consumer run_local_statsdaemon run_local_dependencies stop_local_dependencies stop_local test
 
 clean:
 	rm -rf ./.bin 2>/dev/null || true
@@ -11,6 +11,7 @@ build: clean
 	go build -v -o ./.bin/goldmine_api ./cmd/api
 	go build -v -o ./.bin/goldmine_consumer ./cmd/consumer
 	go build -v -o ./.bin/goldmine_migrate ./cmd/migrate
+	go build -v -o ./.bin/goldmine_statsdaemon ./cmd/statsdaemon
 
 ecs_deploy:
 	./scripts/ecs_deploy.sh
@@ -32,6 +33,9 @@ run_local_api: build run_local_dependencies
 
 run_local_consumer: build run_local_dependencies
 	./scripts/run_local_consumer.sh
+
+run_local_statsdaemon: build run_local_dependencies
+	./scripts/run_local_statsdaemon.sh
 
 run_local_dependencies:
 	./scripts/run_local_dependencies.sh

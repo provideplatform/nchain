@@ -1,4 +1,4 @@
-package network
+package main
 
 import (
 	"context"
@@ -21,8 +21,10 @@ import (
 	"github.com/gorilla/websocket"
 	logger "github.com/kthomas/go-logger"
 	natsutil "github.com/kthomas/go-natsutil"
+	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/network"
 	"github.com/provideservices/provide-go"
 )
 
@@ -30,6 +32,8 @@ const defaultChainpointBufferSize = 64
 const defaultChainpointFlushInterval = time.Millisecond * 60000
 const defaultChainpointProofInterval = time.Millisecond * 60500
 const defaultStatsDaemonQueueSize = 8
+const defaultStatsTTL = time.Minute * 30
+const natsBlockFinalizedSubject = "goldmine.block.finalized"
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 32
 const networkStatsMinimumRecentBlockCacheSize = 3
@@ -41,7 +45,7 @@ var currentNetworkStatsMutex = &sync.Mutex{}
 // NetworkStatsDataSource provides JSON-RPC polling (http) and streaming (websocket)
 // interfaces for a network
 type NetworkStatsDataSource struct {
-	Network *Network
+	Network *network.Network
 	Poll    func(chan *provide.NetworkStatus) error // JSON-RPC polling -- implementations should be blocking
 	Stream  func(chan *provide.NetworkStatus) error // websocket -- implementations should be blocking
 }
@@ -66,6 +70,13 @@ type StatsDaemon struct {
 	stats                 *provide.NetworkStatus
 }
 
+type natsBlockFinalizedMsg struct {
+	NetworkID *string `json:"network_id"`
+	Block     uint64  `json:"block"`
+	BlockHash *string `json:"blockhash"`
+	Timestamp uint64  `json:"timestamp"`
+}
+
 type jsonRpcNotSupported string
 type websocketNotSupported string
 
@@ -83,7 +94,7 @@ func init() {
 
 // BcoinNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
 // data source which is used by stats daemon instances to consume bcoin network statistics
-func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
+func BcoinNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsDataSource {
 	return &NetworkStatsDataSource{
 		Network: network,
 
@@ -97,7 +108,7 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 			for {
 				select {
 				case <-ticker.C:
-					status, err := network.Status(true)
+					status, err := network.Stats()
 					if err != nil {
 						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
 						ticker.Stop()
@@ -110,7 +121,7 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 		},
 
 		Stream: func(ch chan *provide.NetworkStatus) error {
-			websocketURL := network.websocketURL()
+			websocketURL := network.WebsocketURL()
 			if websocketURL == "" {
 				err := new(websocketNotSupported)
 				return *err
@@ -165,7 +176,7 @@ func BcoinNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSourc
 
 // EthereumNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
 // data source which is used by stats daemon instances to consume EVM-based network statistics
-func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSource {
+func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsDataSource {
 	return &NetworkStatsDataSource{
 		Network: network,
 
@@ -179,20 +190,20 @@ func EthereumNetworkStatsDataSourceFactory(network *Network) *NetworkStatsDataSo
 			for {
 				select {
 				case <-ticker.C:
-					status, err := network.Status(true)
+					stats, err := network.Stats()
 					if err != nil {
 						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
 						ticker.Stop()
 						return nil
 					}
 
-					ch <- status
+					ch <- stats
 				}
 			}
 		},
 
 		Stream: func(ch chan *provide.NetworkStatus) error {
-			websocketURL := network.websocketURL()
+			websocketURL := network.WebsocketURL()
 			if websocketURL == "" {
 				err := new(websocketNotSupported)
 				return *err
@@ -383,6 +394,8 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 			common.Log.Warningf("Received malformed *provide.NetworkStats message; dropping message...")
 		}
 	}
+
+	sd.publish()
 }
 
 func (sd *StatsDaemon) ingestLcoin(response interface{}) {
@@ -481,9 +494,11 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 
 		natsutil.NatsPublish(natsBlockFinalizedSubject, natsPayload)
 	}
+
+	sd.publish()
 }
 
-// This loop is responsible for processing new messages received by daemon
+// loop is responsible for processing new messages received by daemon
 func (sd *StatsDaemon) loop() error {
 	for {
 		select {
@@ -497,8 +512,19 @@ func (sd *StatsDaemon) loop() error {
 	}
 }
 
+// publish stats atomically to in-memory network namespace
+func (sd *StatsDaemon) publish() error {
+	payload, _ := json.Marshal(sd.stats)
+	ttl := defaultStatsTTL
+	err := redisutil.Set(sd.dataSource.Network.StatsKey(), string(payload), &ttl)
+	if err != nil {
+		common.Log.Warningf("failed to set network stats on key: %s; %s", sd.dataSource.Network.StatsKey(), err.Error())
+	}
+	return err
+}
+
 // EvictNetworkStatsDaemon evicts a single, previously-initialized stats daemon instance {
-func EvictNetworkStatsDaemon(network *Network) error {
+func EvictNetworkStatsDaemon(network *network.Network) error {
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
 		common.Log.Debugf("Evicting stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
 		daemon.shutdown()
@@ -513,7 +539,7 @@ func EvictNetworkStatsDaemon(network *Network) error {
 // RequireNetworkStatsDaemon ensures a single stats daemon instance is running for
 // the given network; if no stats daemon instance has been started for the network,
 // the instance is configured and started immediately, caching real-time network stats.
-func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
+func RequireNetworkStatsDaemon(network *network.Network) *StatsDaemon {
 	var daemon *StatsDaemon
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
 		common.Log.Debugf("Cached stats daemon instance found for network: %s; id: %s", *network.Name, network.ID)
@@ -534,7 +560,7 @@ func RequireNetworkStatsDaemon(network *Network) *StatsDaemon {
 
 // NewNetworkStatsDaemon initializes a new network stats daemon instance using
 // NetworkStatsDataSourceFactory to construct the daemon's its data source
-func NewNetworkStatsDaemon(lg *logger.Logger, network *Network) *StatsDaemon {
+func NewNetworkStatsDaemon(lg *logger.Logger, network *network.Network) *StatsDaemon {
 	sd := new(StatsDaemon)
 	sd.attempt = 0
 	sd.log = lg.Clone()
