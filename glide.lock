@@ -1,5 +1,5 @@
 hash: d4adb2a94f62a9064b134aff48c662abee9bb6916f25d2e18c2a37fb11d5a84e
-updated: 2019-11-17T03:13:19.646587-05:00
+updated: 2019-11-17T18:01:20.192608-05:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -82,7 +82,7 @@ imports:
   subpackages:
   - sys/windows
 - name: github.com/ethereum/go-ethereum
-  version: 738b51ae31c48a598b7c5bad37c054976a41025f
+  version: a28093ced4e81bcae10ccceba68f0c64da14383c
   subpackages:
   - accounts/abi
   - common

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -28,6 +29,7 @@ import (
 	"github.com/provideservices/provide-go"
 )
 
+const blockchainInfoWebsocketURL = "wss://ws.blockchain.info/inv"
 const defaultChainpointBufferSize = 64
 const defaultChainpointFlushInterval = time.Millisecond * 60000
 const defaultChainpointProofInterval = time.Millisecond * 60500
@@ -35,7 +37,7 @@ const defaultStatsDaemonQueueSize = 8
 const defaultStatsTTL = time.Minute * 30
 const natsBlockFinalizedSubject = "goldmine.block.finalized"
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
-const networkStatsMaxRecentBlockCacheSize = 32
+const networkStatsMaxRecentBlockCacheSize = 8
 const networkStatsMinimumRecentBlockCacheSize = 3
 const statsDaemonMaximumBackoffMillis = 12800
 
@@ -99,25 +101,7 @@ func BcoinNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsD
 		Network: network,
 
 		Poll: func(ch chan *provide.NetworkStatus) error {
-			rpcURL := network.RPCURL()
-			if rpcURL == "" {
-				err := new(jsonRpcNotSupported)
-				return *err
-			}
-			ticker := time.NewTicker(networkStatsJsonRpcPollingTickerInterval)
-			for {
-				select {
-				case <-ticker.C:
-					status, err := network.Stats()
-					if err != nil {
-						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
-						ticker.Stop()
-						return nil
-					}
-
-					ch <- status
-				}
-			}
+			return new(jsonRpcNotSupported)
 		},
 
 		Stream: func(ch chan *provide.NetworkStatus) error {
@@ -128,47 +112,144 @@ func BcoinNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsD
 			}
 
 			networkCfg := network.ParseConfig()
-			var rpcAPIUser string
-			var rpcAPIKey string
+			var rpcAPIUser *string
+			var rpcAPIKey *string
 			if rpcUser, rpcUserOk := networkCfg["rpc_api_user"].(string); rpcUserOk {
-				rpcAPIUser = rpcUser
+				rpcAPIUser = &rpcUser
 			}
 			if rpcKey, rpcKeyOk := networkCfg["rpc_api_key"].(string); rpcKeyOk {
-				rpcAPIKey = rpcKey
+				rpcAPIKey = &rpcKey
 			}
 
-			cfg := &rpcclient.ConnConfig{
-				Host:     websocketURL,
-				Endpoint: "ws",
-				User:     rpcAPIUser,
-				Pass:     rpcAPIKey,
+			useBCInfoWebsocket := false
+
+			if websocketURL == blockchainInfoWebsocketURL {
+				common.Log.Debugf("Enabling blockchain.info websocket on network stats websocket for configured network: %s", *network.Name)
+				useBCInfoWebsocket = true
 			}
 
-			client, err := rpcclient.New(cfg, &rpcclient.NotificationHandlers{
-				OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*btcutil.Tx) {
-					common.Log.Debugf("Received message on network stats websocket; height: %d", height)
-					common.Log.Debugf("Block connected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+			if useBCInfoWebsocket {
+				websocketURL := network.WebsocketURL()
+				if websocketURL == "" {
+					err := new(websocketNotSupported)
+					return *err
+				}
+				var wsDialer websocket.Dialer
+				wsConn, _, err := wsDialer.Dial(websocketURL, nil)
+				if err != nil {
+					common.Log.Errorf("Failed to establish network stats websocket connection to %s; %s", websocketURL, err.Error())
+				} else {
+					defer wsConn.Close()
+					payload := map[string]interface{}{
+						"op": "ping_block",
+					}
+					if err := wsConn.WriteJSON(payload); err != nil {
+						common.Log.Errorf("Failed to write ping_block message to blockchain.info network stats websocket connection")
+						return err
+					}
 
-				},
-				OnFilteredBlockDisconnected: func(height int32, header *wire.BlockHeader) {
-					common.Log.Debugf("Received message on network stats websocket; height: %d", height)
-					common.Log.Debugf("Block disconnected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
-				},
-			})
+					payload = map[string]interface{}{
+						"op": "blocks_sub",
+					}
+					if err := wsConn.WriteJSON(payload); err != nil {
+						common.Log.Errorf("Failed to write block subcription message to blockchain.info network stats websocket connection")
+					} else {
+						common.Log.Debugf("Subscribed to block headers from blockchain.info network stats websocket: %s", websocketURL)
 
-			if err != nil {
-				common.Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
-				return err
-			}
-
-			// Register for block connect and disconnect notifications.
-			if err := client.NotifyBlocks(); err != nil {
-				common.Log.Errorf("Failed to write subscribe message to network stats websocket connection")
-				return err
+						for {
+							_, message, err := wsConn.ReadMessage()
+							if err != nil {
+								common.Log.Errorf("Failed to receive message on network stats websocket; %s", err)
+								break
+							} else {
+								common.Log.Debugf("Received %d-byte message on network stats websocket for network: %s", len(message), *network.Name)
+								response := map[string]interface{}{}
+								err := json.Unmarshal(message, &response)
+								if err != nil {
+									common.Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
+								} else {
+									if op, opok := response["op"].(string); opok && op == "block" {
+										if header, headerOk := response["x"].(map[string]interface{}); headerOk {
+											common.Log.Debugf("Received block header on blockchain.info network stats websocket subscription: %s", websocketURL)
+											ch <- &provide.NetworkStatus{
+												Meta: map[string]interface{}{
+													blockchainInfoWebsocketURL: true,
+													"last_block_header":        header,
+												},
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			} else {
+				wsEndpoint := "ws"
+				if strings.HasPrefix(websocketURL, "wss://") {
+					websocketURL = strings.Split(websocketURL, "wss://")[len(strings.Split(websocketURL, "wss://"))-1]
+				} else {
+					websocketURL = strings.Split(websocketURL, "ws://")[len(strings.Split(websocketURL, "ws://"))-1]
+				}
+
+				cfg := &rpcclient.ConnConfig{
+					Host:     websocketURL,
+					Endpoint: wsEndpoint,
+				}
+
+				if rpcAPIUser != nil && rpcAPIKey != nil {
+					cfg.User = *rpcAPIUser
+					cfg.Pass = *rpcAPIKey
+				}
+
+				var client *rpcclient.Client
+				var err error
+
+				client, err = rpcclient.New(cfg, &rpcclient.NotificationHandlers{
+					OnClientConnected: func() {
+						common.Log.Debugf("Bitcoin websocket client connected on configured network stats websocket for network: %s", *network.Name)
+
+						// Register for block connect and disconnect notifications.
+						if err := client.NotifyBlocks(); err != nil {
+						} else {
+							if err != nil {
+								common.Log.Errorf("Failed to establish network stats websocket subscription to %s for network: %s; %s", websocketURL, *network.Name, err.Error())
+								client.Disconnect()
+								return
+							}
+						}
+					},
+
+					OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*btcutil.Tx) {
+						common.Log.Debugf("Received block header on network stats websocket for network: %s; height: %d", *network.Name, height)
+						common.Log.Debugf("Block connected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+
+						ch <- &provide.NetworkStatus{
+							Meta: map[string]interface{}{
+								"last_block_header": header,
+							},
+						}
+					},
+
+					OnFilteredBlockDisconnected: func(height int32, header *wire.BlockHeader) {
+						common.Log.Debugf("Received block disconnected header on network stats websocket for network: %s; height: %d", *network.Name, height)
+						common.Log.Debugf("Block disconnected: %v (%d) %v", header.BlockHash(), height, header.Timestamp)
+					},
+
+					OnUnknownNotification: func(method string, params []json.RawMessage) {
+						common.Log.Warningf("Unknown notification received on bitcoin network stats websocket; method: %s; %s", method, params)
+					},
+				})
+
+				if err != nil {
+					common.Log.Errorf("Failed to establish network stats websocket connection to %s for network: %s; %s", websocketURL, *network.Name, err.Error())
+					return err
+				}
+
 				common.Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
+				client.WaitForShutdown()
 			}
-			client.WaitForShutdown()
+
 			return nil
 		},
 	}
@@ -181,25 +262,7 @@ func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkSta
 		Network: network,
 
 		Poll: func(ch chan *provide.NetworkStatus) error {
-			rpcURL := network.RPCURL()
-			if rpcURL == "" {
-				err := new(jsonRpcNotSupported)
-				return *err
-			}
-			ticker := time.NewTicker(networkStatsJsonRpcPollingTickerInterval)
-			for {
-				select {
-				case <-ticker.C:
-					stats, err := network.Stats()
-					if err != nil {
-						common.Log.Errorf("Failed to retrieve network status via JSON-RPC: %s; %s", rpcURL, err)
-						ticker.Stop()
-						return nil
-					}
-
-					ch <- stats
-				}
-			}
+			return new(jsonRpcNotSupported)
 		},
 
 		Stream: func(ch chan *provide.NetworkStatus) error {
@@ -211,7 +274,7 @@ func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkSta
 			var wsDialer websocket.Dialer
 			wsConn, _, err := wsDialer.Dial(websocketURL, nil)
 			if err != nil {
-				common.Log.Errorf("Failed to establish network stats websocket connection to %s", websocketURL)
+				common.Log.Errorf("Failed to establish network stats websocket connection to %s; %s", websocketURL, err.Error())
 			} else {
 				defer wsConn.Close()
 				id, _ := uuid.NewV4()
@@ -232,7 +295,7 @@ func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkSta
 							common.Log.Errorf("Failed to receive message on network stats websocket; %s", err)
 							break
 						} else {
-							common.Log.Debugf("Received message on network stats websocket: %s", message)
+							common.Log.Debugf("Received %d-byte message on network stats websocket for network: %s", len(message), *network.Name)
 							response := &provide.EthereumWebsocketSubscriptionResponse{}
 							err := json.Unmarshal(message, response)
 							if err != nil {
@@ -325,8 +388,89 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 		resp := response.(*provide.NetworkStatus)
 		if resp != nil && resp.Meta != nil {
 			header, headerOk := resp.Meta["last_block_header"].(map[string]interface{})
+			isBCInfoWebsocket, isBCInfoWebsocketOk := resp.Meta[blockchainInfoWebsocketURL].(bool)
 			chainInfo, chainInfoOk := resp.Meta["chain_info"].(map[string]interface{})
-			if headerOk && chainInfoOk {
+			if headerOk && isBCInfoWebsocketOk && isBCInfoWebsocket {
+				// "txIndexes": [
+				// 	3187871,
+				// 	3187868
+				// ],
+				// "nTx": 0,
+				// "totalBTCSent": 0,
+				// "estimatedBTCSent": 0,
+				// "reward": 0,
+				// "size": 0,
+				// "blockIndex": 190460,
+				// "prevBlockIndex": 190457,
+				// "height": 170359,
+				// "hash": "00000000000006436073c07dfa188a8fa54fefadf571fd774863cda1b884b90f",
+				// "mrklRoot": "94e51495e0e8a0c3b78dac1220b2f35ceda8799b0a20cfa68601ed28126cfcc2",
+				// "version": 1,
+				// "time": 1331301261,
+				// "bits": 436942092,
+				// "nonce": 758889471
+
+				if height, heightOk := header["height"].(float64); heightOk {
+					sd.stats.Block = uint64(height)
+
+					sd.stats.State = nil
+					sd.stats.Syncing = sd.stats.Block == 0
+
+					if sd.stats.Block == 0 {
+						common.Log.Debugf("Ignoring genesis header")
+						return
+					}
+				}
+
+				var lastBlockAt uint64
+				if timestamp, timestampOk := header["time"].(float64); timestampOk {
+					lastBlockAt = uint64(timestamp) * 1000.0
+					sd.stats.LastBlockAt = &lastBlockAt
+				}
+
+				sd.stats.Meta["last_block_header"] = header
+
+				merkleRoot, _ := header["mrklRoot"].(string)
+
+				// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
+				// chainptHash := []byte(merkleRoot)
+				// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
+
+				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["mrklRoot"].(string) != merkleRoot {
+					sd.recentBlocks = append(sd.recentBlocks, header)
+					sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
+				}
+
+				for len(sd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
+					i := len(sd.recentBlocks) - 1
+					sd.recentBlocks = append(sd.recentBlocks[:i], sd.recentBlocks[i+1:]...)
+				}
+
+				if len(sd.recentBlocks) >= networkStatsMinimumRecentBlockCacheSize {
+					blocktimes := make([]float64, 0)
+					timedelta := float64(0)
+					i := 0
+					for i < len(sd.recentBlocks)-1 {
+						currentBlocktime := sd.recentBlockTimestamps[i]
+						nextBlocktime := sd.recentBlockTimestamps[i+1]
+						blockDelta := float64(nextBlocktime-currentBlocktime) / 1000.0
+						if blockDelta != 0 {
+							blocktimes = append(blocktimes, blockDelta)
+							timedelta += blockDelta
+							i++
+						}
+					}
+
+					if len(blocktimes) > 0 {
+						sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
+						sd.stats.Meta["blocktimes"] = blocktimes
+						sd.stats.Meta["last_block_hash"] = merkleRoot
+					}
+				} else if medianTime, medianTimeOk := chainInfo["mediantime"].(float64); medianTimeOk {
+					// This is pretty naive but gives us an avg. time before we have >= 3 recent blocks; can take some time after statsdaemon starts monitoring a PoW network...
+					sd.stats.Meta["average_blocktime"] = (float64(time.Now().Unix()) - medianTime) / (11.0 / 2.0)
+				}
+			} else if headerOk && chainInfoOk {
 				if resp.Height != nil {
 					sd.stats.Block = *resp.Height
 
