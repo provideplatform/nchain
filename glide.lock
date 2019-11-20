@@ -1,5 +1,5 @@
-hash: d4adb2a94f62a9064b134aff48c662abee9bb6916f25d2e18c2a37fb11d5a84e
-updated: 2019-11-17T18:01:20.192608-05:00
+hash: 9ce291c1112a20a82a74805a23640ed5a1ec98f6ab89642bf3d289cdcca3b925
+updated: 2019-11-20T04:38:40.571411-05:00
 imports:
 - name: github.com/allegro/bigcache
   version: baaa21686666424b386f282d68fc1d23594ab38d
@@ -102,6 +102,14 @@ imports:
   - rlp
   - rpc
   - trie
+- name: github.com/FactomProject/basen
+  version: fe3947df716ebfda9847eb1b9a48f9592e06478c
+- name: github.com/FactomProject/btcutilecc
+  version: d3a63a5752ecf3fbc06bd97365da752111c263df
+- name: github.com/FactomProject/go-bip32
+  version: 3b593af1c415abc1017648e4eb24a88c32fee0f3
+- name: github.com/FactomProject/go-bip44
+  version: b541a96d8da98567af7610ef96105a834e6ed46c
 - name: github.com/gin-contrib/sse
   version: 54d8467d122d380a14768b6b4e5cd7ca4755938f
 - name: github.com/gin-gonic/gin
@@ -278,6 +286,10 @@ imports:
   version: c99c65617cd3d686aea8365fe563d6542f01d940
 - name: github.com/streadway/amqp
   version: edfb9018d2714e4ec54dbaba37dbfef2bdadf0e4
+- name: github.com/tyler-smith/go-bip39
+  version: c55f737395bc849274c1d1a35ca6f29a4e568092
+  subpackages:
+  - wordlists
 - name: github.com/ugorji/go
   version: e118e2d506a6b252f6b85f2e2f2ac1bfed82f1b8
   subpackages:

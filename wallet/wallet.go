@@ -1,137 +1,48 @@
 package wallet
 
 import (
-	"encoding/hex"
-	"errors"
-	"fmt"
-	"math/big"
-	"time"
-
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/jinzhu/gorm"
+	bip32 "github.com/FactomProject/go-bip32"
 	dbconf "github.com/kthomas/go-db-config"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
-	"github.com/provideapp/goldmine/token"
 	provide "github.com/provideservices/provide-go"
+	bip39 "github.com/tyler-smith/go-bip39"
+
+	"github.com/jinzhu/gorm"
+	"github.com/provideapp/goldmine/common"
 )
 
 func init() {
 	db := dbconf.DatabaseConnection()
 	db.AutoMigrate(&Wallet{})
+	db.Model(&Wallet{}).AddIndex("idx_wallets_wallet_id", "wallet_id")
 	db.Model(&Wallet{}).AddIndex("idx_wallets_application_id", "application_id")
 	db.Model(&Wallet{}).AddIndex("idx_wallets_user_id", "user_id")
 	db.Model(&Wallet{}).AddIndex("idx_wallets_accessed_at", "accessed_at")
 	db.Model(&Wallet{}).AddIndex("idx_wallets_network_id", "network_id")
 	db.Model(&Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+	db.Model(&Wallet{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
 }
 
-// Wallet instances must be associated with exactly one instance of either an a) application identifier or b) user identifier.
+// Wallet instances are logical collections of accounts; wallet instances are HD wallets
+// conforming to BIP44, (i.e., m / purpose' / coin_type' / account' / change / address_index);
+// ephemeral wallet instances can be derived from the top-level wallet. (WIP)
 type Wallet struct {
 	provide.Model
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id"`
-	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id"`
-	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
-	Address       string     `sql:"not null" json:"address"`
-	PrivateKey    *string    `sql:"not null;type:bytea" json:"-"`
-	Balance       *big.Int   `sql:"-" json:"balance"`
-	AccessedAt    *time.Time `json:"accessed_at"`
+	WalletID      *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+
+	Purpose    *int    `sql:"not null;default:44" json:"purpose,omitempty"`
+	Mnemonic   *string `sql:"not null;type:bytea" json:"mnemonic,omitempty"`
+	Seed       *string `sql:"not null;type:bytea" json:"-"`
+	PublicKey  *string `sql:"not null;type:bytea" json:"public_key,omitempty"`  // i.e., the master public key
+	PrivateKey *string `sql:"not null;type:bytea" json:"private_key,omitempty"` // i.e., the master private key
+
+	Accounts []Account `gorm:"many2many:wallets_accounts" json:"-"`
 }
 
-// SetID sets the wallet id in-memory
-func (w *Wallet) SetID(walletID uuid.UUID) {
-	if w.ID != uuid.Nil {
-		common.Log.Warningf("Attempted to change a wallet id in memory; wallet id not changed: %s", w.ID)
-		return
-	}
-	w.ID = walletID
-}
-
-func (w *Wallet) generate(db *gorm.DB) error {
-	network, _ := w.GetNetwork()
-
-	if w.NetworkID == uuid.Nil {
-		err := errors.New("Unable to generate private key for wallet without an associated network")
-		common.Log.Warning(err.Error())
-		return err
-	}
-
-	var encodedPrivateKey *string
-
-	if network.IsEthereumNetwork() {
-		addr, privateKey, err := provide.EVMGenerateKeyPair()
-		if err != nil {
-			err := fmt.Errorf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
-			common.Log.Warning(err.Error())
-			return err
-		}
-
-		w.Address = *addr
-		encodedPrivateKey = common.StringOrNil(hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
-	} else if network.IsBcoinNetwork() {
-		var version byte = 0x00
-		networkCfg := network.ParseConfig()
-		if networkVersion, networkVersionOk := networkCfg["version"].(string); networkVersionOk {
-			versionBytes, err := hex.DecodeString(networkVersion)
-			if err != nil {
-				err := fmt.Errorf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
-				common.Log.Warning(err.Error())
-				return err
-			} else if len(versionBytes) != 1 {
-				err := fmt.Errorf("Unable to generate private key for unsupported bitcoin network version %s for network: %s", networkVersion, w.NetworkID.String())
-				common.Log.Warning(err.Error())
-				return err
-			} else {
-				version = versionBytes[0]
-			}
-		}
-
-		addr, privateKey, err := provide.BcoinGenerateKeyPair(version)
-		if err != nil {
-			err := fmt.Errorf("Unable to generate private key for bitcoin wallet for network: %s; %s", w.NetworkID.String(), err.Error())
-			common.Log.Warning(err.Error())
-			return err
-		}
-
-		w.Address = *addr
-		encodedPrivateKey = common.StringOrNil(fmt.Sprintf("%X", privateKey.D))
-	} else {
-		err := fmt.Errorf("Unable to generate private key for wallet using unsupported network: %s", w.NetworkID.String())
-		common.Log.Warning(err.Error())
-		return err
-	}
-
-	if encodedPrivateKey != nil {
-		encryptedPrivateKey, err := pgputil.PGPPubEncrypt([]byte(*encodedPrivateKey))
-		if err != nil {
-			common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
-			return err
-		}
-		w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
-		common.Log.Debugf("Generated wallet signing address: %s", w.Address)
-	} else {
-		err := errors.New("Unable to generate private key for wallet due to an unhandled error")
-		common.Log.Warning(err.Error())
-		return err
-	}
-
-	return nil
-}
-
-// GetNetwork - retrieve the associated transaction network
-func (w *Wallet) GetNetwork() (*network.Network, error) {
-	db := dbconf.DatabaseConnection()
-	var network = &network.Network{}
-	db.Model(w).Related(&network)
-	if network == nil {
-		return nil, fmt.Errorf("Failed to retrieve associated network for wallet: %s", w.ID)
-	}
-	return network, nil
-}
-
-// Create and persist a network-specific wallet used for storing crpyotcurrency or digital tokens native to a specific network
+// Create and persist an HD wallet
 func (w *Wallet) Create() bool {
 	db := dbconf.DatabaseConnection()
 
@@ -161,13 +72,7 @@ func (w *Wallet) Create() bool {
 // Validate a wallet for persistence
 func (w *Wallet) Validate() bool {
 	w.Errors = make([]*provide.Error, 0)
-	var network = &network.Network{}
-	dbconf.DatabaseConnection().Model(w).Related(&network)
-	if w.NetworkID == uuid.Nil {
-		w.Errors = append(w.Errors, &provide.Error{
-			Message: common.StringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", w.NetworkID.String())),
-		})
-	}
+
 	if w.ApplicationID == nil && w.UserID == nil {
 		w.Errors = append(w.Errors, &provide.Error{
 			Message: common.StringOrNil("no application or user identifier provided"),
@@ -177,71 +82,134 @@ func (w *Wallet) Validate() bool {
 			Message: common.StringOrNil("only an application OR user identifier should be provided"),
 		})
 	}
-	var err error
-	if w.PrivateKey != nil {
-		if network.IsEthereumNetwork() {
-			_, err = common.DecryptECDSAPrivateKey(*w.PrivateKey)
-		}
-	} else {
+	if w.Purpose == nil {
 		w.Errors = append(w.Errors, &provide.Error{
-			Message: common.StringOrNil("private key generation failed"),
+			Message: common.StringOrNil("purpose required; see https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki"),
+		})
+	}
+	if w.Mnemonic == nil {
+		w.Errors = append(w.Errors, &provide.Error{
+			Message: common.StringOrNil("mnemonic required"),
+		})
+	}
+	if w.Seed == nil {
+		w.Errors = append(w.Errors, &provide.Error{
+			Message: common.StringOrNil("seed required"),
+		})
+	}
+	if w.PublicKey == nil {
+		w.Errors = append(w.Errors, &provide.Error{
+			Message: common.StringOrNil("public key required"),
+		})
+	}
+	if w.PrivateKey == nil {
+		w.Errors = append(w.Errors, &provide.Error{
+			Message: common.StringOrNil("private key required"),
 		})
 	}
 
-	if err != nil {
-		msg := err.Error()
-		w.Errors = append(w.Errors, &provide.Error{
-			Message: &msg,
-		})
-	}
 	return len(w.Errors) == 0
 }
 
-// NativeCurrencyBalance retrieves a wallet's native currency/token balance
-func (w *Wallet) NativeCurrencyBalance() (*big.Int, error) {
-	var balance *big.Int
-	var err error
-	db := dbconf.DatabaseConnection()
-	var network = &network.Network{}
-	db.Model(w).Related(&network)
-	if network.IsEthereumNetwork() {
-		balance, err = provide.EVMGetNativeBalance(network.ID.String(), network.RPCURL(), w.Address)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		common.Log.Warningf("Unable to read native currency balance for network: %s", w.NetworkID)
+func (w *Wallet) decrypt() error {
+	mnemonic, err := pgputil.PGPPubDecrypt([]byte(*w.Mnemonic))
+	if err != nil {
+		common.Log.Warningf("Failed to decrypt mnemonic; %s", err.Error())
+		return err
 	}
-	return balance, nil
+	w.Mnemonic = common.StringOrNil(string(mnemonic))
+
+	seed, err := pgputil.PGPPubDecrypt([]byte(*w.Seed))
+	if err != nil {
+		common.Log.Warningf("Failed to decrypt seed; %s", err.Error())
+		return err
+	}
+	w.Seed = common.StringOrNil(string(seed))
+
+	publicKey, err := pgputil.PGPPubDecrypt([]byte(*w.PublicKey))
+	if err != nil {
+		common.Log.Warningf("Failed to decrypt public key; %s", err.Error())
+		return err
+	}
+	w.PublicKey = common.StringOrNil(string(publicKey))
+
+	privateKey, err := pgputil.PGPPubDecrypt([]byte(*w.PrivateKey))
+	if err != nil {
+		common.Log.Warningf("Failed to decrypt private key; %s", err.Error())
+		return err
+	}
+	w.PrivateKey = common.StringOrNil(string(privateKey))
+
+	return nil
 }
 
-// TokenBalance retrieves a wallet's token balance for a given token id
-func (w *Wallet) TokenBalance(tokenID string) (*big.Int, error) {
-	var balance *big.Int
-	db := dbconf.DatabaseConnection()
-	var network = &network.Network{}
-	var token = &token.Token{}
-	db.Model(w).Related(&network)
-	db.Where("id = ?", tokenID).Find(&token)
-	if token == nil {
-		return nil, fmt.Errorf("Unable to read token balance for invalid token: %s", tokenID)
+func (w *Wallet) encrypt() error {
+	encryptedMnemonic, err := pgputil.PGPPubEncrypt([]byte(*w.Mnemonic))
+	if err != nil {
+		common.Log.Warningf("Failed to encrypt mnemonic; %s", err.Error())
+		return err
 	}
-	if network.IsEthereumNetwork() {
-		contractAbi, err := token.ReadEthereumContractAbi()
-		balance, err = provide.EVMGetTokenBalance(network.ID.String(), network.RPCURL(), *token.Address, w.Address, contractAbi)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		common.Log.Warningf("Unable to read native currency balance for network: %s", w.NetworkID)
+	w.Mnemonic = common.StringOrNil(string(encryptedMnemonic))
+
+	encryptedSeed, err := pgputil.PGPPubEncrypt([]byte(*w.Seed))
+	if err != nil {
+		common.Log.Warningf("Failed to encrypt seed; %s", err.Error())
+		return err
 	}
-	return balance, nil
+	w.Seed = common.StringOrNil(string(encryptedSeed))
+
+	encryptedPublicKey, err := pgputil.PGPPubEncrypt([]byte(*w.PublicKey))
+	if err != nil {
+		common.Log.Warningf("Failed to encrypt public key; %s", err.Error())
+		return err
+	}
+	w.PublicKey = common.StringOrNil(string(encryptedPublicKey))
+
+	encryptedPrivateKey, err := pgputil.PGPPubEncrypt([]byte(*w.PrivateKey))
+	if err != nil {
+		common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
+		return err
+	}
+	w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
+
+	return nil
 }
 
-// not used
-// TxCount retrieves a count of transactions signed by the wallet
-// func (w *Wallet) TxCount() (count *uint64) {
-// 	db := dbconf.DatabaseConnection()
-// 	db.Model(&Transaction{}).Where("wallet_id = ?", w.ID).Count(&count)
-// 	return count
-// }
+func (w *Wallet) generate(db *gorm.DB) error {
+	entropy, err := bip39.NewEntropy(256)
+	if err != nil {
+		common.Log.Warningf("failed to create entropy for HD wallet mnemonic; %s", err.Error())
+		return err
+	}
+
+	mnemonic, err := bip39.NewMnemonic(entropy)
+	if err != nil {
+		common.Log.Warningf("failed to generate HD wallet mnemonic from %d-bit entropy; %s", len(entropy)*8, err.Error())
+		return err
+	}
+
+	seed, err := bip39.NewSeedWithErrorChecking(mnemonic, "")
+	if err != nil {
+		common.Log.Warningf("failed to generate seed from mnemonic: %s; %s", mnemonic, err.Error())
+		return err
+	}
+
+	masterKey, err := bip32.NewMasterKey(seed)
+	if err != nil {
+		common.Log.Warningf("failed to generate master key from mnemonic: %s; %s", mnemonic, err.Error())
+		return err
+	}
+
+	seedstr := string(seed)
+	xpub := masterKey.PublicKey().String()
+	xprv := masterKey.String()
+
+	w.Mnemonic = &mnemonic
+	w.Seed = &seedstr
+	w.PublicKey = &xpub
+	w.PrivateKey = &xprv
+
+	common.Log.Debugf("generated HD wallet master seed; mnemonic: %s; seed: %s; xpub: %s; xprv: %s", mnemonic, string(seed), xpub, xprv)
+
+	return nil
+}

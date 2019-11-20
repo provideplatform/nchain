@@ -212,7 +212,7 @@ func (c *Contract) Create() bool {
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
 						"contract_id":  c.ID,
 						"data":         compiledArtifact.Bytecode,
-						"wallet_id":    common.StringOrNil(params["wallet_id"].(string)),
+						"account_id":   common.StringOrNil(params["account_id"].(string)),
 						"value":        value,
 						"params":       params,
 						"published_at": time.Now(),

@@ -34,11 +34,11 @@ func init() {
 	db.Model(&Transaction{}).AddIndex("idx_transactions_status", "status")
 	db.Model(&Transaction{}).AddIndex("idx_transactions_network_id", "network_id")
 	db.Model(&Transaction{}).AddIndex("idx_transactions_user_id", "user_id")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_wallet_id", "wallet_id")
+	db.Model(&Transaction{}).AddIndex("idx_transactions_account_id", "account_id")
 	db.Model(&Transaction{}).AddIndex("idx_transactions_ref", "ref")
 	db.Model(&Transaction{}).AddUniqueIndex("idx_transactions_hash", "hash")
 	db.Model(&Transaction{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Transaction{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
+	db.Model(&Transaction{}).AddForeignKey("account_id", "accounts(id)", "SET NULL", "CASCADE")
 }
 
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
@@ -47,7 +47,7 @@ type Transaction struct {
 	ApplicationID    *uuid.UUID                          `sql:"type:uuid" json:"application_id"`
 	UserID           *uuid.UUID                          `sql:"type:uuid" json:"user_id"`
 	NetworkID        uuid.UUID                           `sql:"not null;type:uuid" json:"network_id"`
-	WalletID         *uuid.UUID                          `sql:"type:uuid" json:"wallet_id"`
+	AccountID        *uuid.UUID                          `sql:"type:uuid" json:"account_id"`
 	Signer           *string                             `sql:"-" json:"signer,omitempty"`
 	To               *string                             `json:"to"`
 	Value            *TxValue                            `sql:"not null;type:text" json:"value"`
@@ -102,7 +102,7 @@ func (v *TxValue) UnmarshalJSON(data []byte) error {
 
 func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.CallMsg {
 	db := dbconf.DatabaseConnection()
-	var wallet = &wallet.Wallet{}
+	var wallet = &wallet.Account{}
 	db.Model(t).Related(&wallet)
 	var to *ethcommon.Address
 	var data []byte
@@ -136,9 +136,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		db.Model(t).Related(&ntwrk)
 	}
 
-	var wllt *wallet.Wallet
-	if t.WalletID != nil && *t.WalletID != uuid.Nil {
-		wllt = &wallet.Wallet{}
+	var wllt *wallet.Account
+	if t.AccountID != nil && *t.AccountID != uuid.Nil {
+		wllt = &wallet.Account{}
 		db.Model(t).Related(&wllt)
 	}
 
@@ -218,9 +218,9 @@ func (t *Transaction) GetContract(db *gorm.DB) *contract.Contract {
 // Validate a transaction for persistence
 func (t *Transaction) Validate() bool {
 	db := dbconf.DatabaseConnection()
-	var wal *wallet.Wallet
-	if t.WalletID != nil {
-		wal = &wallet.Wallet{}
+	var wal *wallet.Account
+	if t.AccountID != nil {
+		wal = &wallet.Account{}
 		db.Model(t).Related(&wal)
 	}
 	t.Errors = make([]*provide.Error, 0)
@@ -267,9 +267,9 @@ func (t *Transaction) GetNetwork() (*network.Network, error) {
 }
 
 // GetWallet - retrieve the associated transaction wallet
-func (t *Transaction) GetWallet() (*wallet.Wallet, error) {
+func (t *Transaction) GetWallet() (*wallet.Account, error) {
 	db := dbconf.DatabaseConnection()
-	var wallet = &wallet.Wallet{}
+	var wallet = &wallet.Account{}
 	db.Model(t).Related(&wallet)
 	if wallet == nil || wallet.ID == uuid.Nil {
 		return nil, fmt.Errorf("Failed to retrieve transaction wallet for tx: %s", t.ID)
@@ -328,7 +328,7 @@ func (t *Transaction) attemptTxBroadcastRecovery(err error) error {
 	return err
 }
 
-func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *wallet.Wallet) error {
+func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *wallet.Account) error {
 	var err error
 
 	if t.SignedTx == nil {
@@ -374,7 +374,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *w
 	return err
 }
 
-func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet.Wallet) error {
+func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet.Account) error {
 	var err error
 
 	if network.IsEthereumNetwork() {
@@ -419,7 +419,7 @@ func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet
 	return err
 }
 
-func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Wallet) error {
+func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Account) error {
 	if network.IsEthereumNetwork() {
 		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.RPCURL(), *t.Hash, wallet.Address)
 		if err != nil {
@@ -450,7 +450,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 	return nil
 }
 
-func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Wallet, receipt *types.Receipt) error {
+func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Account, receipt *types.Receipt) error {
 	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 	if err != nil {
 		common.Log.Warningf("Unable to handle ethereum tx receipt; %s", err.Error())
@@ -510,7 +510,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 	return nil
 }
 
-func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Wallet, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
+func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Account, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {
 		common.Log.Debugf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")

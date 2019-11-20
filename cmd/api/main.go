@@ -106,6 +106,7 @@ func runAPI() {
 	oracle.InstallOraclesAPI(r)
 	token.InstallTokensAPI(r)
 	tx.InstallTransactionsAPI(r)
+	wallet.InstallAccountsAPI(r)
 	wallet.InstallWalletsAPI(r)
 
 	r.GET("/status", statusHandler)

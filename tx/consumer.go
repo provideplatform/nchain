@@ -124,7 +124,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	contractID, contractIDOk := params["contract_id"]
 	data, dataOk := params["data"].(string)
-	walletID, walletIDOk := params["wallet_id"].(string)
+	accountID, accountIDOk := params["account_id"].(string)
 	value, valueOk := params["value"]
 	txParams, paramsOk := params["params"].(map[string]interface{})
 	publishedAt, publishedAtOk := params["published_at"].(string)
@@ -139,8 +139,8 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		natsutil.Nack(msg)
 		return
 	}
-	if !walletIDOk {
-		common.Log.Warningf("Failed to unmarshal wallet_id during NATS %v message handling", msg.Subject)
+	if !accountIDOk {
+		common.Log.Warningf("Failed to unmarshal account_idduring NATS %v message handling", msg.Subject)
 		natsutil.Nack(msg)
 		return
 	}
@@ -164,9 +164,9 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 	db.Where("id = ?", contractID).Find(&contract)
 
-	walletUUID, err := uuid.FromString(walletID)
+	walletUUID, err := uuid.FromString(accountID)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal wallet_id during NATS %v message handling; %s", msg.Subject, err.Error())
+		common.Log.Warningf("Failed to unmarshal account_idduring NATS %v message handling; %s", msg.Subject, err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -182,7 +182,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		ApplicationID: contract.ApplicationID,
 		Data:          common.StringOrNil(data),
 		NetworkID:     contract.NetworkID,
-		WalletID:      &walletUUID,
+		AccountID:     &walletUUID,
 		To:            nil,
 		Value:         &TxValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:   &publishedAtTime,
@@ -342,7 +342,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 	return nil, err
 }
 
-func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
+func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, accountID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
 	db := dbconf.DatabaseConnection()
 	publishedAt := execution.PublishedAt
 	method := execution.Method
@@ -354,7 +354,7 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 		ApplicationID: c.ApplicationID,
 		UserID:        nil,
 		NetworkID:     c.NetworkID,
-		WalletID:      walletID,
+		AccountID:     accountID,
 		To:            c.Address,
 		Value:         &TxValue{value: value},
 		Params:        _txParamsJSON,
@@ -405,24 +405,24 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, wal
 	return tx.Response, nil
 }
 
-func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-	tmpWallet := &wallet.Wallet{}
+func wfunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+	tmpWallet := &wallet.Account{}
 	var address *string
 	var privateKey *string
 
-	switch w.(type) {
-	case *wallet.Wallet:
-		wallet := w.(*wallet.Wallet)
-		walletID := wallet.ID
-		if walletID != uuid.Nil {
-			return &walletID
+	switch a.(type) {
+	case *wallet.Account:
+		wallet := a.(*wallet.Account)
+		accountID := wallet.ID
+		if accountID != uuid.Nil {
+			return &accountID
 		}
 		if wallet.Address != "" {
 			address = &wallet.Address
 		}
 		privateKey = wallet.PrivateKey
 	case map[string]interface{}:
-		walletMap := w.(map[string]interface{})
+		walletMap := a.(map[string]interface{})
 		if addr, addrOk := walletMap["address"].(string); addrOk {
 			address = &addr
 		}
@@ -467,23 +467,23 @@ func consumeTxMsg(msg *stan.Msg) {
 		return
 	}
 
-	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
-		var executionWalletID *uuid.UUID
+	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
+		var executionAccountID *uuid.UUID
 		if executionWallet, executionWalletOk := execution.Wallet.(map[string]interface{}); executionWalletOk {
-			if executionWalletIDStr, executionWalletIDStrOk := executionWallet["id"].(string); executionWalletIDStrOk {
-				execWalletUUID, err := uuid.FromString(executionWalletIDStr)
+			if executionAccountIDStr, executionAccountIDStrOk := executionWallet["id"].(string); executionAccountIDStrOk {
+				execWalletUUID, err := uuid.FromString(executionAccountIDStr)
 				if err == nil {
-					executionWalletID = &execWalletUUID
+					executionAccountID = &execWalletUUID
 				}
 			}
 		}
-		if execution.Wallet != nil && *executionWalletID != *execution.WalletID {
-			common.Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
+		if execution.Wallet != nil && *executionAccountID != *execution.AccountID {
+			common.Log.Errorf("Invalid tx message specifying a account_idand wallet")
 			natsutil.Nack(msg)
 			return
 		}
-		wallet := &wallet.Wallet{}
-		wallet.SetID(*execution.WalletID)
+		wallet := &wallet.Account{}
+		wallet.SetID(*execution.AccountID)
 		execution.Wallet = wallet
 	}
 
@@ -501,8 +501,8 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 
 	var tx Transaction
-	txCreateFn := func(c *contract.Contract, network *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
+	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
+		return txCreatefunc(&tx, c, network, accountID, execution, _txParamsJSON)
 	}
 
 	executionResponse, err := cntract.ExecuteFromTx(execution, wfunc, txCreateFn)

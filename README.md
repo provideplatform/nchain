@@ -673,7 +673,7 @@ x-total-results-count: 1061221
         "application_id": null,
         "user_id": "7062d7f8-d536-4c53-bba5-7486a8724ac3",
         "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-        "wallet_id": "f924d014-9d76-444a-b8e1-810bd3a75319",
+        "account_id": "f924d014-9d76-444a-b8e1-810bd3a75319",
         "to": null,
         "value": 0,
         "data": "0x6080604052604051602080612faa833981016040818152915160008054600160a060020a0383...",
@@ -691,7 +691,7 @@ x-total-results-count: 1061221
         "application_id": null,
         "user_id": null,
         "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-        "wallet_id": "dfc12196-44d8-4ca2-8e6e-46f3ccf4c3a8",
+        "account_id": "dfc12196-44d8-4ca2-8e6e-46f3ccf4c3a8",
         "to": "0x139c328F1fF7910757E63F5045469CbDE18152b2",
         "value": 0,
         "data": "0x676f7fec31313233343500000000000000000000000000000000000000000000000000003031...",
@@ -727,7 +727,7 @@ access-control-allow-origin: *
     "application_id": null,
     "user_id": "7062d7f8-d536-4c53-bba5-7486a8724ac3",
     "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-    "wallet_id": "f924d014-9d76-444a-b8e1-810bd3a75319",
+    "account_id": "f924d014-9d76-444a-b8e1-810bd3a75319",
     "to": null,
     "value": 0,
     "data": "0x6080604052604051602080612faa833981016040818152915160008054600160a060020a03831660...",
@@ -1970,7 +1970,7 @@ $ curl -i \
     -H 'Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.NQLm__LbMWor-9GMG0LPcH4yQIbu9Uw70kJfRt1KP64' \
     https://goldmine.provide.services/api/contracts \
     -d '{"network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-          "wallet_id": "86ee6d48-66bb-4122-8073-a078854d09e6",
+          "account_id": "86ee6d48-66bb-4122-8073-a078854d09e6",
           "data": "0x608060405234...",
           "params": {
             "name": "X12",
@@ -2009,7 +2009,7 @@ access-control-allow-origin: *
   "application_id": "25b6339c-f11f-4a00-94d7-0a6e9b64586d",
   "user_id": null,
   "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-  "wallet_id": "86ee6d48-66bb-4122-8073-a078854d09e6",
+  "account_id": "86ee6d48-66bb-4122-8073-a078854d09e6",
   "to": null,
   "value": 0,
   "data": "0x6080604052...",
@@ -2141,7 +2141,7 @@ Execute specific functionality encapsulated within a given `Contract`.
 - Error responses vary with the nature of the error. 
 
 Explanation of request body:
-- `wallet_id` is the signing identity to use for the request
+- `account_id` is the signing identity to use for the request
 - `method` is the function name from the contract to invoke 
 - `params` is an array of values to pass as arguments to the `method`
 - `value` is the amount of token transfer
@@ -2151,7 +2151,7 @@ $ curl -i \
      -H 'content-type: application/json' \
      -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/contracts/3b9fe62e-5da7-43dc-838f-3cfa1421ed0f/execute \
-     -d '{"wallet_id": "a-signing-identity-identifier", "method": "a_method_from_the_contract", "params": ["arguments", "for", "the", "method"], "value": 0.5}'
+     -d '{"account_id": "a-signing-identity-identifier", "method": "a_method_from_the_contract", "params": ["arguments", "for", "the", "method"], "value": 0.5}'
 HTTP/2 202
 date: Wed, 10 Oct 2018 15:34:35 GMT
 content-type: application/json; charset=UTF-8
@@ -2284,7 +2284,7 @@ x-total-results-count: 1
         "application_id": "e49302c5-e485-4e14-9b0f-db5643b6a15c",
         "user_id": null,
         "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-        "wallet_id": "efef1044-4958-43bc-903b-28f2bb938037",
+        "account_id": "efef1044-4958-43bc-903b-28f2bb938037",
         "to": null,
         "value": 0,
         "data": "0x608060405234801561001057600080fd5b50610704806100206000396000f300608060405260...",
@@ -2307,7 +2307,7 @@ $ curl -i \
      -H 'content-type: application/json' \
      -H 'authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7fSwiZXhwIjpudWxsLCJpYXQiOjE1NTk4Nzg1NzQsImp0aSI6IjYzYTJkY2QzLWI5OTgtNDZjNC1hNzFkLTQ5MjU4YTBhYmEyMyIsInN1YiI6ImFwcGxpY2F0aW9uOmNiMjAzN2Y3LTc5ZmMtNDBmNC05NzIwLWFkYTYzNmRhNDE4MyJ9.0LsVj7oTF0KjwbcUhg9a-fQRWB7cGzKJxLIANeX2cWE' \
      https://goldmine.provide.services/api/v1/transactions \
-     -d '{"network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4", "wallet_id": "efef1044-4958-43bc-903b-28f2bb938037", "to": "0xfb17cB7bb99128AAb60B1DD103271d99C8237c0d", "value": 0}'
+     -d '{"network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4", "account_id": "efef1044-4958-43bc-903b-28f2bb938037", "to": "0xfb17cB7bb99128AAb60B1DD103271d99C8237c0d", "value": 0}'
 HTTP/2 201
 date: Mon, 15 Oct 2018 04:04:47 GMT
 content-type: application/json; charset=UTF-8
@@ -2323,7 +2323,7 @@ access-control-allow-origin: *
     "application_id": "e49302c5-e485-4e14-9b0f-db5643b6a15c",
     "user_id": null,
     "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-    "wallet_id": "efef1044-4958-43bc-903b-28f2bb938037",
+    "account_id": "efef1044-4958-43bc-903b-28f2bb938037",
     "to": "0xfb17cB7bb99128AAb60B1DD103271d99C8237c0d",
     "value": 0,
     "data": null,
@@ -2347,7 +2347,7 @@ $ curl -i \
     https://goldmine.provide.services/api/v1/transactions \
     -d '{
   "network_id": "ba02ff92-f5bb-4d44-9187-7e1cc214b9fc",
-  "wallet_id": "ce1fa3b8-049e-467b-90d8-53b9a5098b7b",
+  "account_id": "ce1fa3b8-049e-467b-90d8-53b9a5098b7b",
   "data": "60606040526003805460a060020a60ff021916905560006...",
   "params": {"name": "ProvideToken",
                 "abi": [
@@ -2408,7 +2408,7 @@ access-control-allow-origin: * Connection: keep-alive
     "id": "a1e55081-52d3-452b-bc24-fd4030317ac5",
     "created_at": "2018-10-12T21:21:57.527211009Z",
     "network_id": "ba02ff92-f5bb-4d44-9187-7e1cc214b9fc",
-    "wallet_id": "ce1fa3b8-049e-467b-90d8-53b9a5098b7b",
+    "account_id": "ce1fa3b8-049e-467b-90d8-53b9a5098b7b",
     "to": null,
     "value": 0,
     "data": "60606040526003805460a060020a60ff02191690556000600455601460055534156100...",
@@ -2485,7 +2485,7 @@ access-control-allow-origin: *
     "application_id": "e49302c5-e485-4e14-9b0f-db5643b6a15c",
     "user_id": null,
     "network_id": "024ff1ef-7369-4dee-969c-1918c6edb5d4",
-    "wallet_id": "efef1044-4958-43bc-903b-28f2bb938037",
+    "account_id": "efef1044-4958-43bc-903b-28f2bb938037",
     "to": null,
     "value": 0,
     "data": "0x608060405234801561001057600080fd5b506...",

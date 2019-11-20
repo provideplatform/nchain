@@ -26,7 +26,6 @@ func InstallTransactionsAPI(r *gin.Engine) {
 	r.GET("/api/v1/networks/:id/transactions/:transactionId", networkTransactionDetailsHandler)
 
 	r.POST("/api/v1/contracts/:id/execute", contractExecutionHandler)
-
 }
 
 func transactionsListHandler(c *gin.Context) {
@@ -58,7 +57,7 @@ func transactionsListHandler(c *gin.Context) {
 	}
 
 	if c.Query("from") != "" {
-		from := &wallet.Wallet{}
+		from := &wallet.Account{}
 		db := dbconf.DatabaseConnection()
 		fromQuery := db.Where("address = ?", from)
 		if c.Query("network_id") != "" {
@@ -66,7 +65,7 @@ func transactionsListHandler(c *gin.Context) {
 		}
 		fromQuery.Find(&from)
 		if from != nil && from.ID != uuid.Nil {
-			query = query.Where("transactions.wallet_id = ?", from.ID)
+			query = query.Where("transactions.account_id= ?", from.ID)
 		} else {
 			provide.RenderError("from address not resolved to a known signer", 404, c)
 		}
@@ -76,8 +75,8 @@ func transactionsListHandler(c *gin.Context) {
 		query = query.Where("transactions.network_id = ?", c.Query("network_id"))
 	}
 
-	if c.Query("wallet_id") != "" {
-		query = query.Where("transactions.wallet_id = ?", c.Query("wallet_id"))
+	if c.Query("account_id") != "" {
+		query = query.Where("transactions.account_id= ?", c.Query("account_id"))
 	}
 
 	var txs []Transaction
@@ -113,18 +112,18 @@ func createTransactionHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 
 	if tx.Signer != nil {
-		if tx.WalletID != nil {
-			provide.RenderError("provided signer and wallet_id to tx creation, which is ambiguous", 400, c)
+		if tx.AccountID != nil {
+			provide.RenderError("provided signer and account_id to tx creation, which is ambiguous", 400, c)
 			return
 		}
 
-		wallet := &wallet.Wallet{}
+		wallet := &wallet.Account{}
 		db.Where("address = ?", tx.Signer).Find(&wallet)
 		if wallet == nil || wallet.ID == uuid.Nil {
 			provide.RenderError("failed to resolve signer address to wallet", 404, c)
 			return
 		}
-		tx.WalletID = &wallet.ID
+		tx.AccountID = &wallet.ID
 	}
 
 	if tx.Create(db) {
@@ -217,7 +216,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		return
 	}
 
-	wal := &wallet.Wallet{} // signer for the tx
+	wal := &wallet.Account{} // signer for the tx
 
 	params := map[string]interface{}{}
 	err := json.Unmarshal(buf, &params)
@@ -244,13 +243,13 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
-	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
+	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
 		if execution.Wallet != nil {
-			err := fmt.Errorf("invalid request specifying a wallet_id and wallet")
+			err := fmt.Errorf("invalid request specifying a account_idand wallet")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
-		wal.SetID(*execution.WalletID)
+		wal.SetID(*execution.AccountID)
 	} else if publicKeyOk && privateKeyOk {
 		wal.Address = publicKey
 		wal.PrivateKey = common.StringOrNil(privateKey)
@@ -420,23 +419,23 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 	execution.Contract = contractObj
 	execution.ContractID = &contractObj.ID
-	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
+	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
 		if execution.Wallet != nil {
-			err := fmt.Errorf("invalid request specifying a wallet_id and wallet")
+			err := fmt.Errorf("invalid request specifying a account_address and account")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
-		wallet := &wallet.Wallet{}
-		wallet.SetID(*execution.WalletID)
+		wallet := &wallet.Account{}
+		wallet.SetID(*execution.AccountID)
 		execution.Wallet = wallet
-	} else if common.StringOrNil(*execution.WalletAddress) != nil {
+	} else if common.StringOrNil(*execution.AccountAddress) != nil {
 		if execution.Wallet != nil {
-			err := fmt.Errorf("invalid request specifying a wallet_address and wallet")
+			err := fmt.Errorf("invalid request specifying account_address and account")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
-		wallet := &wallet.Wallet{}
-		wallet.Address = *execution.WalletAddress
+		wallet := &wallet.Account{}
+		wallet.Address = *execution.AccountAddress
 		execution.Wallet = wallet
 	}
 
@@ -457,7 +456,7 @@ func contractExecutionHandler(c *gin.Context) {
 		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
 	}
 	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-		return wfunc(w.(*wallet.Wallet), txParams)
+		return wfunc(w.(*wallet.Account), txParams)
 	}
 
 	executionResponse, err := execution.ExecuteFromTx(walletFn, txCreateFn)

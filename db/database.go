@@ -66,17 +66,26 @@ func MigrateSchema() {
 		db.Model(&wallet.Wallet{}).AddIndex("idx_wallets_network_id", "network_id")
 		db.Model(&wallet.Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
 
+		db.AutoMigrate(&wallet.Account{})
+		db.Model(&wallet.Account{}).AddIndex("idx_accounts_wallet_id", "wallet_id")
+		db.Model(&wallet.Account{}).AddIndex("idx_accounts_application_id", "application_id")
+		db.Model(&wallet.Account{}).AddIndex("idx_accounts_user_id", "user_id")
+		db.Model(&wallet.Account{}).AddIndex("idx_accounts_accessed_at", "accessed_at")
+		db.Model(&wallet.Account{}).AddIndex("idx_accounts_network_id", "network_id")
+		db.Model(&wallet.Account{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
+		db.Model(&wallet.Account{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
+
 		db.AutoMigrate(&tx.Transaction{})
 		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_application_id", "application_id")
 		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_created_at", "created_at")
 		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_status", "status")
 		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_network_id", "network_id")
 		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_user_id", "user_id")
-		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_wallet_id", "wallet_id")
+		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_account_id", "account_id")
 		db.Model(&tx.Transaction{}).AddIndex("idx_transactions_ref", "ref")
 		db.Model(&tx.Transaction{}).AddUniqueIndex("idx_transactions_hash", "hash")
 		db.Model(&tx.Transaction{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-		db.Model(&tx.Transaction{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
+		db.Model(&tx.Transaction{}).AddForeignKey("account_id", "account(id)", "SET NULL", "CASCADE")
 
 		db.AutoMigrate(&contract.Contract{})
 		db.Model(&contract.Contract{}).AddIndex("idx_contracts_application_id", "application_id")
@@ -127,6 +136,9 @@ func MigrateSchema() {
 
 		db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 		db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+
+		db.Exec("ALTER TABLE wallets_accounts ADD CONSTRAINT wallets_accounts_wallet_id_wallets_id_foreign FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON UPDATE CASCADE ON DELETE CASCADE;")
+		db.Exec("ALTER TABLE wallets_accounts ADD CONSTRAINT wallets_accounts_account_id_accounts_id_foreign FOREIGN KEY (account_id) REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE;")
 	})
 }
 
