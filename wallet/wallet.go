@@ -176,7 +176,7 @@ func (w *Wallet) encrypt() error {
 }
 
 func (w *Wallet) generate(db *gorm.DB) error {
-	entropy, err := bip39.NewEntropy(256)
+	entropy, err := bip39.NewEntropy(128)
 	if err != nil {
 		common.Log.Warningf("failed to create entropy for HD wallet mnemonic; %s", err.Error())
 		return err
@@ -209,7 +209,7 @@ func (w *Wallet) generate(db *gorm.DB) error {
 	w.PublicKey = &xpub
 	w.PrivateKey = &xprv
 
-	common.Log.Debugf("generated HD wallet master seed; mnemonic: %s; seed: %s; xpub: %s; xprv: %s", mnemonic, string(seed), xpub, xprv)
+	common.Log.Debugf("generated HD wallet master seed; mnemonic: %s; %d-byte seed; xpub: %s; xprv: %s", mnemonic, len(seed), xpub, xprv)
 
 	return nil
 }
