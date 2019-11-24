@@ -27,7 +27,7 @@ require (
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
 	github.com/kthomas/go-natsutil v0.0.0-20191123231914-bee144fe6fd2
-	github.com/kthomas/go-pgputil v0.0.0-20190808052759-747b287b2049
+	github.com/kthomas/go-pgputil v0.0.0-20191124055155-a2d45567ec49
 	github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e
 	github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
