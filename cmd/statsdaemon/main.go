@@ -10,6 +10,7 @@ import (
 	"time"
 
 	dbconf "github.com/kthomas/go-db-config"
+	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 
 	"github.com/provideapp/goldmine/common"
@@ -32,6 +33,7 @@ var (
 )
 
 func init() {
+	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 }
 

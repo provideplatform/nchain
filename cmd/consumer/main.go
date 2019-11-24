@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 
 	"github.com/provideapp/goldmine/common"
@@ -27,6 +28,7 @@ var (
 )
 
 func init() {
+	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 }
 

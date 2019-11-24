@@ -23,6 +23,7 @@ import (
 	"github.com/provideapp/goldmine/tx"
 	"github.com/provideapp/goldmine/wallet"
 
+	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	provide "github.com/provideservices/provide-go"
 )
@@ -47,6 +48,7 @@ func init() {
 
 	consumer.RunAPIUsageDaemon()
 	filter.CacheTxFilters()
+	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 }
 
