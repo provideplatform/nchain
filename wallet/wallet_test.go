@@ -35,11 +35,11 @@ func TestWalletCreate(t *testing.T) {
 	common.Log.Debugf("master key: %s", masterKey)
 	common.Log.Debugf("master key 2: %s", masterKey2)
 
-	w0, err := wallet.DeriveHardened(dbconf.DatabaseConnection(), uint32(0), uint32(0))
+	w0, err := wallet.DeriveHardened(dbconf.DatabaseConnection(), uint32(60), uint32(0))
 	if err != nil {
 		t.Errorf("failed to derive hardened account; %s", err.Error())
 	}
-	w1, err := wallet.DeriveHardened(dbconf.DatabaseConnection(), uint32(0), uint32(0))
+	w1, err := wallet.DeriveHardened(dbconf.DatabaseConnection(), uint32(60), uint32(0))
 	if err != nil {
 		t.Errorf("failed to derive hardened account; %s", err.Error())
 	}
@@ -47,11 +47,11 @@ func TestWalletCreate(t *testing.T) {
 	common.Log.Debugf("hardened ephemeral HD wallet account (attempt 1); xpub: %s; xprv: %s", *w0.PublicKey, *w0.PrivateKey)
 	common.Log.Debugf("hardened ephemeral HD wallet account (attempt 2); xpub: %s; xprv: %s", *w1.PublicKey, *w1.PrivateKey)
 
-	a0, err := wallet.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), nil)
+	a0, err := w1.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), nil)
 	if err != nil {
 		t.Errorf("failed to derive address; %s", err.Error())
 	}
-	a1, err := wallet.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), nil)
+	a1, err := w1.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), nil)
 	if err != nil {
 		t.Errorf("failed to derive address; %s", err.Error())
 	}
