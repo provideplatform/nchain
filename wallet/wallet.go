@@ -1,6 +1,9 @@
 package wallet
 
 import (
+	"errors"
+	"fmt"
+
 	bip32 "github.com/FactomProject/go-bip32"
 	dbconf "github.com/kthomas/go-db-config"
 	pgputil "github.com/kthomas/go-pgputil"
@@ -14,13 +17,14 @@ import (
 
 // Wallet instances are logical collections of accounts; wallet instances are HD wallets
 // conforming to BIP44, (i.e., m / purpose' / coin_type' / account' / change / address_index);
-// ephemeral wallet instances can be derived from the top-level wallet. (WIP)
+// supports derivation of up to 2,147,483,648 associated addresses per hardened account.
 type Wallet struct {
 	provide.Model
 	WalletID      *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
 	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
 	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
 
+	Path       *string `sql:"-" json:"path,omitempty"`
 	Purpose    *int    `sql:"not null;default:44" json:"purpose,omitempty"`
 	Mnemonic   *string `sql:"not null;type:bytea" json:"mnemonic,omitempty"`
 	Seed       *string `sql:"not null;type:bytea" json:"-"`
@@ -163,6 +167,61 @@ func (w *Wallet) encrypt() error {
 	return nil
 }
 
+// DeriveHardened derives the hardened child account from the parent wallet (i.e., per bip32);
+// the derived wallet is initialized for the given purpose and coin such that the new account
+// exists at `m/purpose'/coin_type'/account'`; this method will fail if the next level in
+// the HD hierarchy must be non-hardened.
+func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, error) {
+	masterKey, err := bip32.NewMasterKey([]byte(*w.Seed))
+	if err != nil {
+		return nil, fmt.Errorf("failed to reinitialize master key from seed; %s", err.Error())
+	}
+
+	pathstr := fmt.Sprintf("m/%d'/%d'/%d'", *w.Purpose, coin, account)
+	common.Log.Debugf("reinitialized master key to attempt account derivation at path: %s; key; %s", pathstr, masterKey)
+
+	childKey, err := masterKey.NewChildKey(coin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize child key at derivation path: m/%d'/%d'; %s", *w.Purpose, coin, err.Error())
+	}
+	common.Log.Debugf("derived child key at derivation path: m/%d'/%d'; key: %s", *w.Purpose, coin, childKey)
+
+	childKey, err = childKey.NewChildKey(account)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize child key at derivation path: m/%d'/%d'/%d'; %s", *w.Purpose, coin, account, err.Error())
+	}
+	common.Log.Debugf("derived child key at derivation path: m/%d'/%d'/%d'; key: %s", *w.Purpose, coin, account, childKey)
+
+	w1 := &Wallet{
+		Path:    &pathstr,
+		Purpose: w.Purpose,
+	}
+	w1.populate(childKey)
+
+	return w1, nil
+}
+
+// DeriveAddress derives a child address from the parent wallet which should be a hardened
+// child account (i.e., per bip32); the derived account is initialized for the purpose,
+// coin type and hardened account per the rules of the active subtree such that the new signer
+// exists at `m/purpose'/coin_type'/account'/<index>` (or `m/purpose'/coin_type'/account'/<chain>/<index>`
+// if a chain index is provided). Returns an `Account` instance.
+func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Account, error) {
+	if w.Path == nil {
+		return nil, errors.New("failed to derive signing address without hardened HD path")
+	}
+
+	pathstr := fmt.Sprintf("%s/%d", *w.Path, index)
+	if chain != nil {
+		pathstr = fmt.Sprintf("%s/%d/%d", *w.Path, chain, index)
+	}
+	common.Log.Debugf("attempting to derive signing account at derivation path: %s", pathstr)
+
+	// TODO: switch on the hardened account path to determine if we support deriving a signing address at this time
+
+	return nil, errors.New("not implemented")
+}
+
 func (w *Wallet) generate(db *gorm.DB) error {
 	entropy, err := bip39.NewEntropy(128)
 	if err != nil {
@@ -188,16 +247,22 @@ func (w *Wallet) generate(db *gorm.DB) error {
 		return err
 	}
 
+	pathstr := fmt.Sprintf("m/%d'", *w.Purpose)
 	seedstr := string(seed)
-	xpub := masterKey.PublicKey().String()
-	xprv := masterKey.String()
 
 	w.Mnemonic = &mnemonic
+	w.Path = &pathstr
 	w.Seed = &seedstr
+	w.populate(masterKey)
+
+	common.Log.Debugf("generated HD wallet master seed; mnemonic: %s; %d-byte seed; xpub: %s; xprv: %s", mnemonic, len(seed), *w.PublicKey, *w.PrivateKey)
+	return nil
+}
+
+func (w *Wallet) populate(key *bip32.Key) {
+	xpub := key.PublicKey().String()
+	xprv := key.String()
+
 	w.PublicKey = &xpub
 	w.PrivateKey = &xprv
-
-	common.Log.Debugf("generated HD wallet master seed; mnemonic: %s; %d-byte seed; xpub: %s; xprv: %s", mnemonic, len(seed), xpub, xprv)
-
-	return nil
 }
