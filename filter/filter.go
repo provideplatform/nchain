@@ -17,14 +17,6 @@ import (
 const natsStreamingTxFilterExecSubjectPrefix = "ml.filter.exec"
 const streamingTxFilterReturnTimeout = time.Millisecond * 50
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Filter{})
-	db.Model(&Filter{}).AddIndex("idx_filters_application_id", "application_id")
-	db.Model(&Filter{}).AddIndex("idx_filters_network_id", "network_id")
-	db.Model(&Filter{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-}
-
 // Filter instances must be associated with an application identifier.
 type Filter struct {
 	provide.Model

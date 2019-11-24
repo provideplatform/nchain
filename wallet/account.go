@@ -18,18 +18,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Account{})
-	db.Model(&Account{}).AddIndex("idx_accounts_wallet_id", "wallet_id")
-	db.Model(&Account{}).AddIndex("idx_accounts_application_id", "application_id")
-	db.Model(&Account{}).AddIndex("idx_accounts_user_id", "user_id")
-	db.Model(&Account{}).AddIndex("idx_accounts_accessed_at", "accessed_at")
-	db.Model(&Account{}).AddIndex("idx_accounts_network_id", "network_id")
-	db.Model(&Account{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Account{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
-}
-
 // Account represents a single address associated with a specific network and application or user
 type Account struct {
 	provide.Model

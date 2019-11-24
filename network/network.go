@@ -28,21 +28,6 @@ var networkGenesisMutex = map[string]*sync.Mutex{}
 
 const defaultWebappPort = 3000
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Network{})
-	db.Model(&Network{}).AddIndex("idx_networks_application_id", "application_id")
-	db.Model(&Network{}).AddIndex("idx_networks_network_id", "network_id")
-	db.Model(&Network{}).AddIndex("idx_networks_user_id", "user_id")
-	db.Model(&Network{}).AddIndex("idx_networks_cloneable", "cloneable")
-	db.Model(&Network{}).AddIndex("idx_networks_enabled", "enabled")
-	db.Model(&Network{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Network{}).AddForeignKey("sidechain_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Network{}).AddUniqueIndex("idx_chain_id", "chain_id")
-
-	rand.Seed(time.Now().Unix())
-}
-
 type bootnodesInitialized string
 
 func (err bootnodesInitialized) Error() string {

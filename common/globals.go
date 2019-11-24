@@ -7,7 +7,6 @@ import (
 
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
-	natsutil "github.com/kthomas/go-natsutil"
 )
 
 const reachabilityTimeout = time.Millisecond * 2500
@@ -58,11 +57,6 @@ func init() {
 	Log = logger.NewLogger("goldmine", lvl, true)
 
 	DefaultAWSConfig = awsconf.GetConfig()
-
-	err := natsutil.EstablishSharedNatsStreamingConnection()
-	if err != nil {
-		Log.Panicf("Failed to established NATS streaming connection; %s", err.Error())
-	}
 
 	ConsumeNATSStreamingSubscriptions = strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
 }

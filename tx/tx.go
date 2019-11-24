@@ -26,21 +26,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Transaction{})
-	db.Model(&Transaction{}).AddIndex("idx_transactions_application_id", "application_id")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_created_at", "created_at")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_status", "status")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_network_id", "network_id")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_user_id", "user_id")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_account_id", "account_id")
-	db.Model(&Transaction{}).AddIndex("idx_transactions_ref", "ref")
-	db.Model(&Transaction{}).AddUniqueIndex("idx_transactions_hash", "hash")
-	db.Model(&Transaction{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Transaction{}).AddForeignKey("account_id", "accounts(id)", "SET NULL", "CASCADE")
-}
-
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
 type Transaction struct {
 	provide.Model

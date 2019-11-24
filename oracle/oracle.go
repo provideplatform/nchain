@@ -10,15 +10,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Oracle{})
-	db.Model(&Oracle{}).AddIndex("idx_oracles_application_id", "application_id")
-	db.Model(&Oracle{}).AddIndex("idx_oracles_network_id", "network_id")
-	db.Model(&Oracle{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Oracle{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
-}
-
 // Oracle instances are smart contracts whose terms are fulfilled by writing data from a configured feed onto the blockchain associated with its configured network
 type Oracle struct {
 	provide.Model

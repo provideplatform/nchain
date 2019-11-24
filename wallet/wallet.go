@@ -12,18 +12,6 @@ import (
 	"github.com/provideapp/goldmine/common"
 )
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Wallet{})
-	db.Model(&Wallet{}).AddIndex("idx_wallets_wallet_id", "wallet_id")
-	db.Model(&Wallet{}).AddIndex("idx_wallets_application_id", "application_id")
-	db.Model(&Wallet{}).AddIndex("idx_wallets_user_id", "user_id")
-	db.Model(&Wallet{}).AddIndex("idx_wallets_accessed_at", "accessed_at")
-	db.Model(&Wallet{}).AddIndex("idx_wallets_network_id", "network_id")
-	db.Model(&Wallet{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Wallet{}).AddForeignKey("wallet_id", "wallets(id)", "SET NULL", "CASCADE")
-}
-
 // Wallet instances are logical collections of accounts; wallet instances are HD wallets
 // conforming to BIP44, (i.e., m / purpose' / coin_type' / account' / change / address_index);
 // ephemeral wallet instances can be derived from the top-level wallet. (WIP)

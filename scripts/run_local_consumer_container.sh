@@ -185,7 +185,7 @@ PUl1cxrvY7BHh4obNa6Bf8ECAwEAAQ==
 -e DATABASE_LOGGING=false \
 -e DATABASE_USER=goldmine \
 -e DATABASE_PASSWORD=goldmine \
--e DATABASE_NAME=goldmine_sandbox \
+-e DATABASE_NAME=goldmine_dev \
 -e DATABASE_HOST=docker.for.mac.localhost \
 -e LOG_LEVEL=DEBUG \
 --entrypoint ./bin/goldmine_consumer \

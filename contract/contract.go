@@ -27,20 +27,6 @@ const resolveTokenTickerTimeout = time.Minute * 1
 
 const natsTxCreateSubject = "goldmine.tx.create"
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Contract{})
-	db.Model(&Contract{}).AddIndex("idx_contracts_application_id", "application_id")
-	db.Model(&Contract{}).AddIndex("idx_contracts_accessed_at", "accessed_at")
-	db.Model(&Contract{}).AddIndex("idx_contracts_address", "address")
-	db.Model(&Contract{}).AddIndex("idx_contracts_contract_id", "contract_id")
-	db.Model(&Contract{}).AddIndex("idx_contracts_network_id", "network_id")
-	db.Model(&Contract{}).AddIndex("idx_contracts_transaction_id", "transaction_id")
-	db.Model(&Contract{}).AddForeignKey("contract_id", "contracts(id)", "SET NULL", "CASCADE")
-	db.Model(&Contract{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Contract{}).AddForeignKey("transaction_id", "transactions(id)", "SET NULL", "CASCADE")
-}
-
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	provide.Model

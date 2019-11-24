@@ -229,7 +229,6 @@ for d in "${pkgs[@]}" ; do
                        -cover \
                        -coverpkg="./${pkg}" \
                        -coverprofile=profile.out \
-                       -ginkgo.progress \
                        -ginkgo.trace \
                        -tags="$TAGS"
   else
@@ -258,7 +257,6 @@ for d in "${pkgs[@]}" ; do
                        -cover \
                        -coverpkg="./${pkg}" \
                        -coverprofile=profile.out \
-                       -ginkgo.progress \
                        -ginkgo.trace \
                        -tags="$TAGS"
   fi

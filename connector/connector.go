@@ -18,22 +18,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Connector{})
-	db.Model(&Connector{}).AddIndex("idx_connectors_application_id", "application_id")
-	db.Model(&Connector{}).AddIndex("idx_connectors_network_id", "network_id")
-	db.Model(&Connector{}).AddIndex("idx_connectors_type", "type")
-	db.Model(&Connector{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-	db.Model(&Connector{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-
-	db.Exec("ALTER TABLE connectors_load_balancers ADD CONSTRAINT connectors_load_balancers_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
-	db.Exec("ALTER TABLE connectors_load_balancers ADD CONSTRAINT connectors_load_balancers_load_balancer_id_load_balancers_id_foreign FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;")
-
-	db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_connector_id_connectors_id_foreign FOREIGN KEY (connector_id) REFERENCES connectors(id) ON UPDATE CASCADE ON DELETE CASCADE;")
-	db.Exec("ALTER TABLE connectors_nodes ADD CONSTRAINT connectors_nodes_node_id_nodes_id_foreign FOREIGN KEY (node_id) REFERENCES nodes(id) ON UPDATE CASCADE ON DELETE CASCADE;")
-}
-
 // ConnectorAPI defines an interface for connector provisioning and deprovisioning
 type ConnectorAPI interface {
 	Deprovision() error

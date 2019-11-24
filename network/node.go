@@ -45,18 +45,6 @@ const nodeRoleIPFS = "ipfs"
 
 var engineToNodeClientEnvMapping = map[string]string{"aura": "parity", "handshake": "handshake"}
 
-func init() {
-	db := dbconf.DatabaseConnection()
-	db.AutoMigrate(&Node{})
-	db.Model(&Node{}).AddIndex("idx_nodes_network_id", "network_id")
-	db.Model(&Node{}).AddIndex("idx_nodes_user_id", "user_id")
-	db.Model(&Node{}).AddIndex("idx_nodes_application_id", "application_id")
-	db.Model(&Node{}).AddIndex("idx_nodes_role", "role")
-	db.Model(&Node{}).AddIndex("idx_nodes_status", "status")
-	db.Model(&Node{}).AddIndex("idx_nodes_bootnode", "bootnode")
-	db.Model(&Node{}).AddForeignKey("network_id", "networks(id)", "SET NULL", "CASCADE")
-}
-
 // Node instances represent nodes of the network to which they belong, acting in a specific role;
 // each Node may have a set or sets of deployed resources, such as application containers, VMs
 // or even phyiscal infrastructure
