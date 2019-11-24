@@ -5,16 +5,17 @@
 -- Dumped from database version 10.6
 -- Dumped by pg_dump version 10.11 (Ubuntu 10.11-1.pgdg16.04+1)
 
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
+-- The following portion of the pg_dump output should not run during migrations:
+-- SET statement_timeout = 0;
+-- SET lock_timeout = 0;
+-- SET idle_in_transaction_session_timeout = 0;
+-- SET client_encoding = 'UTF8';
+-- SET standard_conforming_strings = on;
+-- SELECT pg_catalog.set_config('search_path', '', false);
+-- SET check_function_bodies = false;
+-- SET xmloption = content;
+-- SET client_min_messages = warning;
+-- SET row_security = off;
 
 --
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
@@ -82,7 +83,7 @@ CREATE TABLE public.accounts (
 );
 
 
-ALTER TABLE public.accounts OWNER TO goldmine;
+ALTER TABLE public.accounts OWNER TO current_user;
 
 --
 -- Name: bridges; Type: TABLE; Schema: public; Owner: goldmine
@@ -96,7 +97,7 @@ CREATE TABLE public.bridges (
 );
 
 
-ALTER TABLE public.bridges OWNER TO goldmine;
+ALTER TABLE public.bridges OWNER TO current_user;
 
 --
 -- Name: connectors; Type: TABLE; Schema: public; Owner: goldmine
@@ -117,7 +118,7 @@ CREATE TABLE public.connectors (
 );
 
 
-ALTER TABLE public.connectors OWNER TO goldmine;
+ALTER TABLE public.connectors OWNER TO current_user;
 
 --
 -- Name: connectors_load_balancers; Type: TABLE; Schema: public; Owner: goldmine
@@ -129,7 +130,7 @@ CREATE TABLE public.connectors_load_balancers (
 );
 
 
-ALTER TABLE public.connectors_load_balancers OWNER TO goldmine;
+ALTER TABLE public.connectors_load_balancers OWNER TO current_user;
 
 --
 -- Name: connectors_nodes; Type: TABLE; Schema: public; Owner: goldmine
@@ -141,7 +142,7 @@ CREATE TABLE public.connectors_nodes (
 );
 
 
-ALTER TABLE public.connectors_nodes OWNER TO goldmine;
+ALTER TABLE public.connectors_nodes OWNER TO current_user;
 
 --
 -- Name: contracts; Type: TABLE; Schema: public; Owner: goldmine
@@ -161,7 +162,7 @@ CREATE TABLE public.contracts (
 );
 
 
-ALTER TABLE public.contracts OWNER TO goldmine;
+ALTER TABLE public.contracts OWNER TO current_user;
 
 --
 -- Name: filters; Type: TABLE; Schema: public; Owner: goldmine
@@ -180,7 +181,7 @@ CREATE TABLE public.filters (
 );
 
 
-ALTER TABLE public.filters OWNER TO goldmine;
+ALTER TABLE public.filters OWNER TO current_user;
 
 --
 -- Name: load_balancers; Type: TABLE; Schema: public; Owner: goldmine
@@ -204,7 +205,7 @@ CREATE TABLE public.load_balancers (
 );
 
 
-ALTER TABLE public.load_balancers OWNER TO goldmine;
+ALTER TABLE public.load_balancers OWNER TO current_user;
 
 --
 -- Name: load_balancers_nodes; Type: TABLE; Schema: public; Owner: goldmine
@@ -216,7 +217,7 @@ CREATE TABLE public.load_balancers_nodes (
 );
 
 
-ALTER TABLE public.load_balancers_nodes OWNER TO goldmine;
+ALTER TABLE public.load_balancers_nodes OWNER TO current_user;
 
 --
 -- Name: networks; Type: TABLE; Schema: public; Owner: goldmine
@@ -239,7 +240,7 @@ CREATE TABLE public.networks (
 );
 
 
-ALTER TABLE public.networks OWNER TO goldmine;
+ALTER TABLE public.networks OWNER TO current_user;
 
 --
 -- Name: nodes; Type: TABLE; Schema: public; Owner: goldmine
@@ -265,7 +266,7 @@ CREATE TABLE public.nodes (
 );
 
 
-ALTER TABLE public.nodes OWNER TO goldmine;
+ALTER TABLE public.nodes OWNER TO current_user;
 
 --
 -- Name: oracles; Type: TABLE; Schema: public; Owner: goldmine
@@ -283,7 +284,7 @@ CREATE TABLE public.oracles (
 );
 
 
-ALTER TABLE public.oracles OWNER TO goldmine;
+ALTER TABLE public.oracles OWNER TO current_user;
 
 --
 -- Name: tokens; Type: TABLE; Schema: public; Owner: goldmine
@@ -305,7 +306,7 @@ CREATE TABLE public.tokens (
 );
 
 
-ALTER TABLE public.tokens OWNER TO goldmine;
+ALTER TABLE public.tokens OWNER TO current_user;
 
 --
 -- Name: transactions; Type: TABLE; Schema: public; Owner: goldmine
@@ -336,7 +337,7 @@ CREATE TABLE public.transactions (
 );
 
 
-ALTER TABLE public.transactions OWNER TO goldmine;
+ALTER TABLE public.transactions OWNER TO current_user;
 
 --
 -- Name: wallets; Type: TABLE; Schema: public; Owner: goldmine
@@ -356,7 +357,7 @@ CREATE TABLE public.wallets (
 );
 
 
-ALTER TABLE public.wallets OWNER TO goldmine;
+ALTER TABLE public.wallets OWNER TO current_user;
 
 --
 -- Name: wallets_accounts; Type: TABLE; Schema: public; Owner: goldmine
@@ -368,7 +369,7 @@ CREATE TABLE public.wallets_accounts (
 );
 
 
-ALTER TABLE public.wallets_accounts OWNER TO goldmine;
+ALTER TABLE public.wallets_accounts OWNER TO current_user;
 
 --
 -- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine

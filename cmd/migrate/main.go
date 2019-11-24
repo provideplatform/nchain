@@ -41,15 +41,7 @@ func main() {
 		panic(err)
 	}
 
-	_, _, err = m.Version()
-	initial := err == migrate.ErrNilVersion
-
 	err = m.Up()
-	if err != nil && initial && err.Error() == "pq: relation \"schema_migrations\" does not exist in line 0: TRUNCATE \"schema_migrations\"" {
-		// HACK initial migration issue
-		_, err = db.Exec("UPDATE schema_migrations SET dirty = false WHERE version = 1")
-	}
-
 	if err != nil && err != migrate.ErrNoChange {
 		common.Log.Warningf("migrations failed: %s", err.Error())
 	}
