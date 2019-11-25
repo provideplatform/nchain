@@ -226,7 +226,7 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("Unable to broadcast tx on unspecified network"),
 		})
-	} else if wal != nil && t.ApplicationID != nil && t.NetworkID != wal.NetworkID {
+	} else if wal != nil && t.ApplicationID != nil && wal.NetworkID != nil && t.NetworkID != *wal.NetworkID {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("Transaction network did not match wallet network in application context"),
 		})
