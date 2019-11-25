@@ -6,6 +6,8 @@ require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/FactomProject/go-bip32 v0.3.5
+	github.com/FactomProject/go-bip39 v0.3.5 // indirect
+	github.com/FactomProject/go-bip44 v0.0.0-20190306062959-b541a96d8da9
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/aws/aws-sdk-go v1.25.41
 	github.com/btcsuite/btcd v0.20.1-beta
@@ -31,6 +33,7 @@ require (
 	github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e
 	github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
+	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20191015012459-abf3d7f7f00c
 	github.com/nats-io/stan.go v0.5.0
 	github.com/onsi/ginkgo v1.10.3
 	github.com/onsi/gomega v1.7.1

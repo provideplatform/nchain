@@ -21,7 +21,7 @@ import (
 // Account represents a single address associated with a specific network and application or user
 type Account struct {
 	provide.Model
-	NetworkID     uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+	NetworkID     *uuid.UUID `sql:"type:uuid" json:"network_id,omitempty"`
 	WalletID      *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
 	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
 	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
@@ -33,6 +33,7 @@ type Account struct {
 	Address    string     `sql:"not null" json:"address"`
 	Balance    *big.Int   `sql:"-" json:"balance,omitempty"`
 	AccessedAt *time.Time `json:"accessed_at,omitempty"`
+	Wallet     *Wallet    `sql:"-" json:"-"`
 }
 
 // SetID sets the account id in-memory
@@ -47,7 +48,7 @@ func (a *Account) SetID(accountID uuid.UUID) {
 func (a *Account) generate(db *gorm.DB) error {
 	network, _ := a.GetNetwork()
 
-	if a.NetworkID == uuid.Nil {
+	if a.NetworkID != nil && *a.NetworkID == uuid.Nil {
 		err := errors.New("Unable to generate private key for account without an associated network")
 		common.Log.Warning(err.Error())
 		return err
@@ -158,7 +159,7 @@ func (a *Account) Validate() bool {
 	a.Errors = make([]*provide.Error, 0)
 	var network = &network.Network{}
 	dbconf.DatabaseConnection().Model(a).Related(&network)
-	if a.NetworkID == uuid.Nil {
+	if a.NetworkID != nil && *a.NetworkID == uuid.Nil {
 		a.Errors = append(a.Errors, &provide.Error{
 			Message: common.StringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", a.NetworkID.String())),
 		})
