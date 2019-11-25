@@ -47,14 +47,6 @@ setup_go()
     echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 
-    if hash glide 2>/dev/null
-    then
-        echo 'Using glide...'
-    else 
-        echo 'Installing glide...'
-        curl https://glide.sh/get | sh
-    fi
-
     go env
 }
 
@@ -76,10 +68,7 @@ echo 'Working Directory =' `pwd`
 echo '....[PRVD] Setting Up....'
 bootstrap_environment
 
-make clean
-
-glide cache-clear
-glide --debug install
+make mod
 
 (cd vendor/ && tar c .) | (cd src/ && tar xf -)
 rm -rf vendor/
