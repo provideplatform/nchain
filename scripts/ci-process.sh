@@ -38,13 +38,13 @@ setup_go()
     fi
 
     # Set up Go environment to treat this workspace as within GOPATH. 
-    export GOPATH=`pwd`
+    export GOPATH=~/go
     export GOBIN=$GOPATH/bin
     export PATH=~/.local/bin:$GOBIN:$PATH
     echo "PATH is: '$PATH'"
     mkdir -p $GOPATH/src/github.com/provideapp
-    ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
-    echo "GOPATH is: $GOPATH"
+    # ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
+    # echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 
     go env
