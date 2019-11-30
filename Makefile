@@ -53,7 +53,7 @@ stop_local_dependencies:
 stop_local:
 	./scripts/stop_local.sh
 
-test: build
+test: build migrate
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./scripts/run_local_dependencies.sh
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./scripts/run_unit_tests.sh
 
