@@ -3,12 +3,16 @@
 set -e
 echo "" > coverage.txt
 
+if [[ -z "${DATABASE_NAME}" ]]; then
+  DATABASE_USER=goldmine_test
+fi
+
 if [[ -z "${DATABASE_USER}" ]]; then
-  DATABASE_USER=goldmine
+  DATABASE_USER=goldminetest
 fi
 
 if [[ -z "${DATABASE_PASSWORD}" ]]; then
-  DATABASE_PASSWORD=goldmine
+  DATABASE_PASSWORD=
 fi
 
 if [[ -z "${NATS_SERVER_PORT}" ]]; then
@@ -31,9 +35,9 @@ if [[ -z "${TAGS}" ]]; then
   TAGS=unit
 fi
 
-PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} goldmine_test || true >/dev/null
-PGPASSWORD=${DATABASE_PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} goldmine_test || true >/dev/null
-PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} goldmine_test < db/networks_test.sql || true >/dev/null
+PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} ${DATABASE_NAME} || true >/dev/null
+PGPASSWORD=${DATABASE_PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} ${DATABASE_NAME} || true >/dev/null
+PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} ${DATABASE_NAME} < db/networks_test.sql || true >/dev/null
 
 PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
@@ -216,7 +220,7 @@ for d in "${pkgs[@]}" ; do
     NATS_STREAMING_CONCURRENCY=1 \
     GIN_MODE=release \
     DATABASE_HOST=localhost \
-    DATABASE_NAME=goldmine_test \
+    DATABASE_NAME=${DATABASE_NAME} \
     DATABASE_USER=${DATABASE_USER} \
     DATABASE_PASSWORD=${DATABASE_PASSWORD} \
     LOG_LEVEL=DEBUG \
@@ -245,7 +249,7 @@ for d in "${pkgs[@]}" ; do
     NATS_STREAMING_CONCURRENCY=1 \
     GIN_MODE=release \
     DATABASE_HOST=localhost \
-    DATABASE_NAME=goldmine_test \
+    DATABASE_NAME=${DATABASE_NAME} \
     DATABASE_USER=${DATABASE_USER} \
     DATABASE_PASSWORD=${DATABASE_PASSWORD} \
     LOG_LEVEL=DEBUG \
