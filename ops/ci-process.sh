@@ -75,10 +75,10 @@ rm -rf vendor/
 
 make lint > reports/linters/golint.txt # TODO: add -set_exit_status once we clean current issues up. 
 
-DATABASE_USER=postgres DATABASE_PASSWORD=postgres make test
+make test
 
 if [ "$RUN_INTEGRATION_SUITE" = "true" ]; then
-  DATABASE_USER=postgres DATABASE_PASSWORD=postgres make integration
+  make integration
 fi
 
 make build
