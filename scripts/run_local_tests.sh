@@ -232,7 +232,6 @@ for d in "${pkgs[@]}" ; do
                        -cover \
                        -coverpkg="./${pkg}" \
                        -coverprofile=profile.out \
-                       -ginkgo.trace \
                        -tags="$TAGS"
   else
     GPG_PUBLIC_KEY=$PGP_PUBLIC_KEY \
@@ -260,7 +259,6 @@ for d in "${pkgs[@]}" ; do
                        -cover \
                        -coverpkg="./${pkg}" \
                        -coverprofile=profile.out \
-                       -ginkgo.trace \
                        -tags="$TAGS"
   fi
 done
