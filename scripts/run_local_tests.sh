@@ -35,6 +35,9 @@ if [[ -z "${TAGS}" ]]; then
   TAGS=unit
 fi
 
+dropdb $DATABASE_NAME || true >/dev/null
+dropuser $DATABASE_USER || true >/dev/null
+
 DATABASE_USER=$DATABASE_USER DATABASE_PASSWORD=$DATABASE_PASSWORD DATABASE_NAME=$DATABASE_NAME make migrate
 PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} ${DATABASE_NAME} < db/networks_test.sql || true >/dev/null
 
