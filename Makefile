@@ -14,18 +14,18 @@ build: clean mod
 	go build -v -o ./.bin/goldmine_statsdaemon ./cmd/statsdaemon
 
 ecs_deploy:
-	./scripts/ecs_deploy.sh
+	./ops/ecs_deploy.sh
 
 install: clean
 	go install ./...
 
 lint:
-	./scripts/lint.sh
+	./ops/lint.sh
 
 migrate: mod
 	rm -rf ./.bin/goldmine_migrate 2>/dev/null || true
 	go build -v -o ./.bin/goldmine_migrate ./cmd/migrate
-	./scripts/migrate.sh
+	./ops/migrate.sh
 
 mod:
 	go mod init 2>/dev/null || true
@@ -33,30 +33,30 @@ mod:
 	go mod vendor 
 
 run_local: build run_local_dependencies
-	./scripts/run_local.sh
+	./ops/run_local.sh
 
 run_local_api: build run_local_dependencies
-	./scripts/run_local_api.sh
+	./ops/run_local_api.sh
 
 run_local_consumer: build run_local_dependencies
-	./scripts/run_local_consumer.sh
+	./ops/run_local_consumer.sh
 
 run_local_statsdaemon: build run_local_dependencies
-	./scripts/run_local_statsdaemon.sh
+	./ops/run_local_statsdaemon.sh
 
 run_local_dependencies:
-	./scripts/run_local_dependencies.sh
+	./ops/run_local_dependencies.sh
 
 stop_local_dependencies:
-	./scripts/stop_local_dependencies.sh
+	./ops/stop_local_dependencies.sh
 
 stop_local:
-	./scripts/stop_local.sh
+	./ops/stop_local.sh
 
 test: build
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./scripts/run_local_dependencies.sh
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./scripts/run_unit_tests.sh
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_unit_tests.sh
 
 integration: build
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./scripts/run_local_dependencies.sh
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./scripts/run_integration_tests.sh
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
