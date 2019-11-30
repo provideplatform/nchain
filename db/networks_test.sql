@@ -1,88 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
---
--- Name: networks; Type: TABLE; Schema: public; Owner: goldmine
---
-
-CREATE TABLE public.networks (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    application_id uuid,
-    user_id uuid,
-    name text NOT NULL,
-    description text,
-    is_production boolean NOT NULL,
-    cloneable boolean NOT NULL,
-    enabled boolean NOT NULL,
-    chain_id text,
-    sidechain_id uuid,
-    network_id uuid,
-    config json NOT NULL
-);
-
---
--- Name: wallets; Type: TABLE; Schema: public; Owner: goldmine
---
-
-CREATE TABLE public.wallets (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    application_id uuid,
-    user_id uuid,
-    network_id uuid NOT NULL,
-    address text NOT NULL,
-    private_key bytea NOT NULL,
-    accessed_at timestamp with time zone
-);
-
-
-ALTER TABLE public.wallets OWNER TO goldmine;
-
---
--- Name: wallets wallets_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
---
-
-ALTER TABLE ONLY public.wallets
-    ADD CONSTRAINT wallets_pkey PRIMARY KEY (id);
-
-
---
--- Name: idx_wallets_accessed_at; Type: INDEX; Schema: public; Owner: goldmine
---
-
-CREATE INDEX idx_wallets_accessed_at ON public.wallets USING btree (accessed_at);
-
-
---
--- Name: idx_wallets_application_id; Type: INDEX; Schema: public; Owner: goldmine
---
-
-CREATE INDEX idx_wallets_application_id ON public.wallets USING btree (application_id);
-
-
---
--- Name: idx_wallets_network_id; Type: INDEX; Schema: public; Owner: goldmine
---
-
-CREATE INDEX idx_wallets_network_id ON public.wallets USING btree (network_id);
-
-
---
--- Name: idx_wallets_user_id; Type: INDEX; Schema: public; Owner: goldmine
---
-
-CREATE INDEX idx_wallets_user_id ON public.wallets USING btree (user_id);
-
-
---
--- Name: wallets wallets_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
---
-
-ALTER TABLE ONLY public.wallets
-    ADD CONSTRAINT wallets_network_id_networks_id_foreign FOREIGN KEY (network_id) REFERENCES public.networks(id) ON UPDATE CASCADE ON DELETE SET NULL;
-
-
 INSERT into networks(id, name, is_production, cloneable, enabled, chain_id, config) VALUES (
     '36a5f8e0-bfc1-49f8-a7ba-86457bb52912',
     'provide.network "unicorn v2" testnet', 
@@ -97,7 +12,7 @@ update networks set config = '{"block_explorer_url":null,"chain":null,"chainspec
 
 
 
-INSERT into wallets(address, network_id, user_id, private_key) VALUES (
+INSERT into accounts(address, network_id, user_id, private_key) VALUES (
     '0x1e23ce07ebC8d1f515C5f04101018e8A9Ab9353f', 
     '36a5f8e0-bfc1-49f8-a7ba-86457bb52912',
     'bd7f1b2d-45f6-4399-afcf-7836986d3dc9',
