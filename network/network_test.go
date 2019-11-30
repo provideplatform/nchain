@@ -729,18 +729,6 @@ var _ = Describe("Network", func() {
 					nwa.Reload()
 					Expect(nwa.NetworkID).To(gstruct.PointTo(Equal(first_NetworkID)))
 				})
-
-				It("SidechainID", func() {
-					fmt.Println("reload network >>>>>>>>>>>>>>>>")
-					first_NetworkID := *nwa.SidechainID
-					uid, _ := uuid.FromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-					//uid2, _ := uuid.FromString("1ba7b810-9dad-11d1-80b4-00c04fd430c8")
-					nwa.SidechainID = &uid
-					//nlb.NetworkID
-					nwa.Reload()
-					Expect(nwa.SidechainID).To(gstruct.PointTo(Equal(first_NetworkID)))
-				})
-
 			})
 
 			Context("Update network ", func() {
