@@ -4,7 +4,7 @@ set -e
 echo "" > coverage.txt
 
 if [[ -z "${DATABASE_NAME}" ]]; then
-  DATABASE_USER=goldmine_test
+  DATABASE_NAME=goldmine_test
 fi
 
 if [[ -z "${DATABASE_USER}" ]]; then
@@ -35,10 +35,7 @@ if [[ -z "${TAGS}" ]]; then
   TAGS=unit
 fi
 
-make migrate
-
-PGPASSWORD=${DATABASE_PASSWORD} dropdb -U ${DATABASE_USER} ${DATABASE_NAME} || true >/dev/null
-PGPASSWORD=${DATABASE_PASSWORD} createdb -O ${DATABASE_USER} -U ${DATABASE_USER} ${DATABASE_NAME} || true >/dev/null
+DATABASE_USER=$DATABASE_USER DATABASE_PASSWORD=$DATABASE_PASSWORD DATABASE_NAME=$DATABASE_NAME make migrate
 PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} ${DATABASE_NAME} < db/networks_test.sql || true >/dev/null
 
 PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
