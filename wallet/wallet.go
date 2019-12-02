@@ -355,4 +355,6 @@ func (w *Wallet) populate(key *bip32.Key) {
 	w.ExtendedKey = key
 	w.PublicKey = &xpub
 	w.PrivateKey = &xprv
+
+	w.encrypt()
 }
