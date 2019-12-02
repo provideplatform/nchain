@@ -99,11 +99,13 @@ func TestWalletCreate(t *testing.T) {
 		t.Errorf("failed to deterministically generate master key for seed: %s", string(*wallet.Seed))
 	}
 
-	a0, err := w1.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), nil)
+	chain := uint32(0)
+
+	a0, err := w1.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), &chain)
 	if err != nil {
 		t.Errorf("failed to derive address; %s", err.Error())
 	}
-	a1, err := w1.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), nil)
+	a1, err := w1.DeriveAddress(dbconf.DatabaseConnection(), uint32(0), &chain)
 	if err != nil {
 		t.Errorf("failed to derive address; %s", err.Error())
 	}
