@@ -2,14 +2,20 @@ package wallet
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
+
+const defaultDerivedAccountsPerPage = uint32(10)
+const firstHardenedChildIndex = uint32(0x80000000)
 
 // InstallAccountsAPI installs the handlers using the given gin Engine
 func InstallAccountsAPI(r *gin.Engine) {
@@ -24,6 +30,7 @@ func InstallWalletsAPI(r *gin.Engine) {
 	r.GET("/api/v1/wallets", walletsListHandler)
 	r.POST("/api/v1/wallets", createWalletHandler)
 	r.GET("/api/v1/wallets/:id", walletDetailsHandler)
+	r.GET("/api/v1/wallets/:id/accounts", walletAccountsListHandler)
 }
 
 func createAccountHandler(c *gin.Context) {
@@ -264,4 +271,65 @@ func walletDetailsHandler(c *gin.Context) {
 	}
 
 	provide.Render(wallet, 200, c)
+}
+
+func walletAccountsListHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	if appID == nil && userID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	var wallet = &Wallet{}
+	db.Where("id = ?", c.Param("id")).Find(&wallet)
+
+	if wallet == nil || wallet.ID == uuid.Nil {
+		provide.RenderError("wallet not found", 404, c)
+		return
+	} else if appID != nil && *wallet.ApplicationID != *appID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if userID != nil && *wallet.UserID != *userID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	var accounts []*Account
+
+	page := uint32(1)
+	rpp := defaultDerivedAccountsPerPage
+	if c.Query("page") != "" {
+		if _page, err := strconv.ParseInt(c.Query("page"), 10, 8); err == nil {
+			page = uint32(_page)
+		}
+	}
+	if c.Query("rpp") != "" {
+		if _rpp, err := strconv.ParseInt(c.Query("rpp"), 10, 8); err == nil {
+			rpp = uint32(_rpp)
+		}
+	}
+	c.Header("x-total-results-count", fmt.Sprintf("%d", firstHardenedChildIndex))
+
+	i := uint32(0)
+	for {
+		idx := ((page - 1) * rpp) + i
+		derivedAccount, err := wallet.DeriveAddress(db, idx, nil)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; %s", wallet.ID, err.Error())
+			common.Log.Warningf(msg)
+			provide.RenderError(msg, 500, c)
+			return
+		}
+		accounts = append(accounts, derivedAccount)
+
+		i++
+		if i == rpp || i == firstHardenedChildIndex-1 {
+			break
+		}
+	}
+
+	provide.Render(accounts, 200, c)
 }
