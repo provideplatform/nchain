@@ -247,6 +247,9 @@ func walletsListHandler(c *gin.Context) {
 
 	var wallets []Wallet
 	provide.Paginate(c, query, &Wallet{}).Find(&wallets)
+	for _, wallet := range wallets {
+		wallet.decrypt()
+	}
 	provide.Render(wallets, 200, c)
 }
 
@@ -272,6 +275,7 @@ func walletDetailsHandler(c *gin.Context) {
 		return
 	}
 
+	wallet.decrypt()
 	provide.Render(wallet, 200, c)
 }
 
