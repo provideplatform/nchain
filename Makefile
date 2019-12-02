@@ -1,4 +1,4 @@
-.PHONY: build clean ecs_deploy install integration lint migrate mod run_local run_local_api run_local_consumer run_local_statsdaemon run_local_dependencies stop_local_dependencies stop_local test
+.PHONY: build clean ecs_deploy install integration lint migrate mod run_api run_consumer run_statsdaemon run_local run_local_dependencies stop_local_dependencies stop_local test
 
 clean:
 	rm -rf ./.bin 2>/dev/null || true
@@ -32,17 +32,17 @@ mod:
 	go mod tidy
 	go mod vendor 
 
+run_api: build run_local_dependencies
+	./ops/run_api.sh
+
+run_consumer: build run_local_dependencies
+	./ops/run_consumer.sh
+
+run_statsdaemon: build run_local_dependencies
+	./ops/run_statsdaemon.sh
+
 run_local: build run_local_dependencies
 	./ops/run_local.sh
-
-run_local_api: build run_local_dependencies
-	./ops/run_local_api.sh
-
-run_local_consumer: build run_local_dependencies
-	./ops/run_local_consumer.sh
-
-run_local_statsdaemon: build run_local_dependencies
-	./ops/run_local_statsdaemon.sh
 
 run_local_dependencies:
 	./ops/run_local_dependencies.sh
