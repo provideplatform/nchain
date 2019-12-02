@@ -7,4 +7,4 @@ WORKDIR /go/src/github.com/provideapp/goldmine
 RUN make build
 
 EXPOSE 8080
-ENTRYPOINT ["make", "run_api"]
+ENTRYPOINT ["./.bin/goldmine_api"]
