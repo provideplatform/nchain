@@ -182,6 +182,10 @@ dWaI2DVuGDp6xMrNtmWiOvoZry3/WceLuIqfrUyGhJCaIvepCsX2eg==
 -----END PGP PRIVATE KEY BLOCK-----'
 fi
 
+if [[ -z "${PGP_PASSPHRASE}" ]]; then
+  PGP_PASSPHRASE=password
+fi
+
 if [[ -z "${LOG_LEVEL}" ]]; then
   LOG_LEVEL=info
 fi
@@ -204,14 +208,6 @@ fi
 
 if [[ -z "${DATABASE_LOGGING}" ]]; then
   DATABASE_LOGGING=false
-fi
-
-if [[ -z "${PORT}" ]]; then
-  PORT=8888
-fi
-
-if [[ -z "${REQUIRE_TLS}" ]]; then
-  REQUIRE_TLS=false
 fi
 
 if [[ -z "${CONSUME_NATS_STREAMING_SUBSCRIPTIONS}" ]]; then
@@ -261,7 +257,6 @@ NATS_TOKEN=$NATS_TOKEN \
 NATS_URL=$NATS_URL \
 NATS_STREAMING_URL=$NATS_STREAMING_URL \
 NATS_FORCE_TLS=$NATS_FORCE_TLS \
-GIN_MODE=release \
 DATABASE_HOST=$DATABASE_HOST \
 DATABASE_NAME=$DATABASE_NAME \
 DATABASE_LOGGING=$DATABSE_LOGGING \
