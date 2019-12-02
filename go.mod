@@ -38,7 +38,7 @@ require (
 	github.com/onsi/ginkgo v1.10.3
 	github.com/onsi/gomega v1.7.1
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
-	github.com/provideservices/provide-go v0.0.0-20191128185712-3f9331a9050c
+	github.com/provideservices/provide-go v0.0.0-20191202100929-9cc66daf7156
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
