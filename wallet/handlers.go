@@ -304,12 +304,12 @@ func walletAccountsListHandler(c *gin.Context) {
 	page := uint32(1)
 	rpp := defaultDerivedAccountsPerPage
 	if c.Query("page") != "" {
-		if _page, err := strconv.ParseInt(c.Query("page"), 10, 8); err == nil {
+		if _page, err := strconv.ParseInt(c.Query("page"), 10, 32); err == nil {
 			page = uint32(_page)
 		}
 	}
 	if c.Query("rpp") != "" {
-		if _rpp, err := strconv.ParseInt(c.Query("rpp"), 10, 8); err == nil {
+		if _rpp, err := strconv.ParseInt(c.Query("rpp"), 10, 32); err == nil {
 			rpp = uint32(_rpp)
 		}
 	}
@@ -317,7 +317,7 @@ func walletAccountsListHandler(c *gin.Context) {
 
 	coin := defaultDerivedCoinType
 	if c.Query("coin_type") != "" {
-		cointype, err := strconv.ParseInt(c.Query("coin_type"), 10, 8)
+		cointype, err := strconv.ParseInt(c.Query("coin_type"), 10, 32)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; invalid coin type: %s", wallet.ID, c.Query("coin_type"))
 			common.Log.Warningf(msg)
@@ -329,7 +329,7 @@ func walletAccountsListHandler(c *gin.Context) {
 
 	chainPath := defaultDerivedChainPath
 	if c.Query("chain_path") != "" {
-		path, err := strconv.ParseInt(c.Query("chain_path"), 10, 8)
+		path, err := strconv.ParseInt(c.Query("chain_path"), 10, 32)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; invalid chain path index: %s", wallet.ID, c.Query("chain_path"))
 			common.Log.Warningf(msg)
@@ -341,7 +341,7 @@ func walletAccountsListHandler(c *gin.Context) {
 
 	hardenedChildIndex := uint32(0)
 	if c.Query("index") != "" {
-		childIndex, err := strconv.ParseInt(c.Query("index"), 10, 8)
+		childIndex, err := strconv.ParseInt(c.Query("index"), 10, 32)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; invalid child account index: %s", wallet.ID, c.Query("index"))
 			common.Log.Warningf(msg)
