@@ -233,3 +233,18 @@ func (a *Account) TokenBalance(tokenID string) (*big.Int, error) {
 	}
 	return balance, nil
 }
+
+func (a *Account) ephemeralResponse() map[string]interface{} {
+	ephemeralResponse := map[string]interface{}{
+		"address":            a.Address,
+		"hd_derivation_path": a.HDDerivationPath,
+		"public_key":         a.PublicKey,
+		"private_key":        a.PrivateKey,
+	}
+
+	if a.Balance != nil {
+		ephemeralResponse["balance"] = a.Balance
+	}
+
+	return ephemeralResponse
+}

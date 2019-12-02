@@ -299,8 +299,6 @@ func walletAccountsListHandler(c *gin.Context) {
 		return
 	}
 
-	var accounts []*Account
-
 	page := uint32(1)
 	rpp := defaultDerivedAccountsPerPage
 	if c.Query("page") != "" {
@@ -359,6 +357,8 @@ func walletAccountsListHandler(c *gin.Context) {
 		return
 	}
 
+	var accounts []map[string]interface{}
+
 	i := uint32(0)
 	for {
 		idx := ((page - 1) * rpp) + i
@@ -369,7 +369,7 @@ func walletAccountsListHandler(c *gin.Context) {
 			provide.RenderError(msg, 500, c)
 			return
 		}
-		accounts = append(accounts, derivedAccount)
+		accounts = append(accounts, derivedAccount.ephemeralResponse())
 
 		i++
 		if i == rpp || i == firstHardenedChildIndex-1 {
