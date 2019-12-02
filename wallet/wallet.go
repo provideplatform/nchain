@@ -179,6 +179,8 @@ func (w *Wallet) encrypt() error {
 // exists at `m/purpose'/coin_type'/account'`; this method will fail if the next level in
 // the HD hierarchy must be non-hardened.
 func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, error) {
+	w.decrypt()
+
 	pathstr := fmt.Sprintf("m/%d'/%d'/%d'", *w.Purpose, coin, account)
 
 	masterKey := w.ExtendedKey
@@ -232,6 +234,8 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 	if w.Path == nil {
 		return nil, errors.New("failed to derive signing address without hardened HD path")
 	}
+
+	w.decrypt()
 
 	var mnemonic *string
 	parent := w
@@ -356,5 +360,8 @@ func (w *Wallet) populate(key *bip32.Key) {
 	w.PublicKey = &xpub
 	w.PrivateKey = &xprv
 
-	w.encrypt()
+	err := w.encrypt()
+	if err != nil {
+		common.Log.Warningf("failed to encrypt HD wallet key material; %s", err.Error())
+	}
 }
