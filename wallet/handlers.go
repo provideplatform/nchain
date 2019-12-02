@@ -245,7 +245,7 @@ func walletsListHandler(c *gin.Context) {
 	}
 	query = query.Order("wallets.created_at DESC")
 
-	var wallets []Wallet
+	var wallets []*Wallet
 	provide.Paginate(c, query, &Wallet{}).Find(&wallets)
 	for _, wallet := range wallets {
 		wallet.decrypt()
