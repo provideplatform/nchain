@@ -15,6 +15,7 @@ import (
 )
 
 const defaultDerivedAccountsPerPage = uint32(10)
+const defaultDerivedCoinType = uint32(60)
 const firstHardenedChildIndex = uint32(0x80000000)
 
 // InstallAccountsAPI installs the handlers using the given gin Engine
@@ -313,10 +314,42 @@ func walletAccountsListHandler(c *gin.Context) {
 	}
 	c.Header("x-total-results-count", fmt.Sprintf("%d", firstHardenedChildIndex))
 
+	coin := defaultDerivedCoinType
+	if c.Query("coin_type") != "" {
+		cointype, err := strconv.ParseInt(c.Query("coin_type"), 10, 8)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; invalid coin type: %s", wallet.ID, c.Query("coin_type"))
+			common.Log.Warningf(msg)
+			provide.RenderError(msg, 400, c)
+			return
+		}
+		coin = uint32(cointype)
+	}
+
+	hardenedChildIndex := uint32(0)
+	if c.Query("index") != "" {
+		childIndex, err := strconv.ParseInt(c.Query("index"), 10, 8)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; invalid child account index: %s", wallet.ID, c.Query("index"))
+			common.Log.Warningf(msg)
+			provide.RenderError(msg, 400, c)
+			return
+		}
+		hardenedChildIndex = uint32(childIndex)
+	}
+
+	hardenedChild, err := wallet.DeriveHardened(db, coin, hardenedChildIndex)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; %s", wallet.ID, err.Error())
+		common.Log.Warningf(msg)
+		provide.RenderError(msg, 500, c)
+		return
+	}
+
 	i := uint32(0)
 	for {
 		idx := ((page - 1) * rpp) + i
-		derivedAccount, err := wallet.DeriveAddress(db, idx, nil)
+		derivedAccount, err := hardenedChild.DeriveAddress(db, idx, nil)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; %s", wallet.ID, err.Error())
 			common.Log.Warningf(msg)
