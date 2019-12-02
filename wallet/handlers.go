@@ -16,6 +16,7 @@ import (
 
 const defaultDerivedAccountsPerPage = uint32(10)
 const defaultDerivedCoinType = uint32(60)
+const defaultDerivedChainPath = uint32(0) // i.e., the external or internal chain (also known as change addresses if internal chain)
 const firstHardenedChildIndex = uint32(0x80000000)
 
 // InstallAccountsAPI installs the handlers using the given gin Engine
@@ -326,6 +327,18 @@ func walletAccountsListHandler(c *gin.Context) {
 		coin = uint32(cointype)
 	}
 
+	chainPath := defaultDerivedChainPath
+	if c.Query("index") != "" {
+		path, err := strconv.ParseInt(c.Query("chain"), 10, 8)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; invalid chain path index: %s", wallet.ID, c.Query("path"))
+			common.Log.Warningf(msg)
+			provide.RenderError(msg, 400, c)
+			return
+		}
+		chainPath = uint32(path)
+	}
+
 	hardenedChildIndex := uint32(0)
 	if c.Query("index") != "" {
 		childIndex, err := strconv.ParseInt(c.Query("index"), 10, 8)
@@ -349,7 +362,7 @@ func walletAccountsListHandler(c *gin.Context) {
 	i := uint32(0)
 	for {
 		idx := ((page - 1) * rpp) + i
-		derivedAccount, err := hardenedChild.DeriveAddress(db, idx, nil)
+		derivedAccount, err := hardenedChild.DeriveAddress(db, idx, &chainPath)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to derive address for HD wallet: %s; %s", wallet.ID, err.Error())
 			common.Log.Warningf(msg)
