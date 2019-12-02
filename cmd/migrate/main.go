@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 
 	"github.com/provideapp/goldmine/common"
 
@@ -19,7 +20,7 @@ func main() {
 		cfg.DatabaseHost,
 		cfg.DatabaseName,
 		cfg.DatabaseUser,
-		cfg.DatabasePassword,
+		url.QueryEscape(cfg.DatabasePassword),
 		cfg.DatabaseSSLMode,
 	)
 
