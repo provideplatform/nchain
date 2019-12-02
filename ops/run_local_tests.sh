@@ -209,9 +209,6 @@ for d in "${pkgs[@]}" ; do
   pkg=$(echo $d | sed 's/\/*$//g')
   
   if [ "$RACE" = "true" ]; then
-    GPG_PUBLIC_KEY=$PGP_PUBLIC_KEY \
-    GPG_PRIVATE_KEY=$PGP_PRIVATE_KEY \
-    GPG_PASSWORD=$PGP_PASSPHRASE \
     PGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
     PGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
@@ -237,9 +234,6 @@ for d in "${pkgs[@]}" ; do
                        -coverprofile=profile.out \
                        -tags="$TAGS"
   else
-    GPG_PUBLIC_KEY=$PGP_PUBLIC_KEY \
-    GPG_PRIVATE_KEY=$PGP_PRIVATE_KEY \
-    GPG_PASSWORD=$PGP_PASSPHRASE \
     PGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
     PGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
