@@ -111,65 +111,81 @@ func (w *Wallet) Validate() bool {
 }
 
 func (w *Wallet) decrypt() error {
-	mnemonic, err := pgputil.PGPPubDecrypt([]byte(*w.Mnemonic))
-	if err != nil {
-		common.Log.Warningf("Failed to decrypt mnemonic; %s", err.Error())
-		return err
+	if w.Mnemonic != nil {
+		mnemonic, err := pgputil.PGPPubDecrypt([]byte(*w.Mnemonic))
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt mnemonic; %s", err.Error())
+			return err
+		}
+		w.Mnemonic = common.StringOrNil(string(mnemonic))
 	}
-	w.Mnemonic = common.StringOrNil(string(mnemonic))
 
-	seed, err := pgputil.PGPPubDecrypt([]byte(*w.Seed))
-	if err != nil {
-		common.Log.Warningf("Failed to decrypt seed; %s", err.Error())
-		return err
+	if w.Seed != nil {
+		seed, err := pgputil.PGPPubDecrypt([]byte(*w.Seed))
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt seed; %s", err.Error())
+			return err
+		}
+		w.Seed = common.StringOrNil(string(seed))
 	}
-	w.Seed = common.StringOrNil(string(seed))
 
-	publicKey, err := pgputil.PGPPubDecrypt([]byte(*w.PublicKey))
-	if err != nil {
-		common.Log.Warningf("Failed to decrypt public key; %s", err.Error())
-		return err
+	if w.PublicKey != nil {
+		publicKey, err := pgputil.PGPPubDecrypt([]byte(*w.PublicKey))
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt public key; %s", err.Error())
+			return err
+		}
+		w.PublicKey = common.StringOrNil(string(publicKey))
 	}
-	w.PublicKey = common.StringOrNil(string(publicKey))
 
-	privateKey, err := pgputil.PGPPubDecrypt([]byte(*w.PrivateKey))
-	if err != nil {
-		common.Log.Warningf("Failed to decrypt private key; %s", err.Error())
-		return err
+	if w.PrivateKey != nil {
+		privateKey, err := pgputil.PGPPubDecrypt([]byte(*w.PrivateKey))
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt private key; %s", err.Error())
+			return err
+		}
+		w.PrivateKey = common.StringOrNil(string(privateKey))
 	}
-	w.PrivateKey = common.StringOrNil(string(privateKey))
 
 	return nil
 }
 
 func (w *Wallet) encrypt() error {
-	encryptedMnemonic, err := pgputil.PGPPubEncrypt([]byte(*w.Mnemonic))
-	if err != nil {
-		common.Log.Warningf("Failed to encrypt mnemonic; %s", err.Error())
-		return err
+	if w.Mnemonic != nil {
+		encryptedMnemonic, err := pgputil.PGPPubEncrypt([]byte(*w.Mnemonic))
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt mnemonic; %s", err.Error())
+			return err
+		}
+		w.Mnemonic = common.StringOrNil(string(encryptedMnemonic))
 	}
-	w.Mnemonic = common.StringOrNil(string(encryptedMnemonic))
 
-	encryptedSeed, err := pgputil.PGPPubEncrypt([]byte(*w.Seed))
-	if err != nil {
-		common.Log.Warningf("Failed to encrypt seed; %s", err.Error())
-		return err
+	if w.Seed != nil {
+		encryptedSeed, err := pgputil.PGPPubEncrypt([]byte(*w.Seed))
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt seed; %s", err.Error())
+			return err
+		}
+		w.Seed = common.StringOrNil(string(encryptedSeed))
 	}
-	w.Seed = common.StringOrNil(string(encryptedSeed))
 
-	encryptedPublicKey, err := pgputil.PGPPubEncrypt([]byte(*w.PublicKey))
-	if err != nil {
-		common.Log.Warningf("Failed to encrypt public key; %s", err.Error())
-		return err
+	if w.PublicKey != nil {
+		encryptedPublicKey, err := pgputil.PGPPubEncrypt([]byte(*w.PublicKey))
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt public key; %s", err.Error())
+			return err
+		}
+		w.PublicKey = common.StringOrNil(string(encryptedPublicKey))
 	}
-	w.PublicKey = common.StringOrNil(string(encryptedPublicKey))
 
-	encryptedPrivateKey, err := pgputil.PGPPubEncrypt([]byte(*w.PrivateKey))
-	if err != nil {
-		common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
-		return err
+	if w.PrivateKey != nil {
+		encryptedPrivateKey, err := pgputil.PGPPubEncrypt([]byte(*w.PrivateKey))
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt private key; %s", err.Error())
+			return err
+		}
+		w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
 	}
-	w.PrivateKey = common.StringOrNil(string(encryptedPrivateKey))
 
 	return nil
 }
