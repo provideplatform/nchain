@@ -51,6 +51,10 @@ func contractsListHandler(c *gin.Context) {
 		query = query.Joins("LEFT OUTER JOIN tokens ON tokens.contract_id = contracts.id").Where("symbol IS NULL")
 	}
 
+	if c.Query("type") != "" {
+		query = query.Where("contracts.type = ?", c.Query("type"))
+	}
+
 	sortByMostRecent := strings.ToLower(c.Query("sort")) == "recent"
 	if sortByMostRecent {
 		query = query.Order("contracts.accessed_at DESC NULLS LAST")

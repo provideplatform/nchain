@@ -36,13 +36,14 @@ type Contract struct {
 	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which deployed the contract (or null)
 	Name          *string          `sql:"not null" json:"name"`
 	Address       *string          `sql:"not null" json:"address"`
+	Type          *string          `json:"type"`
 	Params        *json.RawMessage `sql:"type:json" json:"params,omitempty"`
 	AccessedAt    *time.Time       `json:"accessed_at"`
 }
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
 func ContractListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address")
+	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address, contracts.type")
 }
 
 // CompiledArtifact - parse the original JSON params used for contract creation and attempt to unmarshal to a provide.CompiledArtifact
