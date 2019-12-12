@@ -30,8 +30,12 @@ func connectorsListHandler(c *gin.Context) {
 
 	query := dbconf.DatabaseConnection().Where("connectors.application_id = ?", appID)
 
-	var connectors []Connector
-	query = query.Order("created_at ASC")
+	if c.Query("type") != "" {
+		query = query.Where("connectors.type = ?", c.Query("type"))
+	}
+
+	var connectors []*Connector
+	query = query.Order("connectors.created_at ASC")
 	provide.Paginate(c, query, &Connector{}).Find(&connectors)
 	provide.Render(connectors, 200, c)
 }
