@@ -1,4 +1,3 @@
-ALTER TABLE ONLY transactions RENAME COLUMN publish_latency TO queue_latency;
 ALTER TABLE ONLY transactions RENAME COLUMN broadcast_latency TO network_latency;
 
 ALTER INDEX idx_transactions_wallet_id RENAME TO idx_transactions_account_id;
