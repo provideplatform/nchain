@@ -219,9 +219,10 @@ func (c *Contract) Create() bool {
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
 func (c *Contract) ExecuteFromTx(
-	execution *ContractExecution,
+	execution *Execution,
+	accountFn func(interface{}, map[string]interface{}) *uuid.UUID,
 	walletFn func(interface{}, map[string]interface{}) *uuid.UUID,
-	txCreateFn func(*Contract, *network.Network, *uuid.UUID, *ContractExecution, *json.RawMessage) (*ContractExecutionResponse, error)) (*ContractExecutionResponse, error) {
+	txCreateFn func(*Contract, *network.Network, *uuid.UUID, *uuid.UUID, *Execution, *json.RawMessage) (*ExecutionResponse, error)) (*ExecutionResponse, error) {
 
 	var err error
 	db := dbconf.DatabaseConnection()
@@ -229,6 +230,7 @@ func (c *Contract) ExecuteFromTx(
 	db.Model(c).Related(&network)
 
 	// ref := execution.Ref
+	account := execution.Account
 	wallet := execution.Wallet
 	// value := execution.Value
 	// method := execution.Method
@@ -239,6 +241,7 @@ func (c *Contract) ExecuteFromTx(
 
 	txParams := map[string]interface{}{}
 
+	accountID := accountFn(account, txParams)
 	walletID := walletFn(wallet, txParams)
 
 	if gas == nil {
@@ -254,8 +257,8 @@ func (c *Contract) ExecuteFromTx(
 	txParamsJSON, _ := json.Marshal(txParams)
 	_txParamsJSON := json.RawMessage(txParamsJSON)
 
-	var txResponse *ContractExecutionResponse
-	txResponse, err = txCreateFn(c, network, walletID, execution, &_txParamsJSON)
+	var txResponse *ExecutionResponse
+	txResponse, err = txCreateFn(c, network, accountID, walletID, execution, &_txParamsJSON)
 	return txResponse, err
 }
 

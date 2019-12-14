@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -26,44 +27,190 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application identifier or b) user identifier.
-type Transaction struct {
-	provide.Model
-	ApplicationID    *uuid.UUID                          `sql:"type:uuid" json:"application_id"`
-	UserID           *uuid.UUID                          `sql:"type:uuid" json:"user_id"`
-	NetworkID        uuid.UUID                           `sql:"not null;type:uuid" json:"network_id"`
-	AccountID        *uuid.UUID                          `sql:"type:uuid" json:"account_id"`
-	Signer           *string                             `sql:"-" json:"signer,omitempty"`
-	To               *string                             `json:"to"`
-	Value            *TxValue                            `sql:"not null;type:text" json:"value"`
-	Data             *string                             `json:"data"`
-	Hash             *string                             `json:"hash"`
-	Status           *string                             `sql:"not null;default:'pending'" json:"status"`
-	Params           *json.RawMessage                    `sql:"-" json:"params,omitempty"`
-	Response         *contract.ContractExecutionResponse `sql:"-" json:"-"`
-	SignedTx         interface{}                         `sql:"-" json:"-"`
-	Traces           interface{}                         `sql:"-" json:"traces"`
-	Ref              *string                             `json:"ref"`
-	Description      *string                             `json:"description"`
-	Block            *uint64                             `json:"block"`
-	BlockTimestamp   *time.Time                          `json:"block_timestamp"`   // timestamp when the tx was finalized on-chain, according to its tx receipt
-	BroadcastAt      *time.Time                          `json:"broadcast_at"`      // timestamp when the tx was broadcast to the network
-	FinalizedAt      *time.Time                          `json:"finalized_at"`      // timestamp when the tx was finalized on-platform
-	PublishedAt      *time.Time                          `json:"published_at"`      // timestamp when the tx was published to NATS cluster
-	PublishLatency   *uint64                             `json:"publish_latency"`   // broadcast_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is broadcast to the network
-	BroadcastLatency *uint64                             `json:"broadcast_latency"` // finalized_at - broadcast_at (in millis) -- the amount of time between when a message is broadcast to the network and when it is finalized on-chain
-	E2ELatency       *uint64                             `json:"e2e_latency"`       // finalized_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is finalized on-chain
+const defaultDerivedCoinType = uint32(60)
+const defaultDerivedChainPath = uint32(0) // i.e., the external or internal chain (also known as change addresses if internal chain)
+const firstHardenedChildIndex = uint32(0x80000000)
+
+// Signer interface for signing transactions
+type Signer interface {
+	Sign(tx *Transaction) (signedTx interface{}, hash *string, err error)
+	String() string
 }
 
-type TxValue struct {
+// TransactionSigner is either an account or HD wallet; implements the Signer interface
+type TransactionSigner struct {
+	DB *gorm.DB
+
+	Network *network.Network
+
+	Account *wallet.Account
+	Wallet  *wallet.Wallet
+}
+
+// Sign implements the Signer interface
+func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash *string, err error) {
+	if tx == nil || tx.Data == nil {
+		err := errors.New("cannot sign nil transaction payload")
+		common.Log.Warning(err.Error())
+		return nil, nil, err
+	}
+
+	if txs.Network == nil {
+		err := fmt.Errorf("failed to sign %d-byte transaction payload with incorrectly configured signer; no network specified", len(*tx.Data))
+		common.Log.Warning(err.Error())
+		return nil, nil, err
+	}
+
+	if txs.Network.IsEthereumNetwork() {
+		params := tx.ParseParams()
+		gas, gasOk := params["gas"].(float64)
+		if !gasOk {
+			gas = float64(0)
+		}
+
+		var nonce *uint64
+		if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
+			nonceUint := uint64(nonceFloat)
+			nonce = &nonceUint
+		}
+
+		if txs.Account != nil {
+			if txs.Account.PrivateKey != nil {
+				privateKey, _ := common.DecryptECDSAPrivateKey(*txs.Account.PrivateKey)
+				_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+				signedTx, hash, err = provide.EVMSignTx(
+					txs.Network.ID.String(),
+					txs.Network.RPCURL(),
+					txs.Account.Address,
+					_privateKey,
+					tx.To,
+					tx.Data,
+					tx.Value.BigInt(),
+					nonce,
+					uint64(gas),
+				)
+
+				if err == nil {
+					accessedAt := time.Now()
+					go func() {
+						txs.Account.AccessedAt = &accessedAt
+						txs.DB.Save(&txs.Account)
+					}()
+				}
+			} else {
+				err = fmt.Errorf("unable to sign tx; no private key for account: %s", txs.Account.ID)
+			}
+		}
+
+		if txs.Wallet != nil {
+			if txs.Wallet.Path == nil {
+				err := fmt.Errorf("failed to sign %d-byte transaction payload using HD wallet without a specified derivation path", len(*tx.Data))
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			chain := uint32(0) // FIXME-- don't hardcode this
+			hardenedChild, derivationErr := txs.Wallet.DeriveHardened(nil, defaultDerivedCoinType, uint32(0))
+			if derivationErr != nil {
+				msg := fmt.Sprintf("failed to derive address for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
+				common.Log.Warningf(msg)
+				return nil, nil, err
+			}
+
+			idx := uint32(0) // FIXME-- don't hardcode this
+			derivedAccount, derivationErr := hardenedChild.DeriveAddress(nil, idx, &chain)
+			if derivationErr != nil {
+				msg := fmt.Sprintf("failed to derive address for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
+				common.Log.Warningf(msg)
+				return nil, nil, err
+			}
+
+			privateKey, _ := common.DecryptECDSAPrivateKey(*derivedAccount.PrivateKey)
+			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+			signedTx, hash, err = provide.EVMSignTx(
+				txs.Network.ID.String(),
+				txs.Network.RPCURL(),
+				txs.Account.Address,
+				_privateKey,
+				tx.To,
+				tx.Data,
+				tx.Value.BigInt(),
+				nonce,
+				uint64(gas),
+			)
+		}
+	} else {
+		return nil, nil, fmt.Errorf("unable to generate signed tx for unsupported network: %s", *txs.Network.Name)
+	}
+
+	return signedTx, hash, err
+}
+
+// String prints a description of the transaction signer
+func (txs *TransactionSigner) String() string {
+	if txs.Account != nil {
+		return fmt.Sprintf("account: %s", txs.Account.ID)
+	}
+
+	if txs.Wallet != nil {
+		return fmt.Sprintf("HD wallet: %s", txs.Wallet.ID)
+	}
+
+	return "(misconfigured tx signer)"
+}
+
+// Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
+// identifier or b) user identifier.
+type Transaction struct {
+	provide.Model
+	NetworkID uuid.UUID `sql:"not null;type:uuid" json:"network_id,omitempty"`
+
+	// Application or user id, if populated, is the entity for which the transaction was custodially signed and broadcast
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+
+	// Account or HD wallet which custodially signed the transaction; when an HD wallet is used, if no HD derivation path is provided,
+	// the most recently derived non-zero account is used to sign
+	AccountID *uuid.UUID `sql:"type:uuid" json:"account_id,omitempty"`
+	WalletID  *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
+	Path      *string    `json:"hd_derivation_path,omitempty"`
+
+	// Network-agnostic tx fields
+	Signer      *string          `sql:"-" json:"signer,omitempty"`
+	To          *string          `json:"to"`
+	Value       *txValue         `sql:"not null;type:text" json:"value"`
+	Data        *string          `json:"data"`
+	Hash        *string          `json:"hash"`
+	Status      *string          `sql:"not null;default:'pending'" json:"status"`
+	Params      *json.RawMessage `sql:"-" json:"params,omitempty"`
+	Ref         *string          `json:"ref"`
+	Description *string          `json:"description"`
+
+	// Ephemeral fields for managing the tx/rx and tracing lifecycles
+	Response *contract.ExecutionResponse `sql:"-" json:"-"`
+	SignedTx interface{}                 `sql:"-" json:"-"`
+	Traces   interface{}                 `sql:"-" json:"traces"`
+
+	// Transaction metadata/instrumentation
+	Block          *uint64    `json:"block"`
+	BlockTimestamp *time.Time `json:"block_timestamp,omitempty"` // timestamp when the tx was finalized on-chain, according to its tx receipt
+	BroadcastAt    *time.Time `json:"broadcast_at,omitempty"`    // timestamp when the tx was broadcast to the network
+	FinalizedAt    *time.Time `json:"finalized_at,omitempty"`    // timestamp when the tx was finalized on-platform
+	PublishedAt    *time.Time `json:"published_at,omitempty"`    // timestamp when the tx was published to NATS cluster
+	QueueLatency   *uint64    `json:"queue_latency,omitempty"`   // broadcast_at - published_at (in millis) -- the amount of time between when a message is enqueued to the NATS broker and when it is broadcast to the network
+	NetworkLatency *uint64    `json:"network_latency,omitempty"` // finalized_at - broadcast_at (in millis) -- the amount of time between when a message is broadcast to the network and when it is finalized on-chain
+	E2ELatency     *uint64    `json:"e2e_latency,omitempty"`     // finalized_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is finalized on-chain
+}
+
+type txValue struct {
 	value *big.Int
 }
 
-func (v *TxValue) Value() (driver.Value, error) {
+func (v *txValue) Value() (driver.Value, error) {
 	return v.value.String(), nil
 }
 
-func (v *TxValue) Scan(val interface{}) error {
+func (v *txValue) Scan(val interface{}) error {
 	v.value = new(big.Int)
 	if str, ok := val.(string); ok {
 		v.value.SetString(str, 10)
@@ -71,15 +218,15 @@ func (v *TxValue) Scan(val interface{}) error {
 	return nil
 }
 
-func (v *TxValue) BigInt() *big.Int {
+func (v *txValue) BigInt() *big.Int {
 	return v.value
 }
 
-func (v *TxValue) MarshalJSON() ([]byte, error) {
+func (v *txValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *TxValue) UnmarshalJSON(data []byte) error {
+func (v *txValue) UnmarshalJSON(data []byte) error {
 	v.value = new(big.Int)
 	v.value.SetString(string(data), 10)
 	return nil
@@ -121,9 +268,15 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		db.Model(t).Related(&ntwrk)
 	}
 
-	var wllt *wallet.Account
+	var acct *wallet.Account
 	if t.AccountID != nil && *t.AccountID != uuid.Nil {
-		wllt = &wallet.Account{}
+		acct = &wallet.Account{}
+		db.Model(t).Related(&acct)
+	}
+
+	var wllt *wallet.Wallet
+	if t.WalletID != nil && *t.WalletID != uuid.Nil {
+		wllt = &wallet.Wallet{}
 		db.Model(t).Related(&wllt)
 	}
 
@@ -132,9 +285,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 			Message: common.StringOrNil("invalid network for tx broadcast"),
 		})
 	}
-	if wllt == nil || wllt.ID == uuid.Nil {
+	if (acct == nil || acct.ID == uuid.Nil) && (wllt == nil || wllt.ID == uuid.Nil) {
 		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil("invalid signing identity for tx broadcast"),
+			Message: common.StringOrNil("no account or HD wallet signing identity to sign tx for broadcast"),
 		})
 	}
 
@@ -142,8 +295,15 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		return false
 	}
 
+	signer := &TransactionSigner{
+		DB:      db,
+		Network: ntwrk,
+		Account: acct,
+		Wallet:  wllt,
+	}
+
 	var signingErr error
-	err := t.sign(db, ntwrk, wllt)
+	err := t.sign(db, ntwrk, signer)
 	if err != nil {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
@@ -174,7 +334,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					desc := signingErr.Error()
 					t.updateStatus(db, "failed", &desc)
 				} else {
-					err = t.broadcast(db, ntwrk, wllt)
+					err = t.broadcast(db, ntwrk, signer)
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
 						natsutil.NatsPublish(natsTxReceiptSubject, txReceiptMsg)
@@ -215,16 +375,16 @@ func (t *Transaction) Validate() bool {
 		})
 	} else if t.ApplicationID != nil && wal != nil && wal.ApplicationID != nil && *t.ApplicationID != *wal.ApplicationID {
 		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil("Unable to sign tx due to mismatched signing application"),
+			Message: common.StringOrNil("unable to sign tx due to mismatched signing application"),
 		})
 	} else if t.UserID != nil && wal != nil && wal.UserID != nil && *t.UserID != *wal.UserID {
 		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil("Unable to sign tx due to mismatched signing user"),
+			Message: common.StringOrNil("unable to sign tx due to mismatched signing user"),
 		})
 	}
 	if t.NetworkID == uuid.Nil {
 		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil("Unable to broadcast tx on unspecified network"),
+			Message: common.StringOrNil("unable to broadcast tx on unspecified network"),
 		})
 	} else if wal != nil && t.ApplicationID != nil && wal.NetworkID != nil && t.NetworkID != *wal.NetworkID {
 		t.Errors = append(t.Errors, &provide.Error{
@@ -246,7 +406,7 @@ func (t *Transaction) GetNetwork() (*network.Network, error) {
 	var network = &network.Network{}
 	db.Model(t).Related(&network)
 	if network == nil || network.ID == uuid.Nil {
-		return nil, fmt.Errorf("Failed to retrieve transaction network for tx: %s", t.ID)
+		return nil, fmt.Errorf("failed to retrieve transaction network for tx: %s", t.ID)
 	}
 	return network, nil
 }
@@ -257,7 +417,7 @@ func (t *Transaction) GetWallet() (*wallet.Account, error) {
 	var wallet = &wallet.Account{}
 	db.Model(t).Related(&wallet)
 	if wallet == nil || wallet.ID == uuid.Nil {
-		return nil, fmt.Errorf("Failed to retrieve transaction wallet for tx: %s", t.ID)
+		return nil, fmt.Errorf("failed to retrieve transaction wallet for tx: %s", t.ID)
 	}
 	return wallet, nil
 }
@@ -268,7 +428,7 @@ func (t *Transaction) ParseParams() map[string]interface{} {
 	if t.Params != nil {
 		err := json.Unmarshal(*t.Params, &params)
 		if err != nil {
-			common.Log.Warningf("Failed to unmarshal transaction params; %s", err.Error())
+			common.Log.Warningf("failed to unmarshal transaction params; %s", err.Error())
 			return nil
 		}
 	}
@@ -307,44 +467,44 @@ func (t *Transaction) attemptTxBroadcastRecovery(err error) error {
 			t.setParams(params)
 			return nil
 		}
-		common.Log.Debugf("Failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
+		common.Log.Debugf("failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
 	}
 
 	return err
 }
 
-func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *wallet.Account) error {
+func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Signer) error {
 	var err error
 
 	if t.SignedTx == nil {
-		return fmt.Errorf("Failed to broadcast %s tx using wallet: %s; tx not yet signed", *network.Name, wallet.ID)
+		return fmt.Errorf("failed to broadcast %s tx using signer: %s; tx not yet signed", *network.Name, signer.String())
 	}
 
 	if network.IsEthereumNetwork() {
 		if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 			err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 		} else {
-			err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
+			err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 		}
 
 		if err != nil {
 			if t.attemptTxBroadcastRecovery(err) == nil {
-				err = t.sign(db, network, wallet)
+				err = t.sign(db, network, signer)
 				if err == nil {
 					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 					} else {
-						err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
+						err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 					}
 				}
 			}
 		}
 	} else {
-		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
+		err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
 
 	if err != nil {
-		common.Log.Warningf("Failed to broadcast %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
+		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *network.Name, signer.String, err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
@@ -359,47 +519,18 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, wallet *w
 	return err
 }
 
-func (t *Transaction) sign(db *gorm.DB, network *network.Network, wallet *wallet.Account) error {
+func (t *Transaction) sign(db *gorm.DB, network *network.Network, signer Signer) error {
 	var err error
-
-	if network.IsEthereumNetwork() {
-		params := t.ParseParams()
-		gas, gasOk := params["gas"].(float64)
-		if !gasOk {
-			gas = float64(0)
-		}
-
-		var nonce *uint64
-		if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
-			nonceUint := uint64(nonceFloat)
-			nonce = &nonceUint
-		}
-
-		if wallet.PrivateKey != nil {
-			privateKey, _ := common.DecryptECDSAPrivateKey(*wallet.PrivateKey)
-			_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-			t.SignedTx, t.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), wallet.Address, _privateKey, t.To, t.Data, t.Value.BigInt(), nonce, uint64(gas))
-		} else {
-			err = fmt.Errorf("Unable to sign tx; no private key for wallet: %s", wallet.ID)
-		}
-	} else {
-		err = fmt.Errorf("Unable to generate signed tx for unsupported network: %s", *network.Name)
-	}
+	t.SignedTx, t.Hash, err = signer.Sign(t)
 
 	if err != nil {
-		common.Log.Warningf("Failed to sign %s tx using wallet: %s; %s", *network.Name, wallet.ID, err.Error())
+		common.Log.Warningf("failed to sign %s tx using %s; %s", *network.Name, signer.String(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
 		desc := err.Error()
 		t.updateStatus(db, "failed", &desc)
 	}
-
-	accessedAt := time.Now()
-	go func() {
-		wallet.AccessedAt = &accessedAt
-		db.Save(wallet)
-	}()
 
 	return err
 }
@@ -414,10 +545,10 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 		common.Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
 		traces, traceErr := provide.EVMTraceTx(network.ID.String(), network.RPCURL(), t.Hash)
 		if traceErr != nil {
-			common.Log.Warningf("Failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
+			common.Log.Warningf("failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
 			return traceErr
 		}
-		t.Response = &contract.ContractExecutionResponse{
+		t.Response = &contract.ExecutionResponse{
 			Receipt:     receipt,
 			Traces:      traces,
 			Transaction: t,
@@ -426,7 +557,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 
 		err = t.handleEthereumTxReceipt(db, network, wallet, receipt)
 		if err != nil {
-			common.Log.Warningf("Failed to handle fetched ethereum tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
+			common.Log.Warningf("failed to handle fetched ethereum tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
 			return err
 		}
 		t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse), receipt)
@@ -438,7 +569,7 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Account, receipt *types.Receipt) error {
 	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 	if err != nil {
-		common.Log.Warningf("Unable to handle ethereum tx receipt; %s", err.Error())
+		common.Log.Warningf("unable to handle ethereum tx receipt; %s", err.Error())
 		return err
 	}
 	if t.To == nil {
@@ -483,7 +614,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
 				kontract.ResolveTokenContract(db, network, &wallet.Address, client, receipt, tokenCreateFn)
 			} else {
-				common.Log.Warningf("Failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
+				common.Log.Warningf("failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
 			}
 		} else {
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
@@ -498,18 +629,18 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Account, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {
-		common.Log.Debugf("Failed to resolve contract as sender of contract-internal opcode tracing functionality")
+		common.Log.Debugf("failed to resolve contract as sender of contract-internal opcode tracing functionality")
 		return
 	}
 	artifact := kontract.CompiledArtifact()
 	if artifact == nil {
-		common.Log.Warningf("Failed to resolve compiled contract artifact required for contract-internal opcode tracing functionality")
+		common.Log.Warningf("failed to resolve compiled contract artifact required for contract-internal opcode tracing functionality")
 		return
 	}
 
 	// client, err := provide.EVMDialJsonRpc(network.ID.String(), network.rpcURL())
 	// if err != nil {
-	// 	common.Log.Warningf("Unable to handle ethereum tx traces; %s", err.Error())
+	// 	common.Log.Warningf("unable to handle ethereum tx traces; %s", err.Error())
 	// 	return
 	// }
 
@@ -555,7 +686,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 						common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
 						client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 						if err != nil {
-							common.Log.Warningf("Unable to attempt token creation for contract-internal tx; %s", err.Error())
+							common.Log.Warningf("unable to attempt token creation for contract-internal tx; %s", err.Error())
 							return
 						}
 						internalContract.ResolveTokenContract(db, network, &wallet.Address, client, receipt,
@@ -578,7 +709,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 								return
 							})
 					} else {
-						common.Log.Warningf("Failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
+						common.Log.Warningf("failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
 					}
 					break
 				}

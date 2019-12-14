@@ -184,7 +184,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		NetworkID:     contract.NetworkID,
 		AccountID:     &walletUUID,
 		To:            nil,
-		Value:         &TxValue{value: big.NewInt(int64(value.(float64)))},
+		Value:         &txValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:   &publishedAtTime,
 	}
 	tx.setParams(txParams)
@@ -230,7 +230,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 			} else {
 				db := dbconf.DatabaseConnection()
 
-				var txResponse *contract.ContractExecutionResponse
+				var txResponse *contract.ExecutionResponse
 				if tx.Create(db) {
 					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
 					if tx.Response != nil {
@@ -342,7 +342,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 	return nil, err
 }
 
-func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, accountID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
+func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
 	db := dbconf.DatabaseConnection()
 	publishedAt := execution.PublishedAt
 	method := execution.Method
@@ -355,8 +355,9 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, acc
 		UserID:        nil,
 		NetworkID:     c.NetworkID,
 		AccountID:     accountID,
+		WalletID:      walletID,
 		To:            c.Address,
-		Value:         &TxValue{value: value},
+		Value:         &txValue{value: value},
 		Params:        _txParamsJSON,
 		Ref:           ref,
 	}
@@ -391,7 +392,7 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, acc
 	}()
 
 	if tx.Response == nil {
-		tx.Response = &contract.ContractExecutionResponse{
+		tx.Response = &contract.ExecutionResponse{
 			Response:    response,
 			Receipt:     response,
 			Traces:      tx.Traces,
@@ -405,8 +406,8 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, acc
 	return tx.Response, nil
 }
 
-func wfunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
-	tmpWallet := &wallet.Account{}
+func afunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+	tmpAccount := &wallet.Account{}
 	var address *string
 	var privateKey *string
 
@@ -435,9 +436,9 @@ func wfunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 
 	if address != nil {
 		db := dbconf.DatabaseConnection()
-		db.Where("address = ?", *address).Find(&tmpWallet)
-		if tmpWallet != nil && tmpWallet.ID != uuid.Nil {
-			return &tmpWallet.ID
+		db.Where("address = ?", *address).Find(&tmpAccount)
+		if tmpAccount != nil && tmpAccount.ID != uuid.Nil {
+			return &tmpAccount.ID
 		}
 		common.Log.Warningf("Failed to resolve managed wallet for address: %s", *address)
 
@@ -450,10 +451,55 @@ func wfunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 	return &uuid.Nil
 }
 
+// TODO: fix or remove
+func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
+	return nil
+
+	// tmpWallet := &wallet.Account{}
+	// var path *string
+
+	// switch w.(type) {
+	// case *wallet.Wallet:
+	// 	wallet := w.(*wallet.Wallet)
+	// 	accountID := wallet.ID
+	// 	if accountID != uuid.Nil {
+	// 		return &accountID
+	// 	}
+	// 	path = wallet.Path
+	// case map[string]interface{}:
+	// 	walletMap := w.(map[string]interface{})
+	// 	if pathStr, pathOk := walletMap["hd_derivation_path"].(string); pathOk {
+	// 		path = &pathStr
+	// 	}
+	// 	common.Log.Debugf("resolved HD derivation path for deterministic tx signer: %s", *path)
+	// 	// if privKey, privKeyOk := walletMap["private_key"].(string); privKeyOk {
+	// 	// 	privateKey = &privKey
+	// 	// }
+	// default:
+	// 	common.Log.Warningf("No HD wallet uuid resolved during attempted contract execution; invalid params provided for contract execution address: %s", txParams["to"])
+	// }
+
+	// if path != nil {
+	// 	db := dbconf.DatabaseConnection()
+	// 	db.Where("address = ?", *address).Find(&tmpWallet)
+	// 	if tmpWallet != nil && tmpWallet.ID != uuid.Nil {
+	// 		return &tmpWallet.ID
+	// 	}
+	// 	common.Log.Warningf("Failed to resolve managed wallet for address: %s", *address)
+
+	// 	if privateKey != nil {
+	// 		txParams["public_key"] = address
+	// 		txParams["private_key"] = privateKey
+	// 	}
+	// }
+
+	return &uuid.Nil
+}
+
 func consumeTxMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
-	execution := &contract.ContractExecution{}
+	execution := &contract.Execution{}
 	err := json.Unmarshal(msg.Data, execution)
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal contract execution during NATS tx message handling")
@@ -469,21 +515,41 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
 		var executionAccountID *uuid.UUID
-		if executionWallet, executionWalletOk := execution.Wallet.(map[string]interface{}); executionWalletOk {
-			if executionAccountIDStr, executionAccountIDStrOk := executionWallet["id"].(string); executionAccountIDStrOk {
-				execWalletUUID, err := uuid.FromString(executionAccountIDStr)
+		if executionAccount, executionAccountOk := execution.Wallet.(map[string]interface{}); executionAccountOk {
+			if executionAccountIDStr, executionAccountIDStrOk := executionAccount["id"].(string); executionAccountIDStrOk {
+				execAccountUUID, err := uuid.FromString(executionAccountIDStr)
 				if err == nil {
-					executionAccountID = &execWalletUUID
+					executionAccountID = &execAccountUUID
 				}
 			}
 		}
-		if execution.Wallet != nil && *executionAccountID != *execution.AccountID {
-			common.Log.Errorf("Invalid tx message specifying a account_idand wallet")
+		if execution.Account != nil && *executionAccountID != *execution.AccountID {
+			common.Log.Errorf("Invalid tx message specifying a account_id and account")
 			natsutil.Nack(msg)
 			return
 		}
-		wallet := &wallet.Account{}
-		wallet.SetID(*execution.AccountID)
+		account := &wallet.Account{}
+		account.SetID(*execution.AccountID)
+		execution.Account = account
+	}
+
+	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
+		var executionWalletID *uuid.UUID
+		if executionAccount, executionAccountOk := execution.Wallet.(map[string]interface{}); executionAccountOk {
+			if executionWalletIDStr, executionAccountIDStrOk := executionAccount["id"].(string); executionAccountIDStrOk {
+				execWalletUUID, err := uuid.FromString(executionWalletIDStr)
+				if err == nil {
+					executionWalletID = &execWalletUUID
+				}
+			}
+		}
+		if execution.Wallet != nil && *executionWalletID != *execution.AccountID {
+			common.Log.Errorf("Invalid tx message specifying a account_id and wallet")
+			natsutil.Nack(msg)
+			return
+		}
+		wallet := &wallet.Wallet{}
+		wallet.SetID(*execution.WalletID)
 		execution.Wallet = wallet
 	}
 
@@ -501,11 +567,11 @@ func consumeTxMsg(msg *stan.Msg) {
 	}
 
 	var tx Transaction
-	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, accountID, execution, _txParamsJSON)
+	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
+		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	}
 
-	executionResponse, err := cntract.ExecuteFromTx(execution, wfunc, txCreateFn)
+	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, nil, txCreateFn)
 
 	if err != nil {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
@@ -594,15 +660,15 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	tx.FinalizedAt = &finalizedAt
 	if tx.BroadcastAt != nil {
 		if tx.PublishedAt != nil {
-			publishLatency := uint64(tx.BroadcastAt.Sub(*tx.PublishedAt)) / uint64(time.Millisecond)
-			tx.PublishLatency = &publishLatency
+			queueLatency := uint64(tx.BroadcastAt.Sub(*tx.PublishedAt)) / uint64(time.Millisecond)
+			tx.QueueLatency = &queueLatency
 
 			e2eLatency := uint64(tx.FinalizedAt.Sub(*tx.PublishedAt)) / uint64(time.Millisecond)
 			tx.E2ELatency = &e2eLatency
 		}
 
-		broadcastLatency := uint64(tx.FinalizedAt.Sub(*tx.BroadcastAt)) / uint64(time.Millisecond)
-		tx.BroadcastLatency = &broadcastLatency
+		networkLatency := uint64(tx.FinalizedAt.Sub(*tx.BroadcastAt)) / uint64(time.Millisecond)
+		tx.NetworkLatency = &networkLatency
 	}
 
 	tx.updateStatus(db, "success", nil)

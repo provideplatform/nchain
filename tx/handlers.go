@@ -234,7 +234,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
 	}
 
-	execution := &contract.ContractExecution{
+	execution := &contract.Execution{
 		Ref: common.StringOrNil(ref.String()),
 	}
 
@@ -292,14 +292,17 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 
 	var tx Transaction
-	txCreateFn := func(c *contract.Contract, network *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
+	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
+		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
+	}
+	accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+		return afunc(a.(wallet.Account), txParams)
 	}
 	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 		return wfunc(w.(wallet.Wallet), txParams)
 	}
 
-	resp, err := ephemeralContract.ExecuteFromTx(execution, walletFn, txCreateFn)
+	resp, err := ephemeralContract.ExecuteFromTx(execution, accountFn, walletFn, txCreateFn)
 	if err == nil {
 		provide.Render(resp, 202, c)
 	} else {
@@ -408,7 +411,7 @@ func contractExecutionHandler(c *gin.Context) {
 		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
 	}
 
-	execution := &contract.ContractExecution{
+	execution := &contract.Execution{
 		Ref: common.StringOrNil(ref.String()),
 	}
 
@@ -452,28 +455,31 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	var tx Transaction
-	txCreateFn := func(c *contract.Contract, network *network.Network, walletID *uuid.UUID, execution *contract.ContractExecution, _txParamsJSON *json.RawMessage) (*contract.ContractExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, walletID, execution, _txParamsJSON)
+	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
+		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
+	}
+	accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+		return afunc(a.(*wallet.Account), txParams)
 	}
 	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-		return wfunc(w.(*wallet.Account), txParams)
+		return afunc(w.(*wallet.Wallet), txParams)
 	}
 
-	executionResponse, err := execution.ExecuteFromTx(walletFn, txCreateFn)
+	executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
 	if err != nil {
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
 
 	switch executionResponse.(type) {
-	case *contract.ContractExecutionResponse:
-		executionResponse = executionResponse.(*contract.ContractExecutionResponse).Response.(map[string]interface{})
+	case *contract.ExecutionResponse:
+		executionResponse = executionResponse.(*contract.ExecutionResponse).Response.(map[string]interface{})
 		provide.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
 	default:
 		confidence := invokeTxFilters(appID, buf, db)
 		executionResponse = map[string]interface{}{
 			"confidence": confidence,
-			"ref":        executionResponse.(*contract.ContractExecution).Ref,
+			"ref":        executionResponse.(*contract.Execution).Ref,
 		}
 		provide.Render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
 	}

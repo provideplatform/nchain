@@ -330,7 +330,7 @@ CREATE TABLE public.transactions (
     block bigint,
     broadcast_at timestamp with time zone,
     published_at timestamp with time zone,
-    publish_latency bigint,
+    queue_latency bigint,
     broadcast_latency bigint,
     e2_e_latency bigint,
     block_timestamp timestamp with time zone

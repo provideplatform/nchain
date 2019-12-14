@@ -68,6 +68,15 @@ func (w *Wallet) Create() bool {
 	return false
 }
 
+// SetID sets the wallet id in-memory
+func (w *Wallet) SetID(walletID uuid.UUID) {
+	if w.ID != uuid.Nil {
+		common.Log.Warningf("Attempted to change a wallet id in memory; wallet id not changed: %s", w.ID)
+		return
+	}
+	w.ID = walletID
+}
+
 // Validate a wallet for persistence
 func (w *Wallet) Validate() bool {
 	w.Errors = make([]*provide.Error, 0)
