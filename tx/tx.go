@@ -504,7 +504,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 	}
 
 	if err != nil {
-		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *network.Name, signer.String, err.Error())
+		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *network.Name, signer.String(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
