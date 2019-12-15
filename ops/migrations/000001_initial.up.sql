@@ -843,13 +843,6 @@ CREATE INDEX idx_transactions_user_id ON public.transactions USING btree (user_i
 
 
 --
--- Name: idx_transactions_wallet_id; Type: INDEX; Schema: public; Owner: goldmine
---
-
-CREATE INDEX idx_transactions_wallet_id ON public.transactions USING btree (account_id);
-
-
---
 -- Name: idx_wallets_application_id; Type: INDEX; Schema: public; Owner: goldmine
 --
 
