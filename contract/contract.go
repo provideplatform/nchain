@@ -196,13 +196,31 @@ func (c *Contract) Create() bool {
 					if val, valOk := params["value"].(float64); valOk {
 						value = uint64(val)
 					}
+
+					var accountID *string
+					if acctID, acctIDOk := params["account_id"].(string); acctIDOk {
+						accountID = &acctID
+					}
+
+					var walletID *string
+					var hdDerivationPath *string
+					if wlltID, wlltIDOk := params["wallet_id"].(string); wlltIDOk {
+						walletID = &wlltID
+
+						if path, pathOk := params["hd_derivation_path"].(string); pathOk {
+							hdDerivationPath = &path
+						}
+					}
+
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
-						"contract_id":  c.ID,
-						"data":         compiledArtifact.Bytecode,
-						"account_id":   common.StringOrNil(params["account_id"].(string)),
-						"value":        value,
-						"params":       params,
-						"published_at": time.Now(),
+						"contract_id":        c.ID,
+						"data":               compiledArtifact.Bytecode,
+						"account_id":         accountID,
+						"wallet_id":          walletID,
+						"hd_derivation_path": hdDerivationPath,
+						"value":              value,
+						"params":             params,
+						"published_at":       time.Now(),
 					})
 					err := natsutil.NatsPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
