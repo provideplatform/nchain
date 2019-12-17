@@ -13,7 +13,6 @@ import (
 
 	ethereum "github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
@@ -169,12 +168,11 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
-			privateKey, _ := hexutil.Decode(fmt.Sprintf("0x%s", string(*derivedAccount.PrivateKey)))
 			signedTx, hash, err = provide.EVMSignTx(
 				txs.Network.ID.String(),
 				txs.Network.RPCURL(),
 				derivedAccount.Address,
-				string(privateKey),
+				*derivedAccount.PrivateKey,
 				tx.To,
 				tx.Data,
 				tx.Value.BigInt(),
