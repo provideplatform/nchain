@@ -37,6 +37,49 @@ type Signer interface {
 	String() string
 }
 
+// Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
+// identifier or b) user identifier.
+type Transaction struct {
+	provide.Model
+	NetworkID uuid.UUID `sql:"not null;type:uuid" json:"network_id,omitempty"`
+
+	// Application or user id, if populated, is the entity for which the transaction was custodially signed and broadcast
+	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+
+	// Account or HD wallet which custodially signed the transaction; when an HD wallet is used, if no HD derivation path is provided,
+	// the most recently derived non-zero account is used to sign
+	AccountID *uuid.UUID `sql:"type:uuid" json:"account_id,omitempty"`
+	WalletID  *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
+	Path      *string    `gorm:"column:hd_derivation_path" json:"hd_derivation_path,omitempty"`
+
+	// Network-agnostic tx fields
+	Signer      *string          `sql:"-" json:"signer,omitempty"`
+	To          *string          `json:"to"`
+	Value       *txValue         `sql:"not null;type:text" json:"value"`
+	Data        *string          `json:"data"`
+	Hash        *string          `json:"hash"`
+	Status      *string          `sql:"not null;default:'pending'" json:"status"`
+	Params      *json.RawMessage `sql:"-" json:"params,omitempty"`
+	Ref         *string          `json:"ref"`
+	Description *string          `json:"description"`
+
+	// Ephemeral fields for managing the tx/rx and tracing lifecycles
+	Response *contract.ExecutionResponse `sql:"-" json:"-"`
+	SignedTx interface{}                 `sql:"-" json:"-"`
+	Traces   interface{}                 `sql:"-" json:"traces"`
+
+	// Transaction metadata/instrumentation
+	Block          *uint64    `json:"block"`
+	BlockTimestamp *time.Time `json:"block_timestamp,omitempty"`                       // timestamp when the tx was finalized on-chain, according to its tx receipt
+	BroadcastAt    *time.Time `json:"broadcast_at,omitempty"`                          // timestamp when the tx was broadcast to the network
+	FinalizedAt    *time.Time `json:"finalized_at,omitempty"`                          // timestamp when the tx was finalized on-platform
+	PublishedAt    *time.Time `json:"published_at,omitempty"`                          // timestamp when the tx was published to NATS cluster
+	QueueLatency   *uint64    `json:"queue_latency,omitempty"`                         // broadcast_at - published_at (in millis) -- the amount of time between when a message is enqueued to the NATS broker and when it is broadcast to the network
+	NetworkLatency *uint64    `json:"network_latency,omitempty"`                       // finalized_at - broadcast_at (in millis) -- the amount of time between when a message is broadcast to the network and when it is finalized on-chain
+	E2ELatency     *uint64    `gorm:"column:e2e_latency" json:"e2e_latency,omitempty"` // finalized_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is finalized on-chain
+}
+
 // TransactionSigner is either an account or HD wallet; implements the Signer interface
 type TransactionSigner struct {
 	DB *gorm.DB
@@ -157,49 +200,6 @@ func (txs *TransactionSigner) String() string {
 	}
 
 	return "(misconfigured tx signer)"
-}
-
-// Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
-// identifier or b) user identifier.
-type Transaction struct {
-	provide.Model
-	NetworkID uuid.UUID `sql:"not null;type:uuid" json:"network_id,omitempty"`
-
-	// Application or user id, if populated, is the entity for which the transaction was custodially signed and broadcast
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
-	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
-
-	// Account or HD wallet which custodially signed the transaction; when an HD wallet is used, if no HD derivation path is provided,
-	// the most recently derived non-zero account is used to sign
-	AccountID *uuid.UUID `sql:"type:uuid" json:"account_id,omitempty"`
-	WalletID  *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
-	Path      *string    `gorm:"column:hd_derivation_path" json:"hd_derivation_path,omitempty"`
-
-	// Network-agnostic tx fields
-	Signer      *string          `sql:"-" json:"signer,omitempty"`
-	To          *string          `json:"to"`
-	Value       *txValue         `sql:"not null;type:text" json:"value"`
-	Data        *string          `json:"data"`
-	Hash        *string          `json:"hash"`
-	Status      *string          `sql:"not null;default:'pending'" json:"status"`
-	Params      *json.RawMessage `sql:"-" json:"params,omitempty"`
-	Ref         *string          `json:"ref"`
-	Description *string          `json:"description"`
-
-	// Ephemeral fields for managing the tx/rx and tracing lifecycles
-	Response *contract.ExecutionResponse `sql:"-" json:"-"`
-	SignedTx interface{}                 `sql:"-" json:"-"`
-	Traces   interface{}                 `sql:"-" json:"traces"`
-
-	// Transaction metadata/instrumentation
-	Block          *uint64    `json:"block"`
-	BlockTimestamp *time.Time `json:"block_timestamp,omitempty"`                       // timestamp when the tx was finalized on-chain, according to its tx receipt
-	BroadcastAt    *time.Time `json:"broadcast_at,omitempty"`                          // timestamp when the tx was broadcast to the network
-	FinalizedAt    *time.Time `json:"finalized_at,omitempty"`                          // timestamp when the tx was finalized on-platform
-	PublishedAt    *time.Time `json:"published_at,omitempty"`                          // timestamp when the tx was published to NATS cluster
-	QueueLatency   *uint64    `json:"queue_latency,omitempty"`                         // broadcast_at - published_at (in millis) -- the amount of time between when a message is enqueued to the NATS broker and when it is broadcast to the network
-	NetworkLatency *uint64    `json:"network_latency,omitempty"`                       // finalized_at - broadcast_at (in millis) -- the amount of time between when a message is broadcast to the network and when it is finalized on-chain
-	E2ELatency     *uint64    `gorm:"column:e2e_latency" json:"e2e_latency,omitempty"` // finalized_at - published_at (in millis) -- the amount of time between when a message is published to the NATS broker and when it is finalized on-chain
 }
 
 type txValue struct {
