@@ -453,45 +453,28 @@ func afunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 
 // TODO: fix or remove
 func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-	return nil
+	switch w.(type) {
+	case *wallet.Wallet:
+		wallet := w.(*wallet.Wallet)
+		walletID := wallet.ID
+		if walletID != uuid.Nil {
+			return &walletID
+		}
+	case map[string]interface{}:
+		walletMap := w.(map[string]interface{})
+		if walletIDStr, walletIDStrOk := walletMap["wallet_id"].(string); walletIDStrOk {
+			common.Log.Debugf("resolved wallet id for deterministic tx signer: %s", walletIDStr)
+			walletID, err := uuid.FromString(walletIDStr)
+			if err != nil {
+				common.Log.Warningf("failed to parse wallet uuid for deterministic tx signer; %s", err.Error())
+				return nil
+			}
+			return &walletID
+		}
 
-	// tmpWallet := &wallet.Account{}
-	// var path *string
-
-	// switch w.(type) {
-	// case *wallet.Wallet:
-	// 	wallet := w.(*wallet.Wallet)
-	// 	accountID := wallet.ID
-	// 	if accountID != uuid.Nil {
-	// 		return &accountID
-	// 	}
-	// 	path = wallet.Path
-	// case map[string]interface{}:
-	// 	walletMap := w.(map[string]interface{})
-	// 	if pathStr, pathOk := walletMap["hd_derivation_path"].(string); pathOk {
-	// 		path = &pathStr
-	// 	}
-	// 	common.Log.Debugf("resolved HD derivation path for deterministic tx signer: %s", *path)
-	// 	// if privKey, privKeyOk := walletMap["private_key"].(string); privKeyOk {
-	// 	// 	privateKey = &privKey
-	// 	// }
-	// default:
-	// 	common.Log.Warningf("No HD wallet uuid resolved during attempted contract execution; invalid params provided for contract execution address: %s", txParams["to"])
-	// }
-
-	// if path != nil {
-	// 	db := dbconf.DatabaseConnection()
-	// 	db.Where("address = ?", *address).Find(&tmpWallet)
-	// 	if tmpWallet != nil && tmpWallet.ID != uuid.Nil {
-	// 		return &tmpWallet.ID
-	// 	}
-	// 	common.Log.Warningf("Failed to resolve managed wallet for address: %s", *address)
-
-	// 	if privateKey != nil {
-	// 		txParams["public_key"] = address
-	// 		txParams["private_key"] = privateKey
-	// 	}
-	// }
+	default:
+		common.Log.Warningf("No HD wallet uuid resolved during attempted contract execution; invalid params provided for contract execution address: %s", txParams["to"])
+	}
 
 	return &uuid.Nil
 }

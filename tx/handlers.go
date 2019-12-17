@@ -423,22 +423,22 @@ func contractExecutionHandler(c *gin.Context) {
 	execution.Contract = contractObj
 	execution.ContractID = &contractObj.ID
 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
-		if execution.Wallet != nil {
+		if execution.Account != nil {
 			err := fmt.Errorf("invalid request specifying a account_address and account")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
-		wallet := &wallet.Account{}
-		wallet.SetID(*execution.AccountID)
-		execution.Wallet = wallet
-	} else if common.StringOrNil(*execution.AccountAddress) != nil {
+		account := &wallet.Account{}
+		account.SetID(*execution.AccountID)
+		execution.Account = account
+	} else if common.StringOrNil(*execution.HDPath) != nil {
 		if execution.Wallet != nil {
-			err := fmt.Errorf("invalid request specifying account_address and account")
+			err := fmt.Errorf("invalid request specifying hd_derivation_path and wallet")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
-		wallet := &wallet.Account{}
-		wallet.Address = *execution.AccountAddress
+		wallet := &wallet.Wallet{}
+		wallet.Path = execution.HDPath
 		execution.Wallet = wallet
 	}
 
@@ -462,7 +462,7 @@ func contractExecutionHandler(c *gin.Context) {
 		return afunc(a.(*wallet.Account), txParams)
 	}
 	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-		return afunc(w.(*wallet.Wallet), txParams)
+		return wfunc(w.(*wallet.Wallet), txParams)
 	}
 
 	executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
