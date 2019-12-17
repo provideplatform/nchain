@@ -152,7 +152,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
-			chain := uint32(0) // FIXME-- don't hardcode this
 			hardenedChild, derivationErr := txs.Wallet.DeriveHardened(nil, defaultDerivedCoinType, uint32(0))
 			if derivationErr != nil {
 				msg := fmt.Sprintf("failed to derive address for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
@@ -160,7 +159,8 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
-			idx := uint32(0) // FIXME-- don't hardcode this
+			idx := uint32(0)   // FIXME-- don't hardcode this
+			chain := uint32(0) // FIXME-- don't hardcode this
 			derivedAccount, derivationErr := hardenedChild.DeriveAddress(nil, idx, &chain)
 			if derivationErr != nil {
 				msg := fmt.Sprintf("failed to derive address for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())

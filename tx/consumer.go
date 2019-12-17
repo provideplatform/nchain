@@ -737,9 +737,12 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	if account != nil {
 		signerAddress = account.Address
 	} else if wallet != nil {
-		// TODO: parse hd derivation path...
-		chain := uint32(0)
-		derivedAccount, _ := wallet.DeriveAddress(nil, uint32(0), &chain)
+		coin := defaultDerivedCoinType // FIXME-- don't hardcode this
+		account := uint32(0)           // FIXME-- don't hardcode this
+		idx := uint32(0)               // FIXME-- don't hardcode this
+		chain := uint32(0)             // FIXME-- don't hardcode this
+		hardenedChild, _ := wallet.DeriveHardened(nil, coin, account)
+		derivedAccount, _ := hardenedChild.DeriveAddress(nil, idx, &chain)
 		signerAddress = derivedAccount.Address
 	}
 
