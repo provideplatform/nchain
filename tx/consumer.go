@@ -689,6 +689,13 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 }
 
 func consumeTxReceiptMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			common.Log.Warningf("Recovered from failed tx receipt message; %s", r)
+			natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS tx receipt message: %s", msg)
 
 	db := dbconf.DatabaseConnection()
