@@ -401,6 +401,21 @@ func (t *Transaction) Reload() {
 	db.Model(&t).Find(t)
 }
 
+// GetAccount - retrieve the associated transaction account
+func (t *Transaction) GetAccount() (*wallet.Account, error) {
+	if t.AccountID == nil {
+		return nil, fmt.Errorf("unable to retrieve transaction signing account for tx: %s; no signing account id", t.ID)
+	}
+
+	db := dbconf.DatabaseConnection()
+	var account = &wallet.Account{}
+	db.Model(t).Related(&account)
+	if account == nil || account.ID == uuid.Nil {
+		return nil, fmt.Errorf("failed to retrieve transaction signing account for tx: %s", t.ID)
+	}
+	return account, nil
+}
+
 // GetNetwork - retrieve the associated transaction network
 func (t *Transaction) GetNetwork() (*network.Network, error) {
 	db := dbconf.DatabaseConnection()
@@ -413,13 +428,18 @@ func (t *Transaction) GetNetwork() (*network.Network, error) {
 }
 
 // GetWallet - retrieve the associated transaction wallet
-func (t *Transaction) GetWallet() (*wallet.Account, error) {
+func (t *Transaction) GetWallet() (*wallet.Wallet, error) {
+	if t.WalletID == nil {
+		return nil, fmt.Errorf("unable to retrieve transaction signing HD wallet for tx: %s; no HD wallet id", t.ID)
+	}
+
 	db := dbconf.DatabaseConnection()
-	var wallet = &wallet.Account{}
+	var wallet = &wallet.Wallet{}
 	db.Model(t).Related(&wallet)
 	if wallet == nil || wallet.ID == uuid.Nil {
-		return nil, fmt.Errorf("failed to retrieve transaction wallet for tx: %s", t.ID)
+		return nil, fmt.Errorf("failed to retrieve transaction signing HD wallet for tx: %s", t.ID)
 	}
+	wallet.Path = t.Path
 	return wallet, nil
 }
 
@@ -536,9 +556,9 @@ func (t *Transaction) sign(db *gorm.DB, network *network.Network, signer Signer)
 	return err
 }
 
-func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Account) error {
+func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, signerAddress string) error {
 	if network.IsEthereumNetwork() {
-		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.RPCURL(), *t.Hash, wallet.Address)
+		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.RPCURL(), *t.Hash, signerAddress)
 		if err != nil {
 			return err
 		}
@@ -556,18 +576,18 @@ func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, wallet
 		}
 		t.Traces = traces
 
-		err = t.handleEthereumTxReceipt(db, network, wallet, receipt)
+		err = t.handleEthereumTxReceipt(db, network, signerAddress, receipt)
 		if err != nil {
 			common.Log.Warningf("failed to handle fetched ethereum tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
 			return err
 		}
-		t.handleEthereumTxTraces(db, network, wallet, traces.(*provide.EthereumTxTraceResponse), receipt)
+		t.handleEthereumTxTraces(db, network, signerAddress, traces.(*provide.EthereumTxTraceResponse), receipt)
 	}
 
 	return nil
 }
 
-func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, wallet *wallet.Account, receipt *types.Receipt) error {
+func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, signerAddress string, receipt *types.Receipt) error {
 	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 	if err != nil {
 		common.Log.Warningf("unable to handle ethereum tx receipt; %s", err.Error())
@@ -613,7 +633,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 			}
 			if kontract.Create() {
 				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
-				kontract.ResolveTokenContract(db, network, &wallet.Address, client, receipt, tokenCreateFn)
+				kontract.ResolveTokenContract(db, network, &signerAddress, client, receipt, tokenCreateFn)
 			} else {
 				common.Log.Warningf("failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
 			}
@@ -621,13 +641,13 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
 			kontract.Address = common.StringOrNil(receipt.ContractAddress.Hex())
 			db.Save(&kontract)
-			kontract.ResolveTokenContract(db, network, &wallet.Address, client, receipt, tokenCreateFn)
+			kontract.ResolveTokenContract(db, network, &signerAddress, client, receipt, tokenCreateFn)
 		}
 	}
 	return nil
 }
 
-func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, wallet *wallet.Account, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
+func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, signerAddress string, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {
 		common.Log.Debugf("failed to resolve contract as sender of contract-internal opcode tracing functionality")
@@ -690,7 +710,7 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 							common.Log.Warningf("unable to attempt token creation for contract-internal tx; %s", err.Error())
 							return
 						}
-						internalContract.ResolveTokenContract(db, network, &wallet.Address, client, receipt,
+						internalContract.ResolveTokenContract(db, network, &signerAddress, client, receipt,
 							func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 								common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 

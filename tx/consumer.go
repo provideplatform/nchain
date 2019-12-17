@@ -715,16 +715,28 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	wallet, err := tx.GetWallet()
-	if err != nil {
-		desc := fmt.Sprintf("Failed to resolve tx wallet; %s", err.Error())
+	account, _ := tx.GetAccount()
+	wallet, _ := tx.GetWallet()
+
+	if account == nil && wallet == nil {
+		desc := "failed to resolve tx signing account or HD wallet"
 		common.Log.Warningf(desc)
 		tx.updateStatus(db, "failed", common.StringOrNil(desc))
 		natsutil.Nack(msg)
 		return
 	}
 
-	err = tx.fetchReceipt(db, network, wallet)
+	var signerAddress string
+	if account != nil {
+		signerAddress = account.Address
+	} else if wallet != nil {
+		// TODO: parse hd derivation path...
+		chain := uint32(0)
+		derivedAccount, _ := wallet.DeriveAddress(nil, uint32(0), &chain)
+		signerAddress = derivedAccount.Address
+	}
+
+	err = tx.fetchReceipt(db, network, signerAddress)
 	if err != nil {
 		if msg.Redelivered { // FIXME-- implement proper dead-letter logic; only set tx to failed upon deadletter
 			desc := fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error())
