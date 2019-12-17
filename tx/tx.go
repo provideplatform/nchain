@@ -278,6 +278,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 	if t.WalletID != nil && *t.WalletID != uuid.Nil {
 		wllt = &wallet.Wallet{}
 		db.Model(t).Related(&wllt)
+		if wllt != nil {
+			wllt.Path = t.Path
+		}
 	}
 
 	if ntwrk == nil || ntwrk.ID == uuid.Nil {
