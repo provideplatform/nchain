@@ -1,4 +1,3 @@
-ALTER TABLE ONLY transactions RENAME COLUMN publish_latency TO queue_latency;
 ALTER TABLE ONLY transactions RENAME COLUMN network_latency TO broadcast_latency;
 
 ALTER TABLE ONLY transactions DROP COLUMN wallet_id;
