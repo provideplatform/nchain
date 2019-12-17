@@ -173,7 +173,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			signedTx, hash, err = provide.EVMSignTx(
 				txs.Network.ID.String(),
 				txs.Network.RPCURL(),
-				txs.Account.Address,
+				derivedAccount.Address,
 				string(privateKey),
 				tx.To,
 				tx.Data,
