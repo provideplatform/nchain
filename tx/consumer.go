@@ -124,7 +124,9 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	contractID, contractIDOk := params["contract_id"]
 	data, dataOk := params["data"].(string)
-	accountID, accountIDOk := params["account_id"].(string)
+	accountIDStr, accountIDStrOk := params["account_id"].(string)
+	walletIDStr, walletIDStrOk := params["wallet_id"].(string)
+	hdDerivationPath, hdDerivationPathOk := params["hd_derivation_path"].(string)
 	value, valueOk := params["value"]
 	txParams, paramsOk := params["params"].(map[string]interface{})
 	publishedAt, publishedAtOk := params["published_at"].(string)
@@ -139,8 +141,8 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		natsutil.Nack(msg)
 		return
 	}
-	if !accountIDOk {
-		common.Log.Warningf("Failed to unmarshal account_idduring NATS %v message handling", msg.Subject)
+	if !accountIDStrOk && !walletIDStrOk {
+		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
 		natsutil.Nack(msg)
 		return
 	}
@@ -164,9 +166,21 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 	db.Where("id = ?", contractID).Find(&contract)
 
-	walletUUID, err := uuid.FromString(accountID)
-	if err != nil {
-		common.Log.Warningf("Failed to unmarshal account_idduring NATS %v message handling; %s", msg.Subject, err.Error())
+	var accountID *uuid.UUID
+	var walletID *uuid.UUID
+
+	accountUUID, accountUUIDErr := uuid.FromString(accountIDStr)
+	if accountUUIDErr == nil {
+		accountID = &accountUUID
+	}
+
+	walletUUID, walletUUIDErr := uuid.FromString(walletIDStr)
+	if walletUUIDErr == nil {
+		walletID = &walletUUID
+	}
+
+	if accountID == nil && walletID == nil {
+		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
 		natsutil.Nack(msg)
 		return
 	}
@@ -182,7 +196,9 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		ApplicationID: contract.ApplicationID,
 		Data:          common.StringOrNil(data),
 		NetworkID:     contract.NetworkID,
-		AccountID:     &walletUUID,
+		AccountID:     accountID,
+		WalletID:      walletID,
+		Path:          common.StringOrNil(hdDerivationPath),
 		To:            nil,
 		Value:         &txValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:   &publishedAtTime,
