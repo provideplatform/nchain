@@ -126,7 +126,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	data, dataOk := params["data"].(string)
 	accountIDStr, accountIDStrOk := params["account_id"].(string)
 	walletIDStr, walletIDStrOk := params["wallet_id"].(string)
-	hdDerivationPath, hdDerivationPathOk := params["hd_derivation_path"].(string)
+	hdDerivationPath, _ := params["hd_derivation_path"].(string)
 	value, valueOk := params["value"]
 	txParams, paramsOk := params["params"].(map[string]interface{})
 	publishedAt, publishedAtOk := params["published_at"].(string)
