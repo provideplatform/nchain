@@ -460,9 +460,15 @@ func contractExecutionHandler(c *gin.Context) {
 		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	}
 	accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+		if a == nil {
+			return nil
+		}
 		return afunc(a.(*wallet.Account), txParams)
 	}
 	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
+		if w == nil {
+			return nil
+		}
 		return wfunc(w.(*wallet.Wallet), txParams)
 	}
 
