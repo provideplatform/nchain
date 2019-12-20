@@ -222,9 +222,16 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 	var receipt map[string]interface{}
 	out := map[string]interface{}{}
 
+	db := dbconf.DatabaseConnection()
+
+	signer, err := tx.signerFactory(db)
+	if err != nil {
+		err = fmt.Errorf("failed to resolve tx signer for contract: %s; %s", c.ID, err.Error())
+		return nil, err
+	}
+
 	if network.IsEthereumNetwork() {
 		if abiMethod != nil {
-
 			common.Log.Debugf("Attempting to encode %d parameters %s prior to executing method %s on contract: %s", len(params), params, methodDescriptor, c.ID)
 			invocationSig, err := provide.EVMEncodeABI(abiMethod, params...)
 			if err != nil {
@@ -237,15 +244,13 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 			if abiMethod.Const {
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
-				msg := tx.asEthereumCallMsg(0, 0)
+				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)
 				result, err = client.CallContract(context.TODO(), msg, nil)
 				if err != nil {
 					err = fmt.Errorf("Failed to read constant method %s on contract: %s; %s", method, c.ID, err.Error())
 					return nil, err
 				}
 			} else {
-				db := dbconf.DatabaseConnection()
-
 				var txResponse *contract.ExecutionResponse
 				if tx.Create(db) {
 					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
@@ -311,18 +316,9 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 							result = (txResponse.Receipt).([]byte)
 							json.Unmarshal(result, &receipt)
 						case types.Receipt:
-							// client, _ := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 							txReceipt := txResponse.Receipt.(*types.Receipt)
 							txReceiptJSON, _ := json.Marshal(txReceipt)
 							json.Unmarshal(txReceiptJSON, &receipt)
-							// txdeets, _, err := client.TransactionByHash(context.TODO(), txReceipt.TxHash)
-							// if err != nil {
-							// 	err = fmt.Errorf("Failed to retrieve %s transaction by tx hash: %s", *network.Name, *tx.Hash)
-							// 	common.Log.Warning(err.Error())
-							// 	return nil, err
-							// }
-							// txdeetsJSON, _ := json.Marshal(txdeets)
-							// json.Unmarshal(txdeetsJSON, &out)
 							out["receipt"] = receipt
 							return out, nil
 						default:
@@ -715,19 +711,8 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	tx.Reload()
 
-	network, err := tx.GetNetwork()
+	signer, err := tx.signerFactory(db)
 	if err != nil {
-		desc := fmt.Sprintf("Failed to resolve tx network; %s", err.Error())
-		common.Log.Warningf(desc)
-		tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		natsutil.Nack(msg)
-		return
-	}
-
-	account, _ := tx.GetAccount()
-	wallet, _ := tx.GetWallet()
-
-	if account == nil && wallet == nil {
 		desc := "failed to resolve tx signing account or HD wallet"
 		common.Log.Warningf(desc)
 		tx.updateStatus(db, "failed", common.StringOrNil(desc))
@@ -735,20 +720,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	var signerAddress string
-	if account != nil {
-		signerAddress = account.Address
-	} else if wallet != nil {
-		coin := defaultDerivedCoinType // FIXME-- don't hardcode this
-		account := uint32(0)           // FIXME-- don't hardcode this
-		idx := uint32(0)               // FIXME-- don't hardcode this
-		chain := uint32(0)             // FIXME-- don't hardcode this
-		hardenedChild, _ := wallet.DeriveHardened(nil, coin, account)
-		derivedAccount, _ := hardenedChild.DeriveAddress(nil, idx, &chain)
-		signerAddress = derivedAccount.Address
-	}
-
-	err = tx.fetchReceipt(db, network, signerAddress)
+	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
 		if msg.Redelivered { // FIXME-- implement proper dead-letter logic; only set tx to failed upon deadletter
 			desc := fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error())

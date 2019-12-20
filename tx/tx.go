@@ -33,6 +33,7 @@ const firstHardenedChildIndex = uint32(0x80000000)
 
 // Signer interface for signing transactions
 type Signer interface {
+	Address() string
 	Sign(tx *Transaction) (signedTx interface{}, hash *string, err error)
 	String() string
 }
@@ -88,6 +89,24 @@ type TransactionSigner struct {
 
 	Account *wallet.Account
 	Wallet  *wallet.Wallet
+}
+
+// Address returns the public network address of the underlying Signer
+func (txs *TransactionSigner) Address() string {
+	var address string
+	if txs.Account != nil {
+		address = txs.Account.Address
+	} else if txs.Wallet != nil {
+		coin := defaultDerivedCoinType // FIXME-- don't hardcode this
+		account := uint32(0)           // FIXME-- don't hardcode this
+		idx := uint32(0)               // FIXME-- don't hardcode this
+		chain := uint32(0)             // FIXME-- don't hardcode this
+		hardenedChild, _ := txs.Wallet.DeriveHardened(nil, coin, account)
+		derivedAccount, _ := hardenedChild.DeriveAddress(nil, idx, &chain)
+		address = derivedAccount.Address
+	}
+
+	return address
 }
 
 // Sign implements the Signer interface
@@ -154,7 +173,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 			hardenedChild, derivationErr := txs.Wallet.DeriveHardened(nil, defaultDerivedCoinType, uint32(0))
 			if derivationErr != nil {
-				msg := fmt.Sprintf("failed to derive address for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
+				msg := fmt.Sprintf("failed to derive hardened account for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
 				common.Log.Warningf(msg)
 				return nil, nil, err
 			}
@@ -163,7 +182,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			chain := uint32(0) // FIXME-- don't hardcode this
 			derivedAccount, derivationErr := hardenedChild.DeriveAddress(nil, idx, &chain)
 			if derivationErr != nil {
-				msg := fmt.Sprintf("failed to derive address for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
+				msg := fmt.Sprintf("failed to derive account for HD wallet: %s; %s", txs.Wallet.ID, derivationErr.Error())
 				common.Log.Warningf(msg)
 				return nil, nil, err
 			}
@@ -230,10 +249,7 @@ func (v *txValue) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.CallMsg {
-	db := dbconf.DatabaseConnection()
-	var wallet = &wallet.Account{}
-	db.Model(t).Related(&wallet)
+func (t *Transaction) asEthereumCallMsg(address string, gasPrice, gasLimit uint64) ethereum.CallMsg {
 	var to *ethcommon.Address
 	var data []byte
 	if t.To != nil {
@@ -244,7 +260,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 		data = ethcommon.FromHex(*t.Data)
 	}
 	return ethereum.CallMsg{
-		From:     ethcommon.HexToAddress(wallet.Address),
+		From:     ethcommon.HexToAddress(address),
 		To:       to,
 		Gas:      gasLimit,
 		GasPrice: big.NewInt(int64(gasPrice)),
@@ -253,13 +269,7 @@ func (t *Transaction) asEthereumCallMsg(gasPrice, gasLimit uint64) ethereum.Call
 	}
 }
 
-// Create and persist a new transaction. Side effects include persistence of contract and/or token instances
-// when the tx represents a contract and/or token creation.
-func (t *Transaction) Create(db *gorm.DB) bool {
-	if !t.Validate() {
-		return false
-	}
-
+func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 	var ntwrk *network.Network
 	if t.NetworkID != uuid.Nil {
 		ntwrk = &network.Network{}
@@ -282,34 +292,41 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 	}
 
 	if ntwrk == nil || ntwrk.ID == uuid.Nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil("invalid network for tx broadcast"),
-		})
+		return nil, errors.New("invalid network for tx broadcast")
 	}
+
 	if (acct == nil || acct.ID == uuid.Nil) && (wllt == nil || wllt.ID == uuid.Nil) {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil("no account or HD wallet signing identity to sign tx for broadcast"),
-		})
+		return nil, errors.New("no account or HD wallet signing identity to sign tx for broadcast")
 	}
 
-	if len(t.Errors) > 0 {
-		return false
-	}
-
-	signer := &TransactionSigner{
+	return &TransactionSigner{
 		DB:      db,
 		Network: ntwrk,
 		Account: acct,
 		Wallet:  wllt,
+	}, nil
+}
+
+// Create and persist a new transaction. Side effects include persistence of contract and/or token instances
+// when the tx represents a contract and/or token creation.
+func (t *Transaction) Create(db *gorm.DB) bool {
+	if !t.Validate() {
+		return false
 	}
 
-	var signingErr error
-	err := t.sign(db, ntwrk, signer)
+	signer, err := t.signerFactory(db)
 	if err != nil {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
-		signingErr = err
+		return false
+	}
+
+	signingErr := t.sign(db, signer)
+	if signingErr != nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(signingErr.Error()),
+		})
 	}
 
 	if db.NewRecord(t) {
@@ -335,7 +352,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					desc := signingErr.Error()
 					t.updateStatus(db, "failed", &desc)
 				} else {
-					err = t.broadcast(db, ntwrk, signer)
+					err = t.broadcast(db, signer.Network, signer)
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
 						natsutil.NatsPublish(natsTxReceiptSubject, txReceiptMsg)
@@ -510,7 +527,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 
 		if err != nil {
 			if t.attemptTxBroadcastRecovery(err) == nil {
-				err = t.sign(db, network, signer)
+				err = t.sign(db, signer)
 				if err == nil {
 					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
@@ -540,12 +557,12 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 	return err
 }
 
-func (t *Transaction) sign(db *gorm.DB, network *network.Network, signer Signer) error {
+func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 	var err error
 	t.SignedTx, t.Hash, err = signer.Sign(t)
 
 	if err != nil {
-		common.Log.Warningf("failed to sign %s tx using %s; %s", *network.Name, signer.String(), err.Error())
+		common.Log.Warningf("failed to sign %s tx using on behalf of signer: %s; %s", signer.Address(), signer.String(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
