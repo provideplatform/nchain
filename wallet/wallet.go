@@ -25,7 +25,7 @@ import (
 // supports derivation of up to 2,147,483,648 associated addresses per hardened account.
 type Wallet struct {
 	provide.Model
-	WalletID      *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
+	WalletID      *uuid.UUID `sql:"-" json:"wallet_id,omitempty"`
 	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
 	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
 
