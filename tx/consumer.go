@@ -465,7 +465,6 @@ func afunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 	return &uuid.Nil
 }
 
-// TODO: fix or remove
 func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 	switch w.(type) {
 	case *wallet.Wallet:
@@ -568,7 +567,7 @@ func consumeTxMsg(msg *stan.Msg) {
 		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	}
 
-	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, nil, txCreateFn)
+	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
 
 	if err != nil {
 		common.Log.Warningf("Failed to execute contract; %s", err.Error())
