@@ -424,14 +424,16 @@ func contractExecutionHandler(c *gin.Context) {
 	execution.Contract = contractObj
 	execution.ContractID = &contractObj.ID
 
-	if execution.AccountID != nil && (*execution.AccountID != uuid.Nil || execution.AccountAddress != nil) {
+	if (execution.AccountID != nil && *execution.AccountID != uuid.Nil) || execution.AccountAddress != nil {
 		if execution.Account != nil {
-			err := fmt.Errorf("invalid request specifying an account_id or address and account")
+			err := fmt.Errorf("invalid request specifying an account_id or account_address and account")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
 		account := &wallet.Account{}
-		account.SetID(*execution.AccountID)
+		if execution.AccountID != nil {
+			account.SetID(*execution.AccountID)
+		}
 		if execution.AccountAddress != nil {
 			account.Address = *execution.AccountAddress
 		}
