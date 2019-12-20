@@ -427,15 +427,15 @@ func afunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 
 	switch a.(type) {
 	case *wallet.Account:
-		wallet := a.(*wallet.Account)
-		accountID := wallet.ID
+		acct := a.(*wallet.Account)
+		accountID := acct.ID
 		if accountID != uuid.Nil {
 			return &accountID
 		}
-		if wallet.Address != "" {
-			address = &wallet.Address
+		if acct.Address != "" {
+			address = &acct.Address
 		}
-		privateKey = wallet.PrivateKey
+		privateKey = acct.PrivateKey
 	case map[string]interface{}:
 		walletMap := a.(map[string]interface{})
 		if addr, addrOk := walletMap["address"].(string); addrOk {
