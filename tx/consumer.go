@@ -360,6 +360,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 
 func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
 	db := dbconf.DatabaseConnection()
+	hdDerivationPath := execution.HDPath
 	publishedAt := execution.PublishedAt
 	method := execution.Method
 	params := execution.Params
@@ -372,6 +373,7 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, acc
 		NetworkID:     c.NetworkID,
 		AccountID:     accountID,
 		WalletID:      walletID,
+		Path:          hdDerivationPath,
 		To:            c.Address,
 		Value:         &txValue{value: value},
 		Params:        _txParamsJSON,

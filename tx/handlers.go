@@ -431,13 +431,14 @@ func contractExecutionHandler(c *gin.Context) {
 		account := &wallet.Account{}
 		account.SetID(*execution.AccountID)
 		execution.Account = account
-	} else if common.StringOrNil(*execution.HDPath) != nil {
+	} else if execution.WalletID != nil && *execution.WalletID != uuid.Nil && execution.HDPath != nil {
 		if execution.Wallet != nil {
 			err := fmt.Errorf("invalid request specifying hd_derivation_path and wallet")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
 		wallet := &wallet.Wallet{}
+		wallet.SetID(*execution.WalletID)
 		wallet.Path = execution.HDPath
 		execution.Wallet = wallet
 	}
