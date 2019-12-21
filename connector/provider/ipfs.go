@@ -239,8 +239,8 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 	resp := make([]interface{}, 0)
 	args := make([]string, 0)
 
-	if pargs, pargsOk := params["arg"].([]string); pargsOk {
-		args = pargs
+	if objects, objectsOk := params["objects"].([]string); objectsOk {
+		args = objects
 	}
 
 	lsresp, err := sh.Request("ls", args...).Send(context.Background())
