@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,8 +58,12 @@ func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID
 	}
 }
 
-func (p *IPFSProvider) apiClientFactory(basePath string) *ipfs.Shell {
-	apiURL := p.apiURLFactory(basePath)
+func (p *IPFSProvider) apiClientFactory(basePath *string) *ipfs.Shell {
+	uri := ""
+	if basePath != nil {
+		uri = *basePath
+	}
+	apiURL := p.apiURLFactory(uri)
 	if apiURL == nil {
 		common.Log.Warningf("unable to initialize IPFS api client factory")
 		return nil
@@ -221,7 +226,7 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 		}
 	}()
 
-	sh := p.apiClientFactory("ls")
+	sh := p.apiClientFactory(nil)
 	if sh == nil {
 		return nil, fmt.Errorf("unable to list IPFS resources for connector: %s; failed to initialize IPFS shell", p.connectorID)
 	}
@@ -229,19 +234,40 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 	resp := make([]interface{}, 0)
 
 	if argsparam, argsparamOk := params["arg"].([]interface{}); argsparamOk {
+		lsargs := make([]string, 0)
 		for _, arg := range argsparam {
-			links, err := sh.List(arg.(string))
-			if err != nil {
-				common.Log.Warningf("failed to retrieve IPFS path: %s; %s", arg, err.Error())
-				return nil, err
-			}
+			lsargs = append(lsargs, arg.(string))
+		}
 
-			for _, link := range links {
-				resp = append(resp, link)
+		lsresp, err := sh.Request("ls", lsargs...).Send(context.Background())
+		if err != nil {
+			common.Log.Warningf("failed to invoke IPFS ls api; %s", err.Error())
+			return nil, err
+		}
+		defer lsresp.Close()
+
+		buf := []byte{}
+		_, err = lsresp.Output.Read(buf)
+		if err != nil {
+			common.Log.Warningf("failed to read IPFS ls output: %s", err.Error())
+			return nil, err
+		}
+
+		var respobj map[string]interface{}
+		err = json.Unmarshal(buf, &respobj)
+		if err != nil {
+			common.Log.Warningf("failed to unmarshal IPFS ls output: %s", arg, err.Error())
+			return nil, err
+		}
+
+		if objects, objectsOk := respobj["Objects"].([]interface{}); objectsOk {
+			for _, obj := range objects {
+				resp = append(resp, obj)
 			}
 		}
 	}
 
+	common.Log.Debugf("retrieved %d object(s) from IPFS ls api", len(resp))
 	return resp, nil
 }
 
