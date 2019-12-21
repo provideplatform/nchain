@@ -307,8 +307,8 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 	}, nil
 }
 
-// Create and persist a new transaction. Side effects include persistence of contract and/or token instances
-// when the tx represents a contract and/or token creation.
+// Create and persist a new transaction. Side effects include persistence of contract
+// and/or token instances when the tx represents a contract and/or token creation.
 func (t *Transaction) Create(db *gorm.DB) bool {
 	if !t.Validate() {
 		return false
@@ -330,6 +330,16 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 	}
 
 	if db.NewRecord(t) {
+		// last check to make sure we don't violate fk constraints with a nil uuid;
+		// if that happens, a transaction will end up on-chain before it we have a
+		// local record of it...
+		if t.AccountID != nil && *t.AccountID == uuid.Nil {
+			t.AccountID = nil
+		}
+		if t.WalletID != nil && *t.WalletID == uuid.Nil {
+			t.WalletID = nil
+		}
+
 		result := db.Create(&t)
 		rowsAffected := result.RowsAffected
 		errors := result.GetErrors()
