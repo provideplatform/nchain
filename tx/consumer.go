@@ -511,7 +511,7 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
 		var executionAccountID *uuid.UUID
-		if executionAccount, executionAccountOk := execution.Wallet.(map[string]interface{}); executionAccountOk {
+		if executionAccount, executionAccountOk := execution.Account.(map[string]interface{}); executionAccountOk {
 			if executionAccountIDStr, executionAccountIDStrOk := executionAccount["id"].(string); executionAccountIDStrOk {
 				execAccountUUID, err := uuid.FromString(executionAccountIDStr)
 				if err == nil {
@@ -531,16 +531,16 @@ func consumeTxMsg(msg *stan.Msg) {
 
 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
 		var executionWalletID *uuid.UUID
-		if executionAccount, executionAccountOk := execution.Wallet.(map[string]interface{}); executionAccountOk {
-			if executionWalletIDStr, executionAccountIDStrOk := executionAccount["id"].(string); executionAccountIDStrOk {
+		if executionWallet, executionWalletOk := execution.Wallet.(map[string]interface{}); executionWalletOk {
+			if executionWalletIDStr, executionWalletIDStrOk := executionWallet["id"].(string); executionWalletIDStrOk {
 				execWalletUUID, err := uuid.FromString(executionWalletIDStr)
 				if err == nil {
 					executionWalletID = &execWalletUUID
 				}
 			}
 		}
-		if execution.Wallet != nil && *executionWalletID != *execution.AccountID {
-			common.Log.Errorf("Invalid tx message specifying a account_id and wallet")
+		if execution.Wallet != nil && *executionWalletID != *execution.WalletID {
+			common.Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
 			natsutil.Nack(msg)
 			return
 		}
