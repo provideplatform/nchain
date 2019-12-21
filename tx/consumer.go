@@ -519,7 +519,7 @@ func consumeTxMsg(msg *stan.Msg) {
 				}
 			}
 		}
-		if execution.Account != nil && *executionAccountID != *execution.AccountID {
+		if execution.Account != nil && execution.AccountID != nil && *executionAccountID != *execution.AccountID {
 			common.Log.Errorf("Invalid tx message specifying a account_id and account")
 			natsutil.Nack(msg)
 			return
@@ -539,7 +539,7 @@ func consumeTxMsg(msg *stan.Msg) {
 				}
 			}
 		}
-		if execution.Wallet != nil && *executionWalletID != *execution.WalletID {
+		if execution.Wallet != nil && execution.WalletID != nil && *executionWalletID != *execution.WalletID {
 			common.Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
 			natsutil.Nack(msg)
 			return
