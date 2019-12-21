@@ -437,15 +437,15 @@ func afunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 		}
 		privateKey = acct.PrivateKey
 	case map[string]interface{}:
-		walletMap := a.(map[string]interface{})
-		if addr, addrOk := walletMap["address"].(string); addrOk {
+		accountMap := a.(map[string]interface{})
+		if addr, addrOk := accountMap["address"].(string); addrOk {
 			address = &addr
 		}
-		if privKey, privKeyOk := walletMap["private_key"].(string); privKeyOk {
+		if privKey, privKeyOk := accountMap["private_key"].(string); privKeyOk {
 			privateKey = &privKey
 		}
 	default:
-		common.Log.Warningf("No wallet uuid resolved during attempted contract execution; invalid signing identity provided for contract execution address: %s", txParams["to"])
+		common.Log.Warningf("No account uuid resolved during attempted contract execution; invalid signing identity provided for contract execution address: %s", txParams["to"])
 	}
 
 	if address != nil {

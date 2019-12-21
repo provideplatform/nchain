@@ -117,13 +117,13 @@ func createTransactionHandler(c *gin.Context) {
 			return
 		}
 
-		wallet := &wallet.Account{}
-		db.Where("address = ?", tx.Signer).Find(&wallet)
-		if wallet == nil || wallet.ID == uuid.Nil {
-			provide.RenderError("failed to resolve signer address to wallet", 404, c)
+		account := &wallet.Account{}
+		db.Where("address = ?", tx.Signer).Find(&account)
+		if account == nil || account.ID == uuid.Nil {
+			provide.RenderError("failed to resolve signer account address to account", 404, c)
 			return
 		}
-		tx.AccountID = &wallet.ID
+		tx.AccountID = &account.ID
 	}
 
 	if tx.Create(db) {
