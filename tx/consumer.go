@@ -445,7 +445,7 @@ func afunc(a interface{}, txParams map[string]interface{}) *uuid.UUID {
 			privateKey = &privKey
 		}
 	default:
-		common.Log.Warningf("No account uuid resolved during attempted contract execution; invalid signing identity provided for contract execution address: %s", txParams["to"])
+		common.Log.Debugf("no valid signing identity uuid resolved during attempted contract execution; contract execution address: %s", txParams["to"])
 	}
 
 	if address != nil {
@@ -486,7 +486,7 @@ func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 		}
 
 	default:
-		common.Log.Warningf("No HD wallet uuid resolved during attempted contract execution; invalid params provided for contract execution address: %s", txParams["to"])
+		common.Log.Debugf("no HD wallet uuid resolved during attempted contract execution; contract execution address: %s", txParams["to"])
 	}
 
 	return &uuid.Nil
