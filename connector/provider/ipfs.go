@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
@@ -249,14 +250,13 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 	}
 	defer lsresp.Close()
 
-	buf := []byte{}
-	_, err = lsresp.Output.Read(buf)
+	buf, err := ioutil.ReadAll(lsresp.Output)
 	if err != nil {
 		common.Log.Warningf("failed to read IPFS ls output: %s", err.Error())
 		return nil, err
 	}
 
-	common.Log.Debugf("read %d-byte response from IPFS:\n\n%s", len(buf), string(buf))
+	common.Log.Debugf("received %d-byte response from IPFS ls api", len(buf))
 
 	var respobj map[string]interface{}
 	err = json.Unmarshal(buf, &respobj)
