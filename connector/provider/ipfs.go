@@ -203,19 +203,18 @@ func (p *IPFSProvider) Reachable() bool {
 }
 
 // Create impl for IPFSProvider
-func (p *IPFSProvider) Create(params map[string]interface{}) (interface{}, error) {
+func (p *IPFSProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
 	return nil, errors.New("create not implemented for IPFS connectors")
 }
 
 // Read impl for IPFSProvider
-func (p *IPFSProvider) Read(id string) (interface{}, error) {
+func (p *IPFSProvider) Read(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for IPFS connectors")
-
 }
 
 // Update impl for IPFSProvider
-func (p *IPFSProvider) Update(id string, params map[string]interface{}) (interface{}, error) {
-	return nil, errors.New("update not implemented for IPFS connectors")
+func (p *IPFSProvider) Update(id string, params map[string]interface{}) error {
+	return errors.New("update not implemented for IPFS connectors")
 }
 
 // Delete impl for IPFSProvider
@@ -224,7 +223,7 @@ func (p *IPFSProvider) Delete(id string) error {
 }
 
 // List impl for IPFSProvider
-func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error) {
+func (p *IPFSProvider) List(params map[string]interface{}) ([]*ConnectedEntity, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("recovered from failed IPFS connector ls request; %s", r)
@@ -236,7 +235,7 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 		return nil, fmt.Errorf("unable to list IPFS resources for connector: %s; failed to initialize IPFS shell", p.connectorID)
 	}
 
-	resp := make([]interface{}, 0)
+	resp := make([]*ConnectedEntity, 0)
 	args := make([]string, 0)
 
 	if objects, objectsOk := params["objects"].([]string); objectsOk {
@@ -267,7 +266,32 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 
 	if objects, objectsOk := respobj["Objects"].([]interface{}); objectsOk {
 		for _, obj := range objects {
-			resp = append(resp, obj)
+			if entity, entityOk := obj.(map[string]interface{}); entityOk {
+				hash := common.StringOrNil(entity["Hash"].(string))
+
+				apiURL := p.apiURLFactory("get")
+				href := fmt.Sprintf("%s/get?arg=/ipfs/%s&encoding=json&stream-channels=true", *apiURL, *hash)
+
+				resp = append(resp, &ConnectedEntity{
+					ID:   hash,
+					Hash: hash,
+					Href: &href,
+
+					// CreatedAt  *time.Time             `json:"created_at,omitempty"`
+					// DataURL    *string                `json:"data_url,omitempty"`
+					// Errors     []*provide.Error       `json:"errors,omitempty"`
+					// Type       *string                `json:"type,omitempty"`
+					// Hash       *string                `json:"hash,omitempty"`
+					// Href       *string                `json:"href,omitempty"`
+					// Metadata   map[string]interface{} `json:"metadata,omitempty"`
+					// ModifiedAt *time.Time             `json:"modified_at,omitempty"`
+					// Name       *string                `json:"name,omitempty"`
+					// Raw        *string                `json:"raw,omitempty"`
+					// // relations
+					// Parent   *ConnectedEntity    `json:"parent,omitempty"`
+					// Children *[]*ConnectedEntity `json:"children,omitempty"`
+				})
+			}
 		}
 	}
 

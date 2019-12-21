@@ -18,26 +18,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// ProviderAPI defines an interface for connector provisioning and deprovisioning
-type ProviderAPI interface {
-	// infrastructure-specific
-	Deprovision() error
-	DeprovisionNode() error
-	Provision() error
-	ProvisionNode() error
-	Reachable() bool
-
-	// "data-like" connector-specific resource apis, starting with CRUD (i.e.,
-	// this is a proxy interface to the underlying provider such as IPFS)
-	Create(params map[string]interface{}) (interface{}, error)
-	Read(id string) (interface{}, error)
-	Update(id string, params map[string]interface{}) (interface{}, error)
-	Delete(id string) error
-
-	List(params map[string]interface{}) ([]interface{}, error)
-	Query(q string) (interface{}, error)
-}
-
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;
 // in the future it may represent a logical connection to services of other types
 type Connector struct {
@@ -381,14 +361,14 @@ func (c *Connector) Delete() bool {
 	return len(c.Errors) == 0
 }
 
-// connectorAPI returns an instance of the connector's underlying ProviderAPI
-func (c *Connector) connectorAPI() (ProviderAPI, error) {
+// connectorAPI returns an instance of the connector's underlying provider.API
+func (c *Connector) connectorAPI() (provider.API, error) {
 	if c.Type == nil {
 		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
 	}
 
 	db := dbconf.DatabaseConnection()
-	var apiClient ProviderAPI
+	var apiClient provider.API
 
 	switch *c.Type {
 	case provider.IPFSConnectorProvider:
