@@ -77,7 +77,11 @@ func (p *IPFSProvider) apiURLFactory(path string) *string {
 		return nil
 	}
 
-	return common.StringOrNil(fmt.Sprintf("%s/%s", *p.apiURL, path))
+	suffix := ""
+	if path != "" {
+		suffix = fmt.Sprintf("/%s", path)
+	}
+	return common.StringOrNil(fmt.Sprintf("%s%s", *p.apiURL, suffix))
 }
 
 func (p *IPFSProvider) rawConfig() *json.RawMessage {
@@ -232,38 +236,38 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 	}
 
 	resp := make([]interface{}, 0)
+	args := make([]string, 0)
 
-	if argsparam, argsparamOk := params["arg"].([]interface{}); argsparamOk {
-		lsargs := make([]string, 0)
-		for _, arg := range argsparam {
-			lsargs = append(lsargs, arg.(string))
-		}
+	if pargs, pargsOk := params["arg"].([]string); pargsOk {
+		args = pargs
+	}
 
-		lsresp, err := sh.Request("ls", lsargs...).Send(context.Background())
-		if err != nil {
-			common.Log.Warningf("failed to invoke IPFS ls api; %s", err.Error())
-			return nil, err
-		}
-		defer lsresp.Close()
+	lsresp, err := sh.Request("ls", args...).Send(context.Background())
+	if err != nil {
+		common.Log.Warningf("failed to invoke IPFS ls api; %s", err.Error())
+		return nil, err
+	}
+	defer lsresp.Close()
 
-		buf := []byte{}
-		_, err = lsresp.Output.Read(buf)
-		if err != nil {
-			common.Log.Warningf("failed to read IPFS ls output: %s", err.Error())
-			return nil, err
-		}
+	buf := []byte{}
+	_, err = lsresp.Output.Read(buf)
+	if err != nil {
+		common.Log.Warningf("failed to read IPFS ls output: %s", err.Error())
+		return nil, err
+	}
 
-		var respobj map[string]interface{}
-		err = json.Unmarshal(buf, &respobj)
-		if err != nil {
-			common.Log.Warningf("failed to unmarshal IPFS ls output: %s", err.Error())
-			return nil, err
-		}
+	common.Log.Debugf("read %d-byte response from IPFS:\n\n%s", len(buf), string(buf))
 
-		if objects, objectsOk := respobj["Objects"].([]interface{}); objectsOk {
-			for _, obj := range objects {
-				resp = append(resp, obj)
-			}
+	var respobj map[string]interface{}
+	err = json.Unmarshal(buf, &respobj)
+	if err != nil {
+		common.Log.Warningf("failed to unmarshal IPFS ls output: %s", err.Error())
+		return nil, err
+	}
+
+	if objects, objectsOk := respobj["Objects"].([]interface{}); objectsOk {
+		for _, obj := range objects {
+			resp = append(resp, obj)
 		}
 	}
 
