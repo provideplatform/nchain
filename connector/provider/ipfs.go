@@ -256,7 +256,7 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error
 		var respobj map[string]interface{}
 		err = json.Unmarshal(buf, &respobj)
 		if err != nil {
-			common.Log.Warningf("failed to unmarshal IPFS ls output: %s", arg, err.Error())
+			common.Log.Warningf("failed to unmarshal IPFS ls output: %s", err.Error())
 			return nil, err
 		}
 
