@@ -2,8 +2,10 @@ package provider
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
 
 	natsutil "github.com/kthomas/go-natsutil"
@@ -20,7 +22,7 @@ const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
 
-// IPFSProvider is a connector.ConnectorAPI implementing orchestration for IPFS
+// IPFSProvider is a connector.ProviderAPI implementing orchestration for IPFS
 type IPFSProvider struct {
 	connectorID   uuid.UUID
 	model         *gorm.DB
@@ -28,6 +30,7 @@ type IPFSProvider struct {
 	networkID     *uuid.UUID
 	applicationID *uuid.UUID
 	region        *string
+	apiURL        *string
 	apiPort       int
 	gatewayPort   int
 }
@@ -35,6 +38,7 @@ type IPFSProvider struct {
 // InitIPFSProvider initializes and returns the IPFS connector API provider
 func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *IPFSProvider {
 	region, regionOk := config["region"].(string)
+	apiURL, _ := config["api_url"].(string)
 	apiPort, apiPortOk := config["api_port"].(float64)
 	gatewayPort, gatewayPortOk := config["gateway_port"].(float64)
 	if connectorID == uuid.Nil || !regionOk || !apiPortOk || !gatewayPortOk || networkID == nil || *networkID == uuid.Nil {
@@ -47,9 +51,28 @@ func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID
 		networkID:     networkID,
 		applicationID: applicationID,
 		region:        common.StringOrNil(region),
+		apiURL:        common.StringOrNil(apiURL),
 		apiPort:       int(apiPort),
 		gatewayPort:   int(gatewayPort),
 	}
+}
+
+func (p *IPFSProvider) apiClientFactory(basePath string) *ipfs.Shell {
+	apiURL := p.apiURLFactory(basePath)
+	if apiURL == nil {
+		common.Log.Warningf("unable to initialize IPFS api client factory")
+		return nil
+	}
+
+	return ipfs.NewShell(*apiURL)
+}
+
+func (p *IPFSProvider) apiURLFactory(path string) *string {
+	if p.apiURL == nil {
+		return nil
+	}
+
+	return common.StringOrNil(fmt.Sprintf("%s/%s", *p.apiURL, path))
 }
 
 func (p *IPFSProvider) rawConfig() *json.RawMessage {
@@ -167,4 +190,62 @@ func (p *IPFSProvider) Reachable() bool {
 	}
 	common.Log.Debugf("Connector is unreachable: %s", p.connectorID)
 	return false
+}
+
+// Create impl for IPFSProvider
+func (p *IPFSProvider) Create(params map[string]interface{}) (interface{}, error) {
+	return nil, errors.New("create not implemented for IPFS connectors")
+}
+
+// Read impl for IPFSProvider
+func (p *IPFSProvider) Read(id string) (interface{}, error) {
+	return nil, errors.New("read not implemented for IPFS connectors")
+
+}
+
+// Update impl for IPFSProvider
+func (p *IPFSProvider) Update(id string, params map[string]interface{}) (interface{}, error) {
+	return nil, errors.New("update not implemented for IPFS connectors")
+}
+
+// Delete impl for IPFSProvider
+func (p *IPFSProvider) Delete(id string) error {
+	return errors.New("delete not implemented for IPFS connectors")
+}
+
+// List impl for IPFSProvider
+func (p *IPFSProvider) List(params map[string]interface{}) ([]interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			common.Log.Warningf("recovered from failed IPFS connector ls request; %s", r)
+		}
+	}()
+
+	sh := p.apiClientFactory("ls")
+	if sh == nil {
+		return nil, fmt.Errorf("unable to list IPFS resources for connector: %s; failed to initialize IPFS shell", p.connectorID)
+	}
+
+	resp := make([]interface{}, 0)
+
+	if argsparam, argsparamOk := params["arg"].([]interface{}); argsparamOk {
+		for _, arg := range argsparam {
+			links, err := sh.List(arg.(string))
+			if err != nil {
+				common.Log.Warningf("failed to retrieve IPFS path: %s; %s", arg, err.Error())
+				return nil, err
+			}
+
+			for _, link := range links {
+				resp = append(resp, link)
+			}
+		}
+	}
+
+	return resp, nil
+}
+
+// Query impl for IPFSProvider
+func (p *IPFSProvider) Query(q string) (interface{}, error) {
+	return nil, errors.New("query not implemented for IPFS connectors")
 }

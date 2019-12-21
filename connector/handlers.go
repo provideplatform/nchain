@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/network"
 	provide "github.com/provideservices/provide-go"
 )
@@ -57,6 +58,14 @@ func connectorDetailsHandler(c *gin.Context) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
+
+	enrichment := common.StringOrNil(c.Query("enrichment"))
+	err := connector.enrich(enrichment, nil)
+	if err != nil {
+		provide.RenderError(err.Error(), 500, c)
+		return
+	}
+
 	provide.Render(connector, 200, c)
 }
 

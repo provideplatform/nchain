@@ -18,32 +18,87 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// ConnectorAPI defines an interface for connector provisioning and deprovisioning
-type ConnectorAPI interface {
+// ProviderAPI defines an interface for connector provisioning and deprovisioning
+type ProviderAPI interface {
+	// infrastructure-specific
 	Deprovision() error
-	Provision() error
-
 	DeprovisionNode() error
+	Provision() error
 	ProvisionNode() error
-
 	Reachable() bool
+
+	// "data-like" connector-specific resource apis, starting with CRUD (i.e.,
+	// this is a proxy interface to the underlying provider such as IPFS)
+	Create(params map[string]interface{}) (interface{}, error)
+	Read(id string) (interface{}, error)
+	Update(id string, params map[string]interface{}) (interface{}, error)
+	Delete(id string) error
+
+	List(params map[string]interface{}) ([]interface{}, error)
+	Query(q string) (interface{}, error)
 }
 
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;
 // in the future it may represent a logical connection to services of other types
 type Connector struct {
 	provide.Model
-	ApplicationID   *uuid.UUID             `sql:"type:uuid" json:"application_id"`
-	NetworkID       uuid.UUID              `sql:"not null;type:uuid" json:"network_id"`
-	Name            *string                `sql:"not null" json:"name"`
-	Type            *string                `sql:"not null" json:"type"`
-	Status          *string                `sql:"not null;default:'init'" json:"status"`
-	Description     *string                `json:"description"`
-	Config          *json.RawMessage       `sql:"type:json" json:"config"`
-	EncryptedConfig *string                `sql:"type:bytea" json:"-"`
-	AccessedAt      *time.Time             `json:"accessed_at"`
-	LoadBalancers   []network.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
-	Nodes           []network.Node         `gorm:"many2many:connectors_nodes" json:"-"`
+	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	Name            *string          `sql:"not null" json:"name"`
+	Type            *string          `sql:"not null" json:"type"`
+	Status          *string          `sql:"not null;default:'init'" json:"status"`
+	Description     *string          `json:"description"`
+	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
+	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+	AccessedAt      *time.Time       `json:"accessed_at,omitempty"`
+
+	Details *Details `sql:"-" json:"details,omitempty"`
+
+	LoadBalancers []network.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
+	Nodes         []network.Node         `gorm:"many2many:connectors_nodes" json:"-"`
+}
+
+// Details is a generic representation for a type-specific enrichment of a described connector;
+// the details object may have complexity of its own, such as paginated subresults
+type Details struct {
+	Page *int64      `json:"page,omitempty"`
+	RPP  *int64      `json:"rpp,omitempty"`
+	Data interface{} `json:"data,omitempty"`
+}
+
+func (c *Connector) enrich(enrichment *string, params map[string]interface{}) error {
+	apiClient, err := c.connectorAPI()
+	if err != nil {
+		return fmt.Errorf("failed to resolve connector API for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+
+	switch enrichment {
+	case nil:
+		// default IPFS enrichment is the ls() command to retrieve directory listing
+		// page := int64(1)
+		// rpp := int64(25)
+
+		// if pg, pgOk := params["page"].(float64); pgOk {
+		// 	page = int64(pg)
+		// }
+		// if perpg, perpgOk := params["rpp"].(float64); perpgOk {
+		// 	rpp = int64(perpg)
+		// }
+
+		resp, err := apiClient.List(params)
+		if err != nil {
+			common.Log.Warningf("failed to enrich connector: %s; %s", c.ID, err.Error())
+			return err
+		}
+		c.Details = &Details{
+			// Page: page,
+			// RPP: rpp
+			Data: resp,
+		}
+	default:
+		common.Log.Warningf("failed to enrich connector: %s; unsupported enrichment", c.ID)
+	}
+	return nil
 }
 
 // ParseConfig - parse the original JSON params used for Connector creation
@@ -326,18 +381,24 @@ func (c *Connector) Delete() bool {
 	return len(c.Errors) == 0
 }
 
-// connectorAPI returns an instance of the connector's underlying ConnectorAPI
-func (c *Connector) connectorAPI() (ConnectorAPI, error) {
+// connectorAPI returns an instance of the connector's underlying ProviderAPI
+func (c *Connector) connectorAPI() (ProviderAPI, error) {
 	if c.Type == nil {
 		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
 	}
 
 	db := dbconf.DatabaseConnection()
-	var apiClient ConnectorAPI
+	var apiClient ProviderAPI
 
 	switch *c.Type {
 	case provider.IPFSConnectorProvider:
-		apiClient = provider.InitIPFSProvider(c.ID, &c.NetworkID, c.ApplicationID, db.Model(c), c.mergedConfig())
+		apiClient = provider.InitIPFSProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
 	default:
 		return nil, fmt.Errorf("No provider resolved for connector: %s", c.ID)
 	}
