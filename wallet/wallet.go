@@ -365,7 +365,10 @@ func (w *Wallet) generate(db *gorm.DB) error {
 		return err
 	}
 
-	pathstr := fmt.Sprintf("m/%d'", *w.Purpose)
+	var pathstr string
+	if w.Purpose != nil {
+		pathstr = fmt.Sprintf("m/%d'", *w.Purpose)
+	}
 	seedstr := string(seed)
 
 	w.Mnemonic = &mnemonic
