@@ -269,8 +269,8 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]*ConnectedEntity, 
 			if entity, entityOk := obj.(map[string]interface{}); entityOk {
 				hash := common.StringOrNil(entity["Hash"].(string))
 
-				apiURL := p.apiURLFactory("get")
-				href := fmt.Sprintf("%s/get?arg=/ipfs/%s&encoding=json&stream-channels=true", *apiURL, *hash)
+				apiURL := p.apiURLFactory("api/v0/get")
+				href := fmt.Sprintf("%s?arg=/ipfs/%s&encoding=json&stream-channels=true", *apiURL, *hash)
 
 				resp = append(resp, &ConnectedEntity{
 					ID:   hash,
