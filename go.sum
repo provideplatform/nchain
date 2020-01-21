@@ -259,12 +259,8 @@ github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d h1:VsHkZ971M3+
 github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d/go.mod h1:CQhxd0wNT7xvW7FkXnUH8dLXLDFydp5F1BsHnQWDgEw=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBHOhd8DjpcK3ewKvM6YD0E5wHf6LAyTd6XX0=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
-github.com/kthomas/go-aws-wrapper v0.0.0-20200121070211-e2fae712e1c1 h1:0BeVE7/SAvoZ2ChGQ0NomfUcRJbaF88xLUPYl/sC+jA=
-github.com/kthomas/go-aws-wrapper v0.0.0-20200121070211-e2fae712e1c1/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
-github.com/kthomas/go-aws-wrapper v0.0.0-20200121084615-0461851d3df8 h1:bqAwM49/J4XIR17oBEOdyKfl95JkP72uu08TlspEjmU=
-github.com/kthomas/go-aws-wrapper v0.0.0-20200121084615-0461851d3df8/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
-github.com/kthomas/go-aws-wrapper v0.0.0-20200121093622-14d83b2c74d7 h1:KArbmy6otBgIsW/JBBnVvA3fWFGVn+YS1VXrAAmcxzo=
-github.com/kthomas/go-aws-wrapper v0.0.0-20200121093622-14d83b2c74d7/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
+github.com/kthomas/go-aws-wrapper v0.0.0-20200121102502-2929beca6fbb h1:D79vphdR+rZ9ffDBmLadzVLITtr9LfhqD8JhlnZwsLk=
+github.com/kthomas/go-aws-wrapper v0.0.0-20200121102502-2929beca6fbb/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c h1:KIw63xEiZRfXkvq3iKJjofzJhT7hGoj3PLy7zK3jMjQ=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c/go.mod h1:oApzEAKQeLYMWVUCv09olaXsxUac+bSJCOLTOgw3Ekc=
 github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513 h1:lcgOk2ZGtDy87lMLWiZCXzNGe5vLprb8bPN84BsGqUY=
@@ -275,10 +271,8 @@ github.com/kthomas/go-pgputil v0.0.0-20191124055155-a2d45567ec49 h1:Jwb7Dt3D7kmG
 github.com/kthomas/go-pgputil v0.0.0-20191124055155-a2d45567ec49/go.mod h1:39B58+gxki8YxfLtqa4MVW0EGmrl2BJqHJQ/6UvTMws=
 github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e h1:AzgPUN+LP9HbIUi5hCLeQ47YYBvBRzi6t+eOsK5wiy0=
 github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e/go.mod h1:BiqUUMjR9DWuCDsB6KxzH/iSXuIdsjv4VDwc0wvcBoM=
-github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5 h1:Sosu0789XxOLgLZlVRuFMF7k3LnoZ651Fc25N9bfMbc=
-github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5/go.mod h1:KJCUwZyO/D5w+38wU0ENRVDh+aYTvAFeyR3Fma8ZJqs=
-github.com/kthomas/go-self-signed-cert v0.0.0-20200121093429-311a7f4bce2f h1:FUaTm09fWUBJ2HOHKOL+CHtulFXAq7VoSC7hdeQwlao=
-github.com/kthomas/go-self-signed-cert v0.0.0-20200121093429-311a7f4bce2f/go.mod h1:KJCUwZyO/D5w+38wU0ENRVDh+aYTvAFeyR3Fma8ZJqs=
+github.com/kthomas/go-self-signed-cert v0.0.0-20200121102317-5ce1ee6149aa h1:V124rX4ZWG7boBNnbe00JiLi+mdOutkAMaNHkfAYg/0=
+github.com/kthomas/go-self-signed-cert v0.0.0-20200121102317-5ce1ee6149aa/go.mod h1:KJCUwZyO/D5w+38wU0ENRVDh+aYTvAFeyR3Fma8ZJqs=
 github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4 h1:xWgita+beQTA+NaWz1dSFnWMZFLFPpRNZ0NdG1VOfOQ=
 github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4/go.mod h1:HqzG4AC71EusLj6ojuBNx8UKX03eWGSSXNYuKE7sUNo=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
@@ -588,8 +582,6 @@ golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20190912141932-bc967efca4b8/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190922100055-0a153f010e69 h1:rOhMmluY6kLMhdnrivzec6lLgaVbMHMn2ISQXJeJ5EM=
 golang.org/x/sys v0.0.0-20190922100055-0a153f010e69/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20200120151820-655fe14d7479 h1:LhLiKguPgZL+Tglay4GhVtfF0kb8cvOJ0dHTCBO8YNI=
-golang.org/x/sys v0.0.0-20200120151820-655fe14d7479/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200121082415-34d275377bf9 h1:N19i1HjUnR7TF7rMt8O4p3dLvqvmYyzB6ifMFmrbY50=
 golang.org/x/sys v0.0.0-20200121082415-34d275377bf9/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

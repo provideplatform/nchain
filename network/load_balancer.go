@@ -701,7 +701,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				if certificateOk {
 					certificateArn = &certificate
 				} else {
-					certResponse, err := orchestrationAPI.ImportSelfSignedCertificate(nil)
+					certResponse, err := orchestrationAPI.ImportSelfSignedCertificate([]string{*l.Host}, nil)
 					if err != nil {
 						desc := fmt.Sprintf("Failed to import self-signed cert in region: %s; %s", region, err.Error())
 						common.Log.Warning(desc)

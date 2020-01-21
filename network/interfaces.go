@@ -34,7 +34,7 @@ type OrchestrationAPI interface {
 	RegisterTarget(targetGroupARN, ipAddress *string, port *int64) (response *elbv2.RegisterTargetsOutput, err error)
 	DeregisterTarget(targetGroupARN, ipAddress *string, port *int64) (response *elbv2.DeregisterTargetsOutput, err error)
 
-	ImportSelfSignedCertificate(certificateARN *string) (*acm.ImportCertificateOutput, error)
+	ImportSelfSignedCertificate(dnsNames []string, certificateARN *string) (*acm.ImportCertificateOutput, error)
 	DeleteCertificate(certificateARN *string) (response *acm.DeleteCertificateOutput, err error)
 
 	CreateDefaultSubnets(vpcID string) ([]*ec2.CreateDefaultSubnetOutput, error)

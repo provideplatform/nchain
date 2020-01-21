@@ -43,7 +43,7 @@ func DecryptECDSAPrivateKey(encryptedKey string) (*ecdsa.PrivateKey, error) {
 // ShouldServeTLS returns true if the API should be served over TLS
 func ShouldServeTLS() bool {
 	if requireTLS {
-		privKeyPath, certPath, err := selfsignedcert.GenerateToDisk()
+		privKeyPath, certPath, err := selfsignedcert.GenerateToDisk([]string{})
 		if err != nil {
 			Log.Panicf("Failed to generate self-signed certificate; %s", err.Error())
 		}

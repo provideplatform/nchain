@@ -129,8 +129,8 @@ func (p *AWSOrchestrationProvider) DeregisterTarget(targetGroupARN, ipAddress *s
 }
 
 // ImportSelfSignedCertificate needs docs
-func (p *AWSOrchestrationProvider) ImportSelfSignedCertificate(certificateARN *string) (*acm.ImportCertificateOutput, error) {
-	return awswrapper.ImportSelfSignedCertificate(p.accessKeyID, p.secretAccessKey, p.region, certificateARN)
+func (p *AWSOrchestrationProvider) ImportSelfSignedCertificate(dnsNames []string, certificateARN *string) (*acm.ImportCertificateOutput, error) {
+	return awswrapper.ImportSelfSignedCertificate(p.accessKeyID, p.secretAccessKey, p.region, dnsNames, certificateARN)
 }
 
 // DeleteCertificate needs docs
