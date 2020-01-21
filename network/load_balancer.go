@@ -337,6 +337,19 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 						}
 					}
 				}
+
+				if certificates, certificatesOk := cfg["certificates"].(map[string]interface{}); certificatesOk {
+					for _, certificate := range certificates {
+						if certificateArn, certificateArnOk := certificate.(string); certificateArnOk {
+							_, err := orchestrationAPI.DeleteCertificate(&certificateArn)
+							if err != nil {
+								desc := fmt.Sprintf("Failed to delete cert in region: %s; %s", region, err.Error())
+								common.Log.Warning(desc)
+								return fmt.Errorf(desc)
+							}
+						}
+					}
+				}
 			}
 
 			if l.Delete() {
@@ -553,6 +566,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 	targetBalancerArn, arnOk := cfg["target_balancer_id"].(string)
 	vpcID, _ := cfg["vpc_id"].(string)
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
+	certificates, certificatesOk := cfg["certificates"].(map[string]interface{})
 
 	if l.Host != nil {
 		common.Log.Debugf("Attempting to load balance network node %s on balancer: %s", node.ID, l.ID)
@@ -568,6 +582,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 			err := fmt.Errorf("Failed to load balance network node %s on balancer: %s; %s", node.ID, l.ID, err.Error())
 			common.Log.Warningf(err.Error())
 			return err
+		}
+
+		if !certificatesOk {
+			certificates = map[string]interface{}{}
+			cfg["certificates"] = certificates
 		}
 
 		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && arnOk && securityCfgOk {
@@ -676,22 +695,33 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				}
 				common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
 
-				protocol := common.StringOrNil("HTTP")
-
-				var cert *elbv2.Certificate
-				if common.DefaultAWSConfig.DefaultCertificateArn != nil && *common.DefaultAWSConfig.DefaultCertificateArn != "" {
-					cert = &elbv2.Certificate{
-						CertificateArn: common.DefaultAWSConfig.DefaultCertificateArn,
+				var certificateArn *string
+				portStr := strconv.Itoa(int(port))
+				certificate, certificateOk := certificates[portStr].(string)
+				if certificateOk {
+					certificateArn = &certificate
+				} else {
+					certResponse, err := orchestrationAPI.ImportSelfSignedCertificate(nil)
+					if err != nil {
+						desc := fmt.Sprintf("Failed to import self-signed cert in region: %s; %s", region, err.Error())
+						common.Log.Warning(desc)
+						return fmt.Errorf(desc)
 					}
-					protocol = common.StringOrNil("HTTPS")
+					certificateArn = certResponse.CertificateArn
+					certificates[portStr] = certificateArn
+
+					l.setConfig(cfg)
+					db.Save(&l)
 				}
 
 				_, err = orchestrationAPI.CreateListenerV2(
 					common.StringOrNil(targetBalancerArn),
 					common.StringOrNil(targetGroupArn),
-					protocol,
+					common.StringOrNil("HTTPS"),
 					&port,
-					cert,
+					&elbv2.Certificate{
+						CertificateArn: certificateArn,
+					},
 				)
 				if err != nil {
 					common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)

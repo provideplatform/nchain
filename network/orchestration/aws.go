@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
@@ -125,6 +126,16 @@ func (p *AWSOrchestrationProvider) RegisterTarget(targetGroupARN, ipAddress *str
 func (p *AWSOrchestrationProvider) DeregisterTarget(targetGroupARN, ipAddress *string, port *int64) (response *elbv2.DeregisterTargetsOutput, err error) {
 	return awswrapper.DeregisterTarget(p.accessKeyID, p.secretAccessKey, p.region, targetGroupARN, ipAddress, port)
 
+}
+
+// ImportSelfSignedCertificate needs docs
+func (p *AWSOrchestrationProvider) ImportSelfSignedCertificate(certificateARN *string) (*acm.ImportCertificateOutput, error) {
+	return awswrapper.ImportSelfSignedCertificate(p.accessKeyID, p.secretAccessKey, p.region, certificateARN)
+}
+
+// DeleteCertificate needs docs
+func (p *AWSOrchestrationProvider) DeleteCertificate(certificateARN *string) (response *acm.DeleteCertificateOutput, err error) {
+	return awswrapper.DeleteCertificate(p.accessKeyID, p.secretAccessKey, p.region, certificateARN)
 }
 
 // RegisterInstanceWithLoadBalancer needs docs
