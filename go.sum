@@ -38,6 +38,8 @@ github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878 h1:EFSB7Zo9Eg91v7
 github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878/go.mod h1:3AMJUQhVx52RsWOnlkpikZr01T/yAVN2gn0861vByNg=
 github.com/aws/aws-sdk-go v1.25.41 h1:/hj7nZ0586wFqpwjNpzWiUTwtaMgxAZNZKHay80MdXw=
 github.com/aws/aws-sdk-go v1.25.41/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
+github.com/aws/aws-sdk-go v1.28.6 h1:GUbRiuJnFDA6hQw+jK1oQyONVMO5U1EjRdrfSxfONC4=
+github.com/aws/aws-sdk-go v1.28.6/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
@@ -261,6 +263,8 @@ github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBH
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200121054005-0444ce1e0d50 h1:nVGVTQlYu5Saf5WPC4SiwsgYWYwoYbdE4NOyP9tNDzw=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200121054005-0444ce1e0d50/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
+github.com/kthomas/go-aws-wrapper v0.0.0-20200121070211-e2fae712e1c1 h1:0BeVE7/SAvoZ2ChGQ0NomfUcRJbaF88xLUPYl/sC+jA=
+github.com/kthomas/go-aws-wrapper v0.0.0-20200121070211-e2fae712e1c1/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c h1:KIw63xEiZRfXkvq3iKJjofzJhT7hGoj3PLy7zK3jMjQ=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c/go.mod h1:oApzEAKQeLYMWVUCv09olaXsxUac+bSJCOLTOgw3Ekc=
 github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513 h1:lcgOk2ZGtDy87lMLWiZCXzNGe5vLprb8bPN84BsGqUY=
@@ -584,6 +588,8 @@ golang.org/x/sys v0.0.0-20190922100055-0a153f010e69 h1:rOhMmluY6kLMhdnrivzec6lLg
 golang.org/x/sys v0.0.0-20190922100055-0a153f010e69/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191220220014-0732a990476f h1:72l8qCJ1nGxMGH26QVBVIxKd/D34cfGt0OvrPtpemyY=
 golang.org/x/sys v0.0.0-20191220220014-0732a990476f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200120151820-655fe14d7479 h1:LhLiKguPgZL+Tglay4GhVtfF0kb8cvOJ0dHTCBO8YNI=
+golang.org/x/sys v0.0.0-20200120151820-655fe14d7479/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
