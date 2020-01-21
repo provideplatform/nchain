@@ -259,8 +259,8 @@ github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d h1:VsHkZ971M3+
 github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d/go.mod h1:CQhxd0wNT7xvW7FkXnUH8dLXLDFydp5F1BsHnQWDgEw=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBHOhd8DjpcK3ewKvM6YD0E5wHf6LAyTd6XX0=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
-github.com/kthomas/go-aws-wrapper v0.0.0-20190925064413-e00dcbdae456 h1:tG4MOpZwNdk/pMXhIAmNSfM7b4RHQ2jbBxJYwNNVKWA=
-github.com/kthomas/go-aws-wrapper v0.0.0-20190925064413-e00dcbdae456/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
+github.com/kthomas/go-aws-wrapper v0.0.0-20200121054005-0444ce1e0d50 h1:nVGVTQlYu5Saf5WPC4SiwsgYWYwoYbdE4NOyP9tNDzw=
+github.com/kthomas/go-aws-wrapper v0.0.0-20200121054005-0444ce1e0d50/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c h1:KIw63xEiZRfXkvq3iKJjofzJhT7hGoj3PLy7zK3jMjQ=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c/go.mod h1:oApzEAKQeLYMWVUCv09olaXsxUac+bSJCOLTOgw3Ekc=
 github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513 h1:lcgOk2ZGtDy87lMLWiZCXzNGe5vLprb8bPN84BsGqUY=
