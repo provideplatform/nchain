@@ -275,6 +275,8 @@ github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e h1:AzgPUN+LP9
 github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e/go.mod h1:BiqUUMjR9DWuCDsB6KxzH/iSXuIdsjv4VDwc0wvcBoM=
 github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5 h1:Sosu0789XxOLgLZlVRuFMF7k3LnoZ651Fc25N9bfMbc=
 github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5/go.mod h1:KJCUwZyO/D5w+38wU0ENRVDh+aYTvAFeyR3Fma8ZJqs=
+github.com/kthomas/go-self-signed-cert v0.0.0-20200121093429-311a7f4bce2f h1:FUaTm09fWUBJ2HOHKOL+CHtulFXAq7VoSC7hdeQwlao=
+github.com/kthomas/go-self-signed-cert v0.0.0-20200121093429-311a7f4bce2f/go.mod h1:KJCUwZyO/D5w+38wU0ENRVDh+aYTvAFeyR3Fma8ZJqs=
 github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4 h1:xWgita+beQTA+NaWz1dSFnWMZFLFPpRNZ0NdG1VOfOQ=
 github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4/go.mod h1:HqzG4AC71EusLj6ojuBNx8UKX03eWGSSXNYuKE7sUNo=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=

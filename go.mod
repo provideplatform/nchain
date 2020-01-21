@@ -34,7 +34,7 @@ require (
 	github.com/kthomas/go-natsutil v0.0.0-20191123231914-bee144fe6fd2
 	github.com/kthomas/go-pgputil v0.0.0-20191124055155-a2d45567ec49
 	github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e
-	github.com/kthomas/go-self-signed-cert v0.0.0-20190324125449-a6356df979a5
+	github.com/kthomas/go-self-signed-cert v0.0.0-20200121093429-311a7f4bce2f
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
 	github.com/libp2p/go-libp2p-core v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
