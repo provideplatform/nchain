@@ -339,7 +339,7 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 		return
 	}
 
-	err = balancer.Provision(dbconf.DatabaseConnection())
+	err = balancer.Provision(db)
 	if err != nil {
 		common.Log.Warningf("Failed to provision load balancer; %s", err.Error())
 		natsutil.AttemptNack(msg, natsLoadBalancerProvisioningTimeout)

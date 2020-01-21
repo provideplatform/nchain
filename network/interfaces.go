@@ -23,7 +23,7 @@ type OrchestrationAPI interface {
 	GetLoadBalancers(loadBalancerName *string) (response *elb.DescribeLoadBalancersOutput, err error)
 
 	CreateLoadBalancerV2(vpcID, name, balancerType *string, securityGroupIds []string) (response *elbv2.CreateLoadBalancerOutput, err error)
-	CreateListenerV2(loadBalancerARN, targetGroupARN, protocol *string, port *int64) (*elbv2.CreateListenerOutput, error)
+	CreateListenerV2(loadBalancerARN, targetGroupARN, protocol *string, port *int64, certificate interface{}) (*elbv2.CreateListenerOutput, error)
 	DeleteLoadBalancerV2(loadBalancerARN *string) (response *elbv2.DeleteLoadBalancerOutput, err error)
 	GetLoadBalancersV2(loadBalancerArn *string, loadBalancerName *string) (response *elbv2.DescribeLoadBalancersOutput, err error)
 

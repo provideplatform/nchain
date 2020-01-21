@@ -130,6 +130,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 		networkGenesisMutex[pending.NetworkID.String()] = mutex
 	}
 
+	// TODO: make this lock distributed
 	mutex.Lock()
 	defer mutex.Unlock()
 

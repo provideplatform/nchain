@@ -80,7 +80,7 @@ func (p *AWSOrchestrationProvider) CreateDefaultSubnets(vpcID string) ([]*ec2.Cr
 }
 
 // CreateListenerV2 needs docs
-func (p *AWSOrchestrationProvider) CreateListenerV2(loadBalancerARN, targetGroupARN, protocol *string, port *int64) (*elbv2.CreateListenerOutput, error) {
+func (p *AWSOrchestrationProvider) CreateListenerV2(loadBalancerARN, targetGroupARN, protocol *string, port *int64, certificate interface{}) (*elbv2.CreateListenerOutput, error) {
 	return awswrapper.CreateListenerV2(p.accessKeyID, p.secretAccessKey, p.region, loadBalancerARN, targetGroupARN, protocol, port)
 
 }

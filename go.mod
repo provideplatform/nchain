@@ -27,7 +27,7 @@ require (
 	github.com/jinzhu/gorm v1.9.11
 	github.com/kthomas/exchange-consumer v0.0.0-20171225030615-4fb83508b3ca
 	github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d // indirect
-	github.com/kthomas/go-aws-config v0.0.0-20181207121356-b7870ac562af
+	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
 	github.com/kthomas/go-aws-wrapper v0.0.0-20190925064413-e00dcbdae456
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513

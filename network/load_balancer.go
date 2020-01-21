@@ -611,6 +611,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 							}
 
 							for _, tcpPort := range tcp {
+								// FIXME-- support dynamic protocol -- ie TCP vs SSL
 								targetGroupName := l.buildTargetGroupName(tcpPort)
 								targetGroup, err := orchestrationAPI.CreateTargetGroup(
 									common.StringOrNil(vpcID),
@@ -663,7 +664,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 			common.Log.Debugf("Resolved %d target group(s) for load balanced target registration for network node %s on balancer: %s", len(targetGroups), node.ID, l.ID)
 			for port, targetGroupArn := range targetGroups {
-				_, err := orchestrationAPI.RegisterTarget(common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port)
+				_, err := orchestrationAPI.RegisterTarget(
+					common.StringOrNil(targetGroupArn),
+					node.PrivateIPv4,
+					&port,
+				)
 				if err != nil {
 					desc := fmt.Sprintf("Failed to add target to load balanced target group in region: %s; %s", region, err.Error())
 					common.Log.Warning(desc)
@@ -671,7 +676,23 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				}
 				common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
 
-				_, err = orchestrationAPI.CreateListenerV2(common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port)
+				protocol := common.StringOrNil("HTTP")
+
+				var cert *elbv2.Certificate
+				if common.DefaultAWSConfig.DefaultCertificateArn != nil && *common.DefaultAWSConfig.DefaultCertificateArn != "" {
+					cert = &elbv2.Certificate{
+						CertificateArn: common.DefaultAWSConfig.DefaultCertificateArn,
+					}
+					protocol = common.StringOrNil("HTTPS")
+				}
+
+				_, err = orchestrationAPI.CreateListenerV2(
+					common.StringOrNil(targetBalancerArn),
+					common.StringOrNil(targetGroupArn),
+					protocol,
+					&port,
+					cert,
+				)
 				if err != nil {
 					common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
 				}
