@@ -28,7 +28,7 @@ require (
 	github.com/kthomas/exchange-consumer v0.0.0-20171225030615-4fb83508b3ca
 	github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
-	github.com/kthomas/go-aws-wrapper v0.0.0-20200121070211-e2fae712e1c1
+	github.com/kthomas/go-aws-wrapper v0.0.0-20200121084615-0461851d3df8
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
 	github.com/kthomas/go-natsutil v0.0.0-20191123231914-bee144fe6fd2
@@ -48,6 +48,6 @@ require (
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915 // indirect
-	golang.org/x/sys v0.0.0-20200120151820-655fe14d7479 // indirect
+	golang.org/x/sys v0.0.0-20200121082415-34d275377bf9 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
