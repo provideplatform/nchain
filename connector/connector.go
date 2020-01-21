@@ -248,7 +248,7 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 	if host == nil {
 		return nil
 	}
-	return common.StringOrNil(fmt.Sprintf("http://%s:%d", *host, port)) // FIXME-- allow specification of url scheme in cfg := c.ParseConfig()
+	return common.StringOrNil(fmt.Sprintf("https://%s:%d", *host, port)) // FIXME-- allow specification of url scheme in cfg := c.ParseConfig()
 }
 
 func (c *Connector) denormalizeConfig() error {
