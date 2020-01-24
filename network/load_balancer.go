@@ -696,22 +696,40 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				common.Log.Debugf("Registered load balanced target for balancer %s on port: %d", l.ID, port)
 
 				var certificateArn *string
-				portStr := strconv.Itoa(int(port))
-				certificate, certificateOk := certificates[portStr].(string)
-				if certificateOk {
-					certificateArn = &certificate
-				} else {
-					certResponse, err := orchestrationAPI.ImportSelfSignedCertificate([]string{*l.Host}, nil)
+
+				if common.DefaultAWSConfig.DefaultCertificateArn != nil && *common.DefaultAWSConfig.DefaultCertificateArn != "" {
+					common.Log.Debugf("Resolved configured certificate arn for use with load balancer %s: %s", l.ID, *certificateArn)
+
+					certificateArn = common.DefaultAWSConfig.DefaultCertificateArn
+					certificateDomain := "infra.prod.provide.services" // FIXME
+					dnsHostedZoneID := " Z3CZYK2VOGU4FS"               // FIXME
+					dnsName := fmt.Sprintf("%s.%s", l.ID, certificateDomain)
+					_, err := orchestrationAPI.CreateDNSRecord(dnsHostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
 					if err != nil {
-						desc := fmt.Sprintf("Failed to import self-signed cert in region: %s; %s", region, err.Error())
+						desc := fmt.Sprintf("Failed to create DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
 						common.Log.Warning(desc)
 						return fmt.Errorf(desc)
 					}
-					certificateArn = certResponse.CertificateArn
-					certificates[portStr] = certificateArn
+					common.Log.Debugf("Created DNS record for load balancer %s in region: %s; %s", l.ID, region)
+				} else {
+					common.Log.Debugf("Configured certificate arn not resolved for use with load balancer %s; creating self-signed certificate...", l.ID, *certificateArn)
+					portStr := strconv.Itoa(int(port))
+					certificate, certificateOk := certificates[portStr].(string)
+					if certificateOk {
+						certificateArn = &certificate
+					} else {
+						certResponse, err := orchestrationAPI.ImportSelfSignedCertificate([]string{*l.Host}, nil)
+						if err != nil {
+							desc := fmt.Sprintf("Failed to import self-signed cert in region: %s; %s", region, err.Error())
+							common.Log.Warning(desc)
+							return fmt.Errorf(desc)
+						}
+						certificateArn = certResponse.CertificateArn
+						certificates[portStr] = certificateArn
 
-					l.setConfig(cfg)
-					db.Save(&l)
+						l.setConfig(cfg)
+						db.Save(&l)
+					}
 				}
 
 				_, err = orchestrationAPI.CreateListenerV2(

@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	"github.com/aws/aws-sdk-go/service/route53"
 	awswrapper "github.com/kthomas/go-aws-wrapper"
 	"github.com/provideapp/goldmine/common"
 )
@@ -126,6 +127,16 @@ func (p *AWSOrchestrationProvider) RegisterTarget(targetGroupARN, ipAddress *str
 func (p *AWSOrchestrationProvider) DeregisterTarget(targetGroupARN, ipAddress *string, port *int64) (response *elbv2.DeregisterTargetsOutput, err error) {
 	return awswrapper.DeregisterTarget(p.accessKeyID, p.secretAccessKey, p.region, targetGroupARN, ipAddress, port)
 
+}
+
+// CreateDNSRecord needs docs
+func (p *AWSOrchestrationProvider) CreateDNSRecord(hostedZoneID, name, recordType string, value []string, ttl int64) (response *route53.ChangeResourceRecordSetsOutput, err error) {
+	return awswrapper.CreateDNSRecord(p.accessKeyID, p.secretAccessKey, p.region, hostedZoneID, name, recordType, value, ttl)
+}
+
+// DeleteDNSRecord needs docs
+func (p *AWSOrchestrationProvider) DeleteDNSRecord(hostedZoneID, name, recordType string, value []string, ttl int64) (response *route53.ChangeResourceRecordSetsOutput, err error) {
+	return awswrapper.DeleteDNSRecord(p.accessKeyID, p.secretAccessKey, p.region, hostedZoneID, name, recordType, value, ttl)
 }
 
 // ImportSelfSignedCertificate needs docs
