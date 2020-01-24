@@ -259,6 +259,7 @@ func (c *Connector) denormalizeConfig() error {
 			return c.resolveAPIURL()
 		default:
 			// no-op
+			common.Log.Warningf("Unsupported connector type: %s for connector: %s; denormalization of connector config is a no-op", *c.Type, c.ID)
 		}
 	}
 	return nil
@@ -289,6 +290,12 @@ func (c *Connector) updateStatus(db *gorm.DB, status string, description *string
 				Message: common.StringOrNil(err.Error()),
 			})
 		}
+	} else if status == "available" {
+		common.Log.Debugf("Connector become available; dispatching denormalize configuration message for connector: %s", c.ID)
+		msg, _ := json.Marshal(map[string]interface{}{
+			"connector_id": c.ID,
+		})
+		natsutil.NatsPublish(natsConnectorDenormalizeConfigSubject, msg)
 	}
 }
 

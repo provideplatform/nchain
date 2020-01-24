@@ -99,6 +99,12 @@ func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 }
 
 func consumeConnectorProvisioningMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsConnectorProvisioningTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS connector provisioning message: %s", msg)
 	var params map[string]interface{}
 
@@ -137,6 +143,12 @@ func consumeConnectorProvisioningMsg(msg *stan.Msg) {
 }
 
 func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsConnectorDeprovisioningTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS connector deprovisioning message: %s", msg)
 	var params map[string]interface{}
 
@@ -175,6 +187,12 @@ func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
 }
 
 func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsConnectorDenormalizeConfigTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS connector denormalize config message: %s", msg)
 	var params map[string]interface{}
 
@@ -213,6 +231,12 @@ func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
 }
 
 func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsConnectorResolveReachabilityTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS connector resolve reachability message: %s", msg)
 	var params map[string]interface{}
 
@@ -245,6 +269,10 @@ func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
 		connector.updateStatus(db, "available", nil)
 		msg.Ack()
 	} else {
+		if connector.Status != nil && *connector.Status == "available" {
+			connector.updateStatus(db, "unavailable", nil)
+		}
+
 		common.Log.Debugf("Connector is not reachable: %s", connector.ID)
 		natsutil.AttemptNack(msg, natsConnectorResolveReachabilityTimeout)
 	}
