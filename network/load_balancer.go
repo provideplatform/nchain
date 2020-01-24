@@ -730,6 +730,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				var certificateArn *string
 
 				if !common.DefaultInfrastructureUsesSelfSignedCertificate {
+					certificateArn = common.DefaultInfrastructureAWSConfig.DefaultCertificateArn
 					common.Log.Debugf("Resolved configured certificate arn for use with load balancer %s: %s", l.ID, *certificateArn)
 
 					var dnsAPI OrchestrationAPI
@@ -745,7 +746,6 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 					}
 
-					certificateArn = common.DefaultInfrastructureAWSConfig.DefaultCertificateArn
 					dnsName := fmt.Sprintf("%s.%s", l.ID, common.DefaultInfrastructureDomain)
 					_, err := dnsAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
 					if err != nil {
