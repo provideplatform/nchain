@@ -243,6 +243,12 @@ func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 }
 
 func consumeBlockFinalizedMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsBlockFinalizedTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS block finalized message: %s", msg)
 	var err error
 
@@ -312,6 +318,12 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 }
 
 func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsLoadBalancerProvisioningTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS load balancer provisioning message: %s", msg)
 	var params map[string]interface{}
 
@@ -350,6 +362,12 @@ func consumeLoadBalancerProvisioningMsg(msg *stan.Msg) {
 }
 
 func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsLoadBalancerDeprovisioningTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS load balancer deprovisioning message: %s", msg)
 	var params map[string]interface{}
 
@@ -388,6 +406,12 @@ func consumeLoadBalancerDeprovisioningMsg(msg *stan.Msg) {
 }
 
 func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsLoadBalancerBalanceNodeTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS load balancer balance node message: %s", msg)
 	var params map[string]interface{}
 
@@ -440,6 +464,12 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 }
 
 func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsLoadBalancerUnbalanceNodeTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS load balancer unbalance node message: %s", msg)
 	var params map[string]interface{}
 
@@ -493,6 +523,12 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 }
 
 func consumeDeployNodeMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsDeployNodeTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS deploy network node message: %s", msg)
 	var params map[string]interface{}
 
@@ -532,6 +568,12 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 }
 
 func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsDeleteTerminatedNodeTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS terminated network node deletion message: %s", msg)
 	var params map[string]interface{}
 
@@ -586,6 +628,12 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 }
 
 func consumeResolveNodeHostMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsResolveNodeHostTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS resolve network node host message: %s", msg)
 	var params map[string]interface{}
 
@@ -625,6 +673,12 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 }
 
 func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsResolveNodePeerURLTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS resolve network node peer url message: %s", msg)
 	var params map[string]interface{}
 
@@ -670,6 +724,12 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 }
 
 func consumeAddNodePeerMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsAddNodePeerTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS add peer message: %s", msg)
 	var params map[string]interface{}
 
@@ -716,6 +776,12 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 }
 
 func consumeRemoveNodePeerMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+		}
+	}()
+
 	common.Log.Debugf("Consuming NATS remove peer message: %s", msg)
 	var params map[string]interface{}
 
