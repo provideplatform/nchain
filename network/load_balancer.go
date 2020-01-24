@@ -768,7 +768,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				if !common.DefaultInfrastructureUsesSelfSignedCertificate {
 					certificateArn = common.DefaultInfrastructureAWSConfig.DefaultCertificateArn
 					dnsName := fmt.Sprintf("%s.%s", l.ID, common.DefaultInfrastructureDomain)
-					common.Log.Debugf("Resolved configured certificate arn %s for use with DNS name: %s; load balancer %s: %s", *certificateArn, dnsName, l.ID)
+					common.Log.Debugf("Resolved configured certificate arn %s for use with DNS name: %s; load balancer %s", *certificateArn, dnsName, l.ID)
 
 					if !l.hasDNSName(dnsName) {
 						common.Log.Debugf("Attempting to provision managed DNS record %s for load balancer: %s", dnsName, l.ID)
