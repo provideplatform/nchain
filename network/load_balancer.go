@@ -356,8 +356,8 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 					switch targetID {
 					case awsOrchestrationProvider:
 						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
-							"aws_access_key_id":     common.DefaultInfrastructureAWSConfig.AccessKeyId,
-							"aws_secret_access_key": common.DefaultInfrastructureAWSConfig.SecretAccessKey,
+							"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
+							"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
 						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
 					case azureOrchestrationProvider:
 						// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
@@ -736,8 +736,8 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 					switch targetID {
 					case awsOrchestrationProvider:
 						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
-							"aws_access_key_id":     common.DefaultInfrastructureAWSConfig.AccessKeyId,
-							"aws_secret_access_key": common.DefaultInfrastructureAWSConfig.SecretAccessKey,
+							"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
+							"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
 						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
 					case azureOrchestrationProvider:
 						// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
