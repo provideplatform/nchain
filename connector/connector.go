@@ -240,9 +240,10 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 	loadBalancers := make([]*network.LoadBalancer, 0)
 	db.Model(c).Association("LoadBalancers").Find(&loadBalancers)
 	if len(loadBalancers) == 1 {
-		host = loadBalancers[0].Host
+		host = loadBalancers[0].DNSName()
 	} else if len(loadBalancers) > 1 {
-		common.Log.Warningf("Ambiguous loadbalancing configuration for connector: %s; no api url resolved", c.ID)
+		common.Log.Warningf("Ambiguous loadbalancing configuration for connector: %s; api url resolved using first configured load balancer", c.ID)
+		host = loadBalancers[0].DNSName()
 	}
 
 	if host == nil {

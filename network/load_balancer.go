@@ -221,14 +221,33 @@ func (l *LoadBalancer) ParseConfig() map[string]interface{} {
 	return config
 }
 
+// DNSName returns the preferred DNS name for the load balancer
+func (l *LoadBalancer) DNSName() *string {
+	var dnsName *string
+	cfg := l.ParseConfig()
+	if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk {
+		for _, item := range dns {
+			if name, nameOk := item.(string); nameOk {
+				dnsName = &name
+				break
+			}
+		}
+	}
+	if dnsName == nil {
+		if l.Host != nil {
+			dnsName = l.Host
+		} else if l.IPv4 != nil {
+			dnsName = l.IPv4
+		} else if l.IPv6 != nil {
+			dnsName = l.IPv6
+		}
+	}
+	return dnsName
+}
+
 // ReachableOnPort returns true if the load balancer is available on the named port
 func (l *LoadBalancer) ReachableOnPort(port uint) bool {
-	var addr *string
-	if l.IPv4 != nil {
-		addr = l.IPv4
-	} else if l.Host != nil {
-		addr = l.Host
-	}
+	addr := l.DNSName()
 	if addr == nil {
 		return false
 	}
@@ -694,6 +713,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 							cfg["target_groups"] = targetGroups
 							l.setConfig(cfg)
+							l.sanitizeConfig()
 							db.Save(&l)
 						}
 					}
@@ -756,8 +776,10 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 					common.Log.Debugf("Created/updated DNS record for load balancer %s in region: %s", l.ID, region)
 					dns = append(dns, dnsName)
+					cfg["dns"] = dns
 
 					l.setConfig(cfg)
+					l.sanitizeConfig()
 					db.Save(&l)
 				} else {
 					common.Log.Debugf("Configured certificate arn not resolved for use with load balancer %s; creating self-signed certificate...", l.ID)
@@ -776,6 +798,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 						certificates[portStr] = certificateArn
 
 						l.setConfig(cfg)
+						l.sanitizeConfig()
 						db.Save(&l)
 					}
 				}
@@ -791,13 +814,10 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				)
 				if err != nil {
 					common.Log.Warningf("Failed to register load balanced listener with target group: %s", targetGroupArn)
+					// FIXME-- return err here?
 				}
 				common.Log.Debugf("Upserted listener for load balanced target group %s in region: %s", targetGroupArn, region)
 			}
-
-			// desc := fmt.Sprintf("Failed to resolve load balanced target groups needed for listener creation in region: %s", region)
-			// common.Log.Warning(desc)
-			// return fmt.Errorf(desc)
 		}
 	} else {
 		desc := fmt.Sprintf("Failed to resolve host configuration for lazy initialization of load balanced target group in region: %s", region)
@@ -934,6 +954,7 @@ func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {
 
 		delete(cfg, "target_security_group_ids")
 		l.setConfig(cfg)
+		l.sanitizeConfig()
 		db.Save(l)
 	}
 
