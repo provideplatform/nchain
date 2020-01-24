@@ -367,7 +367,7 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 
 					for _, item := range dns {
 						if dnsName, dnsNameOk := item.(string); dnsNameOk {
-							_, err := dnsAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
+							_, err := dnsAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
 							if err != nil {
 								desc := fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
 								common.Log.Warning(desc)
@@ -747,7 +747,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 					}
 
 					dnsName := fmt.Sprintf("%s.%s", l.ID, common.DefaultInfrastructureDomain)
-					_, err := dnsAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
+					_, err := dnsAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
 					if err != nil {
 						desc := fmt.Sprintf("Failed to create DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
 						common.Log.Warning(desc)
