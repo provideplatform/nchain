@@ -245,6 +245,22 @@ func (l *LoadBalancer) DNSName() *string {
 	return dnsName
 }
 
+// hasDNSName returns true if the given DNS name is already configured in the load balancer config
+func (l *LoadBalancer) hasDNSName(name string) bool {
+	cfg := l.ParseConfig()
+	if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk {
+		for _, item := range dns {
+			if dnsName, dnsNameOk := item.(string); dnsNameOk && name == dnsName {
+				return true
+			}
+		}
+	}
+	if l.Host != nil && name == *l.Host {
+		return true
+	}
+	return false
+}
+
 // ReachableOnPort returns true if the load balancer is available on the named port
 func (l *LoadBalancer) ReachableOnPort(port uint) bool {
 	addr := l.DNSName()
@@ -751,36 +767,42 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 				if !common.DefaultInfrastructureUsesSelfSignedCertificate {
 					certificateArn = common.DefaultInfrastructureAWSConfig.DefaultCertificateArn
-					common.Log.Debugf("Resolved configured certificate arn for use with load balancer %s: %s", l.ID, *certificateArn)
-
-					var dnsAPI OrchestrationAPI
-					switch targetID {
-					case awsOrchestrationProvider:
-						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
-							"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
-							"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
-						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
-					case azureOrchestrationProvider:
-						// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
-					case googleOrchestrationProvider:
-						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
-					}
-
 					dnsName := fmt.Sprintf("%s.%s", l.ID, common.DefaultInfrastructureDomain)
-					_, err := dnsAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
-					if err != nil {
-						desc := fmt.Sprintf("Failed to create DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
-						common.Log.Warning(desc)
-						return fmt.Errorf(desc)
+					common.Log.Debugf("Resolved configured certificate arn %s for use with DNS name: %s; load balancer %s: %s", *certificateArn, dnsName, l.ID)
+
+					if !l.hasDNSName(dnsName) {
+						common.Log.Debugf("Attempting to provision managed DNS record %s for load balancer: %s", dnsName, l.ID)
+
+						var dnsAPI OrchestrationAPI
+						switch targetID {
+						case awsOrchestrationProvider:
+							dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
+								"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
+								"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
+							}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
+						case azureOrchestrationProvider:
+							// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
+						case googleOrchestrationProvider:
+							// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
+						}
+
+						_, err := dnsAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
+						if err != nil {
+							desc := fmt.Sprintf("Failed to create DNS record %s for load balancer %s in region: %s; %s", dnsName, l.ID, region, err.Error())
+							common.Log.Warning(desc)
+							return fmt.Errorf(desc)
+						}
+
+						common.Log.Debugf("Created/updated DNS record for load balancer %s in region: %s", l.ID, region)
+						dns = append(dns, dnsName)
+						cfg["dns"] = dns
+
+						l.setConfig(cfg)
+						l.sanitizeConfig()
+						db.Save(&l)
+					} else {
+						common.Log.Debugf("Managed DNS record %s already provisioned for load balancer: %s", dnsName, l.ID)
 					}
-
-					common.Log.Debugf("Created/updated DNS record for load balancer %s in region: %s", l.ID, region)
-					dns = append(dns, dnsName)
-					cfg["dns"] = dns
-
-					l.setConfig(cfg)
-					l.sanitizeConfig()
-					db.Save(&l)
 				} else {
 					common.Log.Debugf("Configured certificate arn not resolved for use with load balancer %s; creating self-signed certificate...", l.ID)
 					portStr := strconv.Itoa(int(port))
