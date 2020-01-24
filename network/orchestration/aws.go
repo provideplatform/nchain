@@ -94,8 +94,8 @@ func (p *AWSOrchestrationProvider) DeleteLoadBalancerV2(loadBalancerARN *string)
 }
 
 // GetLoadBalancersV2 needs docs
-func (p *AWSOrchestrationProvider) GetLoadBalancersV2(loadBalancerArn *string, loadBalancerName *string) (response *elbv2.DescribeLoadBalancersOutput, err error) {
-	return awswrapper.GetLoadBalancersV2(p.accessKeyID, p.secretAccessKey, p.region, loadBalancerArn, loadBalancerName)
+func (p *AWSOrchestrationProvider) GetLoadBalancersV2(loadBalancerArn *string, loadBalancerName *string, nextMarker *string) (response *elbv2.DescribeLoadBalancersOutput, err error) {
+	return awswrapper.GetLoadBalancersV2(p.accessKeyID, p.secretAccessKey, p.region, loadBalancerArn, loadBalancerName, nextMarker)
 
 }
 
