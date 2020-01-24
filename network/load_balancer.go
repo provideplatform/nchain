@@ -728,13 +728,13 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 						return fmt.Errorf(desc)
 					}
 
-					common.Log.Debugf("Created/updated DNS record for load balancer %s in region: %s; %s", l.ID, region)
+					common.Log.Debugf("Created/updated DNS record for load balancer %s in region: %s", l.ID, region)
 					dns = append(dns, dnsName)
 
 					l.setConfig(cfg)
 					db.Save(&l)
 				} else {
-					common.Log.Debugf("Configured certificate arn not resolved for use with load balancer %s; creating self-signed certificate...", l.ID, *certificateArn)
+					common.Log.Debugf("Configured certificate arn not resolved for use with load balancer %s; creating self-signed certificate...", l.ID)
 					portStr := strconv.Itoa(int(port))
 					certificate, certificateOk := certificates[portStr].(string)
 					if certificateOk {
