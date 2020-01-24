@@ -9,7 +9,7 @@ require (
 	github.com/FactomProject/go-bip39 v0.3.5 // indirect
 	github.com/FactomProject/go-bip44 v0.0.0-20190306062959-b541a96d8da9
 	github.com/Microsoft/go-winio v0.4.14 // indirect
-	github.com/aws/aws-sdk-go v1.28.6
+	github.com/aws/aws-sdk-go v1.28.8
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
@@ -28,7 +28,7 @@ require (
 	github.com/kthomas/exchange-consumer v0.0.0-20171225030615-4fb83508b3ca
 	github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
-	github.com/kthomas/go-aws-wrapper v0.0.0-20200121102502-2929beca6fbb
+	github.com/kthomas/go-aws-wrapper v0.0.0-20200124062257-ed9ef0d8d397
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
 	github.com/kthomas/go-natsutil v0.0.0-20191123231914-bee144fe6fd2
@@ -48,6 +48,6 @@ require (
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915 // indirect
-	golang.org/x/sys v0.0.0-20200121082415-34d275377bf9 // indirect
+	golang.org/x/sys v0.0.0-20200122134326-e047566fdf82 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
