@@ -273,6 +273,7 @@ func (c *Connector) resolveAPIURL() error {
 	cfg := c.ParseConfig()
 	cfg["api_url"] = apiURL
 	c.setConfig(cfg)
+	c.sanitizeConfig()
 	db.Save(&c)
 	return nil
 }
