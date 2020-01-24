@@ -352,9 +352,22 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 				}
 
 				if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk && !common.DefaultInfrastructureUsesSelfSignedCertificate {
+					var dnsAPI OrchestrationAPI
+					switch targetID {
+					case awsOrchestrationProvider:
+						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
+							"aws_access_key_id":     common.DefaultInfrastructureAWSConfig.AccessKeyId,
+							"aws_secret_access_key": common.DefaultInfrastructureAWSConfig.SecretAccessKey,
+						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
+					case azureOrchestrationProvider:
+						// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
+					case googleOrchestrationProvider:
+						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
+					}
+
 					for _, item := range dns {
 						if dnsName, dnsNameOk := item.(string); dnsNameOk {
-							_, err := orchestrationAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
+							_, err := dnsAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
 							if err != nil {
 								desc := fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
 								common.Log.Warning(desc)
@@ -719,9 +732,22 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				if !common.DefaultInfrastructureUsesSelfSignedCertificate {
 					common.Log.Debugf("Resolved configured certificate arn for use with load balancer %s: %s", l.ID, *certificateArn)
 
+					var dnsAPI OrchestrationAPI
+					switch targetID {
+					case awsOrchestrationProvider:
+						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
+							"aws_access_key_id":     common.DefaultInfrastructureAWSConfig.AccessKeyId,
+							"aws_secret_access_key": common.DefaultInfrastructureAWSConfig.SecretAccessKey,
+						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
+					case azureOrchestrationProvider:
+						// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
+					case googleOrchestrationProvider:
+						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
+					}
+
 					certificateArn = common.DefaultInfrastructureAWSConfig.DefaultCertificateArn
 					dnsName := fmt.Sprintf("%s.%s", l.ID, common.DefaultInfrastructureDomain)
-					_, err := orchestrationAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
+					_, err := dnsAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
 					if err != nil {
 						desc := fmt.Sprintf("Failed to create DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
 						common.Log.Warning(desc)
