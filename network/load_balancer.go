@@ -350,6 +350,19 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 						}
 					}
 				}
+
+				if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk && !common.DefaultInfrastructureUsesSelfSignedCertificate {
+					for _, item := range dns {
+						if dnsName, dnsNameOk := item.(string); dnsNameOk {
+							_, err := orchestrationAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
+							if err != nil {
+								desc := fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
+								common.Log.Warning(desc)
+								return fmt.Errorf(desc)
+							}
+						}
+					}
+				}
 			}
 
 			if l.Delete() {
@@ -567,6 +580,7 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 	vpcID, _ := cfg["vpc_id"].(string)
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
 	certificates, certificatesOk := cfg["certificates"].(map[string]interface{})
+	dns, dnsOk := cfg["dns"].([]interface{})
 
 	if l.Host != nil {
 		common.Log.Debugf("Attempting to load balance network node %s on balancer: %s", node.ID, l.ID)
@@ -587,6 +601,11 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 		if !certificatesOk {
 			certificates = map[string]interface{}{}
 			cfg["certificates"] = certificates
+		}
+
+		if !dnsOk {
+			dns = make([]interface{}, 0)
+			cfg["dns"] = dns
 		}
 
 		if strings.ToLower(targetID) == "aws" && targetOk && regionOk && arnOk && securityCfgOk {
@@ -697,20 +716,23 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 
 				var certificateArn *string
 
-				if common.DefaultAWSConfig.DefaultCertificateArn != nil && *common.DefaultAWSConfig.DefaultCertificateArn != "" {
+				if !common.DefaultInfrastructureUsesSelfSignedCertificate {
 					common.Log.Debugf("Resolved configured certificate arn for use with load balancer %s: %s", l.ID, *certificateArn)
 
-					certificateArn = common.DefaultAWSConfig.DefaultCertificateArn
-					certificateDomain := "infra.prod.provide.services" // FIXME
-					dnsHostedZoneID := " Z3CZYK2VOGU4FS"               // FIXME
-					dnsName := fmt.Sprintf("%s.%s", l.ID, certificateDomain)
-					_, err := orchestrationAPI.CreateDNSRecord(dnsHostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
+					certificateArn = common.DefaultInfrastructureAWSConfig.DefaultCertificateArn
+					dnsName := fmt.Sprintf("%s.%s", l.ID, common.DefaultInfrastructureDomain)
+					_, err := orchestrationAPI.CreateDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{dnsName}, 300)
 					if err != nil {
 						desc := fmt.Sprintf("Failed to create DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
 						common.Log.Warning(desc)
 						return fmt.Errorf(desc)
 					}
-					common.Log.Debugf("Created DNS record for load balancer %s in region: %s; %s", l.ID, region)
+
+					common.Log.Debugf("Created/updated DNS record for load balancer %s in region: %s; %s", l.ID, region)
+					dns = append(dns, dnsName)
+
+					l.setConfig(cfg)
+					db.Save(&l)
 				} else {
 					common.Log.Debugf("Configured certificate arn not resolved for use with load balancer %s; creating self-signed certificate...", l.ID, *certificateArn)
 					portStr := strconv.Itoa(int(port))

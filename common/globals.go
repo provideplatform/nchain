@@ -40,6 +40,18 @@ var (
 
 	// ConsumeNATSStreamingSubscriptions is a flag the indicates if the goldmine instance is running in API or consumer mode
 	ConsumeNATSStreamingSubscriptions bool
+
+	// DefaultInfrastructureDomain is the DNS name which managed subdomains are created for various infrastructure (i.e., load balancers)
+	DefaultInfrastructureDomain string
+
+	// DefaultInfrastructureRoute53HostedZoneID is the Route53 hosted zone which is used to create/destroy managed subdomains for various infrastructure (i.e., load balancers)
+	DefaultInfrastructureRoute53HostedZoneID string
+
+	// DefaultInfrastructureAWSConfig is the AWS configuration which is used to support various managed infrastructure (i.e., load balancers)
+	DefaultInfrastructureAWSConfig *awsconf.Config
+
+	// DefaultInfrastructureUsesSelfSignedCertificate is a flag that indicates if various managed infrastructure (i.e., load balancers) should use a self-signed cert
+	DefaultInfrastructureUsesSelfSignedCertificate bool
 )
 
 func init() {
@@ -59,4 +71,47 @@ func init() {
 	DefaultAWSConfig = awsconf.GetConfig()
 
 	ConsumeNATSStreamingSubscriptions = strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
+
+	requireInfrastructureSupport()
+}
+
+func requireInfrastructureSupport() {
+	if os.Getenv("INFRASTRUCTURE_DOMAIN") != "" {
+		DefaultInfrastructureDomain = os.Getenv("INFRASTRUCTURE_DOMAIN")
+	}
+
+	if os.Getenv("INFRASTRUCTURE_ROUTE53_HOSTED_ZONE_ID") != "" {
+		DefaultInfrastructureRoute53HostedZoneID = os.Getenv("INFRASTRUCTURE_ROUTE53_HOSTED_ZONE_ID")
+	}
+
+	var awsAccessKeyID string
+	if os.Getenv("INFRASTRUCTURE_AWS_ACCESS_KEY_ID") != "" {
+		awsAccessKeyID = os.Getenv("INFRASTRUCTURE_AWS_ACCESS_KEY_ID")
+	}
+
+	var awsSecretAccessKey string
+	if os.Getenv("INFRASTRUCTURE_AWS_SECRET_ACCESS_KEY") != "" {
+		awsSecretAccessKey = os.Getenv("INFRASTRUCTURE_AWS_SECRET_ACCESS_KEY")
+	}
+
+	var awsDefaultRegion string
+	if os.Getenv("INFRASTRUCTURE_AWS_DEFAULT_REGION") != "" {
+		awsDefaultRegion = os.Getenv("INFRASTRUCTURE_AWS_DEFAULT_REGION")
+	}
+
+	var awsDefaultCertificateArn string
+	if os.Getenv("INFRASTRUCTURE_AWS_DEFAULT_CERTIFICATE_ARN") != "" {
+		awsDefaultCertificateArn = os.Getenv("INFRASTRUCTURE_AWS_DEFAULT_CERTIFICATE_ARN")
+	}
+
+	if awsAccessKeyID != "" && awsSecretAccessKey != "" && awsDefaultRegion != "" && awsDefaultCertificateArn != "" {
+		DefaultInfrastructureAWSConfig = &awsconf.Config{
+			AccessKeyId:           &awsAccessKeyID,
+			SecretAccessKey:       &awsSecretAccessKey,
+			DefaultRegion:         &awsDefaultRegion,
+			DefaultCertificateArn: &awsDefaultCertificateArn,
+		}
+	}
+
+	DefaultInfrastructureUsesSelfSignedCertificate = !(DefaultInfrastructureDomain != "" && DefaultInfrastructureRoute53HostedZoneID != "" && DefaultInfrastructureAWSConfig != nil && DefaultInfrastructureAWSConfig.DefaultCertificateArn != nil && *DefaultInfrastructureAWSConfig.DefaultCertificateArn != "")
 }
