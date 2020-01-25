@@ -26,19 +26,20 @@ const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision
 
 // IPFSProvider is a connector.ProviderAPI implementing orchestration for IPFS
 type IPFSProvider struct {
-	connectorID   uuid.UUID
-	model         *gorm.DB
-	config        map[string]interface{}
-	networkID     *uuid.UUID
-	applicationID *uuid.UUID
-	region        *string
-	apiURL        *string
-	apiPort       int
-	gatewayPort   int
+	connectorID    uuid.UUID
+	model          *gorm.DB
+	config         map[string]interface{}
+	networkID      *uuid.UUID
+	applicationID  *uuid.UUID
+	organizationID *uuid.UUID
+	region         *string
+	apiURL         *string
+	apiPort        int
+	gatewayPort    int
 }
 
 // InitIPFSProvider initializes and returns the IPFS connector API provider
-func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *IPFSProvider {
+func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID, organizationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *IPFSProvider {
 	region, regionOk := config["region"].(string)
 	apiURL, _ := config["api_url"].(string)
 	apiPort, apiPortOk := config["api_port"].(float64)
@@ -47,15 +48,16 @@ func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID *uuid.UUID
 		return nil
 	}
 	return &IPFSProvider{
-		connectorID:   connectorID,
-		model:         model,
-		config:        config,
-		networkID:     networkID,
-		applicationID: applicationID,
-		region:        common.StringOrNil(region),
-		apiURL:        common.StringOrNil(apiURL),
-		apiPort:       int(apiPort),
-		gatewayPort:   int(gatewayPort),
+		connectorID:    connectorID,
+		model:          model,
+		config:         config,
+		networkID:      networkID,
+		applicationID:  applicationID,
+		organizationID: organizationID,
+		region:         common.StringOrNil(region),
+		apiURL:         common.StringOrNil(apiURL),
+		apiPort:        int(apiPort),
+		gatewayPort:    int(gatewayPort),
 	}
 }
 
@@ -120,12 +122,13 @@ func (p *IPFSProvider) Deprovision() error {
 // Provision configures a new load balancer and the initial IPFS nodes and associates the resources with the IPFS connector
 func (p *IPFSProvider) Provision() error {
 	loadBalancer := &network.LoadBalancer{
-		NetworkID:     *p.networkID,
-		ApplicationID: p.applicationID,
-		Type:          common.StringOrNil(IPFSConnectorProvider),
-		Description:   common.StringOrNil(fmt.Sprintf("IPFS Connector Load Balancer")),
-		Region:        p.region,
-		Config:        p.rawConfig(),
+		NetworkID:      *p.networkID,
+		ApplicationID:  p.applicationID,
+		OrganizationID: p.organizationID,
+		Type:           common.StringOrNil(IPFSConnectorProvider),
+		Description:    common.StringOrNil(fmt.Sprintf("IPFS Connector Load Balancer")),
+		Region:         p.region,
+		Config:         p.rawConfig(),
 	}
 
 	if loadBalancer.Create() {
@@ -159,9 +162,10 @@ func (p *IPFSProvider) DeprovisionNode() error {
 // ProvisionNode deploys and load balances a new node and associates it with the IPFS connector
 func (p *IPFSProvider) ProvisionNode() error {
 	node := &network.Node{
-		NetworkID:     *p.networkID,
-		ApplicationID: p.applicationID,
-		Config:        p.rawConfig(),
+		NetworkID:      *p.networkID,
+		ApplicationID:  p.applicationID,
+		OrganizationID: p.organizationID,
+		Config:         p.rawConfig(),
 	}
 
 	if node.Create() {

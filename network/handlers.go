@@ -401,6 +401,11 @@ func createNodeHandler(c *gin.Context) {
 		return
 	}
 
+	if node.OrganizationID != nil {
+		provide.RenderError("unable to set organization_id on node creation API at this time; org authorization not yet implemented in goldmine", 400, c)
+		return
+	}
+
 	if node.Create() {
 		provide.Render(node, 201, c)
 	} else {
