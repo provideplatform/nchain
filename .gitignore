@@ -31,6 +31,7 @@ goldmine
 goldmine_api
 goldmine_consumer
 goldmine_migrate
+goldmine_reachabilitydaemon
 goldmine_statsdaemon
 
 .gocore-id_rsa
