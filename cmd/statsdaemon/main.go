@@ -111,28 +111,30 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 	dbconf.DatabaseConnection().Find(&loadBalancers)
 
 	for _, lb := range loadBalancers {
-		cfg := lb.ParseConfig()
-		if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
-			if ingress, ingressOk := security["ingress"]; ingressOk {
-				switch ingress.(type) {
-				case map[string]interface{}:
-					ingressCfg := ingress.(map[string]interface{})
-					for cidr := range ingressCfg {
-						if tcpPorts, tcpPortsOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpPortsOk {
-							for i := range tcpPorts {
-								RequireReachabilityDaemon(&endpoint{
-									network: "tcp",
-									addr:    fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
-								})
+		if lb.Host != nil {
+			cfg := lb.ParseConfig()
+			if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
+				if ingress, ingressOk := security["ingress"]; ingressOk {
+					switch ingress.(type) {
+					case map[string]interface{}:
+						ingressCfg := ingress.(map[string]interface{})
+						for cidr := range ingressCfg {
+							if tcpPorts, tcpPortsOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpPortsOk {
+								for i := range tcpPorts {
+									RequireReachabilityDaemon(&endpoint{
+										network: "tcp",
+										addr:    fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+									})
+								}
 							}
-						}
 
-						if udpPorts, udpPortsOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpPortsOk {
-							for i := range udpPorts {
-								RequireReachabilityDaemon(&endpoint{
-									network: "udp",
-									addr:    fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
-								})
+							if udpPorts, udpPortsOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpPortsOk {
+								for i := range udpPorts {
+									RequireReachabilityDaemon(&endpoint{
+										network: "udp",
+										addr:    fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
+									})
+								}
 							}
 						}
 					}
