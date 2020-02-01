@@ -237,16 +237,7 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 		return nil
 	}
 
-	var host *string
-	loadBalancers := make([]*network.LoadBalancer, 0)
-	db.Model(c).Association("LoadBalancers").Find(&loadBalancers)
-	if len(loadBalancers) == 1 {
-		host = loadBalancers[0].DNSName()
-	} else if len(loadBalancers) > 1 {
-		common.Log.Warningf("Ambiguous loadbalancing configuration for connector: %s; api url resolved using first configured load balancer", c.ID)
-		host = loadBalancers[0].DNSName()
-	}
-
+	host := c.Host(db)
 	if host == nil {
 		return nil
 	}
@@ -298,6 +289,20 @@ func (c *Connector) updateStatus(db *gorm.DB, status string, description *string
 		})
 		natsutil.NatsPublish(natsConnectorDenormalizeConfigSubject, msg)
 	}
+}
+
+// Host resolves and returns the hostname for the connector instance
+func (c *Connector) Host(db *gorm.DB) *string {
+	var host *string
+	loadBalancers := make([]*network.LoadBalancer, 0)
+	db.Model(c).Association("LoadBalancers").Find(&loadBalancers)
+	if len(loadBalancers) == 1 {
+		host = loadBalancers[0].DNSName()
+	} else if len(loadBalancers) > 1 {
+		common.Log.Warningf("Ambiguous loadbalancing configuration for connector: %s; api url resolved using first configured load balancer", c.ID)
+		host = loadBalancers[0].DNSName()
+	}
+	return host
 }
 
 // Create and persist a new Connector
