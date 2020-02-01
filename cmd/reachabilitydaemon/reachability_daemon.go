@@ -27,6 +27,9 @@ var currentReachabilityDaemonsMutex = &sync.Mutex{}
 type endpoint struct {
 	network string
 	addr    string
+
+	reachable   func()
+	unreachable func()
 }
 
 func (e *endpoint) Network() string {
@@ -39,8 +42,12 @@ func (e *endpoint) String() string {
 
 // ReachabilityDaemon struct
 type ReachabilityDaemon struct {
-	addr    net.Addr
-	attempt uint32
+	addr  net.Addr
+	endpt *endpoint
+
+	attempt     uint32
+	gracePeriod uint32 // number of attempts prior to firing endpoint unreachable callback
+	isReachable bool
 
 	cancelF     context.CancelFunc
 	closing     uint32
@@ -66,8 +73,8 @@ func EvictReachabilityDaemon(addr net.Addr) error {
 // RequireReachabilityDaemon ensures a single reachability daemon instance is running for
 // the given network address; if no reachability daemon instance has been started for the address,
 // the instance is configured and started immediately, caching real-time reachability status.
-func RequireReachabilityDaemon(addr net.Addr) *ReachabilityDaemon {
-	key := fmt.Sprintf("%s:%s", addr.Network(), addr.String())
+func RequireReachabilityDaemon(endpt *endpoint) *ReachabilityDaemon {
+	key := fmt.Sprintf("%s:%s", endpt.Network(), endpt.String())
 
 	var daemon *ReachabilityDaemon
 	if daemon, ok := currentReachabilityDaemons[key]; ok {
@@ -77,7 +84,7 @@ func RequireReachabilityDaemon(addr net.Addr) *ReachabilityDaemon {
 
 	currentReachabilityDaemonsMutex.Lock()
 	common.Log.Infof("Initializing new reachability daemon instance for addr: %s", key)
-	daemon = NewReachabilityDaemon(common.Log, addr)
+	daemon = NewReachabilityDaemon(common.Log, endpt)
 	if daemon != nil {
 		currentReachabilityDaemons[key] = daemon
 		go daemon.run()
@@ -88,20 +95,22 @@ func RequireReachabilityDaemon(addr net.Addr) *ReachabilityDaemon {
 }
 
 // NewReachabilityDaemon initializes a new reachability daemon instance
-func NewReachabilityDaemon(lg *logger.Logger, addr net.Addr) *ReachabilityDaemon {
+func NewReachabilityDaemon(lg *logger.Logger, endpt *endpoint) *ReachabilityDaemon {
 	rd := new(ReachabilityDaemon)
 	rd.attempt = 0
 	rd.log = lg.Clone()
 	rd.shutdownCtx, rd.cancelF = context.WithCancel(context.Background())
-	rd.addr = addr
+
+	// if endpt != nil
+	rd.endpt = endpt
 
 	return rd
 }
 
 // reachable returns true if the configured reachability daemon endpoint is... reachable
 func (rd *ReachabilityDaemon) reachable() bool {
-	ntwrk := rd.addr.Network()
-	addr := rd.addr.String()
+	ntwrk := rd.endpt.Network()
+	addr := rd.endpt.String()
 	conn, err := net.DialTimeout(ntwrk, addr, reachabilityDaemonReachabilityTimeout)
 	if err == nil {
 		common.Log.Debugf("%s %s is reachable", ntwrk, addr)
@@ -124,10 +133,18 @@ func (rd *ReachabilityDaemon) run() {
 				rd.attempt++
 
 				if rd.reachable() {
-					common.Log.Debugf("reachability daemon endpoint %s %s is reachable", rd.addr.Network(), rd.addr.String())
+					common.Log.Debugf("reachability daemon endpoint %s %s is reachable", rd.endpt.Network(), rd.endpt.String())
 					rd.attempt = 0
+					if !rd.isReachable && rd.endpt.reachable != nil {
+						rd.isReachable = true
+						rd.endpt.reachable()
+					}
 				} else {
-					common.Log.Warningf("reachability daemon endpoint %s %s is not reachable after %v attempts", rd.addr.Network(), rd.addr.String(), rd.attempt)
+					common.Log.Warningf("reachability daemon endpoint %s %s is not reachable after %v attempts", rd.endpt.Network(), rd.endpt.String(), rd.attempt)
+					if rd.isReachable && rd.endpt.unreachable != nil {
+						rd.isReachable = false
+						rd.endpt.unreachable()
+					}
 				}
 			default:
 				time.Sleep(reachabilityDaemonSleepInterval)
@@ -154,7 +171,7 @@ func (rd *ReachabilityDaemon) handleSignals() {
 
 func (rd *ReachabilityDaemon) shutdown() {
 	if atomic.AddUint32(&rd.closing, 1) == 1 {
-		common.Log.Debugf("Shutting down reachability daemon instance for %s endpoint %s", rd.addr.Network(), rd.addr.String())
+		common.Log.Debugf("Shutting down reachability daemon instance for %s endpoint %s", rd.endpt.Network(), rd.endpt.String())
 		rd.cancelF()
 	}
 }

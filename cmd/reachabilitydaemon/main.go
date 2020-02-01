@@ -84,17 +84,28 @@ func requireConnectorReachabilityDaemonInstances() {
 	for _, connector := range connectors {
 		host := connector.Host(db)
 		if host != nil {
+			reachableFn := func() {
+				connector.updateStatus(db, "available", nil)
+			}
+			unreachableFn := func() {
+				connector.updateStatus(db, "unavailable", nil)
+			}
+
 			cfg := connector.ParseConfig()
 			if port, portOk := cfg["port"].(float64); portOk {
 				RequireReachabilityDaemon(&endpoint{
-					network: "tcp",
-					addr:    fmt.Sprintf("%s:%v", *host, port),
+					network:     "tcp",
+					addr:        fmt.Sprintf("%s:%v", *host, port),
+					reachable:   reachableFn,
+					unreachable: unreachableFn,
 				})
 			}
 			if apiPort, apiPortOk := cfg["api_port"].(float64); apiPortOk {
 				RequireReachabilityDaemon(&endpoint{
-					network: "tcp",
-					addr:    fmt.Sprintf("%s:%v", *host, apiPort),
+					network:     "tcp",
+					addr:        fmt.Sprintf("%s:%v", *host, apiPort),
+					reachable:   reachableFn,
+					unreachable: unreachableFn,
 				})
 			}
 		}
@@ -110,6 +121,13 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 
 	for _, lb := range loadBalancers {
 		if lb.Host != nil {
+			reachableFn := func() {
+				lb.updateStatus(db, "active", nil)
+			}
+			unreachableFn := func() {
+				lb.updateStatus(db, "unreachable", nil)
+			}
+
 			cfg := lb.ParseConfig()
 			if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
 				if ingress, ingressOk := security["ingress"]; ingressOk {
@@ -120,8 +138,10 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 							if tcpPorts, tcpPortsOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpPortsOk {
 								for i := range tcpPorts {
 									RequireReachabilityDaemon(&endpoint{
-										network: "tcp",
-										addr:    fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+										network:     "tcp",
+										addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+										reachable:   reachableFn,
+										unreachable: unreachableFn,
 									})
 								}
 							}
@@ -129,8 +149,10 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 							if udpPorts, udpPortsOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpPortsOk {
 								for i := range udpPorts {
 									RequireReachabilityDaemon(&endpoint{
-										network: "udp",
-										addr:    fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
+										network:     "udp",
+										addr:        fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
+										reachable:   reachableFn,
+										unreachable: unreachableFn,
 									})
 								}
 							}
