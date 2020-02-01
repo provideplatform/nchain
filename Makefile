@@ -1,4 +1,4 @@
-.PHONY: build clean ecs_deploy install integration lint migrate mod run_api run_consumer run_statsdaemon run_local run_local_dependencies stop_local_dependencies stop_local test
+.PHONY: build clean ecs_deploy install integration lint migrate mod run_api run_consumer run_reachabilitydaemon run_statsdaemon run_local run_local_dependencies stop_local_dependencies stop_local test
 
 clean:
 	rm -rf ./.bin 2>/dev/null || true
@@ -11,6 +11,7 @@ build: clean mod
 	go build -v -o ./.bin/goldmine_api ./cmd/api
 	go build -v -o ./.bin/goldmine_consumer ./cmd/consumer
 	go build -v -o ./.bin/goldmine_migrate ./cmd/migrate
+	go build -v -o ./.bin/goldmine_reachabilitydaemon ./cmd/reachabilitydaemon
 	go build -v -o ./.bin/goldmine_statsdaemon ./cmd/statsdaemon
 
 ecs_deploy:
@@ -37,6 +38,9 @@ run_api: build run_local_dependencies
 
 run_consumer: build run_local_dependencies
 	./ops/run_consumer.sh
+
+run_reachabilitydaemon: build run_local_dependencies
+	./ops/run_reachabilitydaemon.sh
 
 run_statsdaemon: build run_local_dependencies
 	./ops/run_statsdaemon.sh
