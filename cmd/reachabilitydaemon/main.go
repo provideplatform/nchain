@@ -16,10 +16,7 @@ import (
 
 	"github.com/provideapp/goldmine/common"
 	"github.com/provideapp/goldmine/connector"
-	_ "github.com/provideapp/goldmine/connector"
-	_ "github.com/provideapp/goldmine/contract"
 	"github.com/provideapp/goldmine/network"
-	_ "github.com/provideapp/goldmine/tx"
 )
 
 const runloopTickerInterval = 5 * time.Second
@@ -37,6 +34,11 @@ var (
 )
 
 func init() {
+	if common.ConsumeNATSStreamingSubscriptions {
+		common.Log.Panicf("reachabilitydaemon instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
+		return
+	}
+
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 }
@@ -83,16 +85,38 @@ func requireConnectorReachabilityDaemonInstances() {
 
 	for _, connector := range connectors {
 		host := connector.Host(db)
+
 		if host != nil {
+			cfg := connector.ParseConfig()
+			port, portOk := cfg["port"].(float64)
+			apiPort, apiPortOk := cfg["api_port"].(float64)
+
 			reachableFn := func() {
 				connector.UpdateStatus(db, "available", nil)
 			}
+
 			unreachableFn := func() {
-				connector.UpdateStatus(db, "unavailable", nil)
+				connector.Reload(db)
+
+				if connector.Status != nil && *connector.Status == "deprovisioning" {
+					if portOk {
+						EvictReachabilityDaemon(&endpoint{
+							network: "tcp",
+							addr:    fmt.Sprintf("%s:%v", *host, port),
+						})
+					}
+					if apiPortOk {
+						EvictReachabilityDaemon(&endpoint{
+							network: "tcp",
+							addr:    fmt.Sprintf("%s:%v", *host, port),
+						})
+					}
+				} else {
+					connector.UpdateStatus(db, "unreachable", nil)
+				}
 			}
 
-			cfg := connector.ParseConfig()
-			if port, portOk := cfg["port"].(float64); portOk {
+			if portOk {
 				RequireReachabilityDaemon(&endpoint{
 					network:     "tcp",
 					addr:        fmt.Sprintf("%s:%v", *host, port),
@@ -100,7 +124,8 @@ func requireConnectorReachabilityDaemonInstances() {
 					unreachable: unreachableFn,
 				})
 			}
-			if apiPort, apiPortOk := cfg["api_port"].(float64); apiPortOk {
+
+			if apiPortOk {
 				RequireReachabilityDaemon(&endpoint{
 					network:     "tcp",
 					addr:        fmt.Sprintf("%s:%v", *host, apiPort),
@@ -123,12 +148,8 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 
 	for _, lb := range loadBalancers {
 		if lb.Host != nil {
-			reachableFn := func() {
-				lb.UpdateStatus(db, "active", nil)
-			}
-			unreachableFn := func() {
-				lb.UpdateStatus(db, "unreachable", nil)
-			}
+			var tcpPorts []interface{}
+			var udpPorts []interface{}
 
 			cfg := lb.ParseConfig()
 			if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
@@ -137,30 +158,59 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 					case map[string]interface{}:
 						ingressCfg := ingress.(map[string]interface{})
 						for cidr := range ingressCfg {
-							if tcpPorts, tcpPortsOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpPortsOk {
-								for i := range tcpPorts {
-									RequireReachabilityDaemon(&endpoint{
-										network:     "tcp",
-										addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
-										reachable:   reachableFn,
-										unreachable: unreachableFn,
-									})
-								}
+							if ports, portsOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); portsOk {
+								tcpPorts = ports
 							}
-
-							if udpPorts, udpPortsOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpPortsOk {
-								for i := range udpPorts {
-									RequireReachabilityDaemon(&endpoint{
-										network:     "udp",
-										addr:        fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
-										reachable:   reachableFn,
-										unreachable: unreachableFn,
-									})
-								}
+							if ports, portsOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); portsOk {
+								udpPorts = ports
 							}
 						}
 					}
 				}
+			}
+
+			reachableFn := func() {
+				lb.UpdateStatus(db, "active", nil)
+			}
+
+			unreachableFn := func() {
+				lb.Reload(db)
+
+				if lb.Status != nil && *lb.Status == "deprovisioning" {
+					for i := range tcpPorts {
+						EvictReachabilityDaemon(&endpoint{
+							network: "tcp",
+							addr:    fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+						})
+					}
+
+					for i := range udpPorts {
+						EvictReachabilityDaemon(&endpoint{
+							network: "udp",
+							addr:    fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
+						})
+					}
+				} else {
+					lb.UpdateStatus(db, "unreachable", nil)
+				}
+			}
+
+			for i := range tcpPorts {
+				RequireReachabilityDaemon(&endpoint{
+					network:     "tcp",
+					addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+					reachable:   reachableFn,
+					unreachable: unreachableFn,
+				})
+			}
+
+			for i := range udpPorts {
+				RequireReachabilityDaemon(&endpoint{
+					network:     "udp",
+					addr:        fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
+					reachable:   reachableFn,
+					unreachable: unreachableFn,
+				})
 			}
 		}
 	}

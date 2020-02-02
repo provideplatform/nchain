@@ -930,7 +930,14 @@ func (l *LoadBalancer) setConfig(cfg map[string]interface{}) {
 	l.Config = &_cfgJSON
 }
 
+// Reload the underlying load balancer instance
+func (l *LoadBalancer) Reload(db *gorm.DB) {
+	db.Model(&l).Find(&l)
+}
+
+// UpdateStatus allows for the status of the load balancer to be updated with an optional description
 func (l *LoadBalancer) UpdateStatus(db *gorm.DB, status string, description *string) {
+	// FIXME-- use distributed lock here
 	l.Status = common.StringOrNil(status)
 	l.Description = description
 	result := db.Save(&l)

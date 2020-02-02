@@ -15,7 +15,8 @@ import (
 	"github.com/provideapp/goldmine/common"
 )
 
-const defaultReachabilityDaemonQueueSize = 8
+const defaultReachabilityGracePeriod = 2 // this is the number of unreachable attempts prior to marking an endpoint as unreachable
+
 const reachabilityDaemonSleepInterval = 250 * time.Millisecond
 const reachabilityDaemonTickerInterval = 15 * time.Second
 const reachabilityDaemonReachabilityTimeout = time.Millisecond * 2500
@@ -27,6 +28,8 @@ var currentReachabilityDaemonsMutex = &sync.Mutex{}
 type endpoint struct {
 	network string
 	addr    string
+
+	gracePeriod uint32 // number of attempts prior to firing endpoint unreachable callback
 
 	reachable   func()
 	unreachable func()
@@ -46,7 +49,6 @@ type ReachabilityDaemon struct {
 	endpt *endpoint
 
 	attempt     uint32
-	gracePeriod uint32 // number of attempts prior to firing endpoint unreachable callback
 	isReachable bool
 
 	cancelF     context.CancelFunc
@@ -97,11 +99,12 @@ func RequireReachabilityDaemon(endpt *endpoint) *ReachabilityDaemon {
 // NewReachabilityDaemon initializes a new reachability daemon instance
 func NewReachabilityDaemon(lg *logger.Logger, endpt *endpoint) *ReachabilityDaemon {
 	rd := new(ReachabilityDaemon)
-	rd.attempt = 0
 	rd.log = lg.Clone()
 	rd.shutdownCtx, rd.cancelF = context.WithCancel(context.Background())
 
-	// if endpt != nil
+	if endpt.gracePeriod == 0 {
+		endpt.gracePeriod = defaultReachabilityGracePeriod
+	}
 	rd.endpt = endpt
 
 	return rd
@@ -139,9 +142,9 @@ func (rd *ReachabilityDaemon) run() {
 						rd.isReachable = true
 						rd.endpt.reachable()
 					}
-				} else {
-					common.Log.Warningf("reachability daemon endpoint %s %s is not reachable after %v attempts", rd.endpt.Network(), rd.endpt.String(), rd.attempt)
-					if rd.isReachable && rd.endpt.unreachable != nil {
+				} else if rd.isReachable && rd.attempt == rd.endpt.gracePeriod {
+					common.Log.Warningf("reachability daemon endpoint %s %s is not reachable after %v attempts; grace period: %v attempts", rd.endpt.Network(), rd.endpt.String(), rd.attempt, rd.endpt.gracePeriod)
+					if rd.endpt.unreachable != nil {
 						rd.isReachable = false
 						rd.endpt.unreachable()
 					}

@@ -271,6 +271,12 @@ func (c *Connector) resolveAPIURL() error {
 	return nil
 }
 
+// Reload the underlying connector instance
+func (c *Connector) Reload(db *gorm.DB) {
+	db.Model(&c).Find(&c)
+}
+
+// UpdateStatus allows for the status of the connector to be updated with an optional description
 func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string) {
 	c.Status = common.StringOrNil(status)
 	c.Description = description

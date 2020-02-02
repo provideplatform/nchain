@@ -34,6 +34,11 @@ var (
 )
 
 func init() {
+	if common.ConsumeNATSStreamingSubscriptions {
+		common.Log.Panicf("statsdaemon instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
+		return
+	}
+
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 }
