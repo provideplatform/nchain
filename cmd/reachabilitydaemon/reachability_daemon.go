@@ -15,7 +15,7 @@ import (
 	"github.com/provideapp/goldmine/common"
 )
 
-const defaultReachabilityGracePeriod = 2 // this is the number of unreachable attempts prior to marking an endpoint as unreachable
+const defaultReachabilityGracePeriod = uint32(2) // this is the number of unreachable attempts prior to marking an endpoint as unreachable
 
 const reachabilityDaemonSleepInterval = 250 * time.Millisecond
 const reachabilityDaemonTickerInterval = 15 * time.Second
