@@ -321,7 +321,7 @@ func (l *LoadBalancer) buildTargetGroupName(port int64) string {
 func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 	common.Log.Debugf("Attempting to deprovision infrastructure for load balancer with id: %s", l.ID)
 	cfg := l.ParseConfig()
-	l.updateStatus(db, "deprovisioning", l.Description)
+	l.UpdateStatus(db, "deprovisioning", l.Description)
 
 	targetID, targetIDOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
@@ -591,7 +591,7 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 						l.Host = loadBalancer.DNSName
 						l.setConfig(balancerCfg)
 						l.sanitizeConfig()
-						l.updateStatus(db, "active", l.Description)
+						l.UpdateStatus(db, "active", l.Description)
 						db.Save(&l)
 						if len(l.Errors) == 0 {
 							return nil
@@ -930,7 +930,7 @@ func (l *LoadBalancer) setConfig(cfg map[string]interface{}) {
 	l.Config = &_cfgJSON
 }
 
-func (l *LoadBalancer) updateStatus(db *gorm.DB, status string, description *string) {
+func (l *LoadBalancer) UpdateStatus(db *gorm.DB, status string, description *string) {
 	l.Status = common.StringOrNil(status)
 	l.Description = description
 	result := db.Save(&l)

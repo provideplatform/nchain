@@ -172,7 +172,7 @@ func (c *Connector) sanitizeConfig() {
 }
 
 func (c *Connector) deprovision() error {
-	c.updateStatus(dbconf.DatabaseConnection(), "deprovisioning", nil)
+	c.UpdateStatus(dbconf.DatabaseConnection(), "deprovisioning", nil)
 
 	apiClient, err := c.connectorAPI()
 	if err != nil {
@@ -187,7 +187,7 @@ func (c *Connector) deprovision() error {
 
 func (c *Connector) provision() error {
 	db := dbconf.DatabaseConnection()
-	c.updateStatus(db, "provisioning", nil)
+	c.UpdateStatus(db, "provisioning", nil)
 
 	runDefaultProvisioner := false
 	cfg := c.ParseConfig()
@@ -205,18 +205,18 @@ func (c *Connector) provision() error {
 		apiClient, err := c.connectorAPI()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to resolve connector API for connector: %s; %s", c.ID, err.Error())
-			c.updateStatus(db, "failed", &msg)
+			c.UpdateStatus(db, "failed", &msg)
 			return errors.New(msg)
 		}
 		err = apiClient.Provision()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to provision infrastructure for %s connector: %s; %s", *c.Type, c.ID, err.Error())
-			c.updateStatus(db, "failed", &msg)
+			c.UpdateStatus(db, "failed", &msg)
 			return errors.New(msg)
 		}
 	} else {
 		common.Log.Debugf("Default provisioner not being run for connector: %s", c.ID)
-		c.updateStatus(db, "active", nil)
+		c.UpdateStatus(db, "active", nil)
 	}
 
 	return nil
@@ -271,7 +271,7 @@ func (c *Connector) resolveAPIURL() error {
 	return nil
 }
 
-func (c *Connector) updateStatus(db *gorm.DB, status string, description *string) {
+func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string) {
 	c.Status = common.StringOrNil(status)
 	c.Description = description
 	result := db.Save(&c)

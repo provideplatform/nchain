@@ -266,11 +266,11 @@ func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
 
 	if connector.reachable() {
 		common.Log.Debugf("Connector reachability resolved; ACKing NATS message for connector: %s", connector.ID)
-		connector.updateStatus(db, "available", nil)
+		connector.UpdateStatus(db, "available", nil)
 		msg.Ack()
 	} else {
 		if connector.Status != nil && *connector.Status == "available" {
-			connector.updateStatus(db, "unavailable", nil)
+			connector.UpdateStatus(db, "unavailable", nil)
 		}
 
 		common.Log.Debugf("Connector is not reachable: %s", connector.ID)

@@ -85,10 +85,10 @@ func requireConnectorReachabilityDaemonInstances() {
 		host := connector.Host(db)
 		if host != nil {
 			reachableFn := func() {
-				connector.updateStatus(db, "available", nil)
+				connector.UpdateStatus(db, "available", nil)
 			}
 			unreachableFn := func() {
-				connector.updateStatus(db, "unavailable", nil)
+				connector.UpdateStatus(db, "unavailable", nil)
 			}
 
 			cfg := connector.ParseConfig()
@@ -116,16 +116,18 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	db := dbconf.DatabaseConnection()
+
 	loadBalancers = make([]*network.LoadBalancer, 0)
-	dbconf.DatabaseConnection().Find(&loadBalancers)
+	db.Find(&loadBalancers)
 
 	for _, lb := range loadBalancers {
 		if lb.Host != nil {
 			reachableFn := func() {
-				lb.updateStatus(db, "active", nil)
+				lb.UpdateStatus(db, "active", nil)
 			}
 			unreachableFn := func() {
-				lb.updateStatus(db, "unreachable", nil)
+				lb.UpdateStatus(db, "unreachable", nil)
 			}
 
 			cfg := lb.ParseConfig()
