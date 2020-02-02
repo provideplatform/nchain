@@ -48,8 +48,9 @@ type ReachabilityDaemon struct {
 	addr  net.Addr
 	endpt *endpoint
 
-	attempt     uint32
-	isReachable bool
+	attempt           uint32
+	isReachable       bool
+	lastReachableTime *time.Time
 
 	cancelF     context.CancelFunc
 	closing     uint32
@@ -140,11 +141,13 @@ func (rd *ReachabilityDaemon) run() {
 					rd.attempt = 0
 					if !rd.isReachable && rd.endpt.reachable != nil {
 						rd.isReachable = true
+						lastReachableTime = time.Now()
+						rd.lastReachableTime = &lastReachableTime
 						rd.endpt.reachable()
 					}
-				} else if rd.attempt == rd.endpt.gracePeriod {
+				} else if rd.attempt == rd.endpt.gracePeriod+1 {
 					common.Log.Warningf("reachability daemon endpoint %s %s is not reachable after %v attempts; grace period: %v attempts", rd.endpt.Network(), rd.endpt.String(), rd.attempt, rd.endpt.gracePeriod)
-					if rd.isReachable && rd.endpt.unreachable != nil {
+					if (rd.isReachable || rd.lastReachableTime == nil) && rd.endpt.unreachable != nil {
 						rd.isReachable = false
 						rd.endpt.unreachable()
 					}
