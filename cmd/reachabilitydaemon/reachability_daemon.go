@@ -141,7 +141,7 @@ func (rd *ReachabilityDaemon) run() {
 					rd.attempt = 0
 					if !rd.isReachable && rd.endpt.reachable != nil {
 						rd.isReachable = true
-						lastReachableTime = time.Now()
+						lastReachableTime := time.Now()
 						rd.lastReachableTime = &lastReachableTime
 						rd.endpt.reachable()
 					}
