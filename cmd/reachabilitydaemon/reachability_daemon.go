@@ -142,9 +142,9 @@ func (rd *ReachabilityDaemon) run() {
 						rd.isReachable = true
 						rd.endpt.reachable()
 					}
-				} else if rd.isReachable && rd.attempt == rd.endpt.gracePeriod {
+				} else if rd.attempt == rd.endpt.gracePeriod {
 					common.Log.Warningf("reachability daemon endpoint %s %s is not reachable after %v attempts; grace period: %v attempts", rd.endpt.Network(), rd.endpt.String(), rd.attempt, rd.endpt.gracePeriod)
-					if rd.endpt.unreachable != nil {
+					if rd.isReachable && rd.endpt.unreachable != nil {
 						rd.isReachable = false
 						rd.endpt.unreachable()
 					}
