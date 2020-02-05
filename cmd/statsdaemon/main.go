@@ -49,7 +49,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	shutdownCtx, cancelF = context.WithCancel(context.Background())
 
-	requireStatsDaemonInstances()
+	requireNetworkDaemonInstances()
 
 	common.Log.Debugf("Running statsdaemon main()")
 	timer := time.NewTicker(runloopTickerInterval)
@@ -59,6 +59,7 @@ func main() {
 		select {
 		case <-timer.C:
 			// TODO: check statsdaemon statuses
+			// TODO: check logsdaemon statuses
 		case sig := <-sigs:
 			common.Log.Infof("Received signal: %s", sig)
 			shutdown()
@@ -73,7 +74,7 @@ func main() {
 	cancelF()
 }
 
-func requireStatsDaemonInstances() {
+func requireNetworkDaemonInstances() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -81,6 +82,7 @@ func requireStatsDaemonInstances() {
 	dbconf.DatabaseConnection().Where("user_id IS NULL AND enabled IS TRUE").Find(&networks)
 
 	for _, ntwrk := range networks {
+		RequireNetworkLogTransceiver(ntwrk)
 		RequireNetworkStatsDaemon(ntwrk)
 	}
 }
