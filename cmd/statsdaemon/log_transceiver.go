@@ -154,7 +154,7 @@ func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal log message from JSON while ingesting otherwise valid network log event received on websocket: %s; %s", string(logmsg), err.Error())
 	} else {
-		common.log.Debugf("Unmarshaled %d-byte network log message from ingested network log event JSON", len(logmsg))
+		common.Log.Debugf("Unmarshaled %d-byte network log message from ingested network log event JSON", len(logmsg))
 
 		// TODO: attempt to resolve subject log parameter and emit shuttle messages for fanout...
 	}
