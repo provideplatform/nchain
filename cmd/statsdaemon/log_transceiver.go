@@ -202,6 +202,12 @@ func NewNetworkLogTransceiver(lg *logger.Logger, network *network.Network) *LogT
 		lt = EthereumLogTransceiverFactory(network)
 	}
 
+	if lt != nil {
+		lt.log = lg.Clone()
+		lt.shutdownCtx, lt.cancelF = context.WithCancel(context.Background())
+		lt.queue = make(chan []byte, defaultStatsDaemonQueueSize)
+	}
+
 	return lt
 }
 
