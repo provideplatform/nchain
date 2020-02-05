@@ -39,10 +39,29 @@ type LogTransceiver struct {
 	closing     uint32
 	shutdownCtx context.Context
 
-	queue chan []byte
+	queue chan *[]byte
 
 	Network *network.Network
-	Stream  func(chan []byte) error // websocket -- implementations should be blocking
+	Stream  func(chan *[]byte) error // websocket -- implementations should be blocking
+}
+
+type natsEventMessage struct {
+	Address         *string `json:"address"`
+	Block           uint64  `json:"block"`
+	BlockHash       *string `json:"blockhash"`
+	Timestamp       uint64  `json:"timestamp"`
+	TransactionHash *string `json:"transaction_hash"`
+	Data            *string `json:"data"`
+	Type            *string `json:"type"`
+	// Index           *big.Int        // FIXME? add logIndex?
+}
+
+// TODO: move natsShuttleMessage typedef out of here
+type natsShuttleMessage struct {
+	Address   *string `json:"address"`
+	Timestamp *uint64 `json:"timestamp"`
+	Subject   *string `json:"subject"`
+	Hash      *string `json:"hash"`
 }
 
 // EthereumLogTransceiverFactory builds and returns a streaming logs transceiver which is
@@ -51,7 +70,7 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 	return &LogTransceiver{
 		Network: network,
 
-		Stream: func(ch chan []byte) error {
+		Stream: func(ch chan *[]byte) error {
 			websocketURL := network.WebsocketURL()
 			if websocketURL == "" {
 				err := new(websocketNotSupported)
@@ -66,7 +85,7 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 				id, _ := uuid.NewV4()
 				payload := map[string]interface{}{
 					"method":  "eth_subscribe",
-					"params":  []string{"logs"},
+					"params":  []interface{}{"logs", map[string]interface{}{}},
 					"id":      id.String(),
 					"jsonrpc": "2.0",
 				}
@@ -82,24 +101,15 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 							break
 						} else {
 							common.Log.Debugf("Received %d-byte event on network logs websocket for network: %s", len(message), *network.Name)
+
 							response := &provide.EthereumWebsocketSubscriptionResponse{}
 							err := json.Unmarshal(message, response)
 							if err != nil {
 								common.Log.Warningf("Failed to unmarshal event received on network logs websocket: %s; %s", message, err.Error())
 							} else {
 								if result, ok := response.Params["result"].(map[string]interface{}); ok {
-									// var topics []interface{}
-									// var data []byte
 									if resultJSON, err := json.Marshal(result); err == nil {
-										common.Log.Debugf("parsed network log message: %s", string(resultJSON))
-
-										// // header := &types.Header{}
-										// // err := json.Unmarshal(resultJSON, header)
-										// if err != nil {
-										// 	common.Log.Warningf("Failed to stringify result JSON in otherwise valid event received on network logs websocket: %s; %s", response, err.Error())
-										// } else {
-										// 	ch <- resultJSON
-										// }
+										ch <- &resultJSON
 									}
 								}
 							}
@@ -126,7 +136,7 @@ func (lt *LogTransceiver) consume() error {
 	return err
 }
 
-func (lt *LogTransceiver) ingest(response interface{}) {
+func (lt *LogTransceiver) ingest(logmsg []byte) {
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("Recovered from failed log transceiver event ingestion attempt; %s", r)
@@ -134,14 +144,19 @@ func (lt *LogTransceiver) ingest(response interface{}) {
 	}()
 
 	if lt.Network.IsEthereumNetwork() {
-		lt.ingestEthereum(response)
+		lt.ingestEthereum(logmsg)
 	}
 }
 
-func (lt *LogTransceiver) ingestEthereum(response interface{}) {
-	switch response.(type) {
-	default:
-		common.Log.Warningf("EVM log transceiver instance does not have event ingest handler impl")
+func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
+	evtmsg := &natsEventMessage{}
+	err := json.Unmarshal(logmsg, &evtmsg)
+	if err != nil {
+		common.Log.Warningf("Failed to unmarshal log message from JSON while ingesting otherwise valid network log event received on websocket: %s; %s", string(logmsg), err.Error())
+	} else {
+		common.log.Debugf("Unmarshaled %d-byte network log message from ingested network log event JSON", len(logmsg))
+
+		// TODO: attempt to resolve subject log parameter and emit shuttle messages for fanout...
 	}
 }
 
@@ -150,7 +165,7 @@ func (lt *LogTransceiver) loop() error {
 	for {
 		select {
 		case evt := <-lt.queue:
-			lt.ingest(evt)
+			lt.ingest(*evt)
 
 		case <-lt.shutdownCtx.Done():
 			lt.log.Debugf("Closing log transceiver on shutdown")
@@ -205,7 +220,7 @@ func NewNetworkLogTransceiver(lg *logger.Logger, network *network.Network) *LogT
 	if lt != nil {
 		lt.log = lg.Clone()
 		lt.shutdownCtx, lt.cancelF = context.WithCancel(context.Background())
-		lt.queue = make(chan []byte, defaultStatsDaemonQueueSize)
+		lt.queue = make(chan *[]byte, defaultStatsDaemonQueueSize)
 	}
 
 	return lt
