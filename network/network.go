@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net/url"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -23,8 +22,6 @@ const hostReachabilityTimeout = time.Minute * 5
 const hostReachabilityInterval = time.Millisecond * 2500
 
 const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
-
-var networkGenesisMutex = map[string]*sync.Mutex{}
 
 const defaultWebappPort = 3000
 
@@ -55,6 +52,12 @@ type Network struct {
 // NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
 func NetworkListQuery() *gorm.DB {
 	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.cloneable, networks.enabled, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
+}
+
+// MutexKey returns a key key for the given network id, which is guaranteed to be
+// unique-per-network, which represents the distributed lock for the network
+func MutexKey(networkID uuid.UUID) string {
+	return fmt.Sprintf("network.%s.mutex", networkID.String())
 }
 
 // StatsKey returns the network stats key for the given network id, which is guaranteed to be
@@ -124,40 +127,34 @@ func (n *Network) String() string {
 }
 
 func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) {
-	mutex, mutexOk := networkGenesisMutex[pending.NetworkID.String()]
-	if !mutexOk {
-		mutex = &sync.Mutex{}
-		networkGenesisMutex[pending.NetworkID.String()] = mutex
-	}
-
-	// TODO: make this lock distributed
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	count := n.BootnodesCount()
 	bootnodes := make([]*Node, 0)
+	var err error
 
-	if count == 0 {
-		nodeCfg := pending.ParseConfig()
-		if env, envOk := nodeCfg["env"].(map[string]interface{}); envOk {
-			if _, bootnodesOk := env["BOOTNODES"].(string); bootnodesOk {
-				bootnodes = append(bootnodes, pending)
-				err := new(bootnodesInitialized)
-				return bootnodes, *err
+	redisutil.WithRedlock(n.MutexKey(), func() error {
+		count := n.BootnodesCount()
+		if count == 0 {
+			nodeCfg := pending.ParseConfig()
+			if env, envOk := nodeCfg["env"].(map[string]interface{}); envOk {
+				if _, bootnodesOk := env["BOOTNODES"].(string); bootnodesOk {
+					bootnodes = append(bootnodes, pending)
+					err = new(bootnodesInitialized)
+					return err
+				}
 			}
+
+			pending.Bootnode = true
+			pending.updateStatus(db, "genesis", nil)
+			bootnodes = append(bootnodes, pending)
+			err = new(bootnodesInitialized)
+			common.Log.Debugf("Coerced network node into initial bootnode for network with id: %s", n.ID)
+			return err
 		}
 
-		pending.Bootnode = true
-		pending.updateStatus(db, "genesis", nil)
-		bootnodes = append(bootnodes, pending)
-		err := new(bootnodesInitialized)
-		common.Log.Debugf("Coerced network node into initial bootnode for network with id: %s", n.ID)
-		return bootnodes, *err
-	}
+		bootnodes, err = n.Bootnodes()
+		return nil
+	})
 
-	bootnodes, err := n.Bootnodes()
 	common.Log.Debugf("Resolved %d initial bootnode(s) for network with id: %s", len(bootnodes), n.ID)
-
 	return bootnodes, err
 }
 
@@ -219,6 +216,12 @@ func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
 // Stats returns the network stats
 func (n *Network) Stats() (*provide.NetworkStatus, error) {
 	return Stats(n.ID)
+}
+
+// MutexKey returns a key, which is guaranteed to be unique-per-network, which
+// represents the distributed lock for the network
+func (n *Network) MutexKey() string {
+	return MutexKey(n.ID)
 }
 
 // StatsKey returns a key, which is guaranteed to be unique-per-network, which
