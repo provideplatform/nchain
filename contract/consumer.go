@@ -14,6 +14,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/network"
 )
 
 const natsLogTransceiverEmitSubject = "goldmine.logs.emit"
@@ -25,7 +26,7 @@ const natsNetworkContractCreateInvocationSubject = "goldmine.contract.create"
 const natsNetworkContractCreateInvocationMaxInFlight = 32
 const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
 
-type natsEventMessage struct {
+type natsLogEventMessage struct {
 	Address         *string                `json:"address,omitempty"`
 	Block           uint64                 `json:"block,omitempty"`
 	BlockHash       *string                `json:"blockhash,omitempty"`
@@ -41,9 +42,11 @@ type natsEventMessage struct {
 }
 
 var (
+	cachedNetworks            = map[string]*network.Network{}    // map of network id -> network
 	cachedNetworkContractABIs = map[string]map[string]*abi.ABI{} // map of network id -> contract address -> ABI
-	db                        *gorm.DB
-	waitGroup                 sync.WaitGroup
+
+	db        *gorm.DB
+	waitGroup sync.WaitGroup
 )
 
 func init() {
@@ -92,62 +95,25 @@ func cachedABI(networkID uuid.UUID, addr string) *abi.ABI {
 	return contractABI
 }
 
-func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
-			natsLogTransceiverEmitInvocationTimeout,
-			natsLogTransceiverEmitSubject,
-			natsLogTransceiverEmitSubject,
-			consumeLogTransceiverEmitMsg,
-			natsLogTransceiverEmitInvocationTimeout,
-			natsLogTransceiverEmitMaxInFlight,
-		)
+func cachedNetwork(networkID uuid.UUID) *network.Network {
+	var cachedNetwork *network.Network
+	if cachedNtwrk, cachedNtwrkOk := cachedNetworks[networkID.String()]; cachedNtwrkOk {
+		cachedNetwork = cachedNtwrk
+	} else {
+		common.Log.Debugf("Network cache miss; attempting to load network with id: %s", networkID)
+
+		db.Where("id = ?", networkID).Find(&cachedNetwork)
+		if cachedNetwork == nil || cachedNetwork.ID == uuid.Nil {
+			common.Log.Debugf("Network lookup failed; unable to continue log message ingestion for network: %s", networkID)
+			return nil
+		}
+
+		cachedNetworks[networkID.String()] = cachedNetwork
 	}
+	return cachedNetwork
 }
 
-func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
-			natsNetworkContractCreateInvocationTimeout,
-			natsNetworkContractCreateInvocationSubject,
-			natsNetworkContractCreateInvocationSubject,
-			consumeNetworkContractCreateInvocationMsg,
-			natsNetworkContractCreateInvocationTimeout,
-			natsNetworkContractCreateInvocationMaxInFlight,
-		)
-	}
-}
-
-func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS log transceiver event emission message: %s", msg)
-
-	evtmsg := &natsEventMessage{}
-	err := json.Unmarshal(msg.Data, &evtmsg)
-	if err != nil {
-		common.Log.Warningf("Failed to umarshal log transceiver event emission message; %s", err.Error())
-		natsutil.Nack(msg)
-		return
-	}
-
-	var networkID string
-	if evtmsg.NetworkID != nil {
-		networkID = *evtmsg.NetworkID
-	}
-	networkUUID, networkUUIDErr := uuid.FromString(networkID)
-
-	if evtmsg.Address == nil {
-		common.Log.Warningf("Failed to process log transceiver event emission message; no contract address provided")
-		natsutil.Nack(msg)
-		return
-	}
-	if networkUUIDErr != nil {
-		common.Log.Warningf("Failed to process log transceiver event emission message; invalid or no network id provided")
-		natsutil.Nack(msg)
-		return
-	}
-
-	common.Log.Debugf("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
-
+func consumeEVMLogTransceiverEventMsg(evtmsg *natsLogEventMessage) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
 		eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
 		eventIDHex := eventID.Hex()
@@ -195,6 +161,78 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 	} else {
 		common.Log.Debugf("Dropping anonymous %d-byte log emission event on the floor", len(msg.Data))
 		natsutil.Nack(msg)
+	}
+}
+
+func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsLogTransceiverEmitInvocationTimeout,
+			natsLogTransceiverEmitSubject,
+			natsLogTransceiverEmitSubject,
+			consumeLogTransceiverEmitMsg,
+			natsLogTransceiverEmitInvocationTimeout,
+			natsLogTransceiverEmitMaxInFlight,
+		)
+	}
+}
+
+func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsNetworkContractCreateInvocationTimeout,
+			natsNetworkContractCreateInvocationSubject,
+			natsNetworkContractCreateInvocationSubject,
+			consumeNetworkContractCreateInvocationMsg,
+			natsNetworkContractCreateInvocationTimeout,
+			natsNetworkContractCreateInvocationMaxInFlight,
+		)
+	}
+}
+
+func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
+	common.Log.Debugf("Consuming NATS log transceiver event emission message: %s", msg)
+
+	evtmsg := &natsLogEventMessage{}
+	err := json.Unmarshal(msg.Data, &evtmsg)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal log transceiver event emission message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	var networkID string
+	if evtmsg.NetworkID != nil {
+		networkID = *evtmsg.NetworkID
+	}
+	networkUUID, networkUUIDErr := uuid.FromString(networkID)
+
+	if evtmsg.Address == nil {
+		common.Log.Warningf("Failed to process log transceiver event emission message; no contract address provided")
+		natsutil.Nack(msg)
+		return
+	}
+	if networkUUIDErr != nil {
+		common.Log.Warningf("Failed to process log transceiver event emission message; invalid or no network id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	common.Log.Debugf("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
+
+	network := cachedNetwork(networkID)
+	if network == nil || network.ID == uuid.Nil {
+		common.Log.Warningf("Failed to process log transceiver event emission message; network lookup failed for network id: %s", networkID)
+		natsutil.Nack(msg)
+		return
+	}
+
+	if network.IsEthereumNetwork() {
+		consumeEVMLogTransceiverEventMsg(evtmsg)
+	} else {
+		common.Log.Warningf("Failed to process log transceiver event emission message; log events not supported for network: %s", networkID)
+		natsutil.Nack(msg)
+		return
 	}
 }
 
