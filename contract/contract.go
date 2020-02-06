@@ -64,6 +64,13 @@ func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
 	return artifact
 }
 
+// Find - retrieve a specific contract for the given network and address
+func Find(db *gorm.DB, network *network.Network, addr string) *Contract {
+	var cntract *Contract
+	db.Where("network_id = ? AND address = ?", network.ID, addr).Find(&cntract)
+	return cntract
+}
+
 // GetNetwork - retrieve the associated contract network
 func (c *Contract) GetNetwork() (*network.Network, error) {
 	db := dbconf.DatabaseConnection()

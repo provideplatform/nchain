@@ -12,10 +12,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/websocket"
+	"github.com/jinzhu/gorm"
+	dbconf "github.com/kthomas/go-db-config"
 	logger "github.com/kthomas/go-logger"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/contract"
 	"github.com/provideapp/goldmine/network"
 	"github.com/provideservices/provide-go"
 )
@@ -26,13 +31,15 @@ const defaultLogTransceiverMaximumBackoffMillis = 12800
 var currentLogTransceivers = map[string]*LogTransceiver{}
 var currentLogTransceiversMutex = &sync.Mutex{}
 
+var cachedNetworkContractABIs = map[string]map[string]*abi.ABI{} // map of network id -> contract address -> ABI
+
 // LogTransceiver struct
 type LogTransceiver struct {
 	attempt uint32
 	backoff int64
 
 	// natsConnection *stan.Conn
-
+	db  *gorm.DB
 	log *logger.Logger
 
 	cancelF     context.CancelFunc
@@ -46,13 +53,14 @@ type LogTransceiver struct {
 }
 
 type natsEventMessage struct {
-	Address         *string `json:"address"`
-	Block           uint64  `json:"block"`
-	BlockHash       *string `json:"blockhash"`
-	Timestamp       uint64  `json:"timestamp"`
-	TransactionHash *string `json:"transaction_hash"`
-	Data            *string `json:"data"`
-	Type            *string `json:"type"`
+	Address         *string   `json:"address"`
+	Block           uint64    `json:"block"`
+	BlockHash       *string   `json:"blockhash"`
+	Timestamp       uint64    `json:"timestamp"`
+	TransactionHash *string   `json:"transaction_hash"`
+	Data            *string   `json:"data"`
+	Topics          []*string `json:"topics"`
+	Type            *string   `json:"type"`
 	// Index           *big.Int        // FIXME? add logIndex?
 }
 
@@ -136,6 +144,36 @@ func (lt *LogTransceiver) consume() error {
 	return err
 }
 
+func cachedABI(db *gorm.DB, ntwrk *network.Network, addr string) *abi.ABI {
+	var cachedContractABIs map[string]*abi.ABI
+	if cachedABIs, cachedABIsOk := cachedNetworkContractABIs[ntwrk.ID.String()]; cachedABIsOk {
+		cachedContractABIs = cachedABIs
+	} else {
+		cachedContractABIs = map[string]*abi.ABI{}
+		cachedNetworkContractABIs[ntwrk.ID.String()] = cachedContractABIs
+	}
+
+	var contractABI *abi.ABI
+	if cachedABI, cachedABIOk := cachedContractABIs[addr]; cachedABIOk {
+		contractABI = cachedABI
+	} else {
+		common.Log.Debugf("Contract cache miss; attempting to load contract ABI from persistent storage for network: %s; address: %s", ntwrk.ID, addr)
+		contract := contract.Find(db, ntwrk, addr)
+		if contract == nil {
+			common.Log.Debugf("Contract lookup failed; unable to continue log message ingestion on network: %s; address: %s", ntwrk.ID, addr)
+			return nil
+		}
+		cntractABI, err := contract.ReadEthereumContractAbi()
+		if err != nil {
+			common.Log.Warningf("Failed to read ethereum contract ABI on contract: %s; %s", contract.ID, err.Error())
+			return nil
+		}
+		contractABI = cntractABI
+		cachedContractABIs[addr] = contractABI
+	}
+	return contractABI
+}
+
 func (lt *LogTransceiver) ingest(logmsg []byte) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -157,6 +195,31 @@ func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
 		common.Log.Debugf("Unmarshaled %d-byte network log message from ingested network log event JSON", len(logmsg))
 
 		// TODO: attempt to resolve subject log parameter and emit shuttle messages for fanout...
+		if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
+			contractABI := cachedABI(lt.db, lt.Network, *evtmsg.Address)
+			if contractABI != nil {
+				eventID := ethcommon.BytesToHash([]byte(*evtmsg.Topics[0]))
+				eventIDHex := eventID.Hex()
+				common.Log.Debugf("Ingested network log event with id: %s", eventID)
+
+				abievt, err := contractABI.EventByID(eventID)
+				if err != nil {
+					common.Log.Warningf("Failed to ingest log message with id: %s; %s", eventIDHex, err.Error())
+					return
+				}
+
+				mappedValues := map[string]interface{}{}
+				err = abievt.Inputs.UnpackIntoMap(mappedValues, []byte(*evtmsg.Data))
+				if err != nil {
+					common.Log.Warningf("Failed to ingest log message with id: %s; unpacking values failed; %s", eventIDHex, err.Error())
+					return
+				}
+
+				payload, _ := json.Marshal(mappedValues)
+				common.Log.Debugf("Unpacked ingested log message values with id: %s; marshaled values: %s", eventIDHex, payload)
+
+			}
+		}
 	}
 }
 
@@ -218,6 +281,7 @@ func NewNetworkLogTransceiver(lg *logger.Logger, network *network.Network) *LogT
 	}
 
 	if lt != nil {
+		lt.db = dbconf.DatabaseConnection()
 		lt.log = lg.Clone()
 		lt.shutdownCtx, lt.cancelF = context.WithCancel(context.Background())
 		lt.queue = make(chan *[]byte, defaultStatsDaemonQueueSize)
