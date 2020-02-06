@@ -231,11 +231,11 @@ func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
 				common.Log.Debugf("Unpacked ingested log message values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
 
 				subject := natsLogTransceiverPublishSubject
-				if sub, subOk := mappedValues["subject"].(subjectOk); subOk {
+				if sub, subOk := mappedValues["subject"].(string); subOk {
 					subject = sub
 				}
 
-				err := natsutil.NatsPublish(subject, evtmsg)
+				err = natsutil.NatsPublish(subject, payload)
 				if err != nil {
 					common.Log.Warningf("Log transceiver failed to publish %d-byte log message with id: %s; %s", len(payload), eventIDHex, err.Error())
 				}
