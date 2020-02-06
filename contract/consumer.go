@@ -127,7 +127,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 				return
 			}
 
-			common.Log.Debugf("Publishing %d-byte log event emission message with id: %s; %s", len(*evtmsg.Data), string([]byte(*evtmsg.Data)))
+			common.Log.Debugf("Publishing %d-byte log event emission message with id: %s", len(*evtmsg.Data), eventIDHex))
 
 			mappedValues := map[string]interface{}{}
 			err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
