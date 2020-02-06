@@ -5,17 +5,46 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/jinzhu/gorm"
+	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/goldmine/common"
 )
 
-const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
+const natsLogTransceiverEmitSubject = "goldmine.logs.emit"
+const natsLogTransceiverEmitMaxInFlight = 1024
+const natsLogTransceiverEmitInvocationTimeout = time.Second * 10
+const natsLogTransceiverEmitTimeout = int64(time.Second * 30)
+
 const natsNetworkContractCreateInvocationSubject = "goldmine.contract.create"
 const natsNetworkContractCreateInvocationMaxInFlight = 32
+const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
 
-var waitGroup sync.WaitGroup
+type natsEventMessage struct {
+	Address         *string                `json:"address,omitempty"`
+	Block           uint64                 `json:"block,omitempty"`
+	BlockHash       *string                `json:"blockhash,omitempty"`
+	Timestamp       uint64                 `json:"timestamp,omitempty"`
+	TransactionHash *string                `json:"transaction_hash,omitempty"`
+	Data            *string                `json:"data,omitempty"`
+	Topics          []*string              `json:"topics,omitempty"`
+	Type            *string                `json:"type,omitempty"`
+	Params          map[string]interface{} `json:"params,omitempty"`
+	// Index           *big.Int        // FIXME? add logIndex?
+
+	NetworkID *string `json:"network_id,omitempty`
+}
+
+var (
+	cachedNetworkContractABIs = map[string]map[string]*abi.ABI{} // map of network id -> contract address -> ABI
+	db                        *gorm.DB
+	waitGroup                 sync.WaitGroup
+)
 
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
@@ -23,7 +52,57 @@ func init() {
 		return
 	}
 
+	db = dbconf.DatabaseConnection()
+
+	createNatsLogTransceiverEmitInvocationSubscriptions(&waitGroup)
 	createNatsNetworkContractCreateInvocationSubscriptions(&waitGroup)
+}
+
+func cachedABI(networkID uuid.UUID, addr string) *abi.ABI {
+	var cachedContractABIs map[string]*abi.ABI
+	if cachedABIs, cachedABIsOk := cachedNetworkContractABIs[networkID.String()]; cachedABIsOk {
+		cachedContractABIs = cachedABIs
+	} else {
+		cachedContractABIs = map[string]*abi.ABI{}
+		cachedNetworkContractABIs[networkID.String()] = cachedContractABIs
+	}
+
+	var contractABI *abi.ABI
+	var err error
+
+	if cachedABI, cachedABIOk := cachedContractABIs[addr]; cachedABIOk {
+		contractABI = cachedABI
+	} else {
+		common.Log.Debugf("Contract cache miss; attempting to load contract ABI from persistent storage for network: %s; address: %s", networkID, addr)
+
+		contract := Find(db, networkID, addr)
+		if contract == nil {
+			common.Log.Debugf("Contract lookup failed; unable to continue log message ingestion on network: %s; address: %s", networkID, addr)
+			return nil
+		}
+
+		contractABI, err = contract.ReadEthereumContractAbi()
+		if err != nil {
+			common.Log.Warningf("Failed to read ethereum contract ABI on contract: %s; %s", contract.ID, err.Error())
+			return nil
+		}
+
+		cachedContractABIs[addr] = contractABI
+	}
+	return contractABI
+}
+
+func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsLogTransceiverEmitInvocationTimeout,
+			natsLogTransceiverEmitSubject,
+			natsLogTransceiverEmitSubject,
+			consumeLogTransceiverEmitMsg,
+			natsLogTransceiverEmitInvocationTimeout,
+			natsLogTransceiverEmitMaxInFlight,
+		)
+	}
 }
 
 func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) {
@@ -36,6 +115,86 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 			natsNetworkContractCreateInvocationTimeout,
 			natsNetworkContractCreateInvocationMaxInFlight,
 		)
+	}
+}
+
+func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
+	common.Log.Debugf("Consuming NATS log transceiver event emission message: %s", msg)
+
+	evtmsg := &natsEventMessage{}
+	err := json.Unmarshal(msg.Data, &evtmsg)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal log transceiver event emission message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	var networkID string
+	if evtmsg.NetworkID != nil {
+		networkID = *evtmsg.NetworkID
+	}
+	networkUUID, networkUUIDErr := uuid.FromString(networkID)
+
+	if evtmsg.Address == nil {
+		common.Log.Warningf("Failed to process log transceiver event emission message; no contract address provided")
+		natsutil.Nack(msg)
+		return
+	}
+	if networkUUIDErr != nil {
+		common.Log.Warningf("Failed to process log transceiver event emission message; invalid or no network id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	common.Log.Debugf("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
+
+	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
+		eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
+		eventIDHex := eventID.Hex()
+		common.Log.Debugf("Attempting to publish parsed log emission event with id: %s", eventIDHex)
+
+		contractABI := cachedABI(networkUUID, *evtmsg.Address)
+		if contractABI != nil {
+			abievt, err := contractABI.EventByID(eventID)
+			if err != nil {
+				common.Log.Warningf("Failed to publish log emission event with id: %s; %s", eventIDHex, err.Error())
+				return
+			}
+
+			common.Log.Debugf("Publishing %d-byte log event emission message with id: %s; %s", len(*evtmsg.Data), string([]byte(*evtmsg.Data)))
+
+			mappedValues := map[string]interface{}{}
+			err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
+			if err != nil {
+				common.Log.Warningf("Failed to ingest log event with id: %s; unpacking values failed; %s", eventIDHex, err.Error())
+				return
+			}
+
+			evtmsg.Params = mappedValues
+
+			payload, _ := json.Marshal(evtmsg)
+			common.Log.Debugf("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
+
+			subject := natsLogTransceiverEmitSubject
+			if sub, subOk := mappedValues["subject"].(string); subOk {
+				subject = sub
+			}
+
+			err = natsutil.NatsPublish(subject, payload)
+			if err != nil {
+				common.Log.Warningf("Log transceiver failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
+				natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
+			} else {
+				common.Log.Warningf("Log transceiver emission published %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
+				msg.Ack()
+			}
+		} else {
+			common.Log.Debugf("No contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
+			natsutil.Nack(msg)
+		}
+	} else {
+		common.Log.Debugf("Dropping anonymous %d-byte log emission event on the floor", len(msg.Data))
+		natsutil.Nack(msg)
 	}
 }
 

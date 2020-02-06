@@ -12,9 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
@@ -22,20 +19,17 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/contract"
 	"github.com/provideapp/goldmine/network"
 	"github.com/provideservices/provide-go"
 )
 
-const natsLogTransceiverPublishSubject = "goldmine.logs.emit"
+const natsLogTransceiverEmitSubject = "goldmine.logs.emit"
 
 const defaultLogTransceiverQueueSize = 512
 const defaultLogTransceiverMaximumBackoffMillis = 12800
 
 var currentLogTransceivers = map[string]*LogTransceiver{}
 var currentLogTransceiversMutex = &sync.Mutex{}
-
-var cachedNetworkContractABIs = map[string]map[string]*abi.ABI{} // map of network id -> contract address -> ABI
 
 // LogTransceiver struct
 type LogTransceiver struct {
@@ -67,14 +61,8 @@ type natsEventMessage struct {
 	Type            *string                `json:"type,omitempty"`
 	Params          map[string]interface{} `json:"params,omitempty"`
 	// Index           *big.Int        // FIXME? add logIndex?
-}
 
-// TODO: move natsShuttleMessage typedef out of here
-type natsShuttleMessage struct {
-	Address   *string `json:"address"`
-	Timestamp *uint64 `json:"timestamp"`
-	Subject   *string `json:"subject"`
-	Hash      *string `json:"hash"`
+	NetworkID *string `json:"network_id,omitempty`
 }
 
 // EthereumLogTransceiverFactory builds and returns a streaming logs transceiver which is
@@ -121,6 +109,7 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 								common.Log.Warningf("Failed to unmarshal event received on network logs websocket: %s; %s", message, err.Error())
 							} else {
 								if result, ok := response.Params["result"].(map[string]interface{}); ok {
+									result["network_id"] = network.ID.String()
 									if resultJSON, err := json.Marshal(result); err == nil {
 										ch <- &resultJSON
 									}
@@ -149,40 +138,6 @@ func (lt *LogTransceiver) consume() error {
 	return err
 }
 
-func cachedABI(db *gorm.DB, ntwrk *network.Network, addr string) *abi.ABI {
-	var cachedContractABIs map[string]*abi.ABI
-	if cachedABIs, cachedABIsOk := cachedNetworkContractABIs[ntwrk.ID.String()]; cachedABIsOk {
-		cachedContractABIs = cachedABIs
-	} else {
-		cachedContractABIs = map[string]*abi.ABI{}
-		cachedNetworkContractABIs[ntwrk.ID.String()] = cachedContractABIs
-	}
-
-	var contractABI *abi.ABI
-	var err error
-
-	if cachedABI, cachedABIOk := cachedContractABIs[addr]; cachedABIOk {
-		contractABI = cachedABI
-	} else {
-		common.Log.Debugf("Contract cache miss; attempting to load contract ABI from persistent storage for network: %s; address: %s", ntwrk.ID, addr)
-
-		contract := contract.Find(db, ntwrk, addr)
-		if contract == nil {
-			common.Log.Debugf("Contract lookup failed; unable to continue log message ingestion on network: %s; address: %s", ntwrk.ID, addr)
-			return nil
-		}
-
-		contractABI, err = contract.ReadEthereumContractAbi()
-		if err != nil {
-			common.Log.Warningf("Failed to read ethereum contract ABI on contract: %s; %s", contract.ID, err.Error())
-			return nil
-		}
-
-		cachedContractABIs[addr] = contractABI
-	}
-	return contractABI
-}
-
 func (lt *LogTransceiver) ingest(logmsg []byte) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -196,53 +151,9 @@ func (lt *LogTransceiver) ingest(logmsg []byte) {
 }
 
 func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
-	evtmsg := &natsEventMessage{}
-	err := json.Unmarshal(logmsg, &evtmsg)
+	err := natsutil.NatsPublish(natsLogTransceiverEmitSubject, logmsg)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal log message from JSON while ingesting otherwise valid network log event received on websocket: %s; %s", string(logmsg), err.Error())
-	} else {
-		common.Log.Debugf("Unmarshaled %d-byte network log message from ingested network log event JSON", len(logmsg))
-
-		if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
-			eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
-			eventIDHex := eventID.Hex()
-			common.Log.Debugf("Ingested network log event with id: %s", eventIDHex)
-
-			contractABI := cachedABI(lt.db, lt.Network, *evtmsg.Address)
-			if contractABI != nil {
-				abievt, err := contractABI.EventByID(eventID)
-				if err != nil {
-					common.Log.Warningf("Failed to ingest log message with id: %s; %s", eventIDHex, err.Error())
-					return
-				}
-
-				common.Log.Debugf("Ingesting %d-byte log message data with id: %s; %s", len(*evtmsg.Data), string([]byte(*evtmsg.Data)))
-
-				mappedValues := map[string]interface{}{}
-				err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
-				if err != nil {
-					common.Log.Warningf("Failed to ingest log message with id: %s; unpacking values failed; %s", eventIDHex, err.Error())
-					return
-				}
-
-				evtmsg.Params = mappedValues
-
-				payload, _ := json.Marshal(evtmsg)
-				common.Log.Debugf("Unpacked ingested log message values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
-
-				subject := natsLogTransceiverPublishSubject
-				if sub, subOk := mappedValues["subject"].(string); subOk {
-					subject = sub
-				}
-
-				err = natsutil.NatsPublish(subject, payload)
-				if err != nil {
-					common.Log.Warningf("Log transceiver failed to publish %d-byte log message with id: %s; %s", len(payload), eventIDHex, err.Error())
-				}
-			} else {
-				common.Log.Debugf("No contract abi resolved for network log event with id: %s; not emitting log message", eventIDHex)
-			}
-		}
+		common.Log.Warningf("Log transceiver failed to publish %d-byte log emission message; %s", len(payload), err.Error())
 	}
 }
 

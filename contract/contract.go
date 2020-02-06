@@ -65,9 +65,9 @@ func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
 }
 
 // Find - retrieve a specific contract for the given network and address
-func Find(db *gorm.DB, network *network.Network, addr string) *Contract {
+func Find(db *gorm.DB, networkID uuid.UUID, addr string) *Contract {
 	var cntract *Contract
-	db.Where("network_id = ? AND address = ?", network.ID, addr).Find(&cntract)
+	db.Where("network_id = ? AND address = ?", networkID, addr).Find(&cntract)
 	return cntract
 }
 
