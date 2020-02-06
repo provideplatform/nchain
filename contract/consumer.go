@@ -220,7 +220,7 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 
 	common.Log.Debugf("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
 
-	network := cachedNetwork(networkID)
+	network := cachedNetwork(networkUUID)
 	if network == nil || network.ID == uuid.Nil {
 		common.Log.Warningf("Failed to process log transceiver event emission message; network lookup failed for network id: %s", networkID)
 		natsutil.Nack(msg)
