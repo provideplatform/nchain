@@ -113,7 +113,7 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 	return cachedNetwork
 }
 
-func consumeEVMLogTransceiverEventMsg(evtmsg *natsLogEventMessage) {
+func consumeEVMLogTransceiverEventMsg(networkUUID *uuid.UUID, msg *stan.Msg, evtmsg *natsLogEventMessage) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
 		eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
 		eventIDHex := eventID.Hex()
@@ -228,7 +228,7 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 	}
 
 	if network.IsEthereumNetwork() {
-		consumeEVMLogTransceiverEventMsg(evtmsg)
+		consumeEVMLogTransceiverEventMsg(networkUUID, msg, evtmsg)
 	} else {
 		common.Log.Warningf("Failed to process log transceiver event emission message; log events not supported for network: %s", networkID)
 		natsutil.Nack(msg)
