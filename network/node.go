@@ -658,6 +658,9 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
 
 	containerID, containerOk := cfg["container"].(string)
+	image, imageOk := cfg["image"].(string)
+	resources, resourcesOk := cfg["resources"].(map[string]interface{})
+	script, scriptOk := cfg["script"].(map[string]interface{})
 	targetID, targetOk := cfg["target_id"].(string)
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
@@ -690,7 +693,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			securityCfg = cloneableSecurityCfg
 		}
 
-		if !containerOk {
+		if !containerOk && !imageOk {
 			cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
 			if !cloneableTargetOk {
 				desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
@@ -850,22 +853,24 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 			if strings.ToLower(providerID) == "docker" {
 				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
-				var resolvedContainer *string
+				var imageRef *string
 
-				if containerOk {
-					resolvedContainer = common.StringOrNil(containerID)
+				if imageOk {
+					imageRef = common.StringOrNil(containerID)
+				} else if containerOk { // HACK -- deprecate container in favor of image
+					imageRef = common.StringOrNil(containerID)
 				} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
 					common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
 					if container, containerOk := containerRolesByRegion[role].(string); containerOk {
-						resolvedContainer = common.StringOrNil(container)
+						imageRef = common.StringOrNil(container)
 					}
 				} else {
 					common.Log.Warningf("Failed to resolve deployable container(s) by region in EC2 region: %s", region)
 				}
 
-				if resolvedContainer != nil {
-					common.Log.Debugf("Resolved deployable container for role: %s; in EC2 region: %s; container: %s", role, region, *resolvedContainer)
-					common.Log.Debugf("Attempting to deploy container %s in EC2 region: %s", *resolvedContainer, region)
+				if imageRef != nil {
+					common.Log.Debugf("Resolved deployable image for role: %s; in EC2 region: %s; container: %s", role, region, *imageRef)
+					common.Log.Debugf("Attempting to deploy image %s in EC2 region: %s", *imageRef, region)
 					envOverrides := map[string]interface{}{}
 					if envOk {
 						for k := range env {
@@ -929,16 +934,16 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					n.sanitizeConfig()
 					db.Save(&n)
 
-					taskIds, err := orchestrationAPI.StartContainer(*resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
+					taskIds, err := orchestrationAPI.StartContainer(*imageRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
 
 					if err != nil || len(taskIds) == 0 {
-						desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *resolvedContainer, region, err.Error())
+						desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *imageRef, region, err.Error())
 						n.updateStatus(db, "failed", &desc)
 						n.unregisterSecurityGroups()
 						common.Log.Warning(desc)
 						return errors.New(desc)
 					}
-					common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *resolvedContainer, region, taskIds)
+					common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *imageRef, region, taskIds)
 					cfg["target_task_ids"] = taskIds
 					n.setConfig(cfg)
 					n.sanitizeConfig()
