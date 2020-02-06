@@ -113,7 +113,7 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 	return cachedNetwork
 }
 
-func consumeEVMLogTransceiverEventMsg(networkUUID *uuid.UUID, msg *stan.Msg, evtmsg *natsLogEventMessage) {
+func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtmsg *natsLogEventMessage) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
 		eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
 		eventIDHex := eventID.Hex()
