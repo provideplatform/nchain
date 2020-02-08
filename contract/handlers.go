@@ -62,7 +62,7 @@ func contractsListHandler(c *gin.Context) {
 		query = query.Order("contracts.created_at ASC")
 	}
 
-	var contracts []Contract
+	var contracts []*Contract
 	provide.Paginate(c, query, &Contract{}).Find(&contracts)
 	for _, contract := range contracts {
 		contract.enrich()
@@ -180,7 +180,7 @@ func networkContractsListHandler(c *gin.Context) {
 		query = query.Order("contracts.created_at ASC")
 	}
 
-	var contracts []Contract
+	var contracts []*Contract
 	query = query.Order("contracts.created_at ASC")
 	provide.Paginate(c, query, &Contract{}).Find(&contracts)
 	for _, contract := range contracts {
