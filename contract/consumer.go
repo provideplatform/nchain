@@ -38,7 +38,7 @@ type natsLogEventMessage struct {
 	Params          map[string]interface{} `json:"params,omitempty"`
 	// Index           *big.Int        // FIXME? add logIndex?
 
-	NetworkID *string `json:"network_id,omitempty`
+	NetworkID *string `json:"network_id,omitempty"`
 }
 
 var (
