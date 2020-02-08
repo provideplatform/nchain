@@ -102,6 +102,7 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 	} else {
 		common.Log.Debugf("Network cache miss; attempting to load network with id: %s", networkID)
 
+		cachedNetwork = &network.Network{}
 		db.Where("id = ?", networkID).Find(&cachedNetwork)
 		if cachedNetwork == nil || cachedNetwork.ID == uuid.Nil {
 			common.Log.Debugf("Network lookup failed; unable to continue log message ingestion for network: %s", networkID)
