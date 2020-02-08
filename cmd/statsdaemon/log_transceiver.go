@@ -50,21 +50,6 @@ type LogTransceiver struct {
 	Stream  func(chan *[]byte) error // websocket -- implementations should be blocking
 }
 
-type natsEventMessage struct {
-	Address         *string                `json:"address,omitempty"`
-	Block           uint64                 `json:"block,omitempty"`
-	BlockHash       *string                `json:"blockhash,omitempty"`
-	Timestamp       uint64                 `json:"timestamp,omitempty"`
-	TransactionHash *string                `json:"transaction_hash,omitempty"`
-	Data            *string                `json:"data,omitempty"`
-	Topics          []*string              `json:"topics,omitempty"`
-	Type            *string                `json:"type,omitempty"`
-	Params          map[string]interface{} `json:"params,omitempty"`
-	// Index           *big.Int        // FIXME? add logIndex?
-
-	NetworkID *string `json:"network_id,omitempty`
-}
-
 // EthereumLogTransceiverFactory builds and returns a streaming logs transceiver which is
 // used to efficiently propagate interesting log events to our low-latency message daemnon
 func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
