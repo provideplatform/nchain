@@ -659,8 +659,8 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 	containerID, containerOk := cfg["container"].(string)
 	image, imageOk := cfg["image"].(string)
-	resources, resourcesOk := cfg["resources"].(map[string]interface{})
-	script, scriptOk := cfg["script"].(map[string]interface{})
+	// resources, resourcesOk := cfg["resources"].(map[string]interface{})
+	// script, scriptOk := cfg["script"].(map[string]interface{})
 	targetID, targetOk := cfg["target_id"].(string)
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
@@ -856,7 +856,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				var imageRef *string
 
 				if imageOk {
-					imageRef = common.StringOrNil(containerID)
+					imageRef = common.StringOrNil(image)
 				} else if containerOk { // HACK -- deprecate container in favor of image
 					imageRef = common.StringOrNil(containerID)
 				} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
