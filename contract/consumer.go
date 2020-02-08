@@ -86,18 +86,20 @@ func cachedContractArtifacts(networkID uuid.UUID, addr string) (*Contract, *abi.
 	if cachedContract, cachedContractOk := cachedContracts[addr]; cachedContractOk {
 		contract = cachedContract
 	} else {
-		common.Log.Debugf("Contract cache miss; attempting to load contract ABI from persistent storage for network: %s; address: %s", networkID, addr)
+		common.Log.Debugf("Contract cache miss; attempting to load contract from persistent storage for network: %s; address: %s", networkID, addr)
 		contract = Find(db, networkID, addr)
 		if contract == nil || contract.ID == uuid.Nil {
 			common.Log.Debugf("Contract lookup failed; unable to continue log message ingestion on network: %s; address: %s", networkID, addr)
 			return nil, nil
 		}
+
+		cachedContracts[addr] = contract
 	}
 
 	if cachedABI, cachedABIOk := cachedContractABIs[addr]; cachedABIOk {
 		contractABI = cachedABI
 	} else {
-		common.Log.Debugf("Contract ABI cache miss; attempting to cache contract ABI from for network: %s; address: %s", networkID, addr)
+		common.Log.Debugf("Contract ABI cache miss; attempting to cache contract ABI for network: %s; address: %s", networkID, addr)
 		contractABI, err = contract.ReadEthereumContractAbi()
 		if err != nil {
 			common.Log.Warningf("Failed to read ethereum contract ABI on contract: %s; %s", contract.ID, err.Error())
