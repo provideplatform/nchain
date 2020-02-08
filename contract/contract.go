@@ -2,6 +2,8 @@ package contract
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -240,6 +242,29 @@ func (c *Contract) Create() bool {
 	}
 
 	return false
+}
+
+// pubsubSubjectPrefix returns a hash for use as the pub/sub subject prefix for the contract
+func (c *Contract) pubsubSubjectPrefix() *string {
+	if c.ApplicationID != nil {
+		digest := sha256.New()
+		sub = digest.Write(fmt.Sprintf("%s.%s", c.ApplicationID.String(), *c.Address))
+		return common.StringOrNil(hex.EncodeToString(digest.Sum(nil)))
+	}
+
+	return nil
+}
+
+// pubsubSubject returns a namespaced subject suitable for pub/sub subscriptions
+func (c *Contract) qualifiedSubject(suffix *string) *string {
+	prefix := c.pubsubSubjectPrefix()
+	if prefix == nil {
+		return nil
+	}
+	if suffix == nil {
+		return prefix
+	}
+	return fmt.Sprintf("%s.%s", prefix, suffix)
 }
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
