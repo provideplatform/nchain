@@ -64,7 +64,6 @@ func init() {
 
 func cachedContractArtifacts(networkID uuid.UUID, addr string) (*Contract, *abi.ABI) {
 	var cachedContracts map[string]*Contract
-	var cachedContractABIs map[string]*abi.ABI
 	if cachedCntrcts, cachedCntrctsOk := cachedNetworkContracts[networkID.String()]; cachedCntrctsOk {
 		cachedContracts = cachedCntrcts
 	} else {
@@ -166,7 +165,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 			qualifiedSubject := contract.qualifiedSubject(subject)
 			if qualifiedSubject != nil {
 				common.Log.Debugf("Publishing %d-byte log event with id: %s; subject: %s", *qualifiedSubject)
-				err = natsutil.NatsPublish(qualifiedSubject, payload)
+				err = natsutil.NatsPublish(*qualifiedSubject, payload)
 				if err != nil {
 					common.Log.Warningf("Failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
 					natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)

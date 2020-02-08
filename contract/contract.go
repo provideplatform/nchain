@@ -254,7 +254,7 @@ func (c *Contract) Create() bool {
 func (c *Contract) pubsubSubjectPrefix() *string {
 	if c.ApplicationID != nil {
 		digest := sha256.New()
-		sub = digest.Write(fmt.Sprintf("%s.%s", c.ApplicationID.String(), *c.Address))
+		digest.Write([]byte(fmt.Sprintf("%s.%s", c.ApplicationID.String(), *c.Address)))
 		return common.StringOrNil(hex.EncodeToString(digest.Sum(nil)))
 	}
 
@@ -262,15 +262,15 @@ func (c *Contract) pubsubSubjectPrefix() *string {
 }
 
 // pubsubSubject returns a namespaced subject suitable for pub/sub subscriptions
-func (c *Contract) qualifiedSubject(suffix *string) *string {
+func (c *Contract) qualifiedSubject(suffix string) *string {
 	prefix := c.pubsubSubjectPrefix()
 	if prefix == nil {
 		return nil
 	}
-	if suffix == nil {
+	if suffix == "" {
 		return prefix
 	}
-	return fmt.Sprintf("%s.%s", prefix, suffix)
+	return common.StringOrNil(fmt.Sprintf("%s.%s", prefix, suffix))
 }
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
