@@ -64,6 +64,9 @@ func contractsListHandler(c *gin.Context) {
 
 	var contracts []Contract
 	provide.Paginate(c, query, &Contract{}).Find(&contracts)
+	for _, contract := range contracts {
+		contract.enrich()
+	}
 	provide.Render(contracts, 200, c)
 }
 
@@ -99,6 +102,8 @@ func contractDetailsHandler(c *gin.Context) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
+
+	contract.enrich()
 
 	provide.Render(contract, 200, c)
 }
@@ -139,6 +144,8 @@ func createContractHandler(c *gin.Context) {
 	}
 
 	if contract.Create() {
+		contract.enrich()
+
 		if rawSourceOk {
 			provide.Render(contract, 202, c)
 		} else {
@@ -176,6 +183,9 @@ func networkContractsListHandler(c *gin.Context) {
 	var contracts []Contract
 	query = query.Order("contracts.created_at ASC")
 	provide.Paginate(c, query, &Contract{}).Find(&contracts)
+	for _, contract := range contracts {
+		contract.enrich()
+	}
 	provide.Render(contracts, 200, c)
 }
 
@@ -205,6 +215,8 @@ func networkContractDetailsHandler(c *gin.Context) {
 		provide.RenderError("contract not found", 404, c)
 		return
 	}
+
+	contract.enrich()
 
 	provide.Render(contract, 200, c)
 }

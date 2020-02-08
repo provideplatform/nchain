@@ -41,11 +41,17 @@ type Contract struct {
 	Type          *string          `json:"type"`
 	Params        *json.RawMessage `sql:"type:json" json:"params,omitempty"`
 	AccessedAt    *time.Time       `json:"accessed_at"`
+	PubsubPrefix  *string          `sql:"-" json:"pubsub_prefix,omitempty"`
 }
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
 func ContractListQuery() *gorm.DB {
 	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address, contracts.type")
+}
+
+// enrich enriches the contract
+func (c *Contract) enrich() {
+	c.PubsubPrefix = c.pubsubSubjectPrefix()
 }
 
 // CompiledArtifact - parse the original JSON params used for contract creation and attempt to unmarshal to a provide.CompiledArtifact
