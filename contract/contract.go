@@ -270,7 +270,7 @@ func (c *Contract) qualifiedSubject(suffix string) *string {
 	if suffix == "" {
 		return prefix
 	}
-	return common.StringOrNil(fmt.Sprintf("%s.%s", prefix, suffix))
+	return common.StringOrNil(fmt.Sprintf("%s.%s", *prefix, suffix))
 }
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
