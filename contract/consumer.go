@@ -171,7 +171,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 					common.Log.Warningf("Failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
 					natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
 				} else {
-					common.Log.Debugf("Published %d-byte log event with id: %s", len(payload), eventIDHex
+					common.Log.Debugf("Published %d-byte log event with id: %s", len(payload), eventIDHex)
 					msg.Ack()
 				}
 			} else {
