@@ -133,6 +133,8 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 
 func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtmsg *natsLogEventMessage) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
+		evtmsg.Address = common.StringOrNil(ethcommon.HexToAddress(*evtmsg.Address).Hex())
+
 		eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
 		eventIDHex := eventID.Hex()
 		common.Log.Debugf("Attempting to publish parsed log emission event with id: %s", eventIDHex)
@@ -144,8 +146,6 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 				common.Log.Warningf("Failed to publish log emission event with id: %s; %s", eventIDHex, err.Error())
 				return
 			}
-
-			common.Log.Debugf("Publishing %d-byte log event emission message with id: %s", len(*evtmsg.Data), eventIDHex)
 
 			mappedValues := map[string]interface{}{}
 			err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
@@ -166,7 +166,6 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 
 			qualifiedSubject := contract.qualifiedSubject(subject)
 			if qualifiedSubject != nil {
-				common.Log.Debugf("Publishing %d-byte log event with id: %s; subject: %s", len(payload), eventIDHex, *qualifiedSubject)
 				err = natsutil.NatsPublish(*qualifiedSubject, payload)
 				if err != nil {
 					common.Log.Warningf("Failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
@@ -176,7 +175,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 					msg.Ack()
 				}
 			} else {
-				common.Log.Debugf("Dropping %d-byte log emission event on the floor; contract not configured for fanout", len(msg.Data))
+				common.Log.Debugf("Dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
 				natsutil.Nack(msg)
 			}
 		} else {
