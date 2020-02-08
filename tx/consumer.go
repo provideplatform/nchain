@@ -67,6 +67,7 @@ func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 			consumeTxMsg,
 			txAckWait,
 			natsTxMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -80,6 +81,7 @@ func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 			consumeTxCreateMsg,
 			txCreateAckWait,
 			natsTxCreateMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -93,6 +95,7 @@ func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 			consumeTxFinalizeMsg,
 			txFinalizeAckWait,
 			natsTxFinalizeMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -106,6 +109,7 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 			consumeTxReceiptMsg,
 			txReceiptAckWait,
 			natsTxReceiptMaxInFlight,
+			nil,
 		)
 	}
 }

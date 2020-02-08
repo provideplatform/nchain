@@ -197,6 +197,7 @@ func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
 			consumeLogTransceiverEmitMsg,
 			natsLogTransceiverEmitInvocationTimeout,
 			natsLogTransceiverEmitMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -210,6 +211,7 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 			consumeNetworkContractCreateInvocationMsg,
 			natsNetworkContractCreateInvocationTimeout,
 			natsNetworkContractCreateInvocationMaxInFlight,
+			nil,
 		)
 	}
 }

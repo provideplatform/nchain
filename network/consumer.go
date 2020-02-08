@@ -108,6 +108,7 @@ func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 			consumeBlockFinalizedMsg,
 			natsBlockFinalizedInvocationTimeout,
 			natsBlockFinalizedSubjectMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -121,6 +122,7 @@ func createNatsLoadBalancerProvisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeLoadBalancerProvisioningMsg,
 			natsLoadBalancerProvisioningInvocationTimeout,
 			natsLoadBalancerProvisioningMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -134,6 +136,7 @@ func createNatsLoadBalancerDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeLoadBalancerDeprovisioningMsg,
 			natsLoadBalancerDeprovisioningInvocationTimeout,
 			natsLoadBalancerDeprovisioningMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -147,6 +150,7 @@ func createNatsLoadBalancerBalanceNodeSubscriptions(wg *sync.WaitGroup) {
 			consumeLoadBalancerBalanceNodeMsg,
 			natsLoadBalancerBalanceNodeInvocationTimeout,
 			natsLoadBalancerBalanceNodeMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -160,6 +164,7 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(wg *sync.WaitGroup) {
 			consumeLoadBalancerUnbalanceNodeMsg,
 			natsLoadBalancerUnbalanceNodeInvocationTimeout,
 			natsLoadBalancerUnbalanceNodeMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -173,6 +178,7 @@ func createNatsDeployNodeSubscriptions(wg *sync.WaitGroup) {
 			consumeDeployNodeMsg,
 			natsDeployNodeInvocationTimeout,
 			natsDeployNodeMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -186,6 +192,7 @@ func createNatsResolveNodeHostSubscriptions(wg *sync.WaitGroup) {
 			consumeResolveNodeHostMsg,
 			natsResolveNodeHostInvocationTimeout,
 			natsResolveNodeHostMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -199,6 +206,7 @@ func createNatsResolveNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 			consumeResolveNodePeerURLMsg,
 			natsResolveNodePeerURLInvocationTimeout,
 			natsResolveNodePeerURLMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -212,6 +220,7 @@ func createNatsDeleteTerminatedNodeSubscriptions(wg *sync.WaitGroup) {
 			consumeDeleteTerminatedNodeMsg,
 			natsDeleteTerminatedNodeInvocationTimeout,
 			natsDeleteTerminatedNodeMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -225,6 +234,7 @@ func createNatsAddNodePeerSubscriptions(wg *sync.WaitGroup) {
 			consumeAddNodePeerMsg,
 			natsAddNodePeerInvocationTimeout,
 			natsAddNodePeerMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -238,6 +248,7 @@ func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 			consumeRemoveNodePeerMsg,
 			natsRemoveNodePeerInvocationTimeout,
 			natsRemoveNodePeerMaxInFlight,
+			nil,
 		)
 	}
 }

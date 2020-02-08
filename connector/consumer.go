@@ -55,6 +55,7 @@ func createNatsConnectorProvisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorProvisioningMsg,
 			natsConnectorProvisioningInvocationTimeout,
 			natsConnectorProvisioningMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -68,6 +69,7 @@ func createNatsConnectorResolveReachabilitySubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorResolveReachabilityMsg,
 			natsConnectorResolveReachabilityInvocationTimeout,
 			natsConnectorResolveReachabilityMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -81,6 +83,7 @@ func createNatsConnectorDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorDeprovisioningMsg,
 			natsConnectorDeprovisioningInvocationTimeout,
 			natsConnectorDeprovisioningMaxInFlight,
+			nil,
 		)
 	}
 }
@@ -94,6 +97,7 @@ func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorDenormalizeConfigMsg,
 			natsConnectorDenormalizeConfigInvocationTimeout,
 			natsConnectorDenormalizeConfigMaxInFlight,
+			nil,
 		)
 	}
 }
