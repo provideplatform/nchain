@@ -92,5 +92,5 @@ func (e *Execution) ExecuteFromTx(
 	e.PublishedAt = &publishedAt
 
 	txMsg, _ := json.Marshal(e)
-	return e, natsutil.NatsPublish(natsTxSubject, txMsg)
+	return e, natsutil.NatsStreamingPublish(natsTxSubject, txMsg)
 }

@@ -191,7 +191,7 @@ func (n *Node) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"network_node_id": n.ID.String(),
 				})
-				natsutil.NatsPublish(natsDeployNodeSubject, msg)
+				natsutil.NatsStreamingPublish(natsDeployNodeSubject, msg)
 			}
 			return success
 		}
@@ -413,7 +413,7 @@ func (n *Node) Delete() bool {
 	msg, _ := json.Marshal(map[string]interface{}{
 		"network_node_id": n.ID.String(),
 	})
-	natsutil.NatsPublish(natsDeleteTerminatedNodeSubject, msg)
+	natsutil.NatsStreamingPublish(natsDeleteTerminatedNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
@@ -952,8 +952,8 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					msg, _ := json.Marshal(map[string]interface{}{
 						"network_node_id": n.ID.String(),
 					})
-					natsutil.NatsPublish(natsResolveNodeHostSubject, msg)
-					natsutil.NatsPublish(natsResolveNodePeerURLSubject, msg)
+					natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
+					natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg)
 				}
 			}
 		}
@@ -1266,7 +1266,7 @@ func (n *Node) unbalance(db *gorm.DB) error {
 			"load_balancer_id": balancer.ID.String(),
 			"network_node_id":  n.ID.String(),
 		})
-		return natsutil.NatsPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
+		return natsutil.NatsStreamingPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
 	}
 	return nil
 }

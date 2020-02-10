@@ -113,7 +113,7 @@ func (p *IPFSProvider) Deprovision() error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": balancer.ID,
 		})
-		natsutil.NatsPublish(natsLoadBalancerDeprovisioningSubject, msg)
+		natsutil.NatsStreamingPublish(natsLoadBalancerDeprovisioningSubject, msg)
 	}
 
 	return nil
@@ -138,7 +138,7 @@ func (p *IPFSProvider) Provision() error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID,
 		})
-		natsutil.NatsPublish(natsConnectorDenormalizeConfigSubject, msg)
+		natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
 
 		err := p.ProvisionNode()
 		if err != nil {
@@ -179,13 +179,13 @@ func (p *IPFSProvider) ProvisionNode() error {
 				"load_balancer_id": balancer.ID.String(),
 				"network_node_id":  node.ID.String(),
 			})
-			natsutil.NatsPublish(natsLoadBalancerBalanceNodeSubject, msg)
+			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}
 
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID.String(),
 		})
-		natsutil.NatsPublish(natsConnectorResolveReachabilitySubject, msg)
+		natsutil.NatsStreamingPublish(natsConnectorResolveReachabilitySubject, msg)
 	} else {
 		return fmt.Errorf("Failed to provision node on connector: %s", p.connectorID)
 	}

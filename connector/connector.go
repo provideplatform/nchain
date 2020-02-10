@@ -293,7 +293,7 @@ func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": c.ID,
 		})
-		natsutil.NatsPublish(natsConnectorDenormalizeConfigSubject, msg)
+		natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
 	}
 }
 
@@ -338,7 +338,7 @@ func (c *Connector) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"connector_id": c.ID,
 				})
-				natsutil.NatsPublish(natsConnectorProvisioningSubject, msg)
+				natsutil.NatsStreamingPublish(natsConnectorProvisioningSubject, msg)
 			}
 			return success
 		}

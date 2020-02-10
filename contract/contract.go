@@ -240,7 +240,7 @@ func (c *Contract) Create() bool {
 						"params":             params,
 						"published_at":       time.Now(),
 					})
-					err := natsutil.NatsPublish(natsTxCreateSubject, txCreationMsg)
+					err := natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
 					}

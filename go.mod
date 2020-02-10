@@ -31,7 +31,7 @@ require (
 	github.com/kthomas/go-aws-wrapper v0.0.0-20200124115755-62132de25ee2
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
-	github.com/kthomas/go-natsutil v0.0.0-20200208211216-a7982c77265e
+	github.com/kthomas/go-natsutil v0.0.0-20200210080106-862d055fac98
 	github.com/kthomas/go-pgputil v0.0.0-20191124055155-a2d45567ec49
 	github.com/kthomas/go-redisutil v0.0.0-20191117081122-69f1fff0cf7e
 	github.com/kthomas/go-self-signed-cert v0.0.0-20200121102317-5ce1ee6149aa

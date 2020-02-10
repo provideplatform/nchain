@@ -157,7 +157,7 @@ func (l *LoadBalancer) Create() bool {
 				msg, _ := json.Marshal(map[string]interface{}{
 					"load_balancer_id": l.ID,
 				})
-				natsutil.NatsPublish(natsLoadBalancerProvisioningSubject, msg)
+				natsutil.NatsStreamingPublish(natsLoadBalancerProvisioningSubject, msg)
 			}
 			return success
 		}
@@ -912,7 +912,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": l.ID,
 		})
-		natsutil.NatsPublish(natsLoadBalancerDeprovisioningSubject, msg)
+		natsutil.NatsStreamingPublish(natsLoadBalancerDeprovisioningSubject, msg)
 
 		if l.Type != nil && *l.Type == loadBalancerTypeRPC {
 			network := node.relatedNetwork(db)
