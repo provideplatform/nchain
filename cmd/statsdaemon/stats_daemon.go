@@ -644,6 +644,8 @@ func (sd *StatsDaemon) publish() error {
 	err := redisutil.Set(sd.dataSource.Network.StatsKey(), string(payload), &ttl)
 	if err != nil {
 		common.Log.Warningf("failed to set network stats on key: %s; %s", sd.dataSource.Network.StatsKey(), err.Error())
+	} else {
+		natsutil.NatsPublish(sd.dataSource.Network.StatusKey(), payload)
 	}
 	return err
 }

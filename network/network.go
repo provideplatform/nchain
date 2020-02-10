@@ -67,6 +67,13 @@ func StatsKey(networkID uuid.UUID) string {
 	return fmt.Sprintf("network.%s.stats", networkID.String())
 }
 
+// StatusKey returns the network stats key for the given network id, which is guaranteed to be
+// unique-per-network, which represents the namespace where real-time stats/status updates for
+// the network are published (i.e., via NATS)
+func StatusKey(networkID uuid.UUID) string {
+	return fmt.Sprintf("network.%s.status", networkID.String())
+}
+
 // Stats returns the network stats for the given network id without a network instance
 func Stats(networkID uuid.UUID) (*provide.NetworkStatus, error) {
 	statsKey := StatsKey(networkID)
@@ -228,6 +235,13 @@ func (n *Network) MutexKey() string {
 // represents the namespace where real-time stats for the network are cached
 func (n *Network) StatsKey() string {
 	return StatsKey(n.ID)
+}
+
+// StatusKey returns a key, which is guaranteed to be unique-per-network, which
+// represents the namespace where real-time stats/status updates for the network
+// are published (i.e., via NATS)
+func (n *Network) StatusKey() string {
+	return StatusKey(n.ID)
 }
 
 // Reload the underlying network instance
