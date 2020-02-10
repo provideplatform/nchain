@@ -278,7 +278,15 @@ func (c *Connector) Reload(db *gorm.DB) {
 
 // UpdateStatus allows for the status of the connector to be updated with an optional description
 func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string) {
-	c.Status = common.StringOrNil(status)
+	var prevStatus string
+	if c.Status != nil {
+		prevStatus = *c.Status
+	}
+
+	if status != prevStatus {
+		c.Status = common.StringOrNil(status)
+	}
+
 	c.Description = description
 	result := db.Save(&c)
 	errors := result.GetErrors()
@@ -288,7 +296,7 @@ func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string
 				Message: common.StringOrNil(err.Error()),
 			})
 		}
-	} else if status == "available" {
+	} else if status == "available" && status != prevStatus {
 		common.Log.Debugf("Connector become available; dispatching denormalize configuration message for connector: %s", c.ID)
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": c.ID,
