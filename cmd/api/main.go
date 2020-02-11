@@ -46,10 +46,12 @@ func init() {
 		return
 	}
 
-	consumer.RunAPIUsageDaemon()
-	filter.CacheTxFilters()
+	common.RequireJWT()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
+
+	consumer.RunAPIUsageDaemon()
+	filter.CacheTxFilters()
 }
 
 func main() {
