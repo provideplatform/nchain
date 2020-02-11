@@ -223,13 +223,16 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 	}
 
 	allowedSubject := *contract.PubsubPrefix
+
+	subscribeAllow := make([]string, 0)
 	if subpart, subpartOk := params["subject"].(string); subpartOk {
-		allowedSubject = fmt.Sprintf("%s.%s", allowedSubject, subpart)
+		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.%s", subpart))
 	} else {
-		allowedSubject = fmt.Sprintf("%s.*", allowedSubject)
+		subscribeAllow = append(subscribeAllow, allowedSubject)
+		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.*", allowedSubject))
 	}
 
-	tkn, err := token.VendNatsBearerAuthorization(subject, []string{}, []string{}, []string{allowedSubject}, []string{}, nil, nil)
+	tkn, err := token.VendNatsBearerAuthorization(subject, []string{}, []string{}, subscribeAllow, []string{}, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to vend NATS bearer authorization; %s", err.Error())
 		provide.RenderError(err.Error(), 500, c)
