@@ -307,7 +307,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								}
 
 								msgPayload, _ := json.Marshal(params)
-								natsutil.NatsPublish(natsTxFinalizeSubject, msgPayload)
+								natsutil.NatsStreamingPublish(natsTxFinalizeSubject, msgPayload)
 							}
 						}
 					}
