@@ -26,6 +26,8 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	provide "github.com/provideservices/provide-go"
+
+	identcommon "github.com/provideapp/ident"
 )
 
 const runloopSleepInterval = 250 * time.Millisecond
@@ -46,7 +48,7 @@ func init() {
 		return
 	}
 
-	common.RequireJWT()
+	identcommon.RequireJWT()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 
