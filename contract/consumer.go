@@ -159,7 +159,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 			payload, _ := json.Marshal(evtmsg)
 			common.Log.Debugf("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
 
-			subject := natsLogTransceiverEmitSubject
+			var subject string
 			if sub, subOk := mappedValues["subject"].(string); subOk {
 				subject = sub
 			}
