@@ -83,7 +83,7 @@ func contractDetailsHandler(c *gin.Context) {
 	}
 
 	db := dbconf.DatabaseConnection()
-	var contract = &Contract{}
+	contract := &Contract{}
 
 	query := db.Where("id = ?", c.Param("id"))
 	if appID != nil {
@@ -171,7 +171,7 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 	}
 
 	db := dbconf.DatabaseConnection()
-	var contract = &Contract{}
+	contract := &Contract{}
 
 	query := db.Where("id = ?", c.Param("id"))
 	if appID != nil {
