@@ -27,7 +27,7 @@ import (
 	redisutil "github.com/kthomas/go-redisutil"
 	provide "github.com/provideservices/provide-go"
 
-	identcommon "github.com/provideapp/ident"
+	identcommon "github.com/provideapp/ident/common"
 )
 
 const runloopSleepInterval = 250 * time.Millisecond
