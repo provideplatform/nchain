@@ -10,6 +10,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
+
+	"github.com/provideapp/ident/token"
 )
 
 // InstallContractsAPI installs the handlers using the given gin Engine
@@ -19,6 +21,8 @@ func InstallContractsAPI(r *gin.Engine) {
 	r.POST("/api/v1/contracts", createContractHandler)
 	r.GET("/api/v1/networks/:id/contracts", networkContractsListHandler)
 	r.GET("/api/v1/networks/:id/contracts/:contractId", networkContractDetailsHandler)
+
+	r.POST("/api/v1/contracts/:id/subscriptions", createContractSubscriptionTokenHandler)
 }
 
 func contractsListHandler(c *gin.Context) {
@@ -156,6 +160,62 @@ func createContractHandler(c *gin.Context) {
 		obj["errors"] = contract.Errors
 		provide.Render(obj, 422, c)
 	}
+}
+
+func createContractSubscriptionTokenHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := provide.AuthorizedSubjectID(c, "user")
+	if appID == nil && userID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+	var contract = &Contract{}
+
+	query := db.Where("id = ?", c.Param("id"))
+	if appID != nil {
+		query = query.Where("contracts.application_id = ?", appID)
+	}
+	if userID != nil {
+		query = query.Where("contracts.application_id IS NULL", userID)
+	}
+
+	query.Find(&contract)
+
+	if contract == nil || contract.ID == uuid.Nil { // attempt to lookup the contract by address
+		db.Where("address = ?", c.Param("id")).Find(&contract)
+	}
+
+	if contract == nil || contract.ID == uuid.Nil {
+		provide.RenderError("contract not found", 404, c)
+		return
+	} else if appID != nil && *contract.ApplicationID != *appID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	contract.enrich()
+	if contract.PubsubPrefix == nil {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	var subject string
+	if appID != nil {
+		subject = fmt.Sprintf("application:%s", appID.String())
+	} else if userID != nil {
+		subject = fmt.Sprintf("user:%s", userID.String())
+	}
+
+	tkn, err := token.VendNatsBearerAuthorization(subject, []string{}, []string{}, []string{*contract.PubsubPrefix}, []string{}, nil, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to vend NATS bearer authorization; %s", err.Error())
+		provide.RenderError(err.Error(), 500, c)
+		return
+	}
+
+	provide.Render(tkn, 201, c)
 }
 
 func networkContractsListHandler(c *gin.Context) {
