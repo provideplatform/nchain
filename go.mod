@@ -38,7 +38,7 @@ require (
 	github.com/nats-io/stan.go v0.5.1-0.20191007145005-74ff03f767e3
 	github.com/onsi/ginkgo v1.10.3
 	github.com/onsi/gomega v1.7.1
-	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
+	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
 	github.com/provideservices/provide-go v0.0.0-20191202100929-9cc66daf7156
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
