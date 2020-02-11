@@ -226,7 +226,7 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 
 	subscribeAllow := make([]string, 0)
 	if subpart, subpartOk := params["subject"].(string); subpartOk {
-		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.%s", subpart))
+		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.%s", allowedSubject, subpart))
 	} else {
 		subscribeAllow = append(subscribeAllow, allowedSubject)
 		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.*", allowedSubject))
