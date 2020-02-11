@@ -170,6 +170,20 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 		return
 	}
 
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	params := map[string]interface{}{}
+	err = json.Unmarshal(buf, &params)
+	if err != nil {
+		err = fmt.Errorf("failed to parse params; %s", err.Error())
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
 	db := dbconf.DatabaseConnection()
 	contract := &Contract{}
 
@@ -208,7 +222,14 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 		subject = fmt.Sprintf("user:%s", userID.String())
 	}
 
-	tkn, err := token.VendNatsBearerAuthorization(subject, []string{}, []string{}, []string{*contract.PubsubPrefix}, []string{}, nil, nil)
+	allowedSubject := *contract.PubsubPrefix
+	if subpart, subpartOk := params["subject"].(string); subpartOk {
+		allowedSubject = fmt.Sprintf("%s.%s", allowedSubject, subpart)
+	} else {
+		allowedSubject = fmt.Sprintf("%s.*", allowedSubject)
+	}
+
+	tkn, err := token.VendNatsBearerAuthorization(subject, []string{}, []string{}, []string{allowedSubject}, []string{}, nil, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to vend NATS bearer authorization; %s", err.Error())
 		provide.RenderError(err.Error(), 500, c)
