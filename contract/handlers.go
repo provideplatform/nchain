@@ -229,7 +229,7 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.%s", allowedSubject, subpart))
 	} else {
 		subscribeAllow = append(subscribeAllow, allowedSubject)
-		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.*", allowedSubject))
+		subscribeAllow = append(subscribeAllow, fmt.Sprintf("%s.>", allowedSubject))
 	}
 
 	tkn, err := token.VendNatsBearerAuthorization(subject, []string{}, []string{}, subscribeAllow, []string{}, nil, nil)
