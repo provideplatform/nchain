@@ -2,10 +2,12 @@ package provider
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
@@ -64,7 +66,22 @@ func (p *IPFSProvider) apiClientFactory(basePath *string) *ipfs.Shell {
 		return nil
 	}
 
-	return ipfs.NewShell(*apiURL)
+	var tlsConfig *tls.Config
+	if common.DefaultInfrastructureUsesSelfSignedCertificate {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+
+	ipfsClient := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyFromEnvironment,
+			TLSClientConfig:   tlsConfig,
+		},
+	}
+
+	return ipfs.NewShellWithClient(*apiURL, ipfsClient)
 }
 
 func (p *IPFSProvider) apiURLFactory(path string) *string {
