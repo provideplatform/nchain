@@ -178,7 +178,7 @@ PUl1cxrvY7BHh4obNa6Bf8ECAwEAAQ==
 -e CONSUME_NATS_STREAMING_SUBSCRIPTIONS=false \
 -e NATS_CLUSTER_ID=provide \
 -e NATS_TOKEN=testtoken \
--e NATS_URL=nats://docker.for.mac.localhost:4221 \
+-e NATS_URL=nats://docker.for.mac.localhost:4222 \
 -e NATS_STREAMING_URL=nats://docker.for.mac.localhost:4222 \
 -e NATS_FORCE_TLS=false \
 -e GIN_MODE=release \
