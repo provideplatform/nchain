@@ -193,10 +193,16 @@ func (c *Connector) provision() error {
 	cfg := c.ParseConfig()
 
 	switch *c.Type {
+	case provider.ElasticsearchConnectorProvider:
+		common.Log.Warningf("elasticsearch connector does not yet support provider-specific provision() impl")
 	case provider.IPFSConnectorProvider:
 		_, gatewayURLOk := cfg["gateway_url"].(string)
 		_, rpcURLOk := cfg["rpc_url"].(string)
 		runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
+	case provider.TableauConnectorProvider:
+		common.Log.Warningf("tableau connector does not yet support provider-specific provision() impl")
+	case provider.ZokratesConnectorProvider:
+		common.Log.Warningf("zokrates connector does not yet support provider-specific provision() impl")
 	default:
 		// no-op
 	}
@@ -247,7 +253,13 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 func (c *Connector) denormalizeConfig() error {
 	if c.Type != nil {
 		switch *c.Type {
+		case provider.ElasticsearchConnectorProvider:
+			return c.resolveAPIURL()
 		case provider.IPFSConnectorProvider:
+			return c.resolveAPIURL()
+		case provider.TableauConnectorProvider:
+			return c.resolveAPIURL()
+		case provider.ZokratesConnectorProvider:
 			return c.resolveAPIURL()
 		default:
 			// no-op
@@ -400,8 +412,35 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 	var apiClient provider.API
 
 	switch *c.Type {
+	case provider.ElasticsearchConnectorProvider:
+		apiClient = provider.InitElasticsearchProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
 	case provider.IPFSConnectorProvider:
 		apiClient = provider.InitIPFSProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
+	case provider.TableauConnectorProvider:
+		apiClient = provider.InitTableauProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
+	case provider.ZokratesConnectorProvider:
+		apiClient = provider.InitZokratesProvider(
 			c.ID,
 			&c.NetworkID,
 			c.ApplicationID,

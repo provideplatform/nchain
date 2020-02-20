@@ -6,6 +6,16 @@ import (
 	"github.com/provideservices/provide-go"
 )
 
+const ElasticsearchConnectorProvider = "elasticsearch"
+const IPFSConnectorProvider = "ipfs"
+const TableauConnectorProvider = "tableau"
+const ZokratesConnectorProvider = "zokrates"
+
+const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
+const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability.resolve"
+const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
+const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
+
 // API defines a provider interface for third-party software and service connectors,
 // providing an interface for infrastructure provisioning and deprovisioning and an
 // interface for data exchange (i.e., CRUD, search, etc.)

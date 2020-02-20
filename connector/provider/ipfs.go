@@ -16,14 +16,6 @@ import (
 	"github.com/provideapp/goldmine/network"
 )
 
-// IPFSConnectorProvider "ipfs"
-const IPFSConnectorProvider = "ipfs"
-
-const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
-const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability.resolve"
-const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
-const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
-
 // IPFSProvider is a connector.ProviderAPI implementing orchestration for IPFS
 type IPFSProvider struct {
 	connectorID    uuid.UUID
