@@ -754,8 +754,10 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 			if imageOk {
 				imageRef = common.StringOrNil(image)
+				common.Log.Debugf("Resolved container image to deploy in region %s; imge: %s", region, *imageRef)
 			} else if containerOk { // HACK -- deprecate container in favor of image
 				containerRef = common.StringOrNil(containerID)
+				common.Log.Debugf("Resolved container to deploy in region %s; imge: %s", region, *containerRef)
 			} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
 				common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
 				if container, containerOk := containerRolesByRegion[role].(string); containerOk {
@@ -766,7 +768,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			}
 
 			if imageRef != nil || containerRef != nil {
-				common.Log.Debugf("Resolved deployable image for role: %s; in EC2 region: %s; container: %s", role, region, *imageRef)
 				common.Log.Debugf("Attempting to deploy image %s in EC2 region: %s", *imageRef, region)
 				envOverrides := map[string]interface{}{}
 				if envOk {
@@ -809,7 +810,9 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					}
 				} else if networkClientOk {
 					client := envOverrides["CLIENT"].(string)
-					common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
+					if client != networkClient {
+						common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
+					}
 				}
 
 				networkChain, networkChainOk := networkCfg["chain"].(string)
@@ -819,7 +822,9 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					}
 				} else if networkChainOk {
 					chain := envOverrides["CHAIN"].(string)
-					common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+					if chain != networkChain {
+						common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+					}
 				}
 
 				overrides := map[string]interface{}{
