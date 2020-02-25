@@ -746,6 +746,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		cfg["region"] = region
 		cfg["target_security_group_ids"] = securityGroupIds
 		n.setConfig(cfg)
+		db.Save(&n)
 
 		if strings.ToLower(providerID) == "docker" {
 			common.Log.Debugf("Attempting to deploy network node container(s) in region: %s", region)
@@ -769,121 +770,119 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				return err
 			}
 
-			if imageRef != nil || containerRef != nil {
-				common.Log.Debugf("Attempting to deploy image %s in region: %s", *imageRef, region)
-				envOverrides := map[string]interface{}{}
-				if envOk {
-					for k := range env {
-						envOverrides[k] = env[k]
-					}
+			common.Log.Debugf("Attempting to deploy image %s in region: %s", *imageRef, region)
+			envOverrides := map[string]interface{}{}
+			if envOk {
+				for k := range env {
+					envOverrides[k] = env[k]
 				}
-				if encryptedEnvOk {
-					for k := range encryptedEnv {
-						envOverrides[k] = encryptedEnv[k]
-					}
-				}
-
-				if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-					envOverrides["BOOTNODES"] = bnodes
-				} else {
-					bootnodesTxt, err := network.BootnodesTxt()
-					if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-						envOverrides["BOOTNODES"] = bootnodesTxt
-					}
-				}
-				if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
-					if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-						envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
-					} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
-						envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
-					}
-				}
-
-				networkClient, networkClientOk := networkCfg["client"].(string)
-				if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
-					if networkClientOk {
-						envOverrides["CLIENT"] = networkClient
-					} else {
-						if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
-							envOverrides["CLIENT"] = defaultClientEnv
-						} else {
-							envOverrides["CLIENT"] = defaultClient
-						}
-					}
-				} else if networkClientOk {
-					client := envOverrides["CLIENT"].(string)
-					if client != networkClient {
-						common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
-					}
-				}
-
-				networkChain, networkChainOk := networkCfg["chain"].(string)
-				if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
-					if networkChainOk {
-						envOverrides["CHAIN"] = networkChain
-					}
-				} else if networkChainOk {
-					chain := envOverrides["CHAIN"].(string)
-					if chain != networkChain {
-						common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
-					}
-				}
-
-				overrides := map[string]interface{}{
-					"environment": envOverrides,
-				}
-				cfg["env"] = envOverrides
-
-				n.setConfig(cfg)
-				n.sanitizeConfig()
-				db.Save(&n)
-
-				containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
-				if imageRef != nil {
-					containerSecurity = securityCfg
-				}
-
-				taskIds, err := orchestrationAPI.StartContainer(
-					imageRef,
-					containerRef,
-					nil,
-					nil,
-					common.StringOrNil(vpc),
-					securityGroupIds,
-					[]string{},
-					overrides,
-					containerSecurity,
-				)
-
-				if err != nil || len(taskIds) == 0 {
-					ref := imageRef
-					if ref == nil {
-						ref = containerRef
-					}
-
-					desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
-					n.updateStatus(db, "failed", &desc)
-					n.unregisterSecurityGroups()
-					common.Log.Warning(desc)
-					return errors.New(desc)
-				}
-
-				if imageRef != nil {
-					common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
-				}
-
-				common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *imageRef, region, taskIds)
-				cfg["target_task_ids"] = taskIds
-				n.setConfig(cfg)
-				n.sanitizeConfig()
-				db.Save(&n)
-
-				msg, _ := json.Marshal(map[string]interface{}{
-					"network_node_id": n.ID.String(),
-				})
-				natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
-				natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg)
 			}
+			if encryptedEnvOk {
+				for k := range encryptedEnv {
+					envOverrides[k] = encryptedEnv[k]
+				}
+			}
+
+			if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+				envOverrides["BOOTNODES"] = bnodes
+			} else {
+				bootnodesTxt, err := network.BootnodesTxt()
+				if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+					envOverrides["BOOTNODES"] = bootnodesTxt
+				}
+			}
+			if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
+				if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+					envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
+				} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
+					envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
+				}
+			}
+
+			networkClient, networkClientOk := networkCfg["client"].(string)
+			if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
+				if networkClientOk {
+					envOverrides["CLIENT"] = networkClient
+				} else {
+					if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+						envOverrides["CLIENT"] = defaultClientEnv
+					} else {
+						envOverrides["CLIENT"] = defaultClient
+					}
+				}
+			} else if networkClientOk {
+				client := envOverrides["CLIENT"].(string)
+				if client != networkClient {
+					common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
+				}
+			}
+
+			networkChain, networkChainOk := networkCfg["chain"].(string)
+			if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
+				if networkChainOk {
+					envOverrides["CHAIN"] = networkChain
+				}
+			} else if networkChainOk {
+				chain := envOverrides["CHAIN"].(string)
+				if chain != networkChain {
+					common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+				}
+			}
+
+			overrides := map[string]interface{}{
+				"environment": envOverrides,
+			}
+			cfg["env"] = envOverrides
+
+			n.setConfig(cfg)
+			n.sanitizeConfig()
+			db.Save(&n)
+
+			containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
+			if imageRef != nil {
+				containerSecurity = securityCfg
+			}
+
+			taskIds, err := orchestrationAPI.StartContainer(
+				imageRef,
+				containerRef,
+				nil,
+				nil,
+				common.StringOrNil(vpc),
+				securityGroupIds,
+				[]string{},
+				overrides,
+				containerSecurity,
+			)
+
+			if err != nil || len(taskIds) == 0 {
+				ref := imageRef
+				if ref == nil {
+					ref = containerRef
+				}
+
+				desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
+				n.updateStatus(db, "failed", &desc)
+				n.unregisterSecurityGroups()
+				common.Log.Warning(desc)
+				return errors.New(desc)
+			}
+
+			if imageRef != nil {
+				common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
+			}
+
+			common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *imageRef, region, taskIds)
+			cfg["target_task_ids"] = taskIds
+			n.setConfig(cfg)
+			n.sanitizeConfig()
+			db.Save(&n)
+
+			msg, _ := json.Marshal(map[string]interface{}{
+				"network_node_id": n.ID.String(),
+			})
+			natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
+			natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg)
 		}
 	}
 
