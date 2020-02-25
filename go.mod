@@ -23,7 +23,7 @@ require (
 	github.com/kthomas/exchange-consumer v0.0.0-20171225030615-4fb83508b3ca
 	github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
-	github.com/kthomas/go-aws-wrapper v0.0.0-20200225101750-cf132c761be8
+	github.com/kthomas/go-aws-wrapper v0.0.0-20200225180119-e676b25aba2d
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
 	github.com/kthomas/go-natsutil v0.0.0-20200210083803-c5a5cc363cf7
