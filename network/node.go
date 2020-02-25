@@ -725,7 +725,12 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				return err
 			}
 
-			common.Log.Debugf("Attempting to deploy image %s in region: %s", *imageRef, region)
+			ref := imageRef
+			if ref == nil {
+				ref = containerRef
+			}
+
+			common.Log.Debugf("Attempting to deploy container %s in region: %s", *ref, region)
 			envOverrides := map[string]interface{}{}
 			if envOk {
 				for k := range env {
@@ -811,11 +816,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			)
 
 			if err != nil || len(taskIds) == 0 {
-				ref := imageRef
-				if ref == nil {
-					ref = containerRef
-				}
-
 				desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
 				n.updateStatus(db, "failed", &desc)
 				n.unregisterSecurityGroups()
