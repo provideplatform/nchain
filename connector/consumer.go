@@ -40,6 +40,8 @@ func init() {
 		return
 	}
 
+	natsutil.EstablishSharedNatsStreamingConnection(nil)
+
 	createNatsConnectorProvisioningSubscriptions(&waitGroup)
 	createNatsConnectorResolveReachabilitySubscriptions(&waitGroup)
 	createNatsConnectorDeprovisioningSubscriptions(&waitGroup)

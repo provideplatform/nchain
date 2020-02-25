@@ -52,6 +52,8 @@ func init() {
 		return
 	}
 
+	natsutil.EstablishSharedNatsStreamingConnection(nil)
+
 	createNatsTxSubscriptions(&waitGroup)
 	createNatsTxCreateSubscriptions(&waitGroup)
 	createNatsTxFinalizeSubscriptions(&waitGroup)

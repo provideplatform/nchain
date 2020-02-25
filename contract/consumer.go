@@ -56,6 +56,7 @@ func init() {
 		return
 	}
 
+	natsutil.EstablishSharedNatsStreamingConnection(nil)
 	db = dbconf.DatabaseConnection()
 
 	createNatsLogTransceiverEmitInvocationSubscriptions(&waitGroup)
