@@ -728,7 +728,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	}
 
 	if imageOk && containerOk {
-		desc := fmt.Sprintf("Failed to deploy node in region %s; network node id: %s; both an image and container were specified; only one should be used", region, n.ID.String(), err.Error())
+		desc := fmt.Sprintf("Failed to deploy node in region %s; network node id: %s; both an image and container were specified; only one should be used", region, n.ID.String())
 		n.updateStatus(db, "failed", &desc)
 		common.Log.Warning(desc)
 		return errors.New(desc)
