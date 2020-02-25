@@ -339,57 +339,12 @@ func (n *Node) updateStatus(db *gorm.DB, status string, description *string) {
 // Validate a network node for persistence
 func (n *Node) Validate() bool {
 	cfg := n.ParseConfig()
-	// if _, protocolOk := cfg["protocol_id"].(string); !protocolOk {
-	// 	n.Errors = append(n.Errors, &provide.Error{
-	// 		Message: common.StringOrNil("Failed to parse protocol_id in network node configuration"),
-	// 	})
-	// }
-	// if _, engineOk := cfg["engine_id"].(string); !engineOk {
-	// 	n.Errors = append(n.Errors, &provide.Error{
-	// 		Message: common.StringOrNil("Failed to parse engine_id in network node configuration"),
-	// 	})
-	// }
-	// if targetID, targetOk := cfg["target_id"].(string); targetOk {
-	// 	if creds, credsOk := cfg["credentials"].(map[string]interface{}); credsOk {
-	// 		if strings.ToLower(targetID) == "aws" {
-	// 			if _, accessKeyIdOk := creds["aws_access_key_id"].(string); !accessKeyIdOk {
-	// 				n.Errors = append(n.Errors, &provide.Error{
-	// 					Message: common.StringOrNil("Failed to parse aws_access_key_id in network node credentials configuration for AWS target"),
-	// 				})
-	// 			}
-	// 			if _, secretAccessKeyOk := creds["aws_secret_access_key"].(string); !secretAccessKeyOk {
-	// 				n.Errors = append(n.Errors, &provide.Error{
-	// 					Message: common.StringOrNil("Failed to parse aws_secret_access_key in network node credentials configuration for AWS target"),
-	// 				})
-	// 			}
-	// 		}
-	// 	} else {
-	// 		n.Errors = append(n.Errors, &provide.Error{
-	// 			Message: common.StringOrNil("Failed to parse credentials in network node configuration"),
-	// 		})
-	// 	}
-	// } else {
-	// 	n.Errors = append(n.Errors, &provide.Error{
-	// 		Message: common.StringOrNil("Failed to parse target_id in network node configuration"),
-	// 	})
-	// }
-	// if _, providerOk := cfg["provider_id"].(string); !providerOk {
-	// 	n.Errors = append(n.Errors, &provide.Error{
-	// 		Message: common.StringOrNil("Failed to parse provider_id in network node configuration"),
-	// 	})
-	// }
 	if role, roleOk := cfg["role"].(string); roleOk {
 		if n.Role == nil || *n.Role != role {
 			common.Log.Debugf("Coercing network node role to match node configuration; role: %s", role)
 			n.Role = common.StringOrNil(role)
 		}
 	}
-	// } else {
-	// 	n.Errors = append(n.Errors, &provide.Error{
-	// 		Message: common.StringOrNil("Failed to parse role in network node configuration"),
-	// 	})
-	// }
-
 	return len(n.Errors) == 0
 }
 
@@ -912,7 +867,6 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	id := identifiers[len(identifiers)-1]
-	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	_, regionOk := cfg["region"].(string)
 
@@ -923,7 +877,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 		return err
 	}
 
-	if strings.ToLower(targetID) == "aws" && targetOk && providerOk && regionOk {
+	if providerOk && regionOk {
 		if strings.ToLower(providerID) == "docker" {
 			containerDetails, err := orchestrationAPI.GetContainerDetails(id, nil)
 			if err == nil {
