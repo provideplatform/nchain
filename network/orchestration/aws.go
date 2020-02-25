@@ -225,8 +225,8 @@ func (p *AWSOrchestrationProvider) CreateSecurityGroup(name, description string,
 				securityGroups, gerr := p.GetSecurityGroups()
 				if gerr == nil {
 					for _, secGroup := range securityGroups.SecurityGroups {
-						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc && secGroup.GroupId != nil {
-							securityGroupIDs = make(securityGroupIDs, *secGroup.GroupId)
+						if secGroup.GroupName != nil && *secGroup.GroupName == description && secGroup.GroupId != nil {
+							securityGroupIDs = append(securityGroupIDs, *secGroup.GroupId)
 							break
 						}
 					}
