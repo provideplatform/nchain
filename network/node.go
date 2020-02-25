@@ -764,7 +764,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					containerRef = common.StringOrNil(container)
 				}
 			} else {
-				err := common.Log.Errorf("Failed to resolve deployable image or container(s) to deploy in region: %s; network node: %s", region, n.ID.String())
+				err := fmt.Errorf("Failed to resolve deployable image or container(s) to deploy in region: %s; network node: %s", region, n.ID)
 				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
 				return err
 			}
@@ -843,7 +843,18 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					containerSecurity = securityCfg
 				}
 
-				taskIds, err := orchestrationAPI.StartContainer(imageRef, containerRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides, containerSecurity)
+				taskIds, err := orchestrationAPI.StartContainer(
+					imageRef,
+					containerRef,
+					nil,
+					nil,
+					common.StringOrNil(vpc),
+					securityGroupIds,
+					[]string{},
+					overrides,
+					containerSecurity,
+				)
+
 				if err != nil || len(taskIds) == 0 {
 					ref := imageRef
 					if ref == nil {
