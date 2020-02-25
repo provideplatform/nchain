@@ -754,10 +754,10 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 			if imageOk {
 				imageRef = common.StringOrNil(image)
-				common.Log.Debugf("Resolved container image to deploy in region %s; imge: %s", region, *imageRef)
+				common.Log.Debugf("Resolved container image to deploy in region %s; image: %s", region, *imageRef)
 			} else if containerOk { // HACK -- deprecate container in favor of image
 				containerRef = common.StringOrNil(containerID)
-				common.Log.Debugf("Resolved container to deploy in region %s; imge: %s", region, *containerRef)
+				common.Log.Debugf("Resolved container to deploy in region %s; ref: %s", region, *containerRef)
 			} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
 				common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
 				if container, containerOk := containerRolesByRegion[role].(string); containerOk {

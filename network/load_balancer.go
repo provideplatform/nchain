@@ -510,18 +510,6 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 			// start security group handling
 			securityGroupDesc := fmt.Sprintf("security group for load balancer: %s", l.ID.String())
 			securityGroupIDs, _ := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID), securityCfg)
-			if securityGroupIDs == nil {
-				securityGroups, err := orchestrationAPI.GetSecurityGroups()
-				if err == nil {
-					for _, secGroup := range securityGroups.SecurityGroups {
-						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc && secGroup.GroupId != nil {
-							securityGroupIDs = []string{*secGroup.GroupId}
-							break
-						}
-					}
-				}
-			}
-
 			balancerCfg["target_security_group_ids"] = securityGroupIDs
 
 			if providerID, providerIDOk := balancerCfg["provider_id"].(string); providerIDOk {

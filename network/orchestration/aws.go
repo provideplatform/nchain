@@ -222,6 +222,15 @@ func (p *AWSOrchestrationProvider) CreateSecurityGroup(name, description string,
 			switch aerr.Code() {
 			case "InvalidGroup.Duplicate":
 				common.Log.Debugf("Security group %s already exists in EC2 region %s", description, p.region)
+				securityGroups, gerr := p.GetSecurityGroups()
+				if gerr == nil {
+					for _, secGroup := range securityGroups.SecurityGroups {
+						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc && secGroup.GroupId != nil {
+							securityGroupIDs = make(securityGroupIDs, *secGroup.GroupId)
+							break
+						}
+					}
+				}
 			default:
 				desc := fmt.Sprintf("Failed to create security group in EC2 region %s; %s", p.region, err.Error())
 				common.Log.Warning(desc)
