@@ -1,6 +1,10 @@
 package orchestration
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -52,8 +56,8 @@ func (p *AWSOrchestrationProvider) GetInstanceDetails(instanceID string) (respon
 }
 
 // CreateLoadBalancer needs docs
-func (p *AWSOrchestrationProvider) CreateLoadBalancer(vpcID *string, name *string, securityGroupIds []string, listeners []*elb.Listener) (response *elb.CreateLoadBalancerOutput, err error) {
-	return awswrapper.CreateLoadBalancer(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, securityGroupIds, listeners)
+func (p *AWSOrchestrationProvider) CreateLoadBalancer(vpcID *string, name *string, securityGroupIDs []string, listeners []*elb.Listener) (response *elb.CreateLoadBalancerOutput, err error) {
+	return awswrapper.CreateLoadBalancer(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, securityGroupIDs, listeners)
 
 }
 
@@ -70,8 +74,8 @@ func (p *AWSOrchestrationProvider) GetLoadBalancers(loadBalancerName *string) (r
 }
 
 // CreateLoadBalancerV2 needs docs
-func (p *AWSOrchestrationProvider) CreateLoadBalancerV2(vpcID, name, balancerType *string, securityGroupIds []string) (response *elbv2.CreateLoadBalancerOutput, err error) {
-	return awswrapper.CreateLoadBalancerV2(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, balancerType, securityGroupIds)
+func (p *AWSOrchestrationProvider) CreateLoadBalancerV2(vpcID, name, balancerType *string, securityGroupIDs []string) (response *elbv2.CreateLoadBalancerOutput, err error) {
+	return awswrapper.CreateLoadBalancerV2(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, balancerType, securityGroupIDs)
 
 }
 
@@ -209,20 +213,146 @@ func (p *AWSOrchestrationProvider) AuthorizeSecurityGroupIngress(securityGroupID
 }
 
 // CreateSecurityGroup needs docs
-func (p *AWSOrchestrationProvider) CreateSecurityGroup(name, description string, vpcID *string) (response *ec2.CreateSecurityGroupOutput, err error) {
-	return awswrapper.CreateSecurityGroup(p.accessKeyID, p.secretAccessKey, p.region, name, description, vpcID)
+func (p *AWSOrchestrationProvider) CreateSecurityGroup(name, description string, vpcID *string, cfg map[string]interface{}) ([]string, error) {
+	securityGroupIDs := make([]string, 0)
+	securityGroup, err := awswrapper.CreateSecurityGroup(p.accessKeyID, p.secretAccessKey, p.region, name, description, vpcID)
 
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "InvalidGroup.Duplicate":
+				common.Log.Debugf("Security group %s already exists in EC2 region %s", description, p.region)
+			default:
+				desc := fmt.Sprintf("Failed to create security group in EC2 region %s; %s", p.region, err.Error())
+				common.Log.Warning(desc)
+				return nil, errors.New(desc)
+			}
+		}
+	} else {
+		if securityGroup != nil {
+			securityGroupIDs = append(securityGroupIDs, *securityGroup.GroupId)
+		}
+
+		if egress, egressOk := cfg["egress"]; egressOk {
+			switch egress.(type) {
+			case string:
+				if egress.(string) == "*" {
+					_, err := p.AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId)
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); ok {
+							switch aerr.Code() {
+							case "InvalidPermission.Duplicate":
+								common.Log.Debugf("Attempted to authorize duplicate security group egress across all ports and protocols in EC2 %s region; security group id: %s", p.region, *securityGroup.GroupId)
+							default:
+								common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", p.region, *securityGroup.GroupId, err.Error())
+							}
+						}
+					}
+				}
+			case map[string]interface{}:
+				egressCfg := egress.(map[string]interface{})
+				for cidr := range egressCfg {
+					tcp := make([]int64, 0)
+					if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+						for i := range _tcp {
+							tcp = append(tcp, int64(_tcp[i].(float64)))
+						}
+					}
+
+					udp := make([]int64, 0)
+					if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+						for i := range _udp {
+							udp = append(udp, int64(_udp[i].(float64)))
+						}
+					}
+
+					_, err := p.AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp)
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); ok {
+							switch aerr.Code() {
+							case "InvalidPermission.Duplicate":
+								common.Log.Debugf("Attempted to authorize duplicate security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d", p.region, *securityGroup.GroupId, tcp, udp)
+							default:
+								common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", p.region, *securityGroup.GroupId, tcp, udp, err.Error())
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if ingress, ingressOk := cfg["ingress"]; ingressOk {
+			switch ingress.(type) {
+			case string:
+				if ingress.(string) == "*" {
+					_, err := p.AuthorizeSecurityGroupIngressAllPortsAllProtocols(*securityGroup.GroupId)
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); ok {
+							switch aerr.Code() {
+							case "InvalidPermission.Duplicate":
+								common.Log.Debugf("Attempted to authorize duplicate security group ingress across all ports and protocols in EC2 %s region; security group id: %s", p.region, *securityGroup.GroupId)
+							default:
+								common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", p.region, *securityGroup.GroupId, err.Error())
+							}
+						}
+					}
+				}
+			case map[string]interface{}:
+				ingressCfg := ingress.(map[string]interface{})
+				for cidr := range ingressCfg {
+					tcp := make([]int64, 0)
+					if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
+						for i := range _tcp {
+							tcp = append(tcp, int64(_tcp[i].(float64)))
+						}
+					}
+
+					udp := make([]int64, 0)
+					if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
+						for i := range _udp {
+							udp = append(udp, int64(_udp[i].(float64)))
+						}
+					}
+
+					_, err := p.AuthorizeSecurityGroupIngress(*securityGroup.GroupId, cidr, tcp, udp)
+					if err != nil {
+						if aerr, ok := err.(awserr.Error); ok {
+							switch aerr.Code() {
+							case "InvalidPermission.Duplicate":
+								common.Log.Debugf("Attempted to authorize duplicate security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d", p.region, *securityGroup.GroupId, tcp, udp)
+							default:
+								common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", p.region, *securityGroup.GroupId, tcp, udp, err.Error())
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return securityGroupIDs, nil
 }
 
 // DeleteSecurityGroup needs docs
-func (p *AWSOrchestrationProvider) DeleteSecurityGroup(securityGroupID string) (response *ec2.DeleteSecurityGroupOutput, err error) {
-	return awswrapper.DeleteSecurityGroup(p.accessKeyID, p.secretAccessKey, p.region, securityGroupID)
+func (p *AWSOrchestrationProvider) DeleteSecurityGroup(securityGroupID string) (interface{}, error) {
+	resp, err := awswrapper.DeleteSecurityGroup(p.accessKeyID, p.secretAccessKey, p.region, securityGroupID)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "InvalidGroup.NotFound":
+				common.Log.Debugf("Attempted to unregister security group which does not exist; security group id: %s", securityGroupID)
+			default:
+				return resp, err
+			}
+		}
+	}
 
+	return resp, nil
 }
 
 // SetInstanceSecurityGroups needs docs
-func (p *AWSOrchestrationProvider) SetInstanceSecurityGroups(instanceID string, securityGroupIds []string) (response *ec2.ModifyInstanceAttributeOutput, err error) {
-	return awswrapper.SetInstanceSecurityGroups(p.accessKeyID, p.secretAccessKey, p.region, instanceID, securityGroupIds)
+func (p *AWSOrchestrationProvider) SetInstanceSecurityGroups(instanceID string, securityGroupIDs []string) (response *ec2.ModifyInstanceAttributeOutput, err error) {
+	return awswrapper.SetInstanceSecurityGroups(p.accessKeyID, p.secretAccessKey, p.region, instanceID, securityGroupIDs)
 
 }
 
@@ -233,8 +363,8 @@ func (p *AWSOrchestrationProvider) TerminateInstance(instanceID string) (respons
 }
 
 // StartContainer needs docs
-func (p *AWSOrchestrationProvider) StartContainer(image, taskDefinition *string, launchType, cluster, vpcName *string, securityGroupIds []string, subnetIds []string, overrides map[string]interface{}, security map[string]interface{}) (taskIds []string, err error) {
-	return awswrapper.StartContainer(p.accessKeyID, p.secretAccessKey, p.region, image, taskDefinition, launchType, cluster, vpcName, securityGroupIds, subnetIds, overrides, security)
+func (p *AWSOrchestrationProvider) StartContainer(image, taskDefinition *string, launchType, cluster, vpcName *string, securityGroupIDs []string, subnetIds []string, overrides map[string]interface{}, security map[string]interface{}) (taskIds []string, err error) {
+	return awswrapper.StartContainer(p.accessKeyID, p.secretAccessKey, p.region, image, taskDefinition, launchType, cluster, vpcName, securityGroupIDs, subnetIds, overrides, security)
 
 }
 

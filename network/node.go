@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
@@ -736,241 +735,130 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	}
 
 	if targetOk && engineOk && providerOk && roleOk && regionOk {
-		if strings.ToLower(targetID) == "aws" {
-			// start security group handling
-			securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-			securityGroup, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil)
-			securityGroupIds := make([]string, 0)
+		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
+		securityGroupIds, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
+		if err != nil {
+			n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
+			return err
+		}
 
-			if err != nil {
-				if aerr, ok := err.(awserr.Error); ok {
-					switch aerr.Code() {
-					case "InvalidGroup.Duplicate":
-						common.Log.Debugf("Security group %s already exists in EC2 region %s; network node id: %s", securityGroupDesc, region, n.ID.String())
-					default:
-						desc := fmt.Sprintf("Failed to create security group in EC2 region %s; network node id: %s; %s", region, n.ID.String(), err.Error())
-						n.updateStatus(db, "failed", &desc)
-						common.Log.Warning(desc)
-						return errors.New(desc)
-					}
+		cfg["security"] = securityCfg
+		cfg["region"] = region
+		cfg["target_security_group_ids"] = securityGroupIds
+		n.setConfig(cfg)
+
+		if strings.ToLower(providerID) == "docker" {
+			common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
+			var imageRef *string
+			var containerRef *string
+
+			if imageOk {
+				imageRef = common.StringOrNil(image)
+			} else if containerOk { // HACK -- deprecate container in favor of image
+				containerRef = common.StringOrNil(containerID)
+			} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
+				common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
+				if container, containerOk := containerRolesByRegion[role].(string); containerOk {
+					containerRef = common.StringOrNil(container)
 				}
 			} else {
-				if securityGroup != nil {
-					securityGroupIds = append(securityGroupIds, *securityGroup.GroupId)
-				}
-
-				cfg["security"] = securityCfg
-				cfg["region"] = region
-				cfg["target_security_group_ids"] = securityGroupIds
-				n.setConfig(cfg)
-
-				if egress, egressOk := securityCfg["egress"]; egressOk {
-					switch egress.(type) {
-					case string:
-						if egress.(string) == "*" {
-							_, err := orchestrationAPI.AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId)
-							if err != nil {
-								if aerr, ok := err.(awserr.Error); ok {
-									switch aerr.Code() {
-									case "InvalidPermission.Duplicate":
-										common.Log.Debugf("Attempted to authorize duplicate security group egress across all ports and protocols in EC2 %s region; security group id: %s", region, *securityGroup.GroupId)
-									default:
-										common.Log.Warningf("Failed to authorize security group egress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
-									}
-								}
-							}
-						}
-					case map[string]interface{}:
-						egressCfg := egress.(map[string]interface{})
-						for cidr := range egressCfg {
-							tcp := make([]int64, 0)
-							udp := make([]int64, 0)
-							if _tcp, tcpOk := egressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-								for i := range _tcp {
-									tcp = append(tcp, int64(_tcp[i].(float64)))
-								}
-							}
-							if _udp, udpOk := egressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-								for i := range _udp {
-									udp = append(udp, int64(_udp[i].(float64)))
-								}
-							}
-							_, err := orchestrationAPI.AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp)
-							if err != nil {
-								if aerr, ok := err.(awserr.Error); ok {
-									switch aerr.Code() {
-									case "InvalidPermission.Duplicate":
-										common.Log.Debugf("Attempted to authorize duplicate security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d", region, *securityGroup.GroupId, tcp, udp)
-									default:
-										common.Log.Warningf("Failed to authorize security group egress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-									}
-								}
-							}
-						}
-					}
-				}
-
-				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-					switch ingress.(type) {
-					case string:
-						if ingress.(string) == "*" {
-							_, err := orchestrationAPI.AuthorizeSecurityGroupIngressAllPortsAllProtocols(*securityGroup.GroupId)
-							if err != nil {
-								if aerr, ok := err.(awserr.Error); ok {
-									switch aerr.Code() {
-									case "InvalidPermission.Duplicate":
-										common.Log.Debugf("Attempted to authorize duplicate security group ingress across all ports and protocols in EC2 %s region; security group id: %s", region, *securityGroup.GroupId)
-									default:
-										common.Log.Warningf("Failed to authorize security group ingress across all ports and protocols in EC2 %s region; security group id: %s; %s", region, *securityGroup.GroupId, err.Error())
-									}
-								}
-							}
-						}
-					case map[string]interface{}:
-						ingressCfg := ingress.(map[string]interface{})
-						for cidr := range ingressCfg {
-							tcp := make([]int64, 0)
-							udp := make([]int64, 0)
-							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-								for i := range _tcp {
-									tcp = append(tcp, int64(_tcp[i].(float64)))
-								}
-							}
-							if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-								for i := range _udp {
-									udp = append(udp, int64(_udp[i].(float64)))
-								}
-							}
-							_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroup.GroupId, cidr, tcp, udp)
-							if err != nil {
-								if aerr, ok := err.(awserr.Error); ok {
-									switch aerr.Code() {
-									case "InvalidPermission.Duplicate":
-										common.Log.Debugf("Attempted to authorize duplicate security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d", region, *securityGroup.GroupId, tcp, udp)
-									default:
-										common.Log.Warningf("Failed to authorize security group ingress in EC2 %s region; security group id: %s; tcp ports: %d; udp ports: %d; %s", region, *securityGroup.GroupId, tcp, udp, err.Error())
-									}
-								}
-							}
-						}
-					}
-				}
+				common.Log.Warningf("Failed to resolve deployable container(s) by region in EC2 region: %s", region)
 			}
-			// end security group handling
 
-			if strings.ToLower(providerID) == "docker" {
-				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
-				var imageRef *string
-				var containerRef *string
-
-				if imageOk {
-					imageRef = common.StringOrNil(image)
-				} else if containerOk { // HACK -- deprecate container in favor of image
-					containerRef = common.StringOrNil(containerID)
-				} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
-					common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
-					if container, containerOk := containerRolesByRegion[role].(string); containerOk {
-						containerRef = common.StringOrNil(container)
+			if imageRef != nil || containerRef != nil {
+				common.Log.Debugf("Resolved deployable image for role: %s; in EC2 region: %s; container: %s", role, region, *imageRef)
+				common.Log.Debugf("Attempting to deploy image %s in EC2 region: %s", *imageRef, region)
+				envOverrides := map[string]interface{}{}
+				if envOk {
+					for k := range env {
+						envOverrides[k] = env[k]
 					}
+				}
+				if encryptedEnvOk {
+					for k := range encryptedEnv {
+						envOverrides[k] = encryptedEnv[k]
+					}
+				}
+
+				if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+					envOverrides["BOOTNODES"] = bnodes
 				} else {
-					common.Log.Warningf("Failed to resolve deployable container(s) by region in EC2 region: %s", region)
+					bootnodesTxt, err := network.BootnodesTxt()
+					if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+						envOverrides["BOOTNODES"] = bootnodesTxt
+					}
 				}
-
-				if imageRef != nil || containerRef != nil {
-					common.Log.Debugf("Resolved deployable image for role: %s; in EC2 region: %s; container: %s", role, region, *imageRef)
-					common.Log.Debugf("Attempting to deploy image %s in EC2 region: %s", *imageRef, region)
-					envOverrides := map[string]interface{}{}
-					if envOk {
-						for k := range env {
-							envOverrides[k] = env[k]
-						}
-					}
-					if encryptedEnvOk {
-						for k := range encryptedEnv {
-							envOverrides[k] = encryptedEnv[k]
-						}
-					}
-
+				if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
 					if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-						envOverrides["BOOTNODES"] = bnodes
-					} else {
-						bootnodesTxt, err := network.BootnodesTxt()
-						if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-							envOverrides["BOOTNODES"] = bootnodesTxt
-						}
+						envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
+					} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
+						envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
 					}
-					if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
-						if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-							envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
-						} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
-							envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
-						}
-					}
-
-					networkClient, networkClientOk := networkCfg["client"].(string)
-					if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
-						if networkClientOk {
-							envOverrides["CLIENT"] = networkClient
-						} else {
-							if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
-								envOverrides["CLIENT"] = defaultClientEnv
-							} else {
-								envOverrides["CLIENT"] = defaultClient
-							}
-						}
-					} else if networkClientOk {
-						client := envOverrides["CLIENT"].(string)
-						common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
-					}
-
-					networkChain, networkChainOk := networkCfg["chain"].(string)
-					if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
-						if networkChainOk {
-							envOverrides["CHAIN"] = networkChain
-						}
-					} else if networkChainOk {
-						chain := envOverrides["CHAIN"].(string)
-						common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
-					}
-
-					overrides := map[string]interface{}{
-						"environment": envOverrides,
-					}
-					cfg["env"] = envOverrides
-
-					n.setConfig(cfg)
-					n.sanitizeConfig()
-					db.Save(&n)
-
-					containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
-					if imageRef != nil {
-						containerSecurity = securityCfg
-					}
-
-					taskIds, err := orchestrationAPI.StartContainer(imageRef, containerRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides, containerSecurity)
-					if imageRef != nil {
-
-					}
-
-					if err != nil || len(taskIds) == 0 {
-						desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *imageRef, region, err.Error())
-						n.updateStatus(db, "failed", &desc)
-						n.unregisterSecurityGroups()
-						common.Log.Warning(desc)
-						return errors.New(desc)
-					}
-					common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *imageRef, region, taskIds)
-					cfg["target_task_ids"] = taskIds
-					n.setConfig(cfg)
-					n.sanitizeConfig()
-					db.Save(&n)
-
-					msg, _ := json.Marshal(map[string]interface{}{
-						"network_node_id": n.ID.String(),
-					})
-					natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
-					natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg)
 				}
+
+				networkClient, networkClientOk := networkCfg["client"].(string)
+				if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
+					if networkClientOk {
+						envOverrides["CLIENT"] = networkClient
+					} else {
+						if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+							envOverrides["CLIENT"] = defaultClientEnv
+						} else {
+							envOverrides["CLIENT"] = defaultClient
+						}
+					}
+				} else if networkClientOk {
+					client := envOverrides["CLIENT"].(string)
+					common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
+				}
+
+				networkChain, networkChainOk := networkCfg["chain"].(string)
+				if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
+					if networkChainOk {
+						envOverrides["CHAIN"] = networkChain
+					}
+				} else if networkChainOk {
+					chain := envOverrides["CHAIN"].(string)
+					common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+				}
+
+				overrides := map[string]interface{}{
+					"environment": envOverrides,
+				}
+				cfg["env"] = envOverrides
+
+				n.setConfig(cfg)
+				n.sanitizeConfig()
+				db.Save(&n)
+
+				containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
+				if imageRef != nil {
+					containerSecurity = securityCfg
+				}
+
+				taskIds, err := orchestrationAPI.StartContainer(imageRef, containerRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides, containerSecurity)
+				if imageRef != nil {
+					common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
+				}
+
+				if err != nil || len(taskIds) == 0 {
+					desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *imageRef, region, err.Error())
+					n.updateStatus(db, "failed", &desc)
+					n.unregisterSecurityGroups()
+					common.Log.Warning(desc)
+					return errors.New(desc)
+				}
+				common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *imageRef, region, taskIds)
+				cfg["target_task_ids"] = taskIds
+				n.setConfig(cfg)
+				n.sanitizeConfig()
+				db.Save(&n)
+
+				msg, _ := json.Marshal(map[string]interface{}{
+					"network_node_id": n.ID.String(),
+				})
+				natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
+				natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg)
 			}
 		}
 	}
@@ -1116,7 +1004,6 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	var peerURL *string
 
 	id := identifiers[len(identifiers)-1]
-	targetID, targetOk := cfg["target_id"].(string)
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	_, regionOk := cfg["region"].(string)
@@ -1130,7 +1017,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 		return err
 	}
 
-	if strings.ToLower(targetID) == "aws" && targetOk && engineOk && providerOk && regionOk {
+	if engineOk && providerOk && regionOk {
 		if strings.ToLower(providerID) == "docker" {
 			logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
 			if err == nil && logs != nil {
@@ -1214,7 +1101,6 @@ func (n *Node) undeploy() error {
 	n.updateStatus(db, "deprovisioning", nil)
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	_, regionOk := cfg["region"].(string)
 	taskIds, taskIdsOk := cfg["target_task_ids"].([]interface{})
@@ -1226,48 +1112,46 @@ func (n *Node) undeploy() error {
 		return err
 	}
 
-	if targetOk && providerOk && regionOk {
-		if strings.ToLower(targetID) == "aws" {
-			if strings.ToLower(providerID) == "docker" && taskIdsOk {
-				for i := range taskIds {
-					taskID := taskIds[i].(string)
+	if providerOk && regionOk {
+		if strings.ToLower(providerID) == "docker" && taskIdsOk {
+			for i := range taskIds {
+				taskID := taskIds[i].(string)
 
-					_, err := orchestrationAPI.StopContainer(taskID, nil)
+				_, err := orchestrationAPI.StopContainer(taskID, nil)
+				if err == nil {
+					common.Log.Debugf("Terminated ECS docker container with id: %s", taskID)
+					n.Status = common.StringOrNil("terminated")
+					db.Save(n)
+					n.unbalance(db)
+				} else {
+					err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
+					common.Log.Warning(err.Error())
+					return err
+				}
+			}
+		}
+
+		// FIXME-- move the following security group removal to an async NATS operation
+		ticker := time.NewTicker(securityGroupTerminationTickerInterval)
+		go func() {
+			startedAt := time.Now()
+			for {
+				select {
+				case <-ticker.C:
+					err := n.unregisterSecurityGroups()
 					if err == nil {
-						common.Log.Debugf("Terminated ECS docker container with id: %s", taskID)
-						n.Status = common.StringOrNil("terminated")
-						db.Save(n)
-						n.unbalance(db)
-					} else {
-						err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
-						common.Log.Warning(err.Error())
-						return err
+						ticker.Stop()
+						return
+					}
+
+					if time.Now().Sub(startedAt) >= securityGroupTerminationTickerTimeout {
+						common.Log.Warningf("Failed to unregister security groups for network node with id: %s; timing out after %v...", n.ID, securityGroupTerminationTickerTimeout)
+						ticker.Stop()
+						return
 					}
 				}
 			}
-
-			// FIXME-- move the following security group removal to an async NATS operation
-			ticker := time.NewTicker(securityGroupTerminationTickerInterval)
-			go func() {
-				startedAt := time.Now()
-				for {
-					select {
-					case <-ticker.C:
-						err := n.unregisterSecurityGroups()
-						if err == nil {
-							ticker.Stop()
-							return
-						}
-
-						if time.Now().Sub(startedAt) >= securityGroupTerminationTickerTimeout {
-							common.Log.Warningf("Failed to unregister security groups for network node with id: %s; timing out after %v...", n.ID, securityGroupTerminationTickerTimeout)
-							ticker.Stop()
-							return
-						}
-					}
-				}
-			}()
-		}
+		}()
 	}
 
 	return nil
@@ -1291,7 +1175,6 @@ func (n *Node) unregisterSecurityGroups() error {
 	common.Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID)
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
 	_, regionOk := cfg["region"].(string)
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
 
@@ -1302,25 +1185,14 @@ func (n *Node) unregisterSecurityGroups() error {
 		return err
 	}
 
-	if targetOk && regionOk && securityGroupIdsOk {
-		if strings.ToLower(targetID) == "aws" {
-			for i := range securityGroupIds {
-				securityGroupID := securityGroupIds[i].(string)
+	if regionOk && securityGroupIdsOk {
+		for i := range securityGroupIds {
+			securityGroupID := securityGroupIds[i].(string)
 
-				if strings.ToLower(targetID) == "aws" {
-					_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
-					if err != nil {
-						if aerr, ok := err.(awserr.Error); ok {
-							switch aerr.Code() {
-							case "InvalidGroup.NotFound":
-								common.Log.Debugf("Attempted to unregister security group which does not exist for network node with id: %s; security group id: %s", n.ID, securityGroupID)
-							default:
-								common.Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
-								return err
-							}
-						}
-					}
-				}
+			_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
+			if err != nil {
+				common.Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
+				return err
 			}
 		}
 	}

@@ -508,66 +508,25 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 	if region != "" {
 		if strings.ToLower(targetID) == "aws" {
 			// start security group handling
-			securityGroupIds := make([]string, 0)
-			var securityGroupID *string
 			securityGroupDesc := fmt.Sprintf("security group for load balancer: %s", l.ID.String())
-			securityGroup, _ := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID))
-			if securityGroup == nil {
+			securityGroupIDs, _ := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID), securityCfg)
+			if securityGroupIDs == nil {
 				securityGroups, err := orchestrationAPI.GetSecurityGroups()
 				if err == nil {
 					for _, secGroup := range securityGroups.SecurityGroups {
-						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc {
-							securityGroupID = secGroup.GroupId
+						if secGroup.GroupName != nil && *secGroup.GroupName == securityGroupDesc && secGroup.GroupId != nil {
+							securityGroupIDs = []string{*secGroup.GroupId}
 							break
 						}
 					}
 				}
-			} else {
-				securityGroupID = securityGroup.GroupId
 			}
 
-			if securityGroupID != nil {
-				securityGroupIds = append(securityGroupIds, *securityGroupID)
-
-				balancerCfg["target_security_group_ids"] = securityGroupIds
-
-				if ingress, ingressOk := securityCfg["ingress"]; ingressOk {
-					switch ingress.(type) {
-					case map[string]interface{}:
-						ingressCfg := ingress.(map[string]interface{})
-						for cidr := range ingressCfg {
-							tcp := make([]int64, 0)
-							udp := make([]int64, 0)
-							if _tcp, tcpOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); tcpOk {
-								for i := range _tcp {
-									_port := int64(_tcp[i].(float64))
-									tcp = append(tcp, _port)
-								}
-							}
-
-							// UDP not currently supported by classic ELB API; UDP support is not needed here at this time...
-							// if _udp, udpOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); udpOk {
-							// 	for i := range _udp {
-							// 		_port := int64(_udp[i].(float64))
-							// 		udp = append(udp, _port)
-							// 	}
-							// }
-
-							_, err := orchestrationAPI.AuthorizeSecurityGroupIngress(*securityGroupID, cidr, tcp, udp)
-							if err != nil {
-								err := fmt.Errorf("Failed to authorize load balancer security group ingress in EC2 %s region; security group id: %s; %d tcp ports; %d udp ports: %s", region, *securityGroupID, len(tcp), len(udp), err.Error())
-								common.Log.Warningf(err.Error())
-								// return err // FIXME-- gotta be a sane way to check for actual failures; this will workaround duplicates for now as those should be acceptable
-							}
-						}
-					}
-				}
-			}
-			// end security group handling
+			balancerCfg["target_security_group_ids"] = securityGroupIDs
 
 			if providerID, providerIDOk := balancerCfg["provider_id"].(string); providerIDOk {
 				if strings.ToLower(providerID) == "docker" {
-					loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIds)
+					loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIDs)
 					if err != nil {
 						err := fmt.Errorf("Failed to provision AWS load balancer (v2); %s", err.Error())
 						common.Log.Warningf(err.Error())

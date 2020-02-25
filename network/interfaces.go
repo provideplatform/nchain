@@ -50,8 +50,8 @@ type OrchestrationAPI interface {
 	AuthorizeSecurityGroupEgressAllPortsAllProtocols(securityGroupID string) (response *ec2.AuthorizeSecurityGroupEgressOutput, err error)
 	AuthorizeSecurityGroupIngressAllPortsAllProtocols(securityGroupID string) (response *ec2.AuthorizeSecurityGroupIngressOutput, err error)
 	AuthorizeSecurityGroupIngress(securityGroupID, ipv4Cidr string, tcpPorts, udpPorts []int64) (response *ec2.AuthorizeSecurityGroupIngressOutput, err error)
-	CreateSecurityGroup(name, description string, vpcID *string) (response *ec2.CreateSecurityGroupOutput, err error)
-	DeleteSecurityGroup(securityGroupID string) (response *ec2.DeleteSecurityGroupOutput, err error)
+	CreateSecurityGroup(name, description string, vpcID *string, cfg map[string]interface{}) ([]string, error)
+	DeleteSecurityGroup(securityGroupID string) (interface{}, error)
 	GetSecurityGroups() (response *ec2.DescribeSecurityGroupsOutput, err error)
 
 	StartContainer(image, taskDefinition *string, launchType, cluster, vpcName *string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error)
