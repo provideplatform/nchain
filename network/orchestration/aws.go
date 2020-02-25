@@ -233,8 +233,8 @@ func (p *AWSOrchestrationProvider) TerminateInstance(instanceID string) (respons
 }
 
 // StartContainer needs docs
-func (p *AWSOrchestrationProvider) StartContainer(taskDefinition string, launchType, cluster, vpcName *string, securityGroupIds []string, subnetIds []string, overrides map[string]interface{}) (taskIds []string, err error) {
-	return awswrapper.StartContainer(p.accessKeyID, p.secretAccessKey, p.region, taskDefinition, launchType, cluster, vpcName, securityGroupIds, subnetIds, overrides)
+func (p *AWSOrchestrationProvider) StartContainer(image, taskDefinition *string, launchType, cluster, vpcName *string, securityGroupIds []string, subnetIds []string, overrides map[string]interface{}, security map[string]interface{}) (taskIds []string, err error) {
+	return awswrapper.StartContainer(p.accessKeyID, p.secretAccessKey, p.region, image, taskDefinition, launchType, cluster, vpcName, securityGroupIds, subnetIds, overrides, security)
 
 }
 

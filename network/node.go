@@ -728,6 +728,13 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		return err
 	}
 
+	if imageOk && containerOk {
+		desc := fmt.Sprintf("Failed to deploy node in region %s; network node id: %s; both an image and container were specified; only one should be used", region, n.ID.String(), err.Error())
+		n.updateStatus(db, "failed", &desc)
+		common.Log.Warning(desc)
+		return errors.New(desc)
+	}
+
 	if targetOk && engineOk && providerOk && roleOk && regionOk {
 		if strings.ToLower(targetID) == "aws" {
 			// start security group handling
@@ -854,21 +861,22 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			if strings.ToLower(providerID) == "docker" {
 				common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
 				var imageRef *string
+				var containerRef *string
 
 				if imageOk {
 					imageRef = common.StringOrNil(image)
 				} else if containerOk { // HACK -- deprecate container in favor of image
-					imageRef = common.StringOrNil(containerID)
+					containerRef = common.StringOrNil(containerID)
 				} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
 					common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
 					if container, containerOk := containerRolesByRegion[role].(string); containerOk {
-						imageRef = common.StringOrNil(container)
+						containerRef = common.StringOrNil(container)
 					}
 				} else {
 					common.Log.Warningf("Failed to resolve deployable container(s) by region in EC2 region: %s", region)
 				}
 
-				if imageRef != nil {
+				if imageRef != nil || containerRef != nil {
 					common.Log.Debugf("Resolved deployable image for role: %s; in EC2 region: %s; container: %s", role, region, *imageRef)
 					common.Log.Debugf("Attempting to deploy image %s in EC2 region: %s", *imageRef, region)
 					envOverrides := map[string]interface{}{}
@@ -934,7 +942,15 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					n.sanitizeConfig()
 					db.Save(&n)
 
-					taskIds, err := orchestrationAPI.StartContainer(*imageRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides)
+					containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
+					if imageRef != nil {
+						containerSecurity = securityCfg
+					}
+
+					taskIds, err := orchestrationAPI.StartContainer(imageRef, containerRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides, containerSecurity)
+					if imageRef != nil {
+
+					}
 
 					if err != nil || len(taskIds) == 0 {
 						desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *imageRef, region, err.Error())

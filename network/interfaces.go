@@ -54,7 +54,7 @@ type OrchestrationAPI interface {
 	DeleteSecurityGroup(securityGroupID string) (response *ec2.DeleteSecurityGroupOutput, err error)
 	GetSecurityGroups() (response *ec2.DescribeSecurityGroupsOutput, err error)
 
-	StartContainer(taskDefinition string, launchType, cluster, vpcName *string, securityGroupIds []string, subnetIds []string, overrides map[string]interface{}) (taskIds []string, err error)
+	StartContainer(image, taskDefinition *string, launchType, cluster, vpcName *string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error)
 	StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error)
 	GetContainerDetails(taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error)
 	GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error)
