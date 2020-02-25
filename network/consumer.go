@@ -86,6 +86,8 @@ func init() {
 		return
 	}
 
+	natsutil.EstablishSharedNatsStreamingConnection(nil)
+
 	createNatsBlockFinalizedSubscriptions(&waitGroup)
 	createNatsLoadBalancerProvisioningSubscriptions(&waitGroup)
 	createNatsLoadBalancerDeprovisioningSubscriptions(&waitGroup)
