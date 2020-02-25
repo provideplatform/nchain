@@ -285,10 +285,28 @@ func (p *IPFSProvider) List(params map[string]interface{}) ([]*ConnectedEntity, 
 				apiURL := p.apiURLFactory("api/v0/get")
 				href := fmt.Sprintf("%s?arg=/ipfs/%s&encoding=json&stream-channels=true", *apiURL, *hash)
 
+				var name *string
+				var size *uint64
+
+				if links, linksOk := entity["Links"].([]interface{}); linksOk && len(links) == 1 {
+					if link, linkOk := links[0].(map[string]interface{}); linkOk {
+						if entityName, entityNameOk := link["Name"].(string); entityNameOk {
+							name = common.StringOrNil(entityName)
+						}
+
+						if entitySize, entitySizeOk := link["Size"].(float64); entitySizeOk {
+							sizeVal := uint64(entitySize)
+							size = &sizeVal
+						}
+					}
+				}
+
 				resp = append(resp, &ConnectedEntity{
-					ID:   hash,
-					Hash: hash,
-					Href: &href,
+					ID:       hash,
+					Hash:     hash,
+					Href:     &href,
+					Filename: name,
+					Size:     size,
 
 					// CreatedAt  *time.Time             `json:"created_at,omitempty"`
 					// DataURL    *string                `json:"data_url,omitempty"`

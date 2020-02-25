@@ -51,6 +51,7 @@ type ConnectedEntity struct {
 	Href       *string                `json:"href,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 	ModifiedAt *time.Time             `json:"modified_at,omitempty"`
+	Filename   *string                `json:"filename,omitempty"`
 	Name       *string                `json:"name,omitempty"`
 	Raw        *string                `json:"raw,omitempty"`
 	Size       *uint64                `json:"size,omitempty"`
