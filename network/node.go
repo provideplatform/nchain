@@ -748,7 +748,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		n.setConfig(cfg)
 
 		if strings.ToLower(providerID) == "docker" {
-			common.Log.Debugf("Attempting to deploy network node container(s) in EC2 region: %s", region)
+			common.Log.Debugf("Attempting to deploy network node container(s) in region: %s", region)
 			var imageRef *string
 			var containerRef *string
 
@@ -759,16 +759,18 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				containerRef = common.StringOrNil(containerID)
 				common.Log.Debugf("Resolved container to deploy in region %s; ref: %s", region, *containerRef)
 			} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
-				common.Log.Debugf("Resolved deployable containers by region in EC2 region: %s", region)
+				common.Log.Debugf("Resolved deployable containers by region in region: %s", region)
 				if container, containerOk := containerRolesByRegion[role].(string); containerOk {
 					containerRef = common.StringOrNil(container)
 				}
 			} else {
-				common.Log.Warningf("Failed to resolve deployable container(s) by region in EC2 region: %s", region)
+				err := common.Log.Errorf("Failed to resolve deployable image or container(s) to deploy in region: %s; network node: %s", region, n.ID.String())
+				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
+				return err
 			}
 
 			if imageRef != nil || containerRef != nil {
-				common.Log.Debugf("Attempting to deploy image %s in EC2 region: %s", *imageRef, region)
+				common.Log.Debugf("Attempting to deploy image %s in region: %s", *imageRef, region)
 				envOverrides := map[string]interface{}{}
 				if envOk {
 					for k := range env {
@@ -842,18 +844,24 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				}
 
 				taskIds, err := orchestrationAPI.StartContainer(imageRef, containerRef, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides, containerSecurity)
-				if imageRef != nil {
-					common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
-				}
-
 				if err != nil || len(taskIds) == 0 {
-					desc := fmt.Sprintf("Attempt to deploy container %s in EC2 %s region failed; %s", *imageRef, region, err.Error())
+					ref := imageRef
+					if ref == nil {
+						ref = containerRef
+					}
+
+					desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
 					n.updateStatus(db, "failed", &desc)
 					n.unregisterSecurityGroups()
 					common.Log.Warning(desc)
 					return errors.New(desc)
 				}
-				common.Log.Debugf("Attempt to deploy container %s in EC2 %s region successful; task ids: %s", *imageRef, region, taskIds)
+
+				if imageRef != nil {
+					common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
+				}
+
+				common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *imageRef, region, taskIds)
 				cfg["target_task_ids"] = taskIds
 				n.setConfig(cfg)
 				n.sanitizeConfig()
