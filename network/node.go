@@ -477,12 +477,13 @@ func (n *Node) deploy(db *gorm.DB) error {
 	env, envOk := cfg["env"].(map[string]interface{})
 	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
 
-	// TODO: move the following to P2PAPI.requireBootnotes()
 	bootnodes, err := network.requireBootnodes(db, n)
 	if err != nil {
 		switch err.(type) {
 		case bootnodesInitialized:
 			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
+
+			// TODO: move the following to P2PAPI.requireBootnotes()
 			if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
 				if strings.ToLower(protocol) == "poa" {
 					if envOk && encryptedEnvOk {
@@ -558,6 +559,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 					}
 				}
 			}
+
 			return n._deploy(network, bootnodes, db)
 		default:
 			msg := fmt.Sprintf("Failed to deploy node %s to network: %s", n.ID, *network.Name)
@@ -827,7 +829,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
 			}
 
-			common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *imageRef, region, taskIds)
+			common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *ref, region, taskIds)
 			cfg["target_task_ids"] = taskIds
 			n.setConfig(cfg)
 			n.sanitizeConfig()
