@@ -1334,5 +1334,5 @@ func dockerhubRepoExists(name string) (*string, error) {
 		return nil, err
 	}
 
-	return &repo, nil
+	return &name, nil
 }
