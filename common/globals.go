@@ -9,6 +9,7 @@ import (
 	"github.com/kthomas/go-logger"
 )
 
+const defaultDockerhubOrganization = "provide"
 const reachabilityTimeout = time.Millisecond * 2500
 
 var (
@@ -40,6 +41,9 @@ var (
 
 	// ConsumeNATSStreamingSubscriptions is a flag the indicates if the goldmine instance is running in API or consumer mode
 	ConsumeNATSStreamingSubscriptions bool
+
+	// DefaultDockerhubOrganization is the default public Dockerhub organization to leverage when resolving repository names
+	DefaultDockerhubOrganization *string
 
 	// DefaultInfrastructureDomain is the DNS name which managed subdomains are created for various infrastructure (i.e., load balancers)
 	DefaultInfrastructureDomain string
@@ -76,6 +80,12 @@ func init() {
 }
 
 func requireInfrastructureSupport() {
+	if os.Getenv("DEFAULT_DOCKERHUB_ORGANIZATION") != "" {
+		DefaultDockerhubOrganization = StringOrNil(os.Getenv("DEFAULT_DOCKERHUB_ORGANIZATION"))
+	} else {
+		DefaultDockerhubOrganization = StringOrNil(defaultDockerhubOrganization)
+	}
+
 	if os.Getenv("INFRASTRUCTURE_DOMAIN") != "" {
 		DefaultInfrastructureDomain = os.Getenv("INFRASTRUCTURE_DOMAIN")
 	}

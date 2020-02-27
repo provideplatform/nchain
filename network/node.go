@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
+const defaultDockerhubBaseURL = "https://hub.docker.com/v2/repositories"
 const nodeReachabilityTimeout = time.Millisecond * 2500
 
 const resolveGenesisTickerInterval = time.Millisecond * 10000
@@ -712,6 +714,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 			if imageOk {
 				imageRef = common.StringOrNil(image)
+
+				// prefer provide dockerhub repo, if it exists for the requested image...
+				imageRef, err = dockerhubRepoExists(*imageRef)
+				if err != nil {
+					n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
+					return err
+				}
+
 				common.Log.Debugf("Resolved container image to deploy in region %s; image: %s", region, *imageRef)
 			} else if containerOk { // HACK -- deprecate container in favor of image
 				containerRef = common.StringOrNil(containerID)
@@ -1287,4 +1297,47 @@ func (n *Node) upgrade() error {
 		return err
 	}
 	return apiClient.Upgrade()
+}
+
+// TODO: move this elsewhere
+func dockerhubRepoExists(name string) (*string, error) {
+	if name == "" {
+		err := errors.New("invalid dockerhub repo name (empty string)")
+		common.Log.Warning(err.Error())
+		return nil, err
+	}
+
+	reentrant := false
+	repo := name
+	if common.DefaultDockerhubOrganization != nil { // reentrancy check
+		reentrant = name != *common.DefaultDockerhubOrganization && strings.HasPrefix(name, *common.DefaultDockerhubOrganization)
+		repo = fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
+	}
+
+	dockerhubClient := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyFromEnvironment,
+		},
+	}
+
+	resp, err := dockerhubClient.Get(fmt.Sprintf("%s/%s", defaultDockerhubBaseURL, repo))
+	if err != nil {
+		common.Log.Warningf("failed to query dockerhub for existance of repo: %s; %s", repo, err.Error())
+		return nil, err
+	} else if resp.StatusCode >= 400 {
+		var err error
+		if resp.StatusCode == 404 {
+			err = fmt.Errorf("dockerhub repo does not exist: %s", repo)
+			if common.DefaultDockerhubOrganization != nil && !reentrant {
+				return dockerhubRepoExists(name)
+			}
+		} else {
+			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", repo, resp.StatusCode)
+		}
+		common.Log.Warning(err.Error())
+		return nil, err
+	}
+
+	return &repo, nil
 }
