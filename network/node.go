@@ -1311,7 +1311,9 @@ func dockerhubRepoExists(name string) (*string, error) {
 	repo := name
 	if common.DefaultDockerhubOrganization != nil { // reentrancy check
 		reentrant = name != *common.DefaultDockerhubOrganization && strings.HasPrefix(name, *common.DefaultDockerhubOrganization)
-		repo = fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
+		if !reentrant {
+			repo = fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
+		}
 	}
 
 	dockerhubClient := &http.Client{
