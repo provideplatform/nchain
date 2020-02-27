@@ -1307,13 +1307,9 @@ func dockerhubRepoExists(name string) (*string, error) {
 		return nil, err
 	}
 
-	reentrant := false
-	repo := name
-	if common.DefaultDockerhubOrganization != nil { // reentrancy check
-		reentrant = name != *common.DefaultDockerhubOrganization && strings.HasPrefix(name, *common.DefaultDockerhubOrganization)
-		if !reentrant {
-			repo = fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
-		}
+	if common.DefaultDockerhubOrganization != nil && name != *common.DefaultDockerhubOrganization && !strings.HasPrefix(name, *common.DefaultDockerhubOrganization) { // reentrancy check
+		repo := fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
+		return dockerhubRepoExists(repo)
 	}
 
 	dockerhubClient := &http.Client{
@@ -1323,19 +1319,16 @@ func dockerhubRepoExists(name string) (*string, error) {
 		},
 	}
 
-	resp, err := dockerhubClient.Get(fmt.Sprintf("%s/%s", defaultDockerhubBaseURL, repo))
+	resp, err := dockerhubClient.Get(fmt.Sprintf("%s/%s", defaultDockerhubBaseURL, name))
 	if err != nil {
-		common.Log.Warningf("failed to query dockerhub for existance of repo: %s; %s", repo, err.Error())
+		common.Log.Warningf("failed to query dockerhub for existance of repo: %s; %s", name, err.Error())
 		return nil, err
 	} else if resp.StatusCode >= 400 {
 		var err error
 		if resp.StatusCode == 404 {
-			err = fmt.Errorf("dockerhub repo does not exist: %s", repo)
-			if common.DefaultDockerhubOrganization != nil && !reentrant {
-				return dockerhubRepoExists(name)
-			}
+			err = fmt.Errorf("dockerhub repo does not exist: %s", name)
 		} else {
-			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", repo, resp.StatusCode)
+			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", name, resp.StatusCode)
 		}
 		common.Log.Warning(err.Error())
 		return nil, err
