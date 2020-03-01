@@ -410,45 +410,38 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 			Logs: make([]*NodeLog, 0),
 		}
 
-		if providerID, providerIDOk := cfg["provider_id"].(string); providerIDOk {
-
-			if strings.ToLower(providerID) == "docker" {
-				if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
-					for i, id := range ids {
-						logEvents, err := orchestrationAPI.GetContainerLogEvents(id.(string), nil, startFromHead, nil, nil, limit, nextToken)
-						if err == nil && logEvents != nil {
-							events := logEvents.Events
-							if !startFromHead {
-								for i := len(events)/2 - 1; i >= 0; i-- {
-									opp := len(events) - 1 - i
-									events[i], events[opp] = events[opp], events[i]
-								}
-							}
-							for i := range logEvents.Events {
-								event := logEvents.Events[i]
-								response.Logs = append(response.Logs, &NodeLog{
-									Message:         string(*event.Message),
-									Timestamp:       event.Timestamp,
-									IngestTimestamp: event.IngestionTime,
-								})
-							}
-							if i == len(ids)-1 {
-								response.NextToken = logEvents.NextForwardToken
-								response.PrevToken = logEvents.NextBackwardToken
-							}
+		if ids, idsOk := cfg["target_task_ids"].([]interface{}); idsOk {
+			for i, id := range ids {
+				logEvents, err := orchestrationAPI.GetContainerLogEvents(id.(string), nil, startFromHead, nil, nil, limit, nextToken)
+				if err == nil && logEvents != nil {
+					events := logEvents.Events
+					if !startFromHead {
+						for i := len(events)/2 - 1; i >= 0; i-- {
+							opp := len(events) - 1 - i
+							events[i], events[opp] = events[opp], events[i]
 						}
 					}
-					return response, nil
+					for i := range logEvents.Events {
+						event := logEvents.Events[i]
+						response.Logs = append(response.Logs, &NodeLog{
+							Message:         string(*event.Message),
+							Timestamp:       event.Timestamp,
+							IngestTimestamp: event.IngestionTime,
+						})
+					}
+					if i == len(ids)-1 {
+						response.NextToken = logEvents.NextForwardToken
+						response.PrevToken = logEvents.NextBackwardToken
+					}
 				}
 			}
-
-			return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; unsupported AWS provider: %s", *network.Name, providerID)
+			return response, nil
 		}
-	} else {
-		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided: %s", *network.Name, providerID)
+
+		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s", n.ID)
 	}
 
-	return nil, fmt.Errorf("Unable to retrieve logs for network node on unsupported network: %s", *network.Name)
+	return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided", n.ID)
 }
 
 func (n *Node) deploy(db *gorm.DB) error {
@@ -617,9 +610,11 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 	containerID, containerOk := cfg["container"].(string)
 	image, imageOk := cfg["image"].(string)
-	// resources, resourcesOk := cfg["resources"].(map[string]interface{})
+	resources, resourcesOk := cfg["resources"].(map[string]interface{})
+	entrypoint, entrypointOk := cfg["entrypoint"].([]interface{})
+	taskRole, taskRoleOk := cfg["task_role"].(string)
 	// script, scriptOk := cfg["script"].(map[string]interface{})
-	targetID, targetOk := cfg["target_id"].(string)
+	_, targetOk := cfg["target_id"].(string)
 	engineID, engineOk := cfg["engine_id"].(string)
 	providerID, providerOk := cfg["provider_id"].(string)
 	role, roleOk := cfg["role"].(string)
@@ -628,6 +623,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	env, envOk := cfg["env"].(map[string]interface{})
 	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
 	securityCfg, securityCfgOk := cfg["security"].(map[string]interface{})
+	p2p, p2pOk := cfg["p2p"].(bool)
 
 	if networkEnv, networkEnvOk := networkCfg["env"].(map[string]interface{}); envOk && networkEnvOk {
 		common.Log.Debugf("Applying environment overrides to network node per network env configuration")
@@ -635,8 +631,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			env[k] = networkEnv[k]
 		}
 	}
-
-	var providerCfgByRegion map[string]interface{}
 
 	cloneableCfg, cloneableCfgOk := networkCfg["cloneable_cfg"].(map[string]interface{})
 	if cloneableCfgOk {
@@ -649,33 +643,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				return errors.New(desc)
 			}
 			securityCfg = cloneableSecurityCfg
-		}
-
-		if !containerOk && !imageOk {
-			cloneableTarget, cloneableTargetOk := cloneableCfg[targetID].(map[string]interface{})
-			if !cloneableTargetOk {
-				desc := fmt.Sprintf("Failed to parse cloneable target configuration for network node: %s", n.ID)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return errors.New(desc)
-			}
-
-			cloneableProvider, cloneableProviderOk := cloneableTarget[providerID].(map[string]interface{})
-			if !cloneableProviderOk {
-				desc := fmt.Sprintf("Failed to parse cloneable provider configuration for network node: %s", n.ID)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return errors.New(desc)
-			}
-
-			cloneableProviderCfgByRegion, cloneableProviderCfgByRegionOk := cloneableProvider["regions"].(map[string]interface{})
-			if !cloneableProviderCfgByRegionOk && !regionOk {
-				desc := fmt.Sprintf("Failed to parse cloneable provider configuration by region (or a single specific deployment region) for network node: %s", n.ID)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warningf(desc)
-				return errors.New(desc)
-			}
-			providerCfgByRegion = cloneableProviderCfgByRegion
 		}
 	}
 
@@ -691,9 +658,20 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		n.updateStatus(db, "failed", &desc)
 		common.Log.Warning(desc)
 		return errors.New(desc)
+	} else if !containerOk && !imageOk {
+		desc := fmt.Sprintf("Failed to deploy node in region %s; network node id: %s; an image or container must be specified", region, n.ID.String())
+		n.updateStatus(db, "failed", &desc)
+		common.Log.Warning(desc)
+		return errors.New(desc)
 	}
 
-	if targetOk && engineOk && providerOk && roleOk && regionOk {
+	if targetOk && providerOk && regionOk {
+		isPeerToPeer := p2pOk && p2p
+		if !isPeerToPeer && !p2pOk && engineOk && roleOk {
+			// coerce p2p flag if applicable for engine/role
+			p2p = role == nodeRoleFull || role == nodeRolePeer || role == nodeRoleValidator || role == nodeRoleBlockExplorer
+		}
+
 		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
 		securityGroupIds, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
 		if err != nil {
@@ -726,11 +704,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			} else if containerOk { // HACK -- deprecate container in favor of image
 				containerRef = common.StringOrNil(containerID)
 				common.Log.Debugf("Resolved container to deploy in region %s; ref: %s", region, *containerRef)
-			} else if containerRolesByRegion, containerRolesByRegionOk := providerCfgByRegion[region].(map[string]interface{}); containerRolesByRegionOk {
-				common.Log.Debugf("Resolved deployable containers by region in region: %s", region)
-				if container, containerOk := containerRolesByRegion[role].(string); containerOk {
-					containerRef = common.StringOrNil(container)
-				}
 			} else {
 				err := fmt.Errorf("Failed to resolve deployable image or container(s) to deploy in region: %s; network node: %s", region, n.ID)
 				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
@@ -755,49 +728,53 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				}
 			}
 
-			if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-				envOverrides["BOOTNODES"] = bnodes
-			} else {
-				bootnodesTxt, err := network.BootnodesTxt()
-				if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-					envOverrides["BOOTNODES"] = bootnodesTxt
-				}
-			}
-			if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
-				if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-					envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
-				} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
-					envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
-				}
-			}
+			if isPeerToPeer {
+				common.Log.Debugf("Applying peer-to-peer environment sanity rules to deploy network node: %s; engine: %s; role: %s", n.ID, engineID, role)
 
-			networkClient, networkClientOk := networkCfg["client"].(string)
-			if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
-				if networkClientOk {
-					envOverrides["CLIENT"] = networkClient
+				if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+					envOverrides["BOOTNODES"] = bnodes
 				} else {
-					if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
-						envOverrides["CLIENT"] = defaultClientEnv
-					} else {
-						envOverrides["CLIENT"] = defaultClient
+					bootnodesTxt, err := network.BootnodesTxt()
+					if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+						envOverrides["BOOTNODES"] = bootnodesTxt
 					}
 				}
-			} else if networkClientOk {
-				client := envOverrides["CLIENT"].(string)
-				if client != networkClient {
-					common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
+				if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
+					if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
+						envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
+					} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
+						envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
+					}
 				}
-			}
 
-			networkChain, networkChainOk := networkCfg["chain"].(string)
-			if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
-				if networkChainOk {
-					envOverrides["CHAIN"] = networkChain
+				networkClient, networkClientOk := networkCfg["client"].(string)
+				if _, clientOk := envOverrides["CLIENT"].(string); !clientOk {
+					if networkClientOk {
+						envOverrides["CLIENT"] = networkClient
+					} else {
+						if defaultClientEnv, defaultClientEnvOk := engineToNodeClientEnvMapping[engineID]; defaultClientEnvOk {
+							envOverrides["CLIENT"] = defaultClientEnv
+						} else {
+							envOverrides["CLIENT"] = defaultClient
+						}
+					}
+				} else if networkClientOk {
+					client := envOverrides["CLIENT"].(string)
+					if client != networkClient {
+						common.Log.Warningf("Overridden client %s did not match network client %s; network id: %s", client, networkClient, network.ID)
+					}
 				}
-			} else if networkChainOk {
-				chain := envOverrides["CHAIN"].(string)
-				if chain != networkChain {
-					common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+
+				networkChain, networkChainOk := networkCfg["chain"].(string)
+				if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
+					if networkChainOk {
+						envOverrides["CHAIN"] = networkChain
+					}
+				} else if networkChainOk {
+					chain := envOverrides["CHAIN"].(string)
+					if chain != networkChain {
+						common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+					}
 				}
 			}
 
@@ -815,12 +792,41 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				containerSecurity = securityCfg
 			}
 
+			var cpu *int64
+			var memory *int64
+			if resourcesOk {
+				if _cpu, cpuOk := resources["cpu"].(float64); cpuOk {
+					cpuInt := int64(_cpu)
+					cpu = &cpuInt
+				}
+				if _memory, memoryOk := resources["memory"].(float64); memoryOk {
+					memoryInt := int64(_memory)
+					memory = &memoryInt
+				}
+			}
+
+			_entrypoint := make([]*string, 0)
+			if entrypointOk {
+				for _, part := range entrypoint {
+					_entrypoint = append(_entrypoint, common.StringOrNil(part.(string)))
+				}
+			}
+
+			var containerRole *string
+			if taskRoleOk {
+				containerRole = &taskRole
+			}
+
 			taskIds, err := orchestrationAPI.StartContainer(
 				imageRef,
 				containerRef,
+				containerRole,
 				nil,
 				nil,
 				common.StringOrNil(vpc),
+				cpu,
+				memory,
+				_entrypoint,
 				securityGroupIds,
 				[]string{},
 				overrides,

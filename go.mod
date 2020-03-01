@@ -23,12 +23,12 @@ require (
 	github.com/kthomas/exchange-consumer v0.0.0-20171225030615-4fb83508b3ca
 	github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
-	github.com/kthomas/go-aws-wrapper v0.0.0-20200225180119-e676b25aba2d
+	github.com/kthomas/go-aws-wrapper v0.0.0-20200301150515-d770a0f9e389
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
 	github.com/kthomas/go-natsutil v0.0.0-20200210083803-c5a5cc363cf7
 	github.com/kthomas/go-pgputil v0.0.0-20191124055155-a2d45567ec49
-	github.com/kthomas/go-redisutil v0.0.0-20200125200743-c81c9abcf1c5
+	github.com/kthomas/go-redisutil v0.0.0-20200225234642-4b593cb135d1
 	github.com/kthomas/go-self-signed-cert v0.0.0-20200121102317-5ce1ee6149aa
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
 	github.com/libp2p/go-libp2p-core v0.3.0 // indirect
