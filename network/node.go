@@ -1315,7 +1315,12 @@ func dockerhubRepoExists(name string) (*string, error) {
 
 	if common.DefaultDockerhubOrganization != nil && name != *common.DefaultDockerhubOrganization && !strings.HasPrefix(name, *common.DefaultDockerhubOrganization) { // reentrancy check
 		repo := fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
-		return dockerhubRepoExists(repo)
+		preferredRepo, err := dockerhubRepoExists(repo)
+		if err == nil {
+			common.Log.Debugf("short-circuiting dockerhub repo resolution; preferred organization hosts repo: %s", repo)
+			return preferredRepo, nil
+		}
+		common.Log.Debugf("preferred dockerhub organization does not currently host repo: %s", repo)
 	}
 
 	dockerhubClient := &http.Client{
