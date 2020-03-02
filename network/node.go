@@ -26,6 +26,7 @@ import (
 
 const defaultDockerhubBaseURL = "https://hub.docker.com/v2/repositories"
 const nodeReachabilityTimeout = time.Millisecond * 2500
+const dockerRepoReachabilityTimeout = time.Millisecond * 2500
 
 const resolveGenesisTickerInterval = time.Millisecond * 10000
 const resolveGenesisTickerTimeout = time.Minute * 20
@@ -1323,6 +1324,18 @@ func dockerhubRepoExists(name string) (*string, error) {
 		common.Log.Debugf("preferred dockerhub organization does not currently host repo: %s", repo)
 	}
 
+	idx := strings.Index(name, "/")
+	if idx != -1 {
+		addr := fmt.Sprintf("%s:443", name[0:idx])
+		conn, err := net.DialTimeout("tcp", addr, dockerRepoReachabilityTimeout)
+		if err == nil {
+			defer conn.Close()
+			common.Log.Debugf("short-circuiting dockerhub repo resolution; third-party hosted repo is reachable: %s", name)
+			return &name, nil
+		}
+		common.Log.Debugf("docker repo was not resolved to a third-party host: %s", name)
+	}
+
 	dockerhubClient := &http.Client{
 		Transport: &http.Transport{
 			DisableKeepAlives: true,
@@ -1337,7 +1350,7 @@ func dockerhubRepoExists(name string) (*string, error) {
 	} else if resp.StatusCode >= 400 {
 		var err error
 		if resp.StatusCode == 404 {
-			err = fmt.Errorf("dockerhub repo does not exist: %s", name)
+			err = fmt.Errorf("docker repository was not resolved: %s", name)
 		} else {
 			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", name, resp.StatusCode)
 		}
