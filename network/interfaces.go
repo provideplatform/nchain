@@ -14,6 +14,10 @@ const awsOrchestrationProvider = "aws"
 const azureOrchestrationProvider = "azure"
 const googleOrchestrationProvider = "gcp"
 
+const p2pPlatformBcoin = "bcoin"
+const p2pPlatformEVM = "evm"
+const p2pPlatformHandshake = "handshake"
+
 const bcoinP2PProvider = "bcoin"
 const parityP2PProvider = "parity"
 const quorumP2PProvider = "quorum"

@@ -556,24 +556,18 @@ func (n *Network) Validate() bool {
 	}
 
 	if n.Enabled == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("enabled flag can't be nil"),
-			Status:  common.PtrToInt(10),
-		})
+		enabled := true
+		n.Enabled = &enabled
 	}
 
 	if n.IsProduction == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("is_production flag can't be nil"),
-			Status:  common.PtrToInt(10),
-		})
+		isProduction := true
+		n.IsProduction = &isProduction
 	}
 
 	if n.Cloneable == nil {
-		n.Errors = append(n.Errors, &provide.Error{
-			Message: common.StringOrNil("cloneable flag can't be nil"),
-			Status:  common.PtrToInt(10),
-		})
+		isCloneable := true
+		n.Cloneable = &isCloneable
 	}
 
 	config := map[string]interface{}{}
@@ -607,14 +601,19 @@ func (n *Network) Validate() bool {
 		chainspecURL, chainspecURLOk := config["chainspec_url"].(string)
 		if !chainspecOk && !chainspecURLOk {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("chainspec_url or chainspec should be present on network configuration"),
+				Message: common.StringOrNil("chainspec or chainspec_url should be present in network configuration"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if chainspecOk && chainspecURLOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("specify chainspec ar chainspec_url in network configuration; not both"),
 				Status:  common.PtrToInt(11),
 			})
 		} else {
 			if chainspecOk {
 				if chainspec == nil || chainspec == "" {
 					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("chainspec object should not be empty on network configuration"),
+						Message: common.StringOrNil("chainspec object should not be empty"),
 						Status:  common.PtrToInt(11),
 					})
 				}
@@ -657,11 +656,11 @@ func (n *Network) Validate() bool {
 		engineID, engineIDOk := config["engine_id"]
 		if !engineIDOk {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config engine_id should not be nil"),
+				Message: common.StringOrNil("engine_id should not be nil"),
 				Status:  common.PtrToInt(11)})
 		} else if engineID == nil || engineID == "" {
 			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("Config engine_id should not be empty"),
+				Message: common.StringOrNil("engine_id should not be empty"),
 				Status:  common.PtrToInt(11),
 			})
 		}
@@ -679,6 +678,19 @@ func (n *Network) Validate() bool {
 			})
 		}
 
+		platform, platformOk := config["platform"]
+		if !platformOk {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("platform should not be nil"),
+				Status:  common.PtrToInt(11),
+			})
+		} else if platform == nil || platform == "" {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("platform should not be empty"),
+				Status:  common.PtrToInt(11),
+			})
+		}
+
 		protocolID, protocolIDOk := config["protocol_id"]
 		if !protocolIDOk {
 			n.Errors = append(n.Errors, &provide.Error{
@@ -690,6 +702,18 @@ func (n *Network) Validate() bool {
 				Message: common.StringOrNil("protocol_id should not be empty"),
 				Status:  common.PtrToInt(11),
 			})
+		}
+
+		_, isBcoinNetworkOk := config["is_bcoin_network"].(bool)
+		_, isEthereumNetworkOk := config["is_ethereum_network"].(bool)
+		_, isHandshakeNetworkOk := config["is_handshake_network"].(bool)
+
+		if !isBcoinNetworkOk && platform != nil && platform == p2pPlatformBcoin {
+			config["is_bcoin_network"] = true
+		} else if !isEthereumNetworkOk && platform != nil && platform == p2pPlatformEVM {
+			config["is_ethereum_network"] = true
+		} else if !isHandshakeNetworkOk && platform != nil && platform == p2pPlatformHandshake {
+			config["is_handshake_network"] = true
 		}
 	}
 

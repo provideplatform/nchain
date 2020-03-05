@@ -855,6 +855,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			msg, _ := json.Marshal(map[string]interface{}{
 				"network_node_id": n.ID.String(),
 			})
+			// TODO: dispatch node availability check
 			natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
 			natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg)
 		}
