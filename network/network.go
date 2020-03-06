@@ -25,9 +25,9 @@ const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
 
 const defaultWebappPort = 3000
 
-type bootnodesInitialized string
+type bootnodesInitialized struct{}
 
-func (err bootnodesInitialized) Error() string {
+func (err *bootnodesInitialized) Error() string {
 	return "network bootnodes initialized"
 }
 

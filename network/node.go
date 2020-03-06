@@ -476,7 +476,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 	bootnodes, err := network.requireBootnodes(db, n)
 	if err != nil {
 		switch err.(type) {
-		case bootnodesInitialized:
+		case *bootnodesInitialized:
 			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
 
 			// TODO: move the following to P2PAPI.requireBootnotes()
@@ -489,7 +489,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 						if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
 							addr = common.StringOrNil(masterOfCeremony)
 							out := []string{}
-							db.Table("wallets").Select("private_key").Where("wallets.user_id = ? AND wallets.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
+							db.Table("accounts").Select("private_key").Where("accounts.user_id = ? AND accounts.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
 							if out == nil || len(out) == 0 || len(out[0]) == 0 {
 								common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
 								addr, privateKey, err = provide.EVMGenerateKeyPair()
@@ -558,7 +558,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 
 			return n._deploy(network, bootnodes, db)
 		default:
-			msg := fmt.Sprintf("Failed to deploy node %s to network: %s", n.ID, *network.Name)
+			msg := fmt.Sprintf("Failed to deploy node %s to network: %s; %s", n.ID, *network.Name, err.Error())
 			common.Log.Warning(msg)
 			return errors.New(msg)
 		}
