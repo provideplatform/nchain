@@ -121,7 +121,7 @@ func TestWalletCreate(t *testing.T) {
 
 	signedTx, hash, _ := provide.EVMSignTx(
 		"test-network-id",
-		"http://ec2-100-27-34-141.compute-1.amazonaws.com:8050/",
+		"https://dawn.infra.prod.provide.services:8050/",
 		a1.Address,
 		*a1.PrivateKey,
 		nil,
