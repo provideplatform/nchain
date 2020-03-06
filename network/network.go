@@ -740,6 +740,12 @@ func (n *Network) RPCURL() string {
 	if balancers != nil && len(balancers) > 0 {
 		balancer := balancers[rand.Intn(len(balancers))] // FIXME-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
+		balancerDNSName := balancer.DNSName()
+		if balancerDNSName != nil {
+			if rpcPort, rpcPortOk := balancerCfg["json_rpc_port"].(float64); rpcPortOk {
+				return fmt.Sprintf("https://%s:%v", *balancerDNSName, rpcPort)
+			}
+		}
 		if url, urlOk := balancerCfg["json_rpc_url"].(string); urlOk {
 			return url
 		}
@@ -757,6 +763,12 @@ func (n *Network) WebsocketURL() string {
 	if balancers != nil && len(balancers) > 0 {
 		balancer := balancers[rand.Intn(len(balancers))] // FIXME-- better would be to factor in geography of end user and/or give weight to balanced regions with more nodes
 		balancerCfg := balancer.ParseConfig()
+		balancerDNSName := balancer.DNSName()
+		if balancerDNSName != nil {
+			if rpcPort, rpcPortOk := balancerCfg["json_rpc_port"].(float64); rpcPortOk {
+				return fmt.Sprintf("wss://%s:%v", *balancerDNSName, rpcPort)
+			}
+		}
 		if url, urlOk := balancerCfg["websocket_url"].(string); urlOk {
 			return url
 		}
