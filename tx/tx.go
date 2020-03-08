@@ -158,6 +158,8 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 						txs.Account.AccessedAt = &accessedAt
 						txs.DB.Save(&txs.Account)
 					}()
+				} else {
+					err = fmt.Errorf("failed to sign %d-byte transaction payload using signing account %s; %s", len(*tx.Data), txs.Account.Address, err.Error())
 				}
 			} else {
 				err = fmt.Errorf("unable to sign tx; no private key for account: %s", txs.Account.ID)
@@ -572,7 +574,7 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 	t.SignedTx, t.Hash, err = signer.Sign(t)
 
 	if err != nil {
-		common.Log.Warningf("failed to sign %s tx using on behalf of signer: %s; %s", signer.Address(), signer.String(), err.Error())
+		common.Log.Warningf("failed to sign %d-byte tx using on behalf of signer: %s; %s", len(*t.Data), signer.Address(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})

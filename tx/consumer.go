@@ -217,7 +217,11 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
 		msg.Ack()
 	} else {
-		common.Log.Warningf("Failed to execute transaction; tx failed with %d error(s); %s", len(tx.Errors), *tx.Errors[0].Message)
+		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
+		for _, err := range tx.Errors {
+			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
+		}
+		common.Log.Warning(errmsg)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
