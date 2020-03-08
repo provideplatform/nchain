@@ -574,7 +574,11 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 	t.SignedTx, t.Hash, err = signer.Sign(t)
 
 	if err != nil {
-		common.Log.Warningf("failed to sign %d-byte tx using on behalf of signer: %s; %s", len(*t.Data), signer.Address(), err.Error())
+		length := 0
+		if t.Data != nil {
+			length = len(*t.Data)
+		}
+		common.Log.Warningf("failed to sign %d-byte tx using on behalf of signer: %s; %s", length, signer.Address(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
