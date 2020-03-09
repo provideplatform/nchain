@@ -193,22 +193,14 @@ func (c *Connector) provision() error {
 	cfg := c.ParseConfig()
 
 	switch *c.Type {
-	case provider.ElasticsearchConnectorProvider:
-		common.Log.Warningf("elasticsearch connector does not yet support provider-specific provision() impl")
 	case provider.IPFSConnectorProvider:
 		_, gatewayURLOk := cfg["gateway_url"].(string)
 		_, rpcURLOk := cfg["rpc_url"].(string)
 		runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
-	case provider.MongoDBConnectorProvider:
-		runDefaultProvisioner = true
-	case provider.RedisConnectorProvider:
-		runDefaultProvisioner = true
 	case provider.TableauConnectorProvider:
 		common.Log.Warningf("tableau connector does not yet support provider-specific provision() impl")
-	case provider.ZokratesConnectorProvider:
-		runDefaultProvisioner = true
 	default:
-		// no-op
+		runDefaultProvisioner = true
 	}
 
 	if runDefaultProvisioner {
@@ -257,21 +249,8 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 func (c *Connector) denormalizeConfig() error {
 	if c.Type != nil {
 		switch *c.Type {
-		case provider.ElasticsearchConnectorProvider:
-			return c.resolveAPIURL()
-		case provider.IPFSConnectorProvider:
-			return c.resolveAPIURL()
-		case provider.MongoDBConnectorProvider:
-			return c.resolveAPIURL()
-		case provider.RedisConnectorProvider:
-			return c.resolveAPIURL()
-		case provider.TableauConnectorProvider:
-			return c.resolveAPIURL()
-		case provider.ZokratesConnectorProvider:
-			return c.resolveAPIURL()
 		default:
-			// no-op
-			common.Log.Warningf("Unsupported connector type: %s for connector: %s; denormalization of connector config is a no-op", *c.Type, c.ID)
+			return c.resolveAPIURL()
 		}
 	}
 	return nil
@@ -382,7 +361,7 @@ func (c *Connector) Validate() bool {
 			Message: common.StringOrNil("Unable to deploy connector using unspecified network"),
 		})
 	}
-	if c.Type == nil || (strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
+	if c.Type == nil || (strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "rest" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
 		c.Errors = append(c.Errors, &provide.Error{
 			Message: common.StringOrNil("Unable to define connector of invalid type"),
 		})
@@ -440,6 +419,15 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 		)
 	case provider.MongoDBConnectorProvider:
 		apiClient = provider.InitMongoDBProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
+	case provider.RESTConnectorProvider:
+		apiClient = provider.InitRESTProvider(
 			c.ID,
 			&c.NetworkID,
 			c.ApplicationID,
