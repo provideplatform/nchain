@@ -25,7 +25,6 @@ type TableauProvider struct {
 	region         *string
 	apiURL         *string
 	apiPort        int
-	gatewayPort    int
 }
 
 // InitTableauProvider initializes and returns the Tableau connector API provider
@@ -33,8 +32,7 @@ func InitTableauProvider(connectorID uuid.UUID, networkID, applicationID, organi
 	region, regionOk := config["region"].(string)
 	apiURL, _ := config["api_url"].(string)
 	apiPort, apiPortOk := config["api_port"].(float64)
-	gatewayPort, gatewayPortOk := config["gateway_port"].(float64)
-	if connectorID == uuid.Nil || !regionOk || !apiPortOk || !gatewayPortOk || networkID == nil || *networkID == uuid.Nil {
+	if connectorID == uuid.Nil || !regionOk || !apiPortOk || networkID == nil || *networkID == uuid.Nil {
 		return nil
 	}
 	return &TableauProvider{
@@ -47,7 +45,6 @@ func InitTableauProvider(connectorID uuid.UUID, networkID, applicationID, organi
 		region:         common.StringOrNil(region),
 		apiURL:         common.StringOrNil(apiURL),
 		apiPort:        int(apiPort),
-		gatewayPort:    int(gatewayPort),
 	}
 }
 
@@ -85,12 +82,6 @@ func (p *TableauProvider) rawConfig() *json.RawMessage {
 
 // Deprovision undeploys all associated nodes and load balancers and removes them from the Tableau connector
 func (p *TableauProvider) Deprovision() error {
-	loadBalancers := make([]*network.LoadBalancer, 0)
-	p.model.Association("LoadBalancers").Find(&loadBalancers)
-	for _, balancer := range loadBalancers {
-		p.model.Association("LoadBalancers").Delete(balancer)
-	}
-
 	nodes := make([]*network.Node, 0)
 	p.model.Association("Nodes").Find(&nodes)
 	for _, node := range nodes {
@@ -99,43 +90,19 @@ func (p *TableauProvider) Deprovision() error {
 		node.Delete()
 	}
 
-	for _, balancer := range loadBalancers {
-		msg, _ := json.Marshal(map[string]interface{}{
-			"load_balancer_id": balancer.ID,
-		})
-		natsutil.NatsStreamingPublish(natsLoadBalancerDeprovisioningSubject, msg)
-	}
-
 	return nil
 }
 
 // Provision configures a new load balancer and the initial Tableau nodes and associates the resources with the Tableau connector
 func (p *TableauProvider) Provision() error {
-	loadBalancer := &network.LoadBalancer{
-		NetworkID:      *p.networkID,
-		ApplicationID:  p.applicationID,
-		OrganizationID: p.organizationID,
-		Type:           common.StringOrNil(TableauConnectorProvider),
-		Description:    common.StringOrNil(fmt.Sprintf("Tableau Connector Load Balancer")),
-		Region:         p.region,
-		Config:         p.rawConfig(),
-	}
+	msg, _ := json.Marshal(map[string]interface{}{
+		"connector_id": p.connectorID,
+	})
+	natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
 
-	if loadBalancer.Create() {
-		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
-		p.model.Association("LoadBalancers").Append(loadBalancer)
-
-		msg, _ := json.Marshal(map[string]interface{}{
-			"connector_id": p.connectorID,
-		})
-		natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
-
-		err := p.ProvisionNode()
-		if err != nil {
-			common.Log.Warning(err.Error())
-		}
-	} else {
-		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
+	err := p.ProvisionNode()
+	if err != nil {
+		common.Log.Warning(err.Error())
 	}
 
 	return nil
@@ -162,16 +129,6 @@ func (p *TableauProvider) ProvisionNode() error {
 		common.Log.Debugf("Created node %s on connector: %s", node.ID, p.connectorID)
 		p.model.Association("Nodes").Append(node)
 
-		loadBalancers := make([]*network.LoadBalancer, 0)
-		p.model.Association("LoadBalancers").Find(&loadBalancers)
-		for _, balancer := range loadBalancers {
-			msg, _ := json.Marshal(map[string]interface{}{
-				"load_balancer_id": balancer.ID.String(),
-				"network_node_id":  node.ID.String(),
-			})
-			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
-		}
-
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID.String(),
 		})
@@ -185,10 +142,10 @@ func (p *TableauProvider) ProvisionNode() error {
 
 // Reachable returns true if the Tableau API provider is available
 func (p *TableauProvider) Reachable() bool {
-	loadBalancers := make([]*network.LoadBalancer, 0)
-	p.model.Association("LoadBalancers").Find(&loadBalancers)
-	for _, loadBalancer := range loadBalancers {
-		if loadBalancer.ReachableOnPort(uint(p.apiPort)) {
+	nodes := make([]*network.Node, 0)
+	p.model.Association("Nodes").Find(&nodes)
+	for _, node := range nodes {
+		if node.ReachableOnPort(uint(p.apiPort)) {
 			return true
 		}
 	}

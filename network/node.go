@@ -283,7 +283,7 @@ func (n *Node) rpcURL() *string {
 
 func (n *Node) reachableViaJSONRPC() (bool, uint) {
 	port := n.rpcPort()
-	return n.reachableOnPort(port), port
+	return n.ReachableOnPort(port), port
 }
 
 func (n *Node) reachableViaWebsocket() (bool, uint) {
@@ -297,10 +297,10 @@ func (n *Node) reachableViaWebsocket() (bool, uint) {
 		port = uint(websocketPortOverride)
 	}
 
-	return n.reachableOnPort(port), port
+	return n.ReachableOnPort(port), port
 }
 
-func (n *Node) reachableOnPort(port uint) bool {
+func (n *Node) ReachableOnPort(port uint) bool {
 	if n.Host == nil {
 		return false
 	}

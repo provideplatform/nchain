@@ -331,7 +331,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 				if isLoadBalanced {
 					common.Log.Warningf("Block explorer load balancer may contain unhealthy or undeployed nodes")
 				} else {
-					if node.reachableOnPort(defaultWebappPort) {
+					if node.ReachableOnPort(defaultWebappPort) {
 						common.Log.Debugf("Block explorer reachable via port %d; node id: %s", defaultWebappPort, n.ID)
 
 						cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)

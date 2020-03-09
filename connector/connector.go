@@ -199,10 +199,14 @@ func (c *Connector) provision() error {
 		_, gatewayURLOk := cfg["gateway_url"].(string)
 		_, rpcURLOk := cfg["rpc_url"].(string)
 		runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
+	case provider.MongoDBConnectorProvider:
+		runDefaultProvisioner = true
+	case provider.RedisConnectorProvider:
+		runDefaultProvisioner = true
 	case provider.TableauConnectorProvider:
 		common.Log.Warningf("tableau connector does not yet support provider-specific provision() impl")
 	case provider.ZokratesConnectorProvider:
-		common.Log.Warningf("zokrates connector does not yet support provider-specific provision() impl")
+		runDefaultProvisioner = true
 	default:
 		// no-op
 	}
@@ -256,6 +260,10 @@ func (c *Connector) denormalizeConfig() error {
 		case provider.ElasticsearchConnectorProvider:
 			return c.resolveAPIURL()
 		case provider.IPFSConnectorProvider:
+			return c.resolveAPIURL()
+		case provider.MongoDBConnectorProvider:
+			return c.resolveAPIURL()
+		case provider.RedisConnectorProvider:
 			return c.resolveAPIURL()
 		case provider.TableauConnectorProvider:
 			return c.resolveAPIURL()
@@ -374,7 +382,7 @@ func (c *Connector) Validate() bool {
 			Message: common.StringOrNil("Unable to deploy connector using unspecified network"),
 		})
 	}
-	if c.Type == nil || strings.ToLower(*c.Type) != "ipfs" {
+	if c.Type == nil || (strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
 		c.Errors = append(c.Errors, &provide.Error{
 			Message: common.StringOrNil("Unable to define connector of invalid type"),
 		})
@@ -423,6 +431,24 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 		)
 	case provider.IPFSConnectorProvider:
 		apiClient = provider.InitIPFSProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
+	case provider.MongoDBConnectorProvider:
+		apiClient = provider.InitMongoDBProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
+	case provider.RedisConnectorProvider:
+		apiClient = provider.InitRedisProvider(
 			c.ID,
 			&c.NetworkID,
 			c.ApplicationID,
