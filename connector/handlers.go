@@ -94,8 +94,7 @@ func createConnectorHandler(c *gin.Context) {
 	connector.ApplicationID = appID
 
 	if connector.OrganizationID != nil {
-		provide.RenderError("unable to set organization_id on connector creation API at this time; org authorization not yet implemented in goldmine", 400, c)
-		return
+		common.Log.Warningf("setting organization_id on connector via creation API; needs audit! at this time, org authorization not yet implemented in goldmine")
 	}
 
 	if connector.Create() {
