@@ -277,7 +277,6 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 	if chain != nil {
 		pathstr = fmt.Sprintf("%s/%d/%d", *w.Path, *chain, index)
 	}
-	common.Log.Debugf("attempting to derive signing account at derivation path: %s", pathstr)
 
 	components := strings.Split(*w.Path, "/")
 	coin, err := strconv.Atoi(strings.Trim(components[len(components)-2], "'"))
