@@ -360,8 +360,18 @@ func (w *Wallet) generate(db *gorm.DB) error {
 
 	masterKey, err := bip32.NewMasterKey(seed)
 	if err != nil {
-		common.Log.Warningf("failed to generate master key from mnemonic: %s; %s", mnemonic, err.Error())
-		return err
+		if strings.Contains(err.Error(), "Invalid seed") {
+			seed, err = bip39.NewSeedWithErrorChecking(mnemonic, "")
+			if err != nil {
+				common.Log.Warningf("failed to generate seed from mnemonic: %s; %s", mnemonic, err.Error())
+				return err
+			}
+			masterKey, err = bip32.NewMasterKey(seed)
+		}
+		if err != nil {
+			common.Log.Warningf("failed to generate master key from mnemonic: %s; %s", mnemonic, err.Error())
+			return err
+		}
 	}
 
 	var pathstr string
