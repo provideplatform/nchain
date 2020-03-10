@@ -264,7 +264,7 @@ func (n *Node) rpcPort() uint {
 		defaultJSONRPCPort = common.EngineToDefaultJSONRPCPortMapping[engineID]
 	}
 	port := uint(defaultJSONRPCPort)
-	if jsonRPCPortOverride, jsonRPCPortOverrideOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOverrideOk {
+	if jsonRPCPortOverride, jsonRPCPortOverrideOk := cfg["json_rpc_port"].(float64); jsonRPCPortOverrideOk {
 		port = uint(jsonRPCPortOverride)
 	}
 	return port
@@ -278,7 +278,12 @@ func (n *Node) rpcURL() *string {
 	if port == 0 {
 		return nil
 	}
-	return common.StringOrNil(fmt.Sprintf("http://%s:%d", *n.Host, port)) // FIXME-- allow specification of url scheme in cfg := n.ParseConfig()
+	cfg := n.ParseConfig()
+	scheme := "http"
+	if rpcScheme, rpcSchemeOk := cfg["rpc_scheme"].(string); rpcSchemeOk {
+		scheme = rpcScheme
+	}
+	return common.StringOrNil(fmt.Sprintf("%s://%s:%d", scheme, *n.Host, port))
 }
 
 func (n *Node) reachableViaJSONRPC() (bool, uint) {
@@ -293,7 +298,7 @@ func (n *Node) reachableViaWebsocket() (bool, uint) {
 		defaultWebsocketPort = common.EngineToDefaultWebsocketPortMapping[engineID]
 	}
 	port := uint(defaultWebsocketPort)
-	if websocketPortOverride, websocketPortOverrideOk := cfg["default_websocket_port"].(float64); websocketPortOverrideOk {
+	if websocketPortOverride, websocketPortOverrideOk := cfg["websocket_port"].(float64); websocketPortOverrideOk {
 		port = uint(websocketPortOverride)
 	}
 
@@ -605,9 +610,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	cfg := n.ParseConfig()
 	encryptedCfg, _ := n.decryptedConfig()
 	networkCfg := network.ParseConfig()
-
-	cfg["default_json_rpc_port"] = networkCfg["default_json_rpc_port"]
-	cfg["default_websocket_port"] = networkCfg["default_websocket_port"]
 
 	containerID, containerOk := cfg["container"].(string)
 	image, imageOk := cfg["image"].(string)

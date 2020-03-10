@@ -238,12 +238,16 @@ func (c *Connector) apiURL(db *gorm.DB) *string {
 	if port == 0 {
 		return nil
 	}
-
 	host := c.Host(db)
 	if host == nil {
 		return nil
 	}
-	return common.StringOrNil(fmt.Sprintf("https://%s:%d", *host, port)) // FIXME-- allow specification of url scheme in cfg := c.ParseConfig()
+	cfg := c.ParseConfig()
+	scheme := "https"
+	if rpcScheme, rpcSchemeOk := cfg["rpc_scheme"].(string); rpcSchemeOk {
+		scheme = rpcScheme
+	}
+	return common.StringOrNil(fmt.Sprintf("%s://%s:%d", scheme, *host, port))
 }
 
 func (c *Connector) denormalizeConfig() error {

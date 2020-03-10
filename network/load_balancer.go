@@ -461,10 +461,10 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 		common.Log.Warningf("Failed to parse cloneable security configuration for load balancer: %s; attempting to create sane initial configuration", n.ID)
 
 		tcpIngressCfg := make([]float64, 0)
-		if _jsonRPCPort, jsonRPCPortOk := cfg["default_json_rpc_port"].(float64); jsonRPCPortOk {
+		if _jsonRPCPort, jsonRPCPortOk := cfg["json_rpc_port"].(float64); jsonRPCPortOk {
 			jsonRPCPort = _jsonRPCPort
 		}
-		if _websocketPort, websocketPortOk := cfg["default_websocket_port"].(float64); websocketPortOk {
+		if _websocketPort, websocketPortOk := cfg["websocket_port"].(float64); websocketPortOk {
 			websocketPort = _websocketPort
 		}
 

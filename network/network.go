@@ -213,6 +213,7 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
 	cfg := n.ParseConfig()
 	if val {
+		// FIXME-- set fallback json rpc url when this value toggles
 		delete(cfg, "json_rpc_url")
 		delete(cfg, "websocket_url")
 	}
