@@ -35,23 +35,23 @@ func (err *bootnodesInitialized) Error() string {
 // a heirarchy of blockchain networks
 type Network struct {
 	provide.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id"`
+	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id,omitempty"`
 	Name          *string          `sql:"not null" json:"name"`
 	Description   *string          `json:"description"`
-	IsProduction  *bool            `sql:"not null" json:"is_production"`
-	Cloneable     *bool            `sql:"not null" json:"cloneable"`
+	IsProduction  *bool            `sql:"not null" json:"-"` // deprecated
+	Cloneable     *bool            `sql:"not null" json:"-"` // deprecated
 	Enabled       *bool            `sql:"not null" json:"enabled"`
 	ChainID       *string          `json:"chain_id"`                               // protocol-specific chain id
 	SidechainID   *uuid.UUID       `sql:"type:uuid" json:"sidechain_id,omitempty"` // network id used as the transactional sidechain (or null)
-	NetworkID     *uuid.UUID       `sql:"type:uuid" json:"network_id"`             // network id used as the parent
+	NetworkID     *uuid.UUID       `sql:"type:uuid" json:"network_id,omitempty"`   // network id used as the parent
 	Config        *json.RawMessage `sql:"type:json not null" json:"config,omitempty"`
 	// Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
 
 // NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
 func NetworkListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.cloneable, networks.enabled, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
+	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
 }
 
 // MutexKey returns a key key for the given network id, which is guaranteed to be
