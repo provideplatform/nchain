@@ -30,11 +30,11 @@ var (
 	requireTLS bool
 
 	// EngineToDefaultJSONRPCPortMapping contains a set of sane defaults for signing enginers and default JSON-RPC ports
-	EngineToDefaultJSONRPCPortMapping = map[string]uint{"aura": 8050, "handshake": 13037}
+	EngineToDefaultJSONRPCPortMapping = map[string]uint{"ethash": 8545, "aura": 8050, "handshake": 13037}
 	// EngineToDefaultPeerListenPortMapping contains a set of sane defaults for signing enginers and default p2p ports
-	EngineToDefaultPeerListenPortMapping = map[string]uint{"aura": 30303, "handshake": 13038}
+	EngineToDefaultPeerListenPortMapping = map[string]uint{"ethash": 30303, "aura": 30303, "handshake": 13038}
 	// EngineToDefaultWebsocketPortMapping contains a set of sane defaults for signing enginers and default websocket ports
-	EngineToDefaultWebsocketPortMapping = map[string]uint{"aura": 8051}
+	EngineToDefaultWebsocketPortMapping = map[string]uint{"ethash": 8546, "aura": 8051}
 
 	// TxFilters contains in-memory Filter instances used for real-time stream processing
 	TxFilters = map[string][]interface{}{}
