@@ -1250,6 +1250,8 @@ func (n *Node) p2pAPIClient() (P2PAPI, error) {
 	case bcoinP2PProvider:
 		// apiClient = p2p.InitBcoinP2PProvider(*rpcURL)
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
+	case gethP2PProvider:
+		apiClient = p2p.InitGethP2PProvider(*rpcURL)
 	case parityP2PProvider:
 		apiClient = p2p.InitParityP2PProvider(*rpcURL)
 	case quorumP2PProvider:

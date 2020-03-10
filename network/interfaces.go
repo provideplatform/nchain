@@ -19,6 +19,7 @@ const p2pPlatformEVM = "evm"
 const p2pPlatformHandshake = "handshake"
 
 const bcoinP2PProvider = "bcoin"
+const gethP2PProvider = "geth"
 const parityP2PProvider = "parity"
 const quorumP2PProvider = "quorum"
 
