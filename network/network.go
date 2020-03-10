@@ -142,7 +142,9 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 		if count == 0 {
 			nodeCfg := pending.ParseConfig()
 			if env, envOk := nodeCfg["env"].(map[string]interface{}); envOk {
-				if _, bootnodesOk := env["BOOTNODES"].(string); bootnodesOk {
+				_, bootnodesOk := env["BOOTNODES"].(string)
+				_, peersetOk := env["PEER_SET"].(string)
+				if bootnodesOk || peersetOk {
 					bootnodes = append(bootnodes, pending)
 					err = new(bootnodesInitialized)
 					return err
