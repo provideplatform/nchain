@@ -564,12 +564,12 @@ func (n *Network) Validate() bool {
 	}
 
 	if n.IsProduction == nil {
-		isProduction := true
+		isProduction := false
 		n.IsProduction = &isProduction
 	}
 
 	if n.Cloneable == nil {
-		isCloneable := true
+		isCloneable := false
 		n.Cloneable = &isCloneable
 	}
 
