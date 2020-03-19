@@ -835,9 +835,15 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 							port := int64(_port)
 							_, err := orchestrationAPI.DeregisterTarget(common.StringOrNil(targetGroupArn.(string)), node.PrivateIPv4, &port)
 							if err != nil {
-								desc := fmt.Sprintf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
-								common.Log.Warning(desc)
-								return err
+								if aerr, ok := err.(awserr.Error); ok {
+									switch aerr.Code() {
+									case "TargetGroupNotFound":
+										common.Log.Debugf("Failed to deregister target from load balanced target group in region: %s; target group does not exist", region)
+									default:
+										common.Log.Warningf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
+										return err
+									}
+								}
 							}
 							common.Log.Debugf("Deregistered target: %s:%v", *node.PrivateIPv4, port)
 						}
