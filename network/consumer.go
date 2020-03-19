@@ -464,6 +464,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	if node == nil || node.ID == uuid.Nil {
 		common.Log.Warningf("Failed to load balance network node; no network node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
+		return
 	}
 
 	err = balancer.balanceNode(db, node)
