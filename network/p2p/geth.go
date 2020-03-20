@@ -38,12 +38,10 @@ func (p *GethP2PProvider) AddPeer(peerURL string) error {
 
 // RemovePeer removes a peer by its peer url
 func (p *GethP2PProvider) RemovePeer(peerURL string) error {
-	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "admin_removePeer", []interface{}{peerURL}, &resp)
+	return errors.New("geth p2p provider does not impl RemovePeer()")
 }
 
 // Upgrade executes a pending upgrade
 func (p *GethP2PProvider) Upgrade() error {
-	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_executeUpgrade", []interface{}{}, &resp)
+	return errors.New("geth p2p provider does not impl Upgrade()")
 }

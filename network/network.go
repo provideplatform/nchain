@@ -589,13 +589,11 @@ func (n *Network) Validate() bool {
 				if _, ok := cfg["security"]; !ok {
 					n.Errors = append(n.Errors, &provide.Error{
 						Message: common.StringOrNil("security object should be present for clonable network configuration"),
-						Status:  common.PtrToInt(11),
 					})
 				}
 			} else {
 				n.Errors = append(n.Errors, &provide.Error{
 					Message: common.StringOrNil("cloneable_cfg object should not be null on cloneable network configuration"),
-					Status:  common.PtrToInt(11),
 				})
 			}
 		}
@@ -605,19 +603,16 @@ func (n *Network) Validate() bool {
 		if !chainspecOk && !chainspecURLOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("chainspec or chainspec_url should be present in network configuration"),
-				Status:  common.PtrToInt(11),
 			})
 		} else if chainspecOk && chainspecURLOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("specify chainspec ar chainspec_url in network configuration; not both"),
-				Status:  common.PtrToInt(11),
 			})
 		} else {
 			if chainspecOk {
 				if chainspec == nil || chainspec == "" {
 					n.Errors = append(n.Errors, &provide.Error{
 						Message: common.StringOrNil("chainspec object should not be empty"),
-						Status:  common.PtrToInt(11),
 					})
 				}
 			}
@@ -626,7 +621,6 @@ func (n *Network) Validate() bool {
 				if err != nil {
 					n.Errors = append(n.Errors, &provide.Error{
 						Message: common.StringOrNil("chainspec_url should be a valid URL if provided"),
-						Status:  common.PtrToInt(11),
 					})
 				}
 			}
@@ -638,7 +632,6 @@ func (n *Network) Validate() bool {
 			if err != nil {
 				n.Errors = append(n.Errors, &provide.Error{
 					Message: common.StringOrNil("block_explorer_url should be a valid URL if provided"),
-					Status:  common.PtrToInt(11),
 				})
 			}
 		}
@@ -647,12 +640,10 @@ func (n *Network) Validate() bool {
 		if !chainOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("chain should not be nil"),
-				Status:  common.PtrToInt(11),
 			})
 		} else if chain == nil || chain == "" {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("chain should not be empty"),
-				Status:  common.PtrToInt(11),
 			})
 		}
 
@@ -660,11 +651,10 @@ func (n *Network) Validate() bool {
 		if !engineIDOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("engine_id should not be nil"),
-				Status:  common.PtrToInt(11)})
+			})
 		} else if engineID == nil || engineID == "" {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("engine_id should not be empty"),
-				Status:  common.PtrToInt(11),
 			})
 		}
 
@@ -672,12 +662,10 @@ func (n *Network) Validate() bool {
 		if !nativeCurrencyOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("native_currency should not be nil"),
-				Status:  common.PtrToInt(11),
 			})
 		} else if nativeCurrency == nil || nativeCurrency == "" {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("native_currency should not be nil"),
-				Status:  common.PtrToInt(11),
 			})
 		}
 
@@ -685,12 +673,10 @@ func (n *Network) Validate() bool {
 		if !platformOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("platform should not be nil"),
-				Status:  common.PtrToInt(11),
 			})
 		} else if platform == nil || platform == "" {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("platform should not be empty"),
-				Status:  common.PtrToInt(11),
 			})
 		}
 
@@ -698,12 +684,10 @@ func (n *Network) Validate() bool {
 		if !protocolIDOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("protocol_id should not be nil"),
-				Status:  common.PtrToInt(11),
 			})
 		} else if protocolID == nil || protocolID == "" {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("protocol_id should not be empty"),
-				Status:  common.PtrToInt(11),
 			})
 		}
 

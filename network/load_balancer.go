@@ -301,8 +301,7 @@ func (l *LoadBalancer) orchestrationAPIClient() (OrchestrationAPI, error) {
 	case awsOrchestrationProvider:
 		apiClient = orchestration.InitAWSOrchestrationProvider(credentials, region)
 	case azureOrchestrationProvider:
-		// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
-		return nil, fmt.Errorf("Azure orchestration provider not yet implemented")
+		apiClient = orchestration.InitAzureOrchestrationProvider(credentials, region)
 	case googleOrchestrationProvider:
 		// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 		return nil, fmt.Errorf("Google orchestration provider not yet implemented")
@@ -396,7 +395,11 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 							"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
 						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
 					case azureOrchestrationProvider:
-						// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
+						dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
+							"azure_tenant_id":     nil,
+							"azure_client_id":     nil,
+							"azure_client_secret": nil,
+						}, *common.DefaultInfrastructureAzureRegion)
 					case googleOrchestrationProvider:
 						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 					}
@@ -439,26 +442,18 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 		balancerType = *l.Type
 	}
 
-	defaultJSONRPCPort := uint(0)
-	defaultWebsocketPort := uint(0)
-	if engineID, engineOk := cfg["engine_id"].(string); engineOk {
-		defaultJSONRPCPort = common.EngineToDefaultJSONRPCPortMapping[engineID]
-		defaultWebsocketPort = common.EngineToDefaultWebsocketPortMapping[engineID]
-	}
-
-	jsonRPCPort := float64(defaultJSONRPCPort)
-	websocketPort := float64(defaultWebsocketPort)
+	jsonRPCPort := float64(common.DefaultHTTPPort)
+	websocketPort := float64(common.DefaultWebsocketPort)
 
 	var securityCfg map[string]interface{}
 	if security, securityOk := balancerCfg["security"].(map[string]interface{}); securityOk {
 		securityCfg = security
 	} else if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
 		securityCfg = security
-	} else if cloneableCfg, cloneableCfgOk := cfg["cloneable_cfg"].(map[string]interface{}); cloneableCfgOk {
-		securityCfg, _ = cloneableCfg["security"].(map[string]interface{})
 	}
+
 	if securityCfg == nil || len(securityCfg) == 0 {
-		common.Log.Warningf("Failed to parse cloneable security configuration for load balancer: %s; attempting to create sane initial configuration", n.ID)
+		common.Log.Warningf("Failed to parse security configuration for load balancer: %s; attempting to infer sane initial configuration", n.ID)
 
 		tcpIngressCfg := make([]float64, 0)
 		if _jsonRPCPort, jsonRPCPortOk := cfg["json_rpc_port"].(float64); jsonRPCPortOk {
@@ -484,7 +479,6 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 	balancerCfg["security"] = securityCfg
 
 	targetID, targetOk := balancerCfg["target_id"].(string)
-	providerID, providerOk := balancerCfg["provider_id"].(string)
 	region, regionOk := balancerCfg["region"].(string)
 	vpcID, _ := balancerCfg["vpc_id"].(string)
 
@@ -492,8 +486,8 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 	l.Region = common.StringOrNil(region)
 	db.Save(&l)
 
-	if !targetOk || !providerOk || !regionOk || balancerType == "" {
-		err := fmt.Errorf("Cannot provision load balancer for network node without credentials, a target, provider, region and type configuration; target id: %s; provider id: %s; region: %s, type: %s", targetID, providerID, region, balancerType)
+	if !targetOk || !regionOk || balancerType == "" {
+		err := fmt.Errorf("Cannot provision load balancer for network node without credentials, a target, type and region configuration; target id: %s; region: %s, type: %s", targetID, region, balancerType)
 		common.Log.Warningf(err.Error())
 		return err
 	}
@@ -512,44 +506,36 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 			securityGroupIDs, _ := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID), securityCfg)
 			balancerCfg["target_security_group_ids"] = securityGroupIDs
 
-			if providerID, providerIDOk := balancerCfg["provider_id"].(string); providerIDOk {
-				if strings.ToLower(providerID) == "docker" {
-					loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIDs)
-					if err != nil {
-						err := fmt.Errorf("Failed to provision AWS load balancer (v2); %s", err.Error())
-						common.Log.Warningf(err.Error())
-						return err
-					}
-
-					for _, loadBalancer := range loadBalancersResp.LoadBalancers {
-						balancerCfg["load_balancer_name"] = l.Name
-						balancerCfg["load_balancer_url"] = loadBalancer.DNSName
-						balancerCfg["target_balancer_id"] = loadBalancer.LoadBalancerArn
-						balancerCfg["vpc_id"] = loadBalancer.VpcId
-
-						if l.Type != nil && *l.Type == loadBalancerTypeRPC {
-							common.Log.Debugf("Setting JSON-RPC and websocket URLs on load balancer: %s", l.ID)
-							balancerCfg["json_rpc_url"] = fmt.Sprintf("https://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
-							balancerCfg["json_rpc_port"] = jsonRPCPort
-							balancerCfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *loadBalancer.DNSName, websocketPort)
-							balancerCfg["websocket_port"] = websocketPort
-						}
-
-						l.Host = loadBalancer.DNSName
-						l.setConfig(balancerCfg)
-						l.sanitizeConfig()
-						l.UpdateStatus(db, "active", l.Description)
-						db.Save(&l)
-						if len(l.Errors) == 0 {
-							return nil
-						}
-						return fmt.Errorf("%s", *l.Errors[0].Message)
-					}
-				}
-			} else {
-				err := fmt.Errorf("Failed to load balance node without provider_id")
+			loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIDs)
+			if err != nil {
+				err := fmt.Errorf("Failed to provision AWS load balancer (v2); %s", err.Error())
 				common.Log.Warningf(err.Error())
 				return err
+			}
+
+			for _, loadBalancer := range loadBalancersResp.LoadBalancers {
+				balancerCfg["load_balancer_name"] = l.Name
+				balancerCfg["load_balancer_url"] = loadBalancer.DNSName
+				balancerCfg["target_balancer_id"] = loadBalancer.LoadBalancerArn
+				balancerCfg["vpc_id"] = loadBalancer.VpcId
+
+				if l.Type != nil && *l.Type == loadBalancerTypeRPC {
+					common.Log.Debugf("Setting JSON-RPC and websocket URLs on load balancer: %s", l.ID)
+					balancerCfg["json_rpc_url"] = fmt.Sprintf("https://%s:%v", *loadBalancer.DNSName, jsonRPCPort)
+					balancerCfg["json_rpc_port"] = jsonRPCPort
+					balancerCfg["websocket_url"] = fmt.Sprintf("wss://%s:%v", *loadBalancer.DNSName, websocketPort)
+					balancerCfg["websocket_port"] = websocketPort
+				}
+
+				l.Host = loadBalancer.DNSName
+				l.setConfig(balancerCfg)
+				l.sanitizeConfig()
+				l.UpdateStatus(db, "active", l.Description)
+				db.Save(&l)
+				if len(l.Errors) == 0 {
+					return nil
+				}
+				return fmt.Errorf("%s", *l.Errors[0].Message)
 			}
 		} else {
 			err := fmt.Errorf("Failed to load balance node without region")
@@ -729,7 +715,12 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 								"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
 							}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
 						case azureOrchestrationProvider:
-							// apiClient = orchestration.InitAzureOrchestrationProvider(credentials)
+							// FIXME
+							dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
+								"azure_tenant_id":     nil,
+								"azure_client_id":     nil,
+								"azure_client_secret": nil,
+							}, *common.DefaultInfrastructureAzureRegion)
 						case googleOrchestrationProvider:
 							// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 						}

@@ -29,12 +29,14 @@ var (
 
 	requireTLS bool
 
-	// EngineToDefaultJSONRPCPortMapping contains a set of sane defaults for signing enginers and default JSON-RPC ports
-	EngineToDefaultJSONRPCPortMapping = map[string]uint{"ethash": 8545, "aura": 8050, "handshake": 13037}
-	// EngineToDefaultPeerListenPortMapping contains a set of sane defaults for signing enginers and default p2p ports
-	EngineToDefaultPeerListenPortMapping = map[string]uint{"ethash": 30303, "aura": 30303, "handshake": 13038}
-	// EngineToDefaultWebsocketPortMapping contains a set of sane defaults for signing enginers and default websocket ports
-	EngineToDefaultWebsocketPortMapping = map[string]uint{"ethash": 8546, "aura": 8051}
+	// DefaultHTTPPort is the default http port, i.e., for json-rpc or rest api listeners
+	DefaultHTTPPort = 8545
+
+	// DefaultPeerDiscoveryPort is the default port for p2p discovery
+	DefaultPeerDiscoveryPort = 30303
+
+	// DefaultWebsocketPort is the default websocket port
+	DefaultWebsocketPort = 8546
 
 	// TxFilters contains in-memory Filter instances used for real-time stream processing
 	TxFilters = map[string][]interface{}{}
@@ -53,6 +55,9 @@ var (
 
 	// DefaultInfrastructureAWSConfig is the AWS configuration which is used to support various managed infrastructure (i.e., load balancers)
 	DefaultInfrastructureAWSConfig *awsconf.Config
+
+	// DefaultInfrastructureAzureRegion is the default Azure region configuration which is used to support various managed infrastructure (i.e., load balancers)
+	DefaultInfrastructureAzureRegion *string // FIXME-- rename like awsconf
 
 	// DefaultInfrastructureUsesSelfSignedCertificate is a flag that indicates if various managed infrastructure (i.e., load balancers) should use a self-signed cert
 	DefaultInfrastructureUsesSelfSignedCertificate bool
