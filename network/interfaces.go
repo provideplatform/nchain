@@ -8,6 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/jinzhu/gorm"
+	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/goldmine/common"
 )
 
 const awsOrchestrationProvider = "aws"
@@ -17,6 +20,8 @@ const googleOrchestrationProvider = "gcp"
 const p2pPlatformBcoin = "bcoin"
 const p2pPlatformEVM = "evm"
 const p2pPlatformHandshake = "handshake"
+const p2pPlatformHyperledger = "hyperledger"
+const p2pPlatformQuorum = "quorum"
 
 const bcoinP2PProvider = "bcoin"
 const gethP2PProvider = "geth"
@@ -92,6 +97,7 @@ type P2PAPI interface {
 	DropNonReservedPeers() error
 	AddPeer(string) error
 	RemovePeer(string) error
-	// TODO: ResolvePeerURL() error
+	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
+	ResolvePeerURL() error
 	Upgrade() error
 }

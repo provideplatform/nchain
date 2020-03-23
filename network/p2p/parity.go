@@ -1,49 +1,156 @@
 package p2p
 
 import (
+	"crypto/ecdsa"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/jinzhu/gorm"
+	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/goldmine/common"
 	provide "github.com/provideservices/provide-go"
 )
 
 // ParityP2PProvider is a network.P2PAPI implementing the parity API
 type ParityP2PProvider struct {
-	rpcClientKey string
-	rpcURL       string
+	rpcClientKey *string
+	rpcURL       *string
+	network      common.Configurable
 }
 
 // InitParityP2PProvider initializes and returns the parity p2p provider
-func InitParityP2PProvider(rpcURL string) *ParityP2PProvider {
+func InitParityP2PProvider(rpcURL *string, ntwrk common.Configurable) *ParityP2PProvider {
 	return &ParityP2PProvider{
 		rpcClientKey: rpcURL,
 		rpcURL:       rpcURL,
+		network:      ntwrk,
 	}
 }
 
 // AcceptNonReservedPeers allows non-reserved peers to connect
 func (p *ParityP2PProvider) AcceptNonReservedPeers() error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, &resp)
+	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, &resp)
 }
 
 // DropNonReservedPeers only allows reserved peers to connect; reversed by calling `AcceptNonReservedPeers`
 func (p *ParityP2PProvider) DropNonReservedPeers() error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, &resp)
+	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, &resp)
 }
 
 // AddPeer adds a peer by its peer url
 func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
+	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
 }
 
 // RemovePeer removes a peer by its peer url
 func (p *ParityP2PProvider) RemovePeer(peerURL string) error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, &resp)
+	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, &resp)
+}
+
+// ResolvePeerURL attempts to resolve one or more viable peer urls
+func (p *ParityP2PProvider) ResolvePeerURL() error {
+	return errors.New("")
+}
+
+// RequireBootnodes attempts to resolve the peers to use as bootnodes
+func (p *ParityP2PProvider) RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error {
+	var err error
+
+	cfg := p.network.ParseConfig()
+	encryptedCfg, err := n.DecryptedConfig()
+	if err != nil {
+		return fmt.Errorf("Failed to decrypt config for network node: %s", err.Error())
+	}
+	env, envOk := cfg["env"].(map[string]interface{})
+	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
+
+	if envOk && encryptedEnvOk {
+		var addr *string
+		var privateKey *ecdsa.PrivateKey
+		_, masterOfCeremonyPrivateKeyOk := encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"].(string)
+		if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
+			addr = common.StringOrNil(masterOfCeremony)
+			out := []string{}
+			db.Table("accounts").Select("private_key").Where("accounts.user_id = ? AND accounts.address = ?", userID.String(), addr).Pluck("private_key", &out)
+			if out == nil || len(out) == 0 || len(out[0]) == 0 {
+				common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", networkID)
+				addr, privateKey, err = provide.EVMGenerateKeyPair()
+			} else {
+				encryptedKey := common.StringOrNil(out[0])
+				privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey)
+				if err == nil {
+					common.Log.Debugf("Decrypted private key for master of ceremony: %s", *addr)
+				} else {
+					msg := fmt.Sprintf("Failed to decrypt private key for master of ceremony on network: %s", networkID)
+					common.Log.Warning(msg)
+					return errors.New(msg)
+				}
+			}
+		} else if !masterOfCeremonyPrivateKeyOk {
+			common.Log.Debugf("Generating managed master of ceremony signing identity for network: %s", networkID)
+			addr, privateKey, err = provide.EVMGenerateKeyPair()
+		}
+
+		if addr != nil && privateKey != nil {
+			keystoreJSON, err := provide.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+			if err == nil {
+				common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, networkID)
+				env["ENGINE_SIGNER"] = addr
+				encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
+				encryptedEnv["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
+
+				n.SetConfig(cfg)
+				n.SetEncryptedConfig(encryptedCfg)
+				n.SanitizeConfig()
+				db.Save(&n)
+
+				networkCfg := p.network.ParseConfig()
+				if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
+					if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
+						nonSystemAccounts := make([]string, 0)
+						for account := range accounts {
+							if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
+								nonSystemAccounts = append(nonSystemAccounts, account)
+							}
+						}
+						if len(nonSystemAccounts) == 1 {
+							templateMasterOfCeremony := nonSystemAccounts[0]
+							chainspecJSON, err := json.Marshal(chainspec)
+							if err == nil {
+								chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
+								chainspecJSON = []byte(strings.Replace(string(chainspecJSON), strings.ToLower(templateMasterOfCeremony[2:]), strings.ToLower(string(*addr)[2:]), -1))
+								var newChainspec map[string]interface{}
+								err = json.Unmarshal(chainspecJSON, &newChainspec)
+								if err == nil {
+									networkCfg["chainspec"] = newChainspec
+									p.network.SetConfig(networkCfg)
+									db.Save(&p.network)
+								}
+							}
+						}
+					}
+				}
+			} else {
+				common.Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", networkID, err.Error())
+			}
+		}
+	}
+
+	return err
 }
 
 // Upgrade executes a pending upgrade
 func (p *ParityP2PProvider) Upgrade() error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(p.rpcClientKey, p.rpcURL, "parity_executeUpgrade", []interface{}{}, &resp)
+	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_executeUpgrade", []interface{}{}, &resp)
 }

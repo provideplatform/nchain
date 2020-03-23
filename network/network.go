@@ -12,6 +12,7 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -35,17 +36,19 @@ func (err *bootnodesInitialized) Error() string {
 // a heirarchy of blockchain networks
 type Network struct {
 	provide.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id,omitempty"`
-	UserID        *uuid.UUID       `sql:"type:uuid" json:"user_id,omitempty"`
-	Name          *string          `sql:"not null" json:"name"`
-	Description   *string          `json:"description"`
-	IsProduction  *bool            `sql:"not null" json:"-"` // deprecated
-	Cloneable     *bool            `sql:"not null" json:"-"` // deprecated
-	Enabled       *bool            `sql:"not null" json:"enabled"`
-	ChainID       *string          `json:"chain_id"`                               // protocol-specific chain id
-	SidechainID   *uuid.UUID       `sql:"type:uuid" json:"sidechain_id,omitempty"` // network id used as the transactional sidechain (or null)
-	NetworkID     *uuid.UUID       `sql:"type:uuid" json:"network_id,omitempty"`   // network id used as the parent
-	Config        *json.RawMessage `sql:"type:json not null" json:"config,omitempty"`
+	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID          *uuid.UUID       `sql:"type:uuid" json:"user_id,omitempty"`
+	Name            *string          `sql:"not null" json:"name"`
+	Description     *string          `json:"description"`
+	IsProduction    *bool            `sql:"not null" json:"-"` // deprecated
+	Cloneable       *bool            `sql:"not null" json:"-"` // deprecated
+	Enabled         *bool            `sql:"not null" json:"enabled"`
+	ChainID         *string          `json:"chain_id"`                               // protocol-specific chain id
+	SidechainID     *uuid.UUID       `sql:"type:uuid" json:"sidechain_id,omitempty"` // network id used as the transactional sidechain (or null)
+	NetworkID       *uuid.UUID       `sql:"type:uuid" json:"network_id,omitempty"`   // network id used as the parent
+	Config          *json.RawMessage `sql:"type:json not null" json:"config,omitempty"`
+	EncryptedConfig *string          `sql:"-" json:"-"`
+
 	// Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
 
@@ -133,6 +136,58 @@ func (n *Network) String() string {
 	return "network: name=" + name + " chainID=" + chainID.String() + " errors=" + errorsStr
 }
 
+func (n *Network) DecryptedConfig() (map[string]interface{}, error) {
+	decryptedParams := map[string]interface{}{}
+	if n.EncryptedConfig != nil {
+		encryptedConfigJSON, err := pgputil.PGPPubDecrypt([]byte(*n.EncryptedConfig))
+		if err != nil {
+			common.Log.Warningf("Failed to decrypt encrypted network config; %s", err.Error())
+			return decryptedParams, err
+		}
+
+		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		if err != nil {
+			common.Log.Warningf("Failed to unmarshal decrypted network config; %s", err.Error())
+			return decryptedParams, err
+		}
+	}
+	return decryptedParams, nil
+}
+
+func (n *Network) encryptConfig() bool {
+	if n.EncryptedConfig != nil {
+		encryptedConfig, err := pgputil.PGPPubEncrypt([]byte(*n.EncryptedConfig))
+		if err != nil {
+			common.Log.Warningf("Failed to encrypt network config; %s", err.Error())
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+			return false
+		}
+		n.EncryptedConfig = common.StringOrNil(string(encryptedConfig))
+	}
+	return true
+}
+
+func (n *Network) SetEncryptedConfig(params map[string]interface{}) {
+	paramsJSON, _ := json.Marshal(params)
+	_paramsJSON := string(json.RawMessage(paramsJSON))
+	n.EncryptedConfig = &_paramsJSON
+	n.encryptConfig()
+}
+
+func (n *Network) SanitizeConfig() {
+	cfg := n.ParseConfig()
+
+	encryptedCfg, err := n.DecryptedConfig()
+	if err != nil {
+		encryptedCfg = map[string]interface{}{}
+	}
+
+	n.SetConfig(cfg)
+	n.SetEncryptedConfig(encryptedCfg)
+}
+
 func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) {
 	bootnodes := make([]*Node, 0)
 	var err error
@@ -140,6 +195,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 	redisutil.WithRedlock(n.MutexKey(), func() error {
 		count := n.BootnodesCount()
 		if count == 0 {
+			common.Log.Debugf("Attempting to resolve bootnodes for network: %s", n.ID)
 			nodeCfg := pending.ParseConfig()
 			if env, envOk := nodeCfg["env"].(map[string]interface{}); envOk {
 				_, bootnodesOk := env["BOOTNODES"].(string)
@@ -219,7 +275,7 @@ func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
 		delete(cfg, "json_rpc_url")
 		delete(cfg, "websocket_url")
 	}
-	n.setConfig(cfg)
+	n.SetConfig(cfg)
 	db.Save(&n)
 }
 
@@ -274,8 +330,8 @@ func (n *Network) Update() bool {
 	return len(n.Errors) == 0
 }
 
-// setConfig sets the network config in-memory
-func (n *Network) setConfig(cfg map[string]interface{}) {
+// SetConfig sets the network config in-memory
+func (n *Network) SetConfig(cfg map[string]interface{}) {
 	n.Config = common.MarshalConfig(cfg)
 }
 
@@ -294,7 +350,7 @@ func (n *Network) setChainID() {
 						params["networkID"] = n.ChainID
 					}
 				}
-				n.setConfig(cfg)
+				n.SetConfig(cfg)
 			}
 		}
 	}
@@ -385,7 +441,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 		var lb *LoadBalancer
 		var err error
 
-		balancerCfg := node.privateConfig()
+		balancerCfg := node.mergedConfig()
 		region, _ := balancerCfg["region"].(string)
 
 		if !isLoadBalanced {
@@ -421,7 +477,7 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 		if isLoadBalanced {
 			msg, _ := json.Marshal(map[string]interface{}{
 				"load_balancer_id": lb.ID.String(),
-				"network_node_id":  node.ID.String(),
+				"node_id":          node.ID.String(),
 			})
 			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		} else {
@@ -474,7 +530,7 @@ func (n *Network) resolveAndBalanceIPFSUrls(db *gorm.DB, node *Node) {
 		var lb *LoadBalancer
 		var err error
 
-		balancerCfg := node.privateConfig()
+		balancerCfg := node.mergedConfig()
 		region, _ := balancerCfg["region"].(string)
 
 		if !isLoadBalanced {
@@ -510,7 +566,7 @@ func (n *Network) resolveAndBalanceIPFSUrls(db *gorm.DB, node *Node) {
 		if isLoadBalanced {
 			msg, _ := json.Marshal(map[string]interface{}{
 				"load_balancer_id": lb.ID.String(),
-				"network_node_id":  node.ID.String(),
+				"node_id":          node.ID.String(),
 			})
 			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}
@@ -547,14 +603,12 @@ func (n *Network) Validate() bool {
 	if n.Config == nil {
 		n.Errors = append(n.Errors, &provide.Error{
 			Message: common.StringOrNil("config object should be defined for network"),
-			Status:  common.PtrToInt(10),
 		})
 	}
 
 	if n.Name == nil {
 		n.Errors = append(n.Errors, &provide.Error{
 			Message: common.StringOrNil("name can't be nil"),
-			Status:  common.PtrToInt(10),
 		})
 	}
 
@@ -580,22 +634,7 @@ func (n *Network) Validate() bool {
 		if err == nil && len(config) == 0 {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("config should not be empty"),
-				Status:  common.PtrToInt(12),
 			})
-		}
-
-		if err == nil && n.Cloneable != nil && *n.Cloneable {
-			if cfg, cfgOk := config["cloneable_cfg"].(map[string]interface{}); cfgOk {
-				if _, ok := cfg["security"]; !ok {
-					n.Errors = append(n.Errors, &provide.Error{
-						Message: common.StringOrNil("security object should be present for clonable network configuration"),
-					})
-				}
-			} else {
-				n.Errors = append(n.Errors, &provide.Error{
-					Message: common.StringOrNil("cloneable_cfg object should not be null on cloneable network configuration"),
-				})
-			}
 		}
 
 		chainspec, chainspecOk := config["chainspec"]
@@ -647,17 +686,6 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		engineID, engineIDOk := config["engine_id"]
-		if !engineIDOk {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("engine_id should not be nil"),
-			})
-		} else if engineID == nil || engineID == "" {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("engine_id should not be empty"),
-			})
-		}
-
 		nativeCurrency, nativeCurrencyOk := config["native_currency"]
 		if !nativeCurrencyOk {
 			n.Errors = append(n.Errors, &provide.Error{
@@ -680,20 +708,10 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		protocolID, protocolIDOk := config["protocol_id"]
-		if !protocolIDOk {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("protocol_id should not be nil"),
-			})
-		} else if protocolID == nil || protocolID == "" {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil("protocol_id should not be empty"),
-			})
-		}
-
 		_, isBcoinNetworkOk := config["is_bcoin_network"].(bool)
 		_, isEthereumNetworkOk := config["is_ethereum_network"].(bool)
 		_, isHandshakeNetworkOk := config["is_handshake_network"].(bool)
+		_, isQuorumNetworkOk := config["is_quorum_network"].(bool)
 
 		if !isBcoinNetworkOk && platform != nil && platform == p2pPlatformBcoin {
 			config["is_bcoin_network"] = true
@@ -701,6 +719,9 @@ func (n *Network) Validate() bool {
 			config["is_ethereum_network"] = true
 		} else if !isHandshakeNetworkOk && platform != nil && platform == p2pPlatformHandshake {
 			config["is_handshake_network"] = true
+		} else if !isQuorumNetworkOk && platform != nil && platform == p2pPlatformQuorum {
+			config["is_ethereum_network"] = true
+			config["is_quorum_network"] = true
 		}
 	}
 
@@ -777,8 +798,8 @@ func (n *Network) addPeer(peerURL string) error {
 	common.Log.Debugf("Attempting to broadcast peer url %s for inclusion on network %s by %d nodes", peerURL, n.ID, len(nodes))
 	for _, node := range nodes {
 		params := map[string]interface{}{
-			"network_node_id": node.ID,
-			"peer_url":        peerURL,
+			"node_id":  node.ID,
+			"peer_url": peerURL,
 		}
 		payload, _ := json.Marshal(params)
 		_, err := natsutil.NatsStreamingPublishAsync(natsAddNodePeerSubject, payload)
@@ -802,8 +823,8 @@ func (n *Network) removePeer(peerURL string) error {
 	common.Log.Debugf("Attempting to broadcast peer url %s for removal on network %s by %d nodes", peerURL, n.ID, len(nodes))
 	for _, node := range nodes {
 		params := map[string]interface{}{
-			"network_node_id": node.ID,
-			"peer_url":        peerURL,
+			"node_id":  node.ID,
+			"peer_url": peerURL,
 		}
 		payload, _ := json.Marshal(params)
 		_, err := natsutil.NatsStreamingPublishAsync(natsRemoveNodePeerSubject, payload)
@@ -913,35 +934,12 @@ func (n *Network) IsEthereumNetwork() bool {
 	return false
 }
 
+// IsHandshakeNetwork returns true if the network is bcoin-based handshake protocol
 func (n *Network) IsHandshakeNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
 		if isHandshakeNetwork, ok := cfg["is_handshake_network"].(bool); ok {
 			return isHandshakeNetwork
-		}
-	}
-	return false
-}
-
-func (n *Network) IsLcoinNetwork() bool {
-	cfg := n.ParseConfig()
-	if cfg != nil {
-		if isLcoinNetwork, ok := cfg["is_lcoin_network"].(bool); ok {
-			return isLcoinNetwork
-		}
-	}
-	return false
-}
-
-func (n *Network) IsQuorumNetwork() bool {
-	// if n.Name != nil && strings.HasPrefix(strings.ToLower(*n.Name), "eth") {
-	// 	return true
-	// }
-
-	cfg := n.ParseConfig()
-	if cfg != nil {
-		if isQuorumNetwork, ok := cfg["is_quorum_network"].(bool); ok {
-			return isQuorumNetwork
 		}
 	}
 	return false

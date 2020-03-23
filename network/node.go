@@ -1,8 +1,6 @@
 package network
 
 import (
-	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
@@ -66,6 +62,9 @@ type Node struct {
 	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_nodes" json:"-"`
 	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+
+	privateConfig map[string]interface{} `sql:"-" json:"-"` // cache for decrypted config map in-memory
+	Network       *Network               `sql:"-" json:"-"` // in-memory reference to lazy-loaded network
 }
 
 // NodeListQuery returns a DB query configured to select columns suitable for a paginated API response
@@ -89,22 +88,28 @@ type NodeLogsResponse struct {
 	NextToken *string    `json:"next_token"`
 }
 
-func (n *Node) decryptedConfig() (map[string]interface{}, error) {
-	decryptedParams := map[string]interface{}{}
+func (n *Node) DecryptedConfig() (map[string]interface{}, error) {
+	if n.privateConfig != nil {
+		return n.privateConfig, nil
+	}
+
+	n.privateConfig = map[string]interface{}{}
 	if n.EncryptedConfig != nil {
 		encryptedConfigJSON, err := pgputil.PGPPubDecrypt([]byte(*n.EncryptedConfig))
 		if err != nil {
 			common.Log.Warningf("Failed to decrypt encrypted network node config; %s", err.Error())
-			return decryptedParams, err
+			n.privateConfig = nil
+			return nil, err
 		}
 
-		err = json.Unmarshal(encryptedConfigJSON, &decryptedParams)
+		err = json.Unmarshal(encryptedConfigJSON, &n.privateConfig)
 		if err != nil {
 			common.Log.Warningf("Failed to unmarshal decrypted network node config; %s", err.Error())
-			return decryptedParams, err
+			n.privateConfig = nil
+			return nil, err
 		}
 	}
-	return decryptedParams, nil
+	return n.privateConfig, nil
 }
 
 func (n *Node) encryptConfig() bool {
@@ -122,17 +127,18 @@ func (n *Node) encryptConfig() bool {
 	return true
 }
 
-func (n *Node) setEncryptedConfig(params map[string]interface{}) {
+func (n *Node) SetEncryptedConfig(params map[string]interface{}) {
 	paramsJSON, _ := json.Marshal(params)
 	_paramsJSON := string(json.RawMessage(paramsJSON))
 	n.EncryptedConfig = &_paramsJSON
 	n.encryptConfig()
+	n.privateConfig = params
 }
 
-func (n *Node) sanitizeConfig() {
+func (n *Node) SanitizeConfig() {
 	cfg := n.ParseConfig()
 
-	encryptedCfg, err := n.decryptedConfig()
+	encryptedCfg, err := n.DecryptedConfig()
 	if err != nil {
 		encryptedCfg = map[string]interface{}{}
 	}
@@ -160,8 +166,8 @@ func (n *Node) sanitizeConfig() {
 		}
 	}
 
-	n.setConfig(cfg)
-	n.setEncryptedConfig(encryptedCfg)
+	n.SetConfig(cfg)
+	n.SetEncryptedConfig(encryptedCfg)
 }
 
 // Create and persist a new network node
@@ -170,7 +176,7 @@ func (n *Node) Create() bool {
 		return false
 	}
 
-	n.sanitizeConfig()
+	n.SanitizeConfig()
 
 	db := dbconf.DatabaseConnection()
 
@@ -189,7 +195,7 @@ func (n *Node) Create() bool {
 			success := rowsAffected > 0
 			if success {
 				msg, _ := json.Marshal(map[string]interface{}{
-					"network_node_id": n.ID.String(),
+					"node_id": n.ID.String(),
 				})
 				natsutil.NatsStreamingPublish(natsDeployNodeSubject, msg)
 			}
@@ -205,7 +211,7 @@ func (n *Node) Update() bool {
 		return false
 	}
 
-	n.sanitizeConfig()
+	n.SanitizeConfig()
 
 	db := dbconf.DatabaseConnection()
 
@@ -222,8 +228,8 @@ func (n *Node) Update() bool {
 	return len(n.Errors) == 0
 }
 
-// setConfig sets the network config in-memory
-func (n *Node) setConfig(cfg map[string]interface{}) {
+// SetConfig sets the network config in-memory
+func (n *Node) SetConfig(cfg map[string]interface{}) {
 	cfgJSON, _ := json.Marshal(cfg)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	n.Config = &_cfgJSON
@@ -238,8 +244,8 @@ func (n *Node) peerURL() *string {
 	return nil
 }
 
-// privateConfig returns a merged version of the config and encrypted config
-func (n *Node) privateConfig() map[string]interface{} {
+// mergedConfig returns a merged version of the config and encrypted config
+func (n *Node) mergedConfig() map[string]interface{} {
 	config := map[string]interface{}{}
 	if n.Config != nil {
 		err := json.Unmarshal(*n.Config, &config)
@@ -248,7 +254,7 @@ func (n *Node) privateConfig() map[string]interface{} {
 			return nil
 		}
 	}
-	encryptedConfig, _ := n.decryptedConfig()
+	encryptedConfig, _ := n.DecryptedConfig()
 	for k := range encryptedConfig {
 		config[k] = encryptedConfig[k]
 	}
@@ -257,7 +263,7 @@ func (n *Node) privateConfig() map[string]interface{} {
 
 func (n *Node) rpcPort() uint {
 	cfg := n.ParseConfig()
-	port := uint(0)
+	port := uint(common.DefaultHTTPPort)
 	if jsonRPCPort, jsonRPCPortOk := cfg["json_rpc_port"].(float64); jsonRPCPortOk {
 		port = uint(jsonRPCPort)
 	}
@@ -363,7 +369,7 @@ func (n *Node) ParseConfig() map[string]interface{} {
 func (n *Node) Delete() bool {
 	n.undeploy()
 	msg, _ := json.Marshal(map[string]interface{}{
-		"network_node_id": n.ID.String(),
+		"node_id": n.ID.String(),
 	})
 	natsutil.NatsStreamingPublish(natsDeleteTerminatedNodeSubject, msg)
 	return len(n.Errors) == 0
@@ -431,12 +437,26 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 				}
 			}
 			return response, nil
+		} else {
+			return response, nil
 		}
 
 		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s", n.ID)
 	}
 
 	return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided", n.ID)
+}
+
+func (n *Node) resolveNetwork(db *gorm.DB) error {
+	var network = &Network{}
+	db.Model(n).Related(&network)
+	if network == nil || network.ID == uuid.Nil {
+		msg := fmt.Sprintf("Failed to resolve network for network node: %s", n.ID)
+		common.Log.Warning(msg)
+		return errors.New(msg)
+	}
+	n.Network = network
+	return nil
 }
 
 func (n *Node) deploy(db *gorm.DB) error {
@@ -446,26 +466,31 @@ func (n *Node) deploy(db *gorm.DB) error {
 		return errors.New(msg)
 	}
 
-	var network = &Network{}
-	db.Model(n).Related(&network)
-	if network == nil || network.ID == uuid.Nil {
-		msg := fmt.Sprintf("Failed to retrieve network for network node: %s", n.ID)
+	err := n.resolveNetwork(db)
+	if n.Network == nil {
+		msg := err.Error()
 		n.updateStatus(db, "failed", &msg)
-		common.Log.Warning(msg)
-		return errors.New(msg)
+		return err
 	}
+	network := n.Network // FIXME
 
-	common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, network.ID)
+	common.Log.Debugf("Attempting to deploy network node with id: %s; network: %s", n.ID, n.Network.ID)
 	n.updateStatus(db, "pending", nil)
 
 	cfg := n.ParseConfig()
-	encryptedCfg, err := n.decryptedConfig()
-	if err != nil {
-		return fmt.Errorf("Failed to decrypt config for network node: %s", n.ID)
-	}
+	// encryptedCfg, err := n.DecryptedConfig()
+	// if err != nil {
+	// 	return fmt.Errorf("Failed to decrypt config for network node: %s", n.ID)
+	// }
 
-	env, envOk := cfg["env"].(map[string]interface{})
-	encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
+	// env, envOk := cfg["env"].(map[string]interface{})
+	// encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
+
+	p2pAPI, err := n.p2pAPIClient()
+	if err != nil {
+		common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
+		return err
+	}
 
 	bootnodes, err := network.requireBootnodes(db, n)
 	if err != nil {
@@ -473,81 +498,10 @@ func (n *Node) deploy(db *gorm.DB) error {
 		case *bootnodesInitialized:
 			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
 
-			// TODO: move the following to P2PAPI.requireBootnotes()
-			if protocol, protocolOk := cfg["protocol_id"].(string); protocolOk {
-				if strings.ToLower(protocol) == p2pProtocolPOA {
-					if envOk && encryptedEnvOk {
-						var addr *string
-						var privateKey *ecdsa.PrivateKey
-						_, masterOfCeremonyPrivateKeyOk := encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"].(string)
-						if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
-							addr = common.StringOrNil(masterOfCeremony)
-							out := []string{}
-							db.Table("accounts").Select("private_key").Where("accounts.user_id = ? AND accounts.address = ?", n.UserID.String(), addr).Pluck("private_key", &out)
-							if out == nil || len(out) == 0 || len(out[0]) == 0 {
-								common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", *network.Name)
-								addr, privateKey, err = provide.EVMGenerateKeyPair()
-							} else {
-								encryptedKey := common.StringOrNil(out[0])
-								privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey)
-								if err == nil {
-									common.Log.Debugf("Decrypted private key for master of ceremony on network: %s", *network.Name)
-								} else {
-									msg := fmt.Sprintf("Failed to decrypt private key for master of ceremony on network: %s", *network.Name)
-									common.Log.Warning(msg)
-									return errors.New(msg)
-								}
-							}
-						} else if !masterOfCeremonyPrivateKeyOk {
-							common.Log.Debugf("Generating managed master of ceremony signing identity for network: %s", *network.Name)
-							addr, privateKey, err = provide.EVMGenerateKeyPair()
-						}
-
-						if addr != nil && privateKey != nil {
-							keystoreJSON, err := provide.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
-							if err == nil {
-								common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, *network.Name)
-								env["ENGINE_SIGNER"] = addr
-								encryptedEnv["ENGINE_SIGNER_PRIVATE_KEY"] = hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
-								encryptedEnv["ENGINE_SIGNER_KEY_JSON"] = string(keystoreJSON)
-
-								n.setConfig(cfg)
-								n.setEncryptedConfig(encryptedCfg)
-								n.sanitizeConfig()
-								db.Save(&n)
-
-								networkCfg := network.ParseConfig()
-								if chainspec, chainspecOk := networkCfg["chainspec"].(map[string]interface{}); chainspecOk {
-									if accounts, accountsOk := chainspec["accounts"].(map[string]interface{}); accountsOk {
-										nonSystemAccounts := make([]string, 0)
-										for account := range accounts {
-											if !strings.HasPrefix(account, "0x000000000000000000000000000000000") { // 7 chars truncated
-												nonSystemAccounts = append(nonSystemAccounts, account)
-											}
-										}
-										if len(nonSystemAccounts) == 1 {
-											templateMasterOfCeremony := nonSystemAccounts[0]
-											chainspecJSON, err := json.Marshal(chainspec)
-											if err == nil {
-												chainspecJSON = []byte(strings.Replace(string(chainspecJSON), templateMasterOfCeremony[2:], string(*addr)[2:], -1))
-												chainspecJSON = []byte(strings.Replace(string(chainspecJSON), strings.ToLower(templateMasterOfCeremony[2:]), strings.ToLower(string(*addr)[2:]), -1))
-												var newChainspec map[string]interface{}
-												err = json.Unmarshal(chainspecJSON, &newChainspec)
-												if err == nil {
-													networkCfg["chainspec"] = newChainspec
-													network.setConfig(networkCfg)
-													db.Save(&network)
-												}
-											}
-										}
-									}
-								}
-							} else {
-								common.Log.Warningf("Failed to generate master of ceremony address for network: %s; %s", *network.Name, err.Error())
-							}
-						}
-					}
-				}
+			err := p2pAPI.RequireBootnodes(db, n.UserID, &n.NetworkID, n)
+			if err != nil {
+				common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
+				return err
 			}
 
 			return n._deploy(network, bootnodes, db)
@@ -559,8 +513,10 @@ func (n *Node) deploy(db *gorm.DB) error {
 	} else {
 		if p2p, p2pOk := cfg["p2p"].(bool); p2pOk {
 			if p2p {
+				common.Log.Debugf("Attempting to require peer-to-peer network genesis for node: %s", n.ID)
 				return n.requireGenesis(network, bootnodes, db)
 			}
+			common.Log.Debugf("Attempting to deploy non-p2p node: %s", n.ID)
 			return n._deploy(network, bootnodes, db)
 		}
 		return n.requireGenesis(network, bootnodes, db) // default assumes p2p
@@ -568,6 +524,8 @@ func (n *Node) deploy(db *gorm.DB) error {
 }
 
 func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) error {
+	common.Log.Debugf("Attempting to resolve network genesis...")
+
 	if n.Role != nil && *n.Role == nodeRoleIPFS {
 		common.Log.Debugf("Short-circuiting genesis block resolution for IPFS node: %s", n.ID)
 		return n._deploy(network, bootnodes, db)
@@ -597,7 +555,7 @@ func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) 
 
 func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
+	encryptedCfg, _ := n.DecryptedConfig()
 	networkCfg := network.ParseConfig()
 
 	containerID, containerOk := cfg["container"].(string)
@@ -672,7 +630,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		cfg["security"] = securityCfg
 		cfg["region"] = region
 		cfg["target_security_group_ids"] = securityGroupIds
-		n.setConfig(cfg)
+		n.SetConfig(cfg)
 		db.Save(&n)
 
 		common.Log.Debugf("Attempting to deploy network node container(s) in region: %s", region)
@@ -754,8 +712,8 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 		cfg["env"] = envOverrides
 
-		n.setConfig(cfg)
-		n.sanitizeConfig()
+		n.SetConfig(cfg)
+		n.SanitizeConfig()
 		db.Save(&n)
 
 		containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
@@ -818,12 +776,12 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *ref, region, taskIds)
 		cfg["target_task_ids"] = taskIds
-		n.setConfig(cfg)
-		n.sanitizeConfig()
+		n.SetConfig(cfg)
+		n.SanitizeConfig()
 		db.Save(&n)
 
 		msg, _ := json.Marshal(map[string]interface{}{
-			"network_node_id": n.ID.String(),
+			"node_id": n.ID.String(),
 		})
 		// TODO: dispatch node availability check
 		natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
@@ -1070,22 +1028,20 @@ func (n *Node) undeploy() error {
 		return err
 	}
 
-	if regionOk {
-		if taskIdsOk {
-			for i := range taskIds {
-				taskID := taskIds[i].(string)
+	if regionOk && taskIdsOk {
+		for i := range taskIds {
+			taskID := taskIds[i].(string)
 
-				_, err := orchestrationAPI.StopContainer(taskID, nil)
-				if err == nil {
-					common.Log.Debugf("Terminated ECS docker container with id: %s", taskID)
-					n.Status = common.StringOrNil("terminated")
-					db.Save(n)
-					n.unbalance(db)
-				} else {
-					err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
-					common.Log.Warning(err.Error())
-					return err
-				}
+			_, err := orchestrationAPI.StopContainer(taskID, nil)
+			if err == nil {
+				common.Log.Debugf("Terminated ECS docker container with id: %s", taskID)
+				n.Status = common.StringOrNil("terminated")
+				db.Save(n)
+				n.unbalance(db)
+			} else {
+				err = fmt.Errorf("Failed to terminate ECS docker container with id: %s; %s", taskID, err.Error())
+				common.Log.Warning(err.Error())
+				return err
 			}
 		}
 
@@ -1122,7 +1078,7 @@ func (n *Node) unbalance(db *gorm.DB) error {
 		common.Log.Debugf("Attempting to unbalance network node %s on load balancer: %s", n.ID, balancer.ID)
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": balancer.ID.String(),
-			"network_node_id":  n.ID.String(),
+			"node_id":          n.ID.String(),
 		})
 		return natsutil.NatsStreamingPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
 	}
@@ -1161,7 +1117,8 @@ func (n *Node) unregisterSecurityGroups() error {
 // orchestrationAPIClient returns an instance of the node's underlying OrchestrationAPI
 func (n *Node) orchestrationAPIClient() (OrchestrationAPI, error) {
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.decryptedConfig()
+	encryptedCfg, _ := n.DecryptedConfig()
+
 	targetID, targetIDOk := cfg["target_id"].(string)
 	region, regionOk := cfg["region"].(string)
 	credentials, credsOk := encryptedCfg["credentials"].(map[string]interface{})
@@ -1197,11 +1154,18 @@ func (n *Node) p2pAPIClient() (P2PAPI, error) {
 	cfg := n.ParseConfig()
 	client, clientOk := cfg["client"].(string)
 	if !clientOk {
-		return nil, fmt.Errorf("Failed to resolve p2p provider for network node: %s", n.ID)
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network node: %s; no configured client", n.ID)
 	}
 	rpcURL := n.rpcURL()
 	if rpcURL == nil {
-		return nil, fmt.Errorf("Failed to resolve p2p provider for network node: %s", n.ID)
+		common.Log.Debugf("Resolved %s p2p provider for network node which does not yet have a configured rpc url; node id: %s", client, n.ID)
+	}
+
+	if n.Network == nil {
+		err := n.resolveNetwork(dbconf.DatabaseConnection())
+		if err != nil {
+			return nil, fmt.Errorf("Failed to resolve p2p provider for network node; %s", err.Error())
+		}
 	}
 
 	var apiClient P2PAPI
@@ -1211,13 +1175,13 @@ func (n *Node) p2pAPIClient() (P2PAPI, error) {
 		// apiClient = p2p.InitBcoinP2PProvider(*rpcURL)
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
 	case gethP2PProvider:
-		apiClient = p2p.InitGethP2PProvider(*rpcURL)
+		apiClient = p2p.InitGethP2PProvider(rpcURL, n.Network)
 	case parityP2PProvider:
-		apiClient = p2p.InitParityP2PProvider(*rpcURL)
+		apiClient = p2p.InitParityP2PProvider(rpcURL, n.Network)
 	case quorumP2PProvider:
-		apiClient = p2p.InitQuorumP2PProvider(*rpcURL)
+		apiClient = p2p.InitQuorumP2PProvider(rpcURL, n.Network)
 	default:
-		return nil, fmt.Errorf("Failed to resolve p2p provider for network node %s", n.ID)
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network node %s; unsupported client", n.ID)
 	}
 
 	return apiClient, nil

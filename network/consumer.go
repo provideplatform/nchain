@@ -436,7 +436,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	}
 
 	balancerID, balancerIDOk := params["load_balancer_id"].(string)
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !balancerIDOk {
 		common.Log.Warningf("Failed to load balance network node; no load balancer id provided")
@@ -495,7 +495,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	}
 
 	balancerID, balancerIDOk := params["load_balancer_id"].(string)
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !balancerIDOk {
 		common.Log.Warningf("Failed to unbalance network node; no load balancer id provided")
@@ -553,7 +553,7 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 		return
 	}
 
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to deploy network node; no network node id provided")
@@ -598,7 +598,7 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 		return
 	}
 
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to delete terminated network node; no network node id provided")
@@ -658,7 +658,7 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 		return
 	}
 
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to resolve host for network node; no network node id provided")
@@ -703,7 +703,7 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 		return
 	}
 
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to resolve peer url for network node; no network node id provided")
@@ -754,7 +754,7 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 		return
 	}
 
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 	peerURL, peerURLOk := params["peer_url"].(string)
 
 	if !nodeIDOk {
@@ -806,7 +806,7 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 		return
 	}
 
-	nodeID, nodeIDOk := params["network_node_id"].(string)
+	nodeID, nodeIDOk := params["node_id"].(string)
 	peerURL, peerURLOk := params["peer_url"].(string)
 
 	if !nodeIDOk {

@@ -167,7 +167,7 @@ func (p *ElasticsearchProvider) ProvisionNode() error {
 		for _, balancer := range loadBalancers {
 			msg, _ := json.Marshal(map[string]interface{}{
 				"load_balancer_id": balancer.ID.String(),
-				"network_node_id":  node.ID.String(),
+				"node_id":          node.ID.String(),
 			})
 			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}

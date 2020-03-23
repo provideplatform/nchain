@@ -14,6 +14,7 @@ import (
 )
 
 const defualtNodeLogRPP = int64(100)
+const networkStateGenesis = "genesis"
 
 // InstallNetworksAPI installs the handlers using the given gin Engine
 func InstallNetworksAPI(r *gin.Engine) {
@@ -148,7 +149,7 @@ func networksListHandler(c *gin.Context) {
 		cfg := ntwrk.ParseConfig()
 		delete(cfg, "chainspec")
 		delete(cfg, "chainspec_abi")
-		ntwrk.setConfig(cfg)
+		ntwrk.SetConfig(cfg)
 	}
 	provide.Render(networks, 200, c)
 }
@@ -285,7 +286,7 @@ func nodesListHandler(c *gin.Context) {
 		query = query.Where("nodes.application_id = ?", appID)
 	}
 
-	var nodes []Node
+	var nodes []*Node
 	query = query.Order("nodes.created_at ASC")
 	provide.Paginate(c, query, &Node{}).Find(&nodes)
 	provide.Render(nodes, 200, c)
@@ -308,9 +309,6 @@ func nodeDetailsHandler(c *gin.Context) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	} else if appID != nil && node.ApplicationID != nil && *node.ApplicationID != *appID {
-		provide.RenderError("forbidden", 403, c)
-		return
-	} else {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -501,8 +499,17 @@ func networkStatusHandler(c *gin.Context) {
 	}
 	stats, err := Stats(networkID)
 	if err != nil {
-		msg := fmt.Sprintf("failed to retrieve network status; %s", err.Error())
-		provide.RenderError(msg, 404, c)
+		var network = &Network{}
+		dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
+		if network == nil || network.ID == uuid.Nil {
+			provide.RenderError("network not found", 404, c)
+			return
+		}
+		provide.Render(&provide.NetworkStatus{
+			ChainID: network.ChainID,
+			State:   common.StringOrNil(networkStateGenesis),
+			Syncing: true,
+		}, 200, c)
 		return
 	}
 	provide.Render(stats, 200, c)

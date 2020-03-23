@@ -375,8 +375,6 @@ func (sd *StatsDaemon) ingest(response interface{}) {
 
 	if sd.dataSource.Network.IsBcoinNetwork() {
 		sd.ingestBcoin(response)
-	} else if sd.dataSource.Network.IsLcoinNetwork() {
-		sd.ingestLcoin(response)
 	} else if sd.dataSource.Network.IsEthereumNetwork() {
 		sd.ingestEthereum(response)
 	}
