@@ -948,7 +948,10 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 					msg := string(*event.Message)
 					peerURL, err = p2pAPI.ParsePeerURL(msg)
 					if err == nil && peerURL != nil {
-						// cfg["peer"] = result
+						if n.IPv4 != nil && n.PrivateIPv4 != nil {
+							url := strings.Replace(*peerURL, *n.PrivateIPv4, *n.IPv4, 1)
+							peerURL = &url
+						}
 						cfg["peer_url"] = peerURL
 						break
 					}

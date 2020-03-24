@@ -60,10 +60,6 @@ func (p *GethP2PProvider) ParsePeerURL(msg string) (*string, error) {
 		enodeIndex := strings.LastIndex(msg, "enode://")
 		if enodeIndex != -1 {
 			enode := msg[enodeIndex:]
-			// FIXME-- resolve public IPv4 instead of private IPv4...
-			// if p.n.IPv4 != nil && n.PrivateIPv4 != nil {
-			// 	enode = strings.Replace(enode, *n.PrivateIPv4, *n.IPv4, 1)
-			// }
 			peerURL := common.StringOrNil(enode)
 			// cfg["peer_url"] = enode
 			return peerURL, nil
