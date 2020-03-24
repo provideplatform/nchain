@@ -97,7 +97,8 @@ type P2PAPI interface {
 	DropNonReservedPeers() error
 	AddPeer(string) error
 	RemovePeer(string) error
+	ParsePeerURL(string) (*string, error)
 	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
-	ResolvePeerURL() error
+	ResolvePeerURL() (*string, error)
 	Upgrade() error
 }

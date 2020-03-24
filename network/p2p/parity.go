@@ -51,6 +51,11 @@ func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
 }
 
+// ParsePeerURL parses a peer url from the given raw log string
+func (p *ParityP2PProvider) ParsePeerURL(string) (*string, error) {
+	return nil, errors.New("parity p2p provider does not impl ParsePeerURL()")
+}
+
 // RemovePeer removes a peer by its peer url
 func (p *ParityP2PProvider) RemovePeer(peerURL string) error {
 	var resp interface{}
@@ -58,8 +63,18 @@ func (p *ParityP2PProvider) RemovePeer(peerURL string) error {
 }
 
 // ResolvePeerURL attempts to resolve one or more viable peer urls
-func (p *ParityP2PProvider) ResolvePeerURL() error {
-	return errors.New("")
+func (p *ParityP2PProvider) ResolvePeerURL() (*string, error) {
+	var resp interface{}
+	err := provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_enode", []interface{}{}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	if response, responseOk := resp.(map[string]interface{}); responseOk {
+		if peerURL, peerURLOk := response["result"].(string); peerURLOk {
+			return &peerURL, nil
+		}
+	}
+	return nil, errors.New("Failed to resolve peer url for parity_enode json-rpc response")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes

@@ -437,8 +437,6 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 				}
 			}
 			return response, nil
-		} else {
-			return response, nil
 		}
 
 		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s", n.ID)
@@ -478,14 +476,6 @@ func (n *Node) deploy(db *gorm.DB) error {
 	n.updateStatus(db, "pending", nil)
 
 	cfg := n.ParseConfig()
-	// encryptedCfg, err := n.DecryptedConfig()
-	// if err != nil {
-	// 	return fmt.Errorf("Failed to decrypt config for network node: %s", n.ID)
-	// }
-
-	// env, envOk := cfg["env"].(map[string]interface{})
-	// encryptedEnv, encryptedEnvOk := encryptedCfg["env"].(map[string]interface{})
-
 	p2pAPI, err := n.p2pAPIClient()
 	if err != nil {
 		common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
@@ -922,65 +912,45 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 
 	common.Log.Debugf("Attempting to resolve peer url for network node: %s", n.ID.String())
 
+	var orchestrationAPI OrchestrationAPI
+	var p2pAPI P2PAPI
+
 	var peerURL *string
+	var err error
 
 	id := identifiers[len(identifiers)-1]
 	_, regionOk := cfg["region"].(string)
 
-	// TODO: use P2PAPI ResolvePeerURL()
-
-	orchestrationAPI, err := n.orchestrationAPIClient()
-	if err != nil {
-		err := fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
-		common.Log.Warningf(err.Error())
-		return err
-	}
-
 	if regionOk {
+		p2pAPI, err = n.p2pAPIClient()
+		if err != nil {
+			common.Log.Warningf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
+			return err
+		}
+
+		orchestrationAPI, err = n.orchestrationAPIClient()
+		if err != nil {
+			err := fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
+			common.Log.Warningf(err.Error())
+			return err
+		}
+
+		peerURL, err = p2pAPI.ResolvePeerURL()
+		if err != nil {
+			err = fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
+		}
+
 		logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
 		if err == nil && logs != nil {
 			for i := range logs.Events {
 				event := logs.Events[i]
 				if event.Message != nil {
 					msg := string(*event.Message)
-
-					if network.IsBcoinNetwork() {
-						const bcoinPoolIdentitySearchString = "Pool identity key:"
-						poolIdentityFoundIndex := strings.LastIndex(msg, bcoinPoolIdentitySearchString)
-						if poolIdentityFoundIndex != -1 {
-							defaultPeerListenPort := common.DefaultPeerDiscoveryPort
-							poolIdentity := strings.TrimSpace(msg[poolIdentityFoundIndex+len(bcoinPoolIdentitySearchString) : len(msg)-1])
-							node := fmt.Sprintf("%s@%s:%v", poolIdentity, *n.IPv4, defaultPeerListenPort)
-							peerURL = &node
-							cfg["peer_url"] = node
-							cfg["peer_identity"] = poolIdentity
-							break
-						}
-					} else if network.IsEthereumNetwork() {
-						nodeInfo := &provide.EthereumJsonRpcResponse{}
-						err := json.Unmarshal([]byte(msg), &nodeInfo)
-						if err == nil && nodeInfo != nil {
-							result, resultOk := nodeInfo.Result.(map[string]interface{})
-							if resultOk {
-								if enode, enodeOk := result["enode"].(string); enodeOk {
-									peerURL = common.StringOrNil(enode)
-									cfg["peer"] = result
-									cfg["peer_url"] = enode
-									break
-								}
-							}
-						} else if err != nil {
-							enodeIndex := strings.LastIndex(msg, "enode://")
-							if enodeIndex != -1 {
-								enode := msg[enodeIndex:]
-								if n.IPv4 != nil && n.PrivateIPv4 != nil {
-									enode = strings.Replace(enode, *n.PrivateIPv4, *n.IPv4, 1)
-								}
-								peerURL = common.StringOrNil(enode)
-								cfg["peer_url"] = enode
-								break
-							}
-						}
+					peerURL, err = p2pAPI.ParsePeerURL(msg)
+					if err == nil && peerURL != nil {
+						// cfg["peer"] = result
+						cfg["peer_url"] = peerURL
+						break
 					}
 				}
 			}

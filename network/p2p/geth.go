@@ -1,7 +1,9 @@
 package p2p
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
@@ -41,14 +43,43 @@ func (p *GethP2PProvider) AddPeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "admin_addPeer", []interface{}{peerURL}, &resp)
 }
 
+// ParsePeerURL parses a peer url from the given raw logs
+func (p *GethP2PProvider) ParsePeerURL(msg string) (*string, error) {
+	nodeInfo := &provide.EthereumJsonRpcResponse{}
+	err := json.Unmarshal([]byte(msg), &nodeInfo)
+	if err == nil && nodeInfo != nil {
+		result, resultOk := nodeInfo.Result.(map[string]interface{})
+		if resultOk {
+			if enode, enodeOk := result["enode"].(string); enodeOk {
+				peerURL := common.StringOrNil(enode)
+				// cfg["peer"] = result
+				return peerURL, nil
+			}
+		}
+	} else if err != nil {
+		enodeIndex := strings.LastIndex(msg, "enode://")
+		if enodeIndex != -1 {
+			enode := msg[enodeIndex:]
+			// FIXME-- resolve public IPv4 instead of private IPv4...
+			// if p.n.IPv4 != nil && n.PrivateIPv4 != nil {
+			// 	enode = strings.Replace(enode, *n.PrivateIPv4, *n.IPv4, 1)
+			// }
+			peerURL := common.StringOrNil(enode)
+			// cfg["peer_url"] = enode
+			return peerURL, nil
+		}
+	}
+	return nil, errors.New("geth p2p provider failed to parse peer url")
+}
+
 // RemovePeer removes a peer by its peer url
 func (p *GethP2PProvider) RemovePeer(peerURL string) error {
 	return errors.New("geth p2p provider does not impl RemovePeer()")
 }
 
 // ResolvePeerURL attempts to resolve one or more viable peer urls
-func (p *GethP2PProvider) ResolvePeerURL() error {
-	return errors.New("geth p2p provider does not impl ResolvePeerURL()")
+func (p *GethP2PProvider) ResolvePeerURL() (*string, error) {
+	return nil, errors.New("geth p2p provider does not impl ResolvePeerURL()")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes
