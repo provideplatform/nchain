@@ -390,12 +390,12 @@ func (p *AWSOrchestrationProvider) GetContainerDetails(taskID string, cluster *s
 
 }
 
-// GetContainerHost retrieves the public hostname for a given container
+// GetContainerInterfaces retrieves the container interfaces
 func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
 	interfaces := make([]*NetworkInterface, 0)
 
 	containerDetails, err := p.GetContainerDetails(taskID, nil)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 
