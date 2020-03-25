@@ -947,7 +947,15 @@ func (n *Network) BootnodesTxt() (*string, error) {
 		return nil, fmt.Errorf("No bootnodes resolved for network with id: %s", n.ID)
 	}
 
-	txt := strings.Join(peerURLs, ",")
+	var txt *string
+
+	p2pAPI, err := n.p2pAPIClient()
+	if err == nil {
+		txt = p2pAPI.FormatBootnodes(peerURLs)
+	} else {
+		txt = common.StringOrNil(strings.Join(peerURLs, ","))
+	}
+
 	common.Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, txt)
 
 	return common.StringOrNil(txt), err
