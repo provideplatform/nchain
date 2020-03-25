@@ -592,6 +592,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 	}
 
+	var p2pAPI p2p.API
 	orchestrationAPI, err := n.orchestrationAPIClient()
 	if err != nil {
 		err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
@@ -670,6 +671,11 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		if isPeerToPeer {
 			common.Log.Debugf("Applying peer-to-peer environment sanity rules to deploy network node: %s; role: %s", n.ID, role)
+			p2pAPI, err := n.p2pAPIClient()
+			if err != nil {
+				err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
+				return err
+			}
 
 			if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
 				envOverrides[networkConfigEnvBootnodes] = bnodes
@@ -731,6 +737,12 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		if entrypointOk {
 			for _, part := range entrypoint {
 				_entrypoint = append(_entrypoint, common.StringOrNil(part.(string)))
+			}
+		}
+
+		if p2pAPI != nil {
+			for _, part := range p2pAPI.EnrichStartCommand() {
+				_entrypoint = append(_entrypoint, part)
 			}
 		}
 

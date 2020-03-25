@@ -27,6 +27,11 @@ func InitGethP2PProvider(rpcURL *string, ntwrk common.Configurable) *GethP2PProv
 	}
 }
 
+// EnrichStartCommand returns the cmd to append to the command to start the container
+func (p *GethP2PProvider) EnrichStartCommand() []string {
+	return []string{}
+}
+
 // AcceptNonReservedPeers allows non-reserved peers to connect
 func (p *GethP2PProvider) AcceptNonReservedPeers() error {
 	return errors.New("geth does not implement AcceptNonReservedPeers()")

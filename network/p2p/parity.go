@@ -33,6 +33,11 @@ func InitParityP2PProvider(rpcURL *string, ntwrk common.Configurable) *ParityP2P
 	}
 }
 
+// EnrichStartCommand returns the cmd to append to the command to start the container
+func (p *ParityP2PProvider) EnrichStartCommand() []string {
+	return []string{}
+}
+
 // AcceptNonReservedPeers allows non-reserved peers to connect
 func (p *ParityP2PProvider) AcceptNonReservedPeers() error {
 	var resp interface{}

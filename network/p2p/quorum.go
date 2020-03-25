@@ -27,6 +27,11 @@ func InitQuorumP2PProvider(rpcURL *string, ntwrk common.Configurable) *QuorumP2P
 	}
 }
 
+// EnrichStartCommand returns the cmd to append to the command to start the container
+func (p *QuorumP2PProvider) EnrichStartCommand() []string {
+	return []string{}
+}
+
 // AcceptNonReservedPeers allows non-reserved peers to connect
 func (p *QuorumP2PProvider) AcceptNonReservedPeers() error {
 	return errors.New("quorum does not implement AcceptNonReservedPeers()")
