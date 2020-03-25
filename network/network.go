@@ -951,7 +951,7 @@ func (n *Network) BootnodesTxt() (*string, error) {
 
 	p2pAPI, err := n.p2pAPIClient()
 	if err == nil {
-		txt = p2pAPI.FormatBootnodes(peerURLs)
+		txt = common.StringOrNil(p2pAPI.FormatBootnodes(peerURLs))
 	} else {
 		txt = common.StringOrNil(strings.Join(peerURLs, ","))
 	}
