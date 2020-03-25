@@ -958,7 +958,7 @@ func (n *Network) BootnodesTxt() (*string, error) {
 
 	common.Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, txt)
 
-	return common.StringOrNil(txt), err
+	return txt, err
 }
 
 // Bootnodes retrieves a list of network bootnodes
