@@ -19,6 +19,9 @@ import (
 
 const awsTaskStatusRunning = "running"
 
+const awsAttachmentElasticNetworkInterface = "ElasticNetworkInterface"
+const awsElasticNetworkInterfaceId = "networkInterfaceId"
+
 // AWSOrchestrationProvider is a network.orchestration.API implementing the AWS API
 type AWSOrchestrationProvider struct {
 	accessKeyID     string
@@ -405,24 +408,26 @@ func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster
 		if task.LastStatus != nil {
 			taskStatus = strings.ToLower(*task.LastStatus)
 		}
-		if taskStatus == awsTaskStatusRunning && len(task.Attachments) > 0 {
+		if taskStatus != awsTaskStatusRunning {
+			return nil, fmt.Errorf("Unable to resolve network interfaces for container status: %s; task id: %s", taskStatus, taskID)
+		}
+
+		if len(task.Attachments) > 0 {
 			attachment := task.Attachments[0]
-			if attachment.Type != nil && *attachment.Type == "ElasticNetworkInterface" {
+			if attachment.Type != nil && *attachment.Type == awsAttachmentElasticNetworkInterface {
 				for i := range attachment.Details {
 					kvp := attachment.Details[i]
-					if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
+					if kvp.Name != nil && *kvp.Name == awsElasticNetworkInterfaceId && kvp.Value != nil {
 						interfaceDetails, err := p.GetNetworkInterfaceDetails(*kvp.Value)
 						if err == nil {
-							networkInterface := &NetworkInterface{}
+							for _, netInterface := range interfaceDetails.NetworkInterfaces {
+								networkInterface := &NetworkInterface{
+									PrivateIPv4: netInterface.PrivateIpAddress,
+								}
 
-							if len(interfaceDetails.NetworkInterfaces) > 0 {
-								common.Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
-								networkInterface.PrivateIPv4 = interfaceDetails.NetworkInterfaces[0].PrivateIpAddress
-
-								interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
-								if interfaceAssociation != nil {
-									networkInterface.Host = interfaceAssociation.PublicDnsName
-									networkInterface.IPv4 = interfaceAssociation.PublicIp
+								if netInterface.Association != nil {
+									networkInterface.Host = netInterface.Association.PublicDnsName
+									networkInterface.IPv4 = netInterface.Association.PublicIp
 								}
 
 								interfaces = append(interfaces, networkInterface)
@@ -430,13 +435,13 @@ func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster
 						} else {
 							return nil, err
 						}
-						break
 					}
 				}
 			}
 		}
 	}
 
+	common.Log.Debugf("Resolved %d network interfaces for container with task id: %s", len(interfaces), taskID)
 	return interfaces, nil
 }
 

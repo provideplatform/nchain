@@ -684,6 +684,7 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 	}
 
 	msg.Ack()
+	natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg.Data)
 }
 
 func consumeResolveNodePeerURLMsg(msg *stan.Msg) {

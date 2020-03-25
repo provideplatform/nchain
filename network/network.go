@@ -26,6 +26,25 @@ const hostReachabilityInterval = time.Millisecond * 2500
 const networkStateGenesis = "genesis"
 const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
 
+const networkConfigChain = "chain"
+const networkConfigChainspec = "chainspec"
+const networkConfigChainspecURL = "chainspec_url"
+const networkConfigChainspecABI = "chainspec_abi"
+const networkConfigChainspecABIURL = "chainspec_abi_url"
+const networkConfigJSONRPCURL = "json_rpc_url"
+const networkConfigJSONRPCPort = "json_rpc_port"
+const networkConfigNativeCurrency = "native_currency"
+const networkConfigNetworkID = "network_id"
+const networkConfigPlatform = "platform"
+const networkConfigRPCAPIUser = "rpc_api_user"
+const networkConfigRPCAPIKey = "rpc_api_key"
+const networkConfigWebsocketURL = "websocket_url"
+const networkConfigWebsocketPort = "websocket_port"
+const networkConfigIsBcoinNetwork = "is_bcoin_network"
+const networkConfigIsEthereumNetwork = "is_ethereum_network"
+const networkConfigIsHandshakeNetwork = "is_handshake_network"
+const networkConfigIsQuorumNetwork = "is_quorum_network"
+
 type bootnodesInitialized struct{}
 
 func (err *bootnodesInitialized) Error() string {
@@ -226,8 +245,8 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 func (n *Network) resolveContracts(db *gorm.DB) {
 	cfg := n.ParseConfig()
 	if n.IsEthereumNetwork() {
-		chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{})
-		chainspecAbi, chainspecAbiOk := cfg["chainspec_abi"].(map[string]interface{})
+		chainspec, chainspecOk := cfg[networkConfigChainspec].(map[string]interface{})
+		chainspecAbi, chainspecAbiOk := cfg[networkConfigChainspecABI].(map[string]interface{})
 		if chainspecOk && chainspecAbiOk {
 			common.Log.Debugf("Resolved configuration for chainspec and ABI for network: %s; attempting to import contracts", n.ID)
 
@@ -272,8 +291,8 @@ func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
 	cfg := n.ParseConfig()
 	if val {
 		// FIXME-- set fallback json rpc url when this value toggles
-		delete(cfg, "json_rpc_url")
-		delete(cfg, "websocket_url")
+		delete(cfg, networkConfigJSONRPCURL)
+		delete(cfg, networkConfigWebsocketURL)
 	}
 	n.SetConfig(cfg)
 	db.Save(&n)
@@ -343,8 +362,8 @@ func (n *Network) setChainID() {
 		if n.ChainID != nil {
 			networkID, err := hexutil.DecodeBig(*n.ChainID)
 			if err == nil {
-				cfg["network_id"] = networkID.Uint64()
-				if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+				cfg[networkConfigNetworkID] = networkID.Uint64()
+				if chainspec, chainspecOk := cfg[networkConfigChainspec].(map[string]interface{}); chainspecOk {
 					if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
 						params["chainID"] = n.ChainID
 						params["networkID"] = n.ChainID
@@ -483,16 +502,16 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 		} else {
 			if reachable, port := node.reachableViaJSONRPC(); reachable {
 				common.Log.Debugf("Node reachable via JSON-RPC port %d; node id: %s", port, n.ID)
-				cfg["json_rpc_url"] = fmt.Sprintf("http://%s:%v", *node.Host, port)
+				cfg[networkConfigJSONRPCURL] = fmt.Sprintf("http://%s:%v", *node.Host, port)
 			} else {
 				common.Log.Debugf("Node unreachable via JSON-RPC port; node id: %s", n.ID)
-				cfg["json_rpc_url"] = nil
+				cfg[networkConfigJSONRPCURL] = nil
 			}
 
 			if reachable, port := node.reachableViaWebsocket(); reachable {
-				cfg["websocket_url"] = fmt.Sprintf("ws://%s:%v", *node.Host, port)
+				cfg[networkConfigWebsocketURL] = fmt.Sprintf("ws://%s:%v", *node.Host, port)
 			} else {
-				cfg["websocket_url"] = nil
+				cfg[networkConfigWebsocketURL] = nil
 			}
 
 			cfgJSON, _ := json.Marshal(cfg)
@@ -501,8 +520,8 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 			db.Save(n)
 		}
 	} else if !isLoadBalanced {
-		cfg["json_rpc_url"] = nil
-		cfg["websocket_url"] = nil
+		cfg[networkConfigJSONRPCURL] = nil
+		cfg[networkConfigWebsocketURL] = nil
 
 		cfgJSON, _ := json.Marshal(cfg)
 		*n.Config = json.RawMessage(cfgJSON)
@@ -637,8 +656,8 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		chainspec, chainspecOk := config["chainspec"]
-		chainspecURL, chainspecURLOk := config["chainspec_url"].(string)
+		chainspec, chainspecOk := config[networkConfigChainspec]
+		chainspecURL, chainspecURLOk := config[networkConfigChainspecURL].(string)
 		if !chainspecOk && !chainspecURLOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("chainspec or chainspec_url should be present in network configuration"),
@@ -675,7 +694,7 @@ func (n *Network) Validate() bool {
 			}
 		}
 
-		chain, chainOk := config["chain"]
+		chain, chainOk := config[networkConfigChain]
 		if !chainOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("chain should not be nil"),
@@ -686,7 +705,7 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		nativeCurrency, nativeCurrencyOk := config["native_currency"]
+		nativeCurrency, nativeCurrencyOk := config[networkConfigNativeCurrency]
 		if !nativeCurrencyOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("native_currency should not be nil"),
@@ -697,7 +716,7 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		platform, platformOk := config["platform"]
+		platform, platformOk := config[networkConfigPlatform]
 		if !platformOk {
 			n.Errors = append(n.Errors, &provide.Error{
 				Message: common.StringOrNil("platform should not be nil"),
@@ -708,20 +727,20 @@ func (n *Network) Validate() bool {
 			})
 		}
 
-		_, isBcoinNetworkOk := config["is_bcoin_network"].(bool)
-		_, isEthereumNetworkOk := config["is_ethereum_network"].(bool)
-		_, isHandshakeNetworkOk := config["is_handshake_network"].(bool)
-		_, isQuorumNetworkOk := config["is_quorum_network"].(bool)
+		_, isBcoinNetworkOk := config[networkConfigIsBcoinNetwork].(bool)
+		_, isEthereumNetworkOk := config[networkConfigIsEthereumNetwork].(bool)
+		_, isHandshakeNetworkOk := config[networkConfigIsHandshakeNetwork].(bool)
+		_, isQuorumNetworkOk := config[networkConfigIsQuorumNetwork].(bool)
 
 		if !isBcoinNetworkOk && platform != nil && platform == p2p.PlatformBcoin {
-			config["is_bcoin_network"] = true
+			config[networkConfigIsBcoinNetwork] = true
 		} else if !isEthereumNetworkOk && platform != nil && platform == p2p.PlatformEVM {
-			config["is_ethereum_network"] = true
+			config[networkConfigIsEthereumNetwork] = true
 		} else if !isHandshakeNetworkOk && platform != nil && platform == p2p.PlatformHandshake {
-			config["is_handshake_network"] = true
+			config[networkConfigIsHandshakeNetwork] = true
 		} else if !isQuorumNetworkOk && platform != nil && platform == p2p.PlatformQuorum {
-			config["is_ethereum_network"] = true
-			config["is_quorum_network"] = true
+			config[networkConfigIsEthereumNetwork] = true
+			config[networkConfigIsQuorumNetwork] = true
 		}
 	}
 
@@ -750,15 +769,15 @@ func (n *Network) RPCURL() string {
 		balancerCfg := balancer.ParseConfig()
 		balancerDNSName := balancer.DNSName()
 		if balancerDNSName != nil {
-			if port, portOk := balancerCfg["json_rpc_port"].(float64); portOk {
+			if port, portOk := balancerCfg[networkConfigJSONRPCPort].(float64); portOk {
 				return fmt.Sprintf("https://%s:%v", *balancerDNSName, port)
 			}
 		}
-		if url, urlOk := balancerCfg["json_rpc_url"].(string); urlOk {
+		if url, urlOk := balancerCfg[networkConfigJSONRPCURL].(string); urlOk {
 			return url
 		}
 	}
-	if rpcURL, ok := cfg["json_rpc_url"].(string); ok {
+	if rpcURL, ok := cfg[networkConfigJSONRPCURL].(string); ok {
 		return rpcURL
 	}
 	return ""
@@ -773,15 +792,15 @@ func (n *Network) WebsocketURL() string {
 		balancerCfg := balancer.ParseConfig()
 		balancerDNSName := balancer.DNSName()
 		if balancerDNSName != nil {
-			if port, portOk := balancerCfg["websocket_port"].(float64); portOk {
+			if port, portOk := balancerCfg[networkConfigWebsocketPort].(float64); portOk {
 				return fmt.Sprintf("wss://%s:%v", *balancerDNSName, port)
 			}
 		}
-		if url, urlOk := balancerCfg["websocket_url"].(string); urlOk {
+		if url, urlOk := balancerCfg[networkConfigWebsocketURL].(string); urlOk {
 			return url
 		}
 	}
-	if websocketURL, ok := cfg["websocket_url"].(string); ok {
+	if websocketURL, ok := cfg[networkConfigWebsocketURL].(string); ok {
 		return websocketURL
 	}
 	return ""
@@ -841,8 +860,8 @@ func (n *Network) removePeer(peerURL string) error {
 func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string]interface{}, error) {
 	if n.IsBcoinNetwork() {
 		cfg := n.ParseConfig()
-		rpcAPIUser := cfg["rpc_api_user"].(string)
-		rpcAPIKey := cfg["rpc_api_key"].(string)
+		rpcAPIUser := cfg[networkConfigRPCAPIUser].(string)
+		rpcAPIKey := cfg[networkConfigRPCAPIKey].(string)
 		var resp map[string]interface{}
 		err := provide.BcoinInvokeJsonRpcClient(n.ID.String(), n.RPCURL(), rpcAPIUser, rpcAPIKey, method, params, &resp)
 		if err != nil {
@@ -916,7 +935,7 @@ func (n *Network) Nodes() (nodes []*Node, err error) {
 func (n *Network) IsBcoinNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
-		if isBcoinNetwork, ok := cfg["is_bcoin_network"].(bool); ok {
+		if isBcoinNetwork, ok := cfg[networkConfigIsBcoinNetwork].(bool); ok {
 			return isBcoinNetwork
 		}
 	}
@@ -927,7 +946,7 @@ func (n *Network) IsBcoinNetwork() bool {
 func (n *Network) IsEthereumNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
-		if isEthereumNetwork, ok := cfg["is_ethereum_network"].(bool); ok {
+		if isEthereumNetwork, ok := cfg[networkConfigIsEthereumNetwork].(bool); ok {
 			return isEthereumNetwork
 		}
 	}
@@ -938,7 +957,7 @@ func (n *Network) IsEthereumNetwork() bool {
 func (n *Network) IsHandshakeNetwork() bool {
 	cfg := n.ParseConfig()
 	if cfg != nil {
-		if isHandshakeNetwork, ok := cfg["is_handshake_network"].(bool); ok {
+		if isHandshakeNetwork, ok := cfg[networkConfigIsHandshakeNetwork].(bool); ok {
 			return isHandshakeNetwork
 		}
 	}
