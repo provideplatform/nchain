@@ -583,7 +583,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	env, envOk := cfg[nodeConfigEnv].(map[string]interface{})
 	encryptedEnv, encryptedEnvOk := encryptedCfg[nodeConfigEnv].(map[string]interface{})
 	securityCfg, securityCfgOk := cfg[nodeConfigSecurity].(map[string]interface{})
-	p2p, p2pOk := cfg[nodeConfigP2P].(bool)
+	isP2P, p2pOk := cfg[nodeConfigP2P].(bool)
 
 	if networkEnv, networkEnvOk := networkCfg[nodeConfigEnv].(map[string]interface{}); envOk && networkEnvOk {
 		common.Log.Debugf("Applying environment overrides to network node per network env configuration")
@@ -592,7 +592,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 	}
 
-	var p2pAPI p2p.API
 	orchestrationAPI, err := n.orchestrationAPIClient()
 	if err != nil {
 		err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
@@ -615,10 +614,10 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	}
 
 	if targetOk && regionOk {
-		isPeerToPeer := p2pOk && p2p
+		isPeerToPeer := p2pOk && isP2P
 		if !isPeerToPeer && !p2pOk && roleOk {
 			// coerce p2p flag if applicable for role
-			p2p = role == nodeRoleFull || role == nodeRolePeer || role == nodeRoleValidator || role == nodeRoleBlockExplorer
+			isP2P = role == nodeRoleFull || role == nodeRolePeer || role == nodeRoleValidator || role == nodeRoleBlockExplorer
 		}
 
 		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
@@ -742,7 +741,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		if p2pAPI != nil {
 			for _, part := range p2pAPI.EnrichStartCommand() {
-				_entrypoint = append(_entrypoint, part)
+				_entrypoint = append(_entrypoint, &part)
 			}
 		}
 

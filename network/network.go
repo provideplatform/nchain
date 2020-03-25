@@ -392,6 +392,7 @@ func (n *Network) setChainID() {
 			if err == nil {
 				cfg[networkConfigNetworkID] = networkID.Uint64()
 				if chainspec, chainspecOk := cfg[networkConfigChainspec].(map[string]interface{}); chainspecOk {
+					// FIXME -- delegate this to p2p client API impl...
 					if params, paramsOk := chainspec["params"].(map[string]interface{}); paramsOk {
 						params["chainID"] = n.ChainID
 						params["networkID"] = n.ChainID
@@ -956,7 +957,7 @@ func (n *Network) BootnodesTxt() (*string, error) {
 		txt = common.StringOrNil(strings.Join(peerURLs, ","))
 	}
 
-	common.Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, txt)
+	common.Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, *txt)
 
 	return txt, err
 }

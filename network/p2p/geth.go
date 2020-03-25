@@ -3,6 +3,7 @@ package p2p
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -29,7 +30,15 @@ func InitGethP2PProvider(rpcURL *string, ntwrk common.Configurable) *GethP2PProv
 
 // EnrichStartCommand returns the cmd to append to the command to start the container
 func (p *GethP2PProvider) EnrichStartCommand() []string {
-	return []string{}
+	cmd := make([]string, 0)
+	cfg := p.network.ParseConfig()
+	if networkID, networkIDOk := cfg["network_id"].(float64); networkIDOk {
+		cmd = append(cmd, fmt.Sprintf("--networkid %f", networkID))
+	}
+	if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
+		cmd = append(cmd, fmt.Sprintf("--bootnodes \"%s\"", p.FormatBootnodes(bootnodes)))
+	}
+	return cmd
 }
 
 // AcceptNonReservedPeers allows non-reserved peers to connect
