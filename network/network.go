@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -26,11 +27,13 @@ const hostReachabilityInterval = time.Millisecond * 2500
 const networkStateGenesis = "genesis"
 const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
 
+const networkConfigBootnodes = "bootnodes"
 const networkConfigChain = "chain"
 const networkConfigChainspec = "chainspec"
 const networkConfigChainspecURL = "chainspec_url"
 const networkConfigChainspecABI = "chainspec_abi"
 const networkConfigChainspecABIURL = "chainspec_abi_url"
+const networkConfigEnv = "env"
 const networkConfigJSONRPCURL = "json_rpc_url"
 const networkConfigJSONRPCPort = "json_rpc_port"
 const networkConfigNativeCurrency = "native_currency"
@@ -44,6 +47,10 @@ const networkConfigIsBcoinNetwork = "is_bcoin_network"
 const networkConfigIsEthereumNetwork = "is_ethereum_network"
 const networkConfigIsHandshakeNetwork = "is_handshake_network"
 const networkConfigIsQuorumNetwork = "is_quorum_network"
+
+const networkConfigEnvBootnodes = "BOOTNODES"
+const networkConfigEnvClient = "CLIENT"
+const networkConfigEnvPeerSet = "PEER_SET"
 
 type bootnodesInitialized struct{}
 
@@ -216,9 +223,9 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 		if count == 0 {
 			common.Log.Debugf("Attempting to resolve bootnodes for network: %s", n.ID)
 			nodeCfg := pending.ParseConfig()
-			if env, envOk := nodeCfg["env"].(map[string]interface{}); envOk {
-				_, bootnodesOk := env["BOOTNODES"].(string)
-				_, peersetOk := env["PEER_SET"].(string)
+			if env, envOk := nodeCfg[networkConfigEnv].(map[string]interface{}); envOk {
+				_, bootnodesOk := env[networkConfigEnvBootnodes].(string)
+				_, peersetOk := env[networkConfigEnvPeerSet].(string)
 				if bootnodesOk || peersetOk {
 					bootnodes = append(bootnodes, pending)
 					err = new(bootnodesInitialized)
@@ -227,7 +234,7 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 			}
 
 			pending.Bootnode = true
-			pending.updateStatus(db, "genesis", nil)
+			pending.updateStatus(db, nodeStatusGenesis, nil)
 			bootnodes = append(bootnodes, pending)
 			err = new(bootnodesInitialized)
 			common.Log.Debugf("Coerced network node into initial bootnode for network with id: %s", n.ID)
@@ -235,6 +242,27 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 		}
 
 		bootnodes, err = n.Bootnodes()
+		if err != nil {
+			common.Log.Warningf("Failed to resolve bootnodes for network: %s", n.ID)
+			return err
+		}
+
+		if len(bootnodes) == 0 {
+			cfg := n.ParseConfig()
+			if cfgBootnodes, cfgBootnodesOk := cfg[networkConfigBootnodes].([]interface{}); cfgBootnodesOk {
+				if len(cfgBootnodes) > 0 {
+					for _, peerURL := range cfgBootnodes {
+						tmpnode := &Node{}
+						tmpnode.SetConfig(map[string]interface{}{
+							"peer_url": peerURL,
+						})
+						bootnodes = append(bootnodes, tmpnode)
+					}
+				}
+
+			}
+		}
+
 		return nil
 	})
 
@@ -885,34 +913,49 @@ func (n *Network) NodeCount() (count *uint64) {
 // and currently are listed with a status of 'running'; this method does not currently check real-time availability
 // of these peers-- it is assumed the are still available. FIXME?
 func (n *Network) AvailablePeerCount() (count uint64) {
-	dbconf.DatabaseConnection().Model(&Node{}).Where("nodes.network_id = ? AND nodes.status = 'running' AND nodes.role IN ('peer', 'full', 'validator', 'faucet')", n.ID).Count(&count)
+	dbconf.DatabaseConnection().Model(&Node{}).Where("nodes.network_id = ? AND nodes.status = 'running' AND nodes.role IN ('peer', 'full', 'validator')", n.ID).Count(&count)
 	return count
 }
 
 // BootnodesTxt retrieves the current bootnodes string for the network; this value can be used
 // to set peer/bootnodes list from which new network nodes are initialized
 func (n *Network) BootnodesTxt() (*string, error) {
+	peerURLs := make([]string, 0)
+
+	cfg := n.ParseConfig()
+	if cfgBootnodes, cfgBootnodesOk := cfg[networkConfigBootnodes].([]interface{}); cfgBootnodesOk {
+		for i := range cfgBootnodes {
+			peerURL := cfgBootnodes[i].(string)
+			peerURLs = append(peerURLs, peerURL)
+		}
+	}
+
 	bootnodes, err := n.Bootnodes()
 	if err != nil {
 		return nil, err
 	}
 
-	txt := ""
 	for i := range bootnodes {
 		bootnode := bootnodes[i]
 		peerURL := bootnode.peerURL()
 		if peerURL != nil {
-			txt += *peerURL
+			peerURLs = append(peerURLs, *peerURL)
 		}
 	}
 
+	if len(peerURLs) == 0 {
+		return nil, fmt.Errorf("No bootnodes resolved for network with id: %s", n.ID)
+	}
+
+	txt := strings.Join(peerURLs, ",")
 	common.Log.Debugf("Resolved bootnodes environment variable for network with id: %s; bootnodes: %s", n.ID, txt)
+
 	return common.StringOrNil(txt), err
 }
 
 // Bootnodes retrieves a list of network bootnodes
 func (n *Network) Bootnodes() (nodes []*Node, err error) {
-	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.bootnode = true", n.ID)
+	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.bootnode = true AND nodes.status = ?", n.ID, nodeStatusRunning)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
 }
@@ -920,7 +963,7 @@ func (n *Network) Bootnodes() (nodes []*Node, err error) {
 // BootnodesCount returns a count of the number of bootnodes on the network
 func (n *Network) BootnodesCount() (count uint64) {
 	db := dbconf.DatabaseConnection()
-	db.Model(&Node{}).Where("nodes.network_id = ? AND nodes.bootnode = true", n.ID).Count(&count)
+	db.Model(&Node{}).Where("nodes.network_id = ? AND nodes.bootnode = true AND nodes.status = ?", n.ID, nodeStatusRunning).Count(&count)
 	return count
 }
 
@@ -962,4 +1005,34 @@ func (n *Network) IsHandshakeNetwork() bool {
 		}
 	}
 	return false
+}
+
+// p2pAPIClient returns an instance of the network's underlying p2p.API, if that is possible given the network config
+func (n *Network) p2pAPIClient() (p2p.API, error) {
+	cfg := n.ParseConfig()
+	client, clientOk := cfg[nodeConfigClient].(string)
+	if !clientOk {
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network: %s; no configured client", n.ID)
+	}
+	rpcURL := n.RPCURL()
+	if rpcURL == "" {
+		common.Log.Debugf("Resolving %s p2p provider for network which does not yet have a configured rpc url; network id: %s", client, n.ID)
+	}
+
+	var apiClient p2p.API
+
+	switch client {
+	case p2p.ProviderBcoin:
+		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
+	case p2p.ProviderGeth:
+		apiClient = p2p.InitGethP2PProvider(common.StringOrNil(rpcURL), n)
+	case p2p.ProviderParity:
+		apiClient = p2p.InitParityP2PProvider(common.StringOrNil(rpcURL), n)
+	case p2p.ProviderQuorum:
+		apiClient = p2p.InitQuorumP2PProvider(common.StringOrNil(rpcURL), n)
+	default:
+		return nil, fmt.Errorf("Failed to resolve p2p provider for network %s; unsupported client", n.ID)
+	}
+
+	return apiClient, nil
 }

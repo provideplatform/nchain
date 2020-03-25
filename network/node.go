@@ -34,6 +34,7 @@ const resolvePeerTickerTimeout = time.Minute * 20
 const securityGroupTerminationTickerInterval = time.Millisecond * 30000
 const securityGroupTerminationTickerTimeout = time.Minute * 10
 
+const nodeConfigClient = "client"
 const nodeConfigCredentials = "credentials"
 const nodeConfigEntrypoint = "entrypoint"
 const nodeConfigEnv = "env"
@@ -49,6 +50,11 @@ const nodeConfigTargetID = "target_id"
 const nodeConfigTaskRole = "task_role"
 const nodeConfigTargetTaskIDs = "target_task_id"
 const nodeConfigVpcID = "vpc_id"
+
+const nodeStatusFailed = "failed"
+const nodeStatusGenesis = "genesis"
+const nodeStatusRunning = "running"
+const nodeStatusUnreachable = "unreachable"
 
 const nodeRoleBlockExplorer = "explorer"
 const nodeRoleFull = "full"
@@ -665,29 +671,29 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		if isPeerToPeer {
 			common.Log.Debugf("Applying peer-to-peer environment sanity rules to deploy network node: %s; role: %s", n.ID, role)
 
-			if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-				envOverrides["BOOTNODES"] = bnodes
+			if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
+				envOverrides[networkConfigEnvBootnodes] = bnodes
 			} else {
 				bootnodesTxt, err := network.BootnodesTxt()
 				if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-					envOverrides["BOOTNODES"] = bootnodesTxt
+					envOverrides[networkConfigEnvBootnodes] = bootnodesTxt
 				}
 			}
-			if _, peerSetOk := envOverrides["PEER_SET"]; !peerSetOk && envOverrides["BOOTNODES"] != nil {
-				if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(string); bootnodesOk {
-					envOverrides["PEER_SET"] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
-				} else if bnodes, bootnodesOk := envOverrides["BOOTNODES"].(*string); bootnodesOk {
-					envOverrides["PEER_SET"] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
-				}
-			}
+			// if _, peerSetOk := envOverrides[networkConfigEnvPeerSet]; !peerSetOk && envOverrides[networkConfigEnvBootnodes] != nil {
+			// 	if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
+			// 		envOverrides[networkConfigEnvPeerSet] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
+			// 	} else if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(*string); bootnodesOk {
+			// 		envOverrides[networkConfigEnvPeerSet] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
+			// 	}
+			// }
 
 			networkChain, networkChainOk := networkCfg[networkConfigChain].(string)
-			if _, chainOk := envOverrides["CHAIN"].(string); !chainOk {
+			if _, chainOk := envOverrides[networkConfigChain].(string); !chainOk {
 				if networkChainOk {
-					envOverrides["CHAIN"] = networkChain
+					envOverrides[networkConfigChain] = networkChain
 				}
 			} else if networkChainOk {
-				chain := envOverrides["CHAIN"].(string)
+				chain := envOverrides[networkConfigChain].(string)
 				if chain != networkChain {
 					common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
 				}
@@ -844,7 +850,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 	cfgJSON, _ := json.Marshal(cfg)
 	*n.Config = json.RawMessage(cfgJSON)
-	n.Status = common.StringOrNil("running")
+	n.Status = common.StringOrNil(nodeStatusRunning)
 	db.Save(&n)
 
 	role, roleOk := cfg[nodeConfigRole].(string)
@@ -1103,13 +1109,13 @@ func (n *Node) orchestrationAPIClient() (orchestration.API, error) {
 // p2pAPIClient returns an instance of the node's underlying p2p.API
 func (n *Node) p2pAPIClient() (p2p.API, error) {
 	cfg := n.ParseConfig()
-	client, clientOk := cfg["client"].(string)
+	client, clientOk := cfg[nodeConfigClient].(string)
 	if !clientOk {
 		return nil, fmt.Errorf("Failed to resolve p2p provider for network node: %s; no configured client", n.ID)
 	}
 	rpcURL := n.rpcURL()
 	if rpcURL == nil {
-		common.Log.Debugf("Resolved %s p2p provider for network node which does not yet have a configured rpc url; node id: %s", client, n.ID)
+		common.Log.Debugf("Resolving %s p2p provider for network node which does not yet have a configured rpc url; node id: %s", client, n.ID)
 	}
 
 	if n.Network == nil {

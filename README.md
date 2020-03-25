@@ -1356,14 +1356,14 @@ access-control-allow-credentials: true
       "default_websocket_port": null,
       "engine_id": "aura",
       "env": {
-        "BOOTNODES": "enode://eb0543bf6c960ad79...",
+        networkConfigEnvBootnodes: "enode://eb0543bf6c960ad79...",
         "CHAIN": "unicorn-v0",
         "CHAIN_SPEC_URL": "https://console.provide.services:443/api/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/spec.json?x-api-authorization=MjE3Nzc4...",
         "ENGINE_SIGNER": "0xc8cf82765ccc99e5d878A245f7eC9ECe8F9Fae4d",
         "ENGINE_SIGNER_KEY_JSON": "{\"id\":\"120354c2-f2d5-...\"}",
         "ENGINE_SIGNER_PRIVATE_KEY": "b9dc0beec2d7f9...",
         "NETWORK_ID": "22",
-        "PEER_SET": "required:eb0543bf6c960ad79a9..."
+        networkConfigEnvPeerSet: "required:eb0543bf6c960ad79a9..."
       },
       "peer_url": "enode://46cd112cbcc91cfe410a697...",
       "protocol_id": "poa",
@@ -1495,14 +1495,14 @@ access-control-allow-origin: *
             }
         ],
         "env": {
-            "BOOTNODES": "enode://eb0543bf6c9...",
+            networkConfigEnvBootnodes: "enode://eb0543bf6c9...",
             "CHAIN": "unicorn-v0",
             "CHAIN_SPEC_URL": "https://console.provide.services:443/api/networks/024ff1ef-7369-4dee-969c-1918c6edb5d4/spec.json?x-api-authorization=MjE3N...",
             "ENGINE_SIGNER": "0xc8...",
             "ENGINE_SIGNER_KEY_JSON": "{\"id\":\"...\"}",
             "ENGINE_SIGNER_PRIVATE_KEY": "b9dc0...",
             "NETWORK_ID": "22",
-            "PEER_SET": "required:eb0543bf6c960a..."
+            networkConfigEnvPeerSet: "required:eb0543bf6c960a..."
         },
         "peer_url": "enode://46cd112cbcc91cfe410...",
         "protocol_id": "poa",

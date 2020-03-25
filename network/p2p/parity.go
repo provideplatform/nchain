@@ -51,6 +51,11 @@ func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
 }
 
+// FormatBootnodes formats the given peer urls as a valid bootnodes param
+func (p *ParityP2PProvider) FormatBootnodes(bootnodes []string) string {
+	return strings.Join(bootnodes, ",")
+}
+
 // ParsePeerURL parses a peer url from the given raw log string
 func (p *ParityP2PProvider) ParsePeerURL(string) (*string, error) {
 	return nil, errors.New("parity p2p provider does not impl ParsePeerURL()")

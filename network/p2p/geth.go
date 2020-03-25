@@ -43,6 +43,11 @@ func (p *GethP2PProvider) AddPeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "admin_addPeer", []interface{}{peerURL}, &resp)
 }
 
+// FormatBootnodes formats the given peer urls as a valid bootnodes param
+func (p *GethP2PProvider) FormatBootnodes(bootnodes []string) string {
+	return strings.Join(bootnodes, ",")
+}
+
 // ParsePeerURL parses a peer url from the given raw logs
 func (p *GethP2PProvider) ParsePeerURL(msg string) (*string, error) {
 	nodeInfo := &provide.EthereumJsonRpcResponse{}

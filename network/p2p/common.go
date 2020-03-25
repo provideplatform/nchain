@@ -40,6 +40,7 @@ type API interface {
 	AddPeer(string) error
 	RemovePeer(string) error
 	ParsePeerURL(string) (*string, error)
+	FormatBootnodes([]string) string
 	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
 	ResolvePeerURL() (*string, error)
 	Upgrade() error
