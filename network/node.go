@@ -46,7 +46,7 @@ const nodeConfigRole = "role"
 const nodeConfigSecurity = "security"
 const nodeConfigSecurityGroupIDs = "target_security_group_ids"
 const nodeConfigTargetID = "target_id"
-const nodeConfigTaskRole = "taskRole"
+const nodeConfigTaskRole = "task_role"
 const nodeConfigTargetTaskIDs = "target_task_id"
 const nodeConfigVpcID = "vpc_id"
 
