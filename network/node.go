@@ -592,6 +592,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 	}
 
+	var p2pAPI p2p.API
 	orchestrationAPI, err := n.orchestrationAPIClient()
 	if err != nil {
 		err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
@@ -670,7 +671,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		if isPeerToPeer {
 			common.Log.Debugf("Applying peer-to-peer environment sanity rules to deploy network node: %s; role: %s", n.ID, role)
-			p2pAPI, err := n.p2pAPIClient()
+			p2pAPI, err = n.p2pAPIClient()
 			if err != nil {
 				err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
 				return err
