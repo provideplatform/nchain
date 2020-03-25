@@ -3,6 +3,7 @@ package orchestration
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/acm"
@@ -16,7 +17,9 @@ import (
 	"github.com/provideapp/goldmine/common"
 )
 
-// AWSOrchestrationProvider is a network.OrchestrationAPI implementing the AWS API
+const awsTaskStatusRunning = "running"
+
+// AWSOrchestrationProvider is a network.orchestration.API implementing the AWS API
 type AWSOrchestrationProvider struct {
 	accessKeyID     string
 	secretAccessKey string
@@ -374,13 +377,11 @@ func (p *AWSOrchestrationProvider) TerminateInstance(instanceID string) (respons
 // StartContainer needs docs
 func (p *AWSOrchestrationProvider) StartContainer(image, taskDefinition *string, taskRole, launchType, cluster, vpcName *string, cpu, memory *int64, entrypoint []*string, securityGroupIDs []string, subnetIds []string, overrides map[string]interface{}, security map[string]interface{}) (taskIds []string, err error) {
 	return awswrapper.StartContainer(p.accessKeyID, p.secretAccessKey, p.region, image, taskDefinition, taskRole, taskRole, launchType, cluster, vpcName, cpu, memory, entrypoint, securityGroupIDs, subnetIds, overrides, security)
-
 }
 
 // StopContainer needs docs
 func (p *AWSOrchestrationProvider) StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error) {
 	return awswrapper.StopContainer(p.accessKeyID, p.secretAccessKey, p.region, taskID, cluster)
-
 }
 
 // GetContainerDetails needs docs
@@ -389,16 +390,64 @@ func (p *AWSOrchestrationProvider) GetContainerDetails(taskID string, cluster *s
 
 }
 
+// GetContainerHost retrieves the public hostname for a given container
+func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
+	interfaces := make([]*NetworkInterface, 0)
+
+	containerDetails, err := p.GetContainerDetails(taskID, nil)
+	if err == nil {
+		return nil, err
+	}
+
+	if len(containerDetails.Tasks) > 0 {
+		task := containerDetails.Tasks[0] // FIXME-- should this support exposing all tasks?
+		taskStatus := ""
+		if task.LastStatus != nil {
+			taskStatus = strings.ToLower(*task.LastStatus)
+		}
+		if taskStatus == awsTaskStatusRunning && len(task.Attachments) > 0 {
+			attachment := task.Attachments[0]
+			if attachment.Type != nil && *attachment.Type == "ElasticNetworkInterface" {
+				for i := range attachment.Details {
+					kvp := attachment.Details[i]
+					if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
+						interfaceDetails, err := p.GetNetworkInterfaceDetails(*kvp.Value)
+						if err == nil {
+							networkInterface := &NetworkInterface{}
+
+							if len(interfaceDetails.NetworkInterfaces) > 0 {
+								common.Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
+								networkInterface.PrivateIPv4 = interfaceDetails.NetworkInterfaces[0].PrivateIpAddress
+
+								interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
+								if interfaceAssociation != nil {
+									networkInterface.Host = interfaceAssociation.PublicDnsName
+									networkInterface.IPv4 = interfaceAssociation.PublicIp
+								}
+
+								interfaces = append(interfaces, networkInterface)
+							}
+						} else {
+							return nil, err
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return interfaces, nil
+}
+
 // GetContainerLogEvents needs docs
 func (p *AWSOrchestrationProvider) GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
 	return awswrapper.GetContainerLogEvents(p.accessKeyID, p.secretAccessKey, p.region, taskID, cluster, startFromHead, startTime, endTime, limit, nextToken)
-
 }
 
 // GetLogEvents needs docs
 func (p *AWSOrchestrationProvider) GetLogEvents(logGroupID string, logStreamID string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
 	return awswrapper.GetLogEvents(p.accessKeyID, p.secretAccessKey, p.region, logGroupID, logStreamID, startFromHead, startTime, endTime, limit, nextToken)
-
 }
 
 // GetNetworkInterfaceDetails needs docs

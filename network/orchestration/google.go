@@ -1,6 +1,6 @@
 package orchestration
 
-// GoogleOrchestrationProvider is a network.OrchestrationAPI implementing the Google API
+// GoogleOrchestrationProvider is a network.orchestration.API implementing the Google API
 type GoogleOrchestrationProvider struct {
 	region string
 }

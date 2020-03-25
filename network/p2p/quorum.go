@@ -11,7 +11,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// QuorumP2PProvider is a network.P2PAPI implementing the geth API
+// QuorumP2PProvider is a network.p2p.API implementing the geth API
 type QuorumP2PProvider struct {
 	rpcClientKey *string
 	rpcURL       *string

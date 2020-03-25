@@ -17,7 +17,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// ParityP2PProvider is a network.P2PAPI implementing the parity API
+// ParityP2PProvider is a network.p2p.API implementing the parity API
 type ParityP2PProvider struct {
 	rpcClientKey *string
 	rpcURL       *string

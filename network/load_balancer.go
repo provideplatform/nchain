@@ -278,8 +278,8 @@ func (l *LoadBalancer) ReachableOnPort(port uint) bool {
 	return false
 }
 
-// orchestrationAPIClient returns an instance of the load balancer's underlying OrchestrationAPI
-func (l *LoadBalancer) orchestrationAPIClient() (OrchestrationAPI, error) {
+// orchestrationAPIClient returns an instance of the load balancer's underlying orchestration API
+func (l *LoadBalancer) orchestrationAPIClient() (orchestration.API, error) {
 	cfg := l.ParseConfig()
 	encryptedCfg, _ := l.decryptedConfig()
 	targetID, targetIDOk := cfg["target_id"].(string)
@@ -295,14 +295,14 @@ func (l *LoadBalancer) orchestrationAPIClient() (OrchestrationAPI, error) {
 		return nil, fmt.Errorf("Failed to resolve orchestration provider credentials for load balancer: %s", l.ID)
 	}
 
-	var apiClient OrchestrationAPI
+	var apiClient orchestration.API
 
 	switch targetID {
-	case awsOrchestrationProvider:
+	case orchestration.ProviderAWS:
 		apiClient = orchestration.InitAWSOrchestrationProvider(credentials, region)
-	case azureOrchestrationProvider:
+	case orchestration.ProviderAzure:
 		apiClient = orchestration.InitAzureOrchestrationProvider(credentials, region)
-	case googleOrchestrationProvider:
+	case orchestration.ProviderGoogle:
 		// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 		return nil, fmt.Errorf("Google orchestration provider not yet implemented")
 	default:
@@ -387,20 +387,20 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 				}
 
 				if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk && !common.DefaultInfrastructureUsesSelfSignedCertificate {
-					var dnsAPI OrchestrationAPI
+					var dnsAPI orchestration.API
 					switch targetID {
-					case awsOrchestrationProvider:
+					case orchestration.ProviderAWS:
 						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
 							"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
 							"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
 						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
-					case azureOrchestrationProvider:
+					case orchestration.ProviderAzure:
 						dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
 							"azure_tenant_id":     nil,
 							"azure_client_id":     nil,
 							"azure_client_secret": nil,
 						}, *common.DefaultInfrastructureAzureRegion)
-					case googleOrchestrationProvider:
+					case orchestration.ProviderGoogle:
 						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 					}
 
@@ -707,21 +707,21 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 					if !l.hasDNSName(dnsName) {
 						common.Log.Debugf("Attempting to provision managed DNS record %s for load balancer: %s", dnsName, l.ID)
 
-						var dnsAPI OrchestrationAPI
+						var dnsAPI orchestration.API
 						switch targetID {
-						case awsOrchestrationProvider:
+						case orchestration.ProviderAWS:
 							dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
 								"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
 								"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
 							}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
-						case azureOrchestrationProvider:
+						case orchestration.ProviderAzure:
 							// FIXME
 							dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
 								"azure_tenant_id":     nil,
 								"azure_client_id":     nil,
 								"azure_client_secret": nil,
 							}, *common.DefaultInfrastructureAzureRegion)
-						case googleOrchestrationProvider:
+						case orchestration.ProviderGoogle:
 							// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 						}
 

@@ -11,7 +11,7 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-// GethP2PProvider is a network.P2PAPI implementing the parity API
+// GethP2PProvider is a network.p2p.API implementing the parity API
 type GethP2PProvider struct {
 	rpcClientKey *string
 	rpcURL       *string

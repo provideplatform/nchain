@@ -1,4 +1,4 @@
-package network
+package orchestration
 
 import (
 	"github.com/aws/aws-sdk-go/service/acm"
@@ -8,28 +8,28 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/jinzhu/gorm"
-	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
 )
 
-const awsOrchestrationProvider = "aws"
-const azureOrchestrationProvider = "azure"
-const googleOrchestrationProvider = "gcp"
+// ProviderAWS aws orchestration provider
+const ProviderAWS = "aws"
 
-const p2pPlatformBcoin = "bcoin"
-const p2pPlatformEVM = "evm"
-const p2pPlatformHandshake = "handshake"
-const p2pPlatformHyperledger = "hyperledger"
-const p2pPlatformQuorum = "quorum"
+// ProviderAzure azure orchestration provider
+const ProviderAzure = "azure"
 
-const bcoinP2PProvider = "bcoin"
-const gethP2PProvider = "geth"
-const parityP2PProvider = "parity"
-const quorumP2PProvider = "quorum"
+// ProviderGoogle google cloud orchestration provider
+const ProviderGoogle = "gcp"
 
-// OrchestrationAPI defines an interface for implementations to orchestrate cloud or on-premise infrastructure
-type OrchestrationAPI interface {
+// NetworkInterface represents a common network interface
+type NetworkInterface struct {
+	Host        *string
+	IPv4        *string
+	IPv6        *string
+	PrivateIPv4 *string
+	PrivateIPv6 *string
+}
+
+// API defines an interface for implementations to orchestrate cloud or on-premise infrastructure
+type API interface {
 	CreateLoadBalancer(vpcID *string, name *string, securityGroupIds []string, listeners []*elb.Listener) (response *elb.CreateLoadBalancerOutput, err error)
 	DeleteLoadBalancer(name *string) (response *elb.DeleteLoadBalancerOutput, err error)
 	GetLoadBalancers(loadBalancerName *string) (response *elb.DescribeLoadBalancersOutput, err error)
@@ -67,38 +67,8 @@ type OrchestrationAPI interface {
 	StartContainer(image, taskDefinition *string, taskRole, launchType, cluster, vpcName *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error)
 	StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error)
 	GetContainerDetails(taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error)
+	GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error)
 	GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error)
 	GetLogEvents(logGroupID string, logStreamID string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error)
 	GetNetworkInterfaceDetails(networkInterfaceID string) (response *ec2.DescribeNetworkInterfacesOutput, err error)
-
-	// AuthorizeSecurityGroupIngress(*securityGroupID, cidr, tcp, udp) (interface{}, error)
-	// AuthorizeSecurityGroupEgressAllPortsAllProtocols(*securityGroup.GroupId) (interface{}, error)
-	// AuthorizeSecurityGroupEgress(*securityGroup.GroupId, cidr, tcp, udp) (interface{}, error)
-	// CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIds) (interface{}, error)
-	// CreateListenerV2(common.StringOrNil(targetBalancerArn), common.StringOrNil(targetGroupArn), common.StringOrNil("HTTP"), &port) (interface{}, error)
-	// CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID)) (interface{}, error)
-	// CreateTargetGroup(common.StringOrNil(vpcID), common.StringOrNil(targetGroupName), common.StringOrNil("HTTP"), tcpPort) (interface{}, error)
-	// DeleteLoadBalancerV2(common.StringOrNil(targetBalancerArn)) (interface{}, error)
-	// DeleteTargetGroup(common.StringOrNil(targetGroupArn.(string))) (interface{}, error)
-	// DeleteSecurityGroup(securityGroupID.(string)) (interface{}, error)
-	// DeregisterTarget(common.StringOrNil(targetGroupArn.(string)), node.PrivateIPv4, &port) (interface{}, error)
-	// GetContainerDetails(id, nil) (interface{}, error)
-	// GetContainerLogEvents(id.(string), nil, startFromHead, nil, nil, limit, nextToken) (interface{}, error)
-	// GetNetworkInterfaceDetails(*kvp.Value) (interface{}, error)
-	// GetSecurityGroups(accessKeyID, secretAccessKey, region) (interface{}, error)
-	// RegisterTarget(common.StringOrNil(targetGroupArn), node.PrivateIPv4, &port) (interface{}, error)
-	// StartContainer(*resolvedContainer, nil, nil, common.StringOrNil(vpc), securityGroupIds, []string{}, overrides) (interface{}, error)
-	// StopContainer(taskID, nil) (interface{}, error)
-}
-
-// P2PAPI defines an interface for p2p network implementations
-type P2PAPI interface {
-	AcceptNonReservedPeers() error
-	DropNonReservedPeers() error
-	AddPeer(string) error
-	RemovePeer(string) error
-	ParsePeerURL(string) (*string, error)
-	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
-	ResolvePeerURL() (*string, error)
-	Upgrade() error
 }

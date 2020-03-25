@@ -8,7 +8,7 @@ import (
 
 const bcoinPoolIdentitySearchString = "Pool identity key:"
 
-// BcoinP2PProvider is a network.P2PAPI implementing the Bcoin API
+// BcoinP2PProvider is a network.p2p.API implementing the Bcoin API
 type BcoinP2PProvider struct {
 	rpcClientKey string
 	rpcURL       string

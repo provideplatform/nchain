@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 )
 
-// AzureOrchestrationProvider is a network.OrchestrationAPI implementing the Azure API
+// AzureOrchestrationProvider is a network.orchestration.API implementing the Azure API
 type AzureOrchestrationProvider struct {
 	region string
 }
@@ -136,6 +136,10 @@ func (p *AzureOrchestrationProvider) StopContainer(taskID string, cluster *strin
 }
 
 func (p *AzureOrchestrationProvider) GetContainerDetails(taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error) {
+	return nil, nil
+}
+
+func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
 	return nil, nil
 }
 

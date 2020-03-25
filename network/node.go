@@ -21,6 +21,7 @@ import (
 )
 
 const defaultDockerhubBaseURL = "https://hub.docker.com/v2/repositories"
+const defualtNodeLogRPP = int64(250)
 const nodeReachabilityTimeout = time.Millisecond * 2500
 const dockerRepoReachabilityTimeout = time.Millisecond * 2500
 
@@ -803,7 +804,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 		return fmt.Errorf("Unable to resolve network node host without any node identifiers")
 	}
 
-	id := identifiers[len(identifiers)-1]
+	taskID := identifiers[len(identifiers)-1]
 	_, regionOk := cfg["region"].(string)
 
 	orchestrationAPI, err := n.orchestrationAPIClient()
@@ -814,39 +815,20 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	if regionOk {
-		containerDetails, err := orchestrationAPI.GetContainerDetails(id, nil)
-		if err == nil {
-			if len(containerDetails.Tasks) > 0 {
-				task := containerDetails.Tasks[0] // FIXME-- should this support exposing all tasks?
-				taskStatus := ""
-				if task.LastStatus != nil {
-					taskStatus = strings.ToLower(*task.LastStatus)
-				}
-				if taskStatus == "running" && len(task.Attachments) > 0 {
-					attachment := task.Attachments[0]
-					if attachment.Type != nil && *attachment.Type == "ElasticNetworkInterface" {
-						for i := range attachment.Details {
-							kvp := attachment.Details[i]
-							if kvp.Name != nil && *kvp.Name == "networkInterfaceId" && kvp.Value != nil {
-								interfaceDetails, err := orchestrationAPI.GetNetworkInterfaceDetails(*kvp.Value)
-								if err == nil {
-									if len(interfaceDetails.NetworkInterfaces) > 0 {
-										common.Log.Debugf("Retrieved interface details for container instance: %s", interfaceDetails)
-										n.PrivateIPv4 = interfaceDetails.NetworkInterfaces[0].PrivateIpAddress
+		interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
+		if err != nil {
+			err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+			common.Log.Warningf(err.Error())
+			return err
+		}
 
-										interfaceAssociation := interfaceDetails.NetworkInterfaces[0].Association
-										if interfaceAssociation != nil {
-											n.Host = interfaceAssociation.PublicDnsName
-											n.IPv4 = interfaceAssociation.PublicIp
-										}
-									}
-								}
-								break
-							}
-						}
-					}
-				}
-			}
+		if len(interfaces) > 0 {
+			networkInterface := interfaces[0]
+			n.Host = networkInterface.Host
+			n.IPv4 = networkInterface.IPv4
+			n.IPv6 = networkInterface.IPv6
+			n.PrivateIPv4 = networkInterface.PrivateIPv4
+			n.PrivateIPv6 = networkInterface.PrivateIPv6
 		}
 	}
 
@@ -912,8 +894,8 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 
 	common.Log.Debugf("Attempting to resolve peer url for network node: %s", n.ID.String())
 
-	var orchestrationAPI OrchestrationAPI
-	var p2pAPI P2PAPI
+	var orchestrationAPI orchestration.API
+	var p2pAPI p2p.API
 
 	var peerURL *string
 	var err error
@@ -1087,8 +1069,8 @@ func (n *Node) unregisterSecurityGroups() error {
 	return nil
 }
 
-// orchestrationAPIClient returns an instance of the node's underlying OrchestrationAPI
-func (n *Node) orchestrationAPIClient() (OrchestrationAPI, error) {
+// orchestrationAPIClient returns an instance of the node's underlying orchestration.API
+func (n *Node) orchestrationAPIClient() (orchestration.API, error) {
 	cfg := n.ParseConfig()
 	encryptedCfg, _ := n.DecryptedConfig()
 
@@ -1105,14 +1087,14 @@ func (n *Node) orchestrationAPIClient() (OrchestrationAPI, error) {
 		return nil, fmt.Errorf("Failed to resolve orchestration provider credentials for network node: %s", n.ID)
 	}
 
-	var apiClient OrchestrationAPI
+	var apiClient orchestration.API
 
 	switch targetID {
-	case awsOrchestrationProvider:
+	case orchestration.ProviderAWS:
 		apiClient = orchestration.InitAWSOrchestrationProvider(credentials, region)
-	case azureOrchestrationProvider:
+	case orchestration.ProviderAzure:
 		apiClient = orchestration.InitAzureOrchestrationProvider(credentials, region)
-	case googleOrchestrationProvider:
+	case orchestration.ProviderGoogle:
 		// apiClient = InitGoogleOrchestrationProvider(credentials, region)
 		return nil, fmt.Errorf("Google orchestration provider not yet implemented")
 	default:
@@ -1122,8 +1104,8 @@ func (n *Node) orchestrationAPIClient() (OrchestrationAPI, error) {
 	return apiClient, nil
 }
 
-// p2pAPIClient returns an instance of the node's underlying P2PAPI
-func (n *Node) p2pAPIClient() (P2PAPI, error) {
+// p2pAPIClient returns an instance of the node's underlying p2p.API
+func (n *Node) p2pAPIClient() (p2p.API, error) {
 	cfg := n.ParseConfig()
 	client, clientOk := cfg["client"].(string)
 	if !clientOk {
@@ -1141,17 +1123,17 @@ func (n *Node) p2pAPIClient() (P2PAPI, error) {
 		}
 	}
 
-	var apiClient P2PAPI
+	var apiClient p2p.API
 
 	switch client {
-	case bcoinP2PProvider:
+	case p2p.ProviderBcoin:
 		// apiClient = p2p.InitBcoinP2PProvider(*rpcURL)
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
-	case gethP2PProvider:
+	case p2p.ProviderGeth:
 		apiClient = p2p.InitGethP2PProvider(rpcURL, n.Network)
-	case parityP2PProvider:
+	case p2p.ProviderParity:
 		apiClient = p2p.InitParityP2PProvider(rpcURL, n.Network)
-	case quorumP2PProvider:
+	case p2p.ProviderQuorum:
 		apiClient = p2p.InitQuorumP2PProvider(rpcURL, n.Network)
 	default:
 		return nil, fmt.Errorf("Failed to resolve p2p provider for network node %s; unsupported client", n.ID)

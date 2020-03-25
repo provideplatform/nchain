@@ -16,15 +16,15 @@ import (
 	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/network/p2p"
 	provide "github.com/provideservices/provide-go"
 )
 
+const defaultWebappPort = 3000
 const hostReachabilityTimeout = time.Minute * 5
 const hostReachabilityInterval = time.Millisecond * 2500
-
+const networkStateGenesis = "genesis"
 const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
-
-const defaultWebappPort = 3000
 
 type bootnodesInitialized struct{}
 
@@ -52,8 +52,8 @@ type Network struct {
 	// Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
 
-// NetworkListQuery returns a DB query configured to select columns suitable for a paginated API response
-func NetworkListQuery() *gorm.DB {
+// ListQuery returns a DB query configured to select columns suitable for a paginated API response
+func ListQuery() *gorm.DB {
 	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
 }
 
@@ -713,13 +713,13 @@ func (n *Network) Validate() bool {
 		_, isHandshakeNetworkOk := config["is_handshake_network"].(bool)
 		_, isQuorumNetworkOk := config["is_quorum_network"].(bool)
 
-		if !isBcoinNetworkOk && platform != nil && platform == p2pPlatformBcoin {
+		if !isBcoinNetworkOk && platform != nil && platform == p2p.PlatformBcoin {
 			config["is_bcoin_network"] = true
-		} else if !isEthereumNetworkOk && platform != nil && platform == p2pPlatformEVM {
+		} else if !isEthereumNetworkOk && platform != nil && platform == p2p.PlatformEVM {
 			config["is_ethereum_network"] = true
-		} else if !isHandshakeNetworkOk && platform != nil && platform == p2pPlatformHandshake {
+		} else if !isHandshakeNetworkOk && platform != nil && platform == p2p.PlatformHandshake {
 			config["is_handshake_network"] = true
-		} else if !isQuorumNetworkOk && platform != nil && platform == p2pPlatformQuorum {
+		} else if !isQuorumNetworkOk && platform != nil && platform == p2p.PlatformQuorum {
 			config["is_ethereum_network"] = true
 			config["is_quorum_network"] = true
 		}

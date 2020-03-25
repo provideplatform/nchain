@@ -13,9 +13,6 @@ import (
 	provide "github.com/provideservices/provide-go"
 )
 
-const defualtNodeLogRPP = int64(100)
-const networkStateGenesis = "genesis"
-
 // InstallNetworksAPI installs the handlers using the given gin Engine
 func InstallNetworksAPI(r *gin.Engine) {
 	r.GET("/api/v1/networks", networksListHandler)
@@ -116,7 +113,7 @@ func updateNetworkHandler(c *gin.Context) {
 
 func networksListHandler(c *gin.Context) {
 	var networks []*Network
-	query := NetworkListQuery()
+	query := ListQuery()
 	query = query.Where("networks.enabled = true")
 
 	if strings.ToLower(c.Query("cloneable")) == "true" {
