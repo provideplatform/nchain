@@ -44,5 +44,7 @@ type API interface {
 	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
 	ResolvePeerURL() (*string, error)
 	Upgrade() error
+
+	DefaultEntrypoint() []string
 	EnrichStartCommand() []string
 }

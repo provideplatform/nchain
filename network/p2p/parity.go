@@ -33,9 +33,60 @@ func InitParityP2PProvider(rpcURL *string, ntwrk common.Configurable) *ParityP2P
 	}
 }
 
+// DefaultEntrypoint returns the default entrypoint to run when starting the container, when one is not otherwise provided
+func (p *ParityP2PProvider) DefaultEntrypoint() []string {
+	return []string{
+		"parity",
+		"--loging", "verbose",
+		"--fat-db", "on",
+		"--pruning", "archive",
+		"--tracing", "on",
+		"--jsonrpc-apis", "web3,eth,net,personal,parity,parity_set,traces,rpc,parity_accounts",
+		"--jsonrpc-hosts", "all",
+		"--jsonrpc-interface", "0.0.0.0",
+		"--jsonrpc-cors", "all",
+		"--tx-queue-per-sender", "2048",
+		"--ws-apis", "web3,eth,pubsub,net,parity,parity_pubsub,traces,rpc,shh,shh_pubsub",
+		"--ws-hosts", "all",
+		"--ws-interface", "0.0.0.0",
+		"--ws-origins", "all",
+		"--ws-max-connections", "2048",
+	}
+}
+
 // EnrichStartCommand returns the cmd to append to the command to start the container
 func (p *ParityP2PProvider) EnrichStartCommand() []string {
-	return []string{}
+	cmd := make([]string, 0)
+	cfg := p.network.ParseConfig()
+	if networkID, networkIDOk := cfg["network_id"].(float64); networkIDOk {
+		cmd = append(cmd, "--chain")
+		cmd = append(cmd, fmt.Sprintf("%f", networkID))
+	}
+	if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
+		cmd = append(cmd, "--bootnodes")
+		cmd = append(cmd, fmt.Sprintf("\"%s\"", p.FormatBootnodes(bootnodes)))
+	}
+
+	encryptedCfg, _ := p.network.DecryptedConfig()
+	if env, envOk := encryptedCfg["env"].(map[string]interface{}); envOk {
+		engineSigner, engineSignerOk := env["ENGINE_SIGNER"].(string)
+		engineSignerKeyJSON, engineSignerKeyJSONOk := env["ENGINE_SIGNER_KEY_JSON"].(string)
+		engineSignerPrivateKey, engineSignerPrivateKeyOk := env["ENGINE_SIGNER_PRIVATE_KEY"].(string)
+
+		if engineSignerOk && engineSignerKeyJSONOk && engineSignerPrivateKeyOk {
+			// FIXME-- modify the entrypoint to write the --password file
+			cmd = append(cmd, "--engine-signer")
+			cmd = append(cmd, fmt.Sprintf("--engine-signer %s", engineSigner))
+
+			cmd = append(cmd, "--password")
+			cmd = append(cmd, fmt.Sprintf("--password %s", engineSignerKeyJSON))
+
+			cmd = append(cmd, "--author")
+			cmd = append(cmd, fmt.Sprintf("%s", engineSignerPrivateKey))
+		}
+	}
+
+	return cmd
 }
 
 // AcceptNonReservedPeers allows non-reserved peers to connect

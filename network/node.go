@@ -573,7 +573,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 	image, imageOk := cfg[nodeConfigImage].(string)
 	resources, resourcesOk := cfg[nodeConfigResources].(map[string]interface{})
-	entrypoint, entrypointOk := cfg[nodeConfigEntrypoint].([]interface{})
+	entrypoint, entrypointOk := cfg[nodeConfigEntrypoint].([]string)
 	taskRole, taskRoleOk := cfg[nodeConfigTaskRole].(string)
 	// script, scriptOk := cfg["script"].(map[string]interface{})
 	_, targetOk := cfg[nodeConfigTargetID].(string)
@@ -685,13 +685,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 					envOverrides[networkConfigEnvBootnodes] = bootnodesTxt
 				}
 			}
-			// if _, peerSetOk := envOverrides[networkConfigEnvPeerSet]; !peerSetOk && envOverrides[networkConfigEnvBootnodes] != nil {
-			// 	if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
-			// 		envOverrides[networkConfigEnvPeerSet] = strings.Replace(strings.Replace(bnodes, "enode://", "required:", -1), ",", " ", -1)
-			// 	} else if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(*string); bootnodesOk {
-			// 		envOverrides[networkConfigEnvPeerSet] = strings.Replace(strings.Replace(*bnodes, "enode://", "required:", -1), ",", " ", -1)
-			// 	}
-			// }
 
 			networkChain, networkChainOk := networkCfg[networkConfigChain].(string)
 			if _, chainOk := envOverrides[networkConfigChain].(string); !chainOk {
@@ -735,14 +728,24 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		_entrypoint := make([]*string, 0)
 		if entrypointOk {
-			for _, part := range entrypoint {
-				_entrypoint = append(_entrypoint, common.StringOrNil(part.(string)))
+			for i := range entrypoint {
+				_entrypoint = append(_entrypoint, &entrypoint[i])
+			}
+		} else if p2pAPI != nil {
+			defaultEntrypoint := p2pAPI.DefaultEntrypoint()
+			for i := range defaultEntrypoint {
+				_entrypoint = append(_entrypoint, &defaultEntrypoint[i])
 			}
 		}
 
 		if p2pAPI != nil {
-			for _, part := range p2pAPI.EnrichStartCommand() {
-				_entrypoint = append(_entrypoint, &part)
+			cmdEnrichment := p2pAPI.EnrichStartCommand()
+			if len(_entrypoint) > 0 && len(cmdEnrichment) > 0 {
+				_entrypoint = append(_entrypoint, common.StringOrNil("&&"))
+			}
+
+			for i := range cmdEnrichment {
+				_entrypoint = append(_entrypoint, &cmdEnrichment[i])
 			}
 		}
 

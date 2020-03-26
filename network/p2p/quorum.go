@@ -3,6 +3,7 @@ package p2p
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -27,9 +28,71 @@ func InitQuorumP2PProvider(rpcURL *string, ntwrk common.Configurable) *QuorumP2P
 	}
 }
 
+// DefaultEntrypoint returns the default entrypoint to run when starting the container, when one is not otherwise provided
+func (p *QuorumP2PProvider) DefaultEntrypoint() []string {
+	cmd := make([]string, 0)
+
+	cfg := p.network.ParseConfig()
+	if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+		chainspecJSON, _ := json.Marshal(chainspec)
+		for _, part := range []string{
+			"echo",
+			fmt.Sprintf("'%s'", string(chainspecJSON)),
+			">",
+			"genesis.json",
+		} {
+			cmd = append(cmd, part)
+		}
+
+		cmd = append(cmd, "&&")
+
+		for _, part := range []string{
+			"geth",
+			"init",
+			"genesis.json",
+		} {
+			cmd = append(cmd, part)
+		}
+	}
+
+	if len(cmd) > 0 {
+		cmd = append(cmd, "&&")
+	}
+
+	for _, part := range []string{
+		"geth",
+		"--nousb",
+		"--gcmode", "archive",
+		"--rpc",
+		"--rpcaddr", "0.0.0.0",
+		"--rpccorsdomain", "*",
+		"--rpcapi", "eth,net,web3,shh",
+		"--ws",
+		"--wsorigins", "*",
+		"--graphql",
+		"--shh",
+		"--verbosity", "5",
+	} {
+		cmd = append(cmd, part)
+	}
+
+	return cmd
+}
+
 // EnrichStartCommand returns the cmd to append to the command to start the container
 func (p *QuorumP2PProvider) EnrichStartCommand() []string {
-	return []string{}
+	cmd := make([]string, 0)
+	cfg := p.network.ParseConfig()
+	if networkID, networkIDOk := cfg["network_id"].(float64); networkIDOk {
+		cmd = append(cmd, "--networkid")
+		cmd = append(cmd, fmt.Sprintf("%d", uint64(networkID)))
+	}
+	if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
+		cmd = append(cmd, "--bootnodes")
+		cmd = append(cmd, fmt.Sprintf("\"%s\"", p.FormatBootnodes(bootnodes)))
+	}
+
+	return cmd
 }
 
 // AcceptNonReservedPeers allows non-reserved peers to connect

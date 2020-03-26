@@ -28,16 +28,57 @@ func InitGethP2PProvider(rpcURL *string, ntwrk common.Configurable) *GethP2PProv
 	}
 }
 
+// DefaultEntrypoint returns the default entrypoint to run when starting the container, when one is not otherwise provided
+func (p *GethP2PProvider) DefaultEntrypoint() []string {
+	cmd := make([]string, 0)
+
+	cfg := p.network.ParseConfig()
+	if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+		chainspecJSON, _ := json.Marshal(chainspec)
+		cmd = append(
+			cmd,
+			"echo",
+			fmt.Sprintf("'%s'", string(chainspecJSON)),
+			">",
+			"genesis.json",
+			"&&",
+			"geth",
+			"init",
+			"genesis.json",
+			"&&",
+		)
+	}
+
+	cmd = append(
+		cmd,
+		"geth",
+		"--nousb",
+		"--gcmode", "archive",
+		"--rpc",
+		"--rpcaddr", "0.0.0.0",
+		"--rpccorsdomain", "*",
+		"--rpcapi", "eth,net,web3,shh",
+		"--ws",
+		"--wsorigins", "*",
+		"--graphql",
+		"--shh",
+		"--verbosity", "5",
+	)
+
+	return cmd
+}
+
 // EnrichStartCommand returns the cmd to append to the command to start the container
 func (p *GethP2PProvider) EnrichStartCommand() []string {
 	cmd := make([]string, 0)
 	cfg := p.network.ParseConfig()
 	if networkID, networkIDOk := cfg["network_id"].(float64); networkIDOk {
-		cmd = append(cmd, fmt.Sprintf("--networkid %f", networkID))
+		cmd = append(cmd, "--networkid", fmt.Sprintf("%d", uint64(networkID)))
 	}
 	if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
-		cmd = append(cmd, fmt.Sprintf("--bootnodes \"%s\"", p.FormatBootnodes(bootnodes)))
+		cmd = append(cmd, "--bootnodes", fmt.Sprintf("'%s'", p.FormatBootnodes(bootnodes)))
 	}
+
 	return cmd
 }
 
