@@ -740,10 +740,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		if p2pAPI != nil {
 			cmdEnrichment := p2pAPI.EnrichStartCommand()
-			if len(_entrypoint) > 0 && len(cmdEnrichment) > 0 {
-				_entrypoint = append(_entrypoint, common.StringOrNil("&&"))
-			}
-
 			for i := range cmdEnrichment {
 				_entrypoint = append(_entrypoint, &cmdEnrichment[i])
 			}
@@ -948,6 +944,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 						if err == nil && peerURL != nil {
 							if n.IPv4 != nil && n.PrivateIPv4 != nil {
 								url := strings.Replace(*peerURL, *n.PrivateIPv4, *n.IPv4, 1)
+								url = strings.Replace(url, "127.0.0.1", *n.IPv4, 1)
 								peerURL = &url
 							}
 							cfg[nodeConfigPeerURL] = peerURL
