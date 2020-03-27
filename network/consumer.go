@@ -439,12 +439,12 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !balancerIDOk {
-		common.Log.Warningf("Failed to load balance network node; no load balancer id provided")
+		common.Log.Warningf("Failed to load balance node; no load balancer id provided")
 		natsutil.Nack(msg)
 		return
 	}
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to load balance network node; no network node id provided")
+		common.Log.Warningf("Failed to load balance node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -454,7 +454,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	balancer := &LoadBalancer{}
 	db.Where("id = ?", balancerID).Find(&balancer)
 	if balancer == nil || balancer.ID == uuid.Nil {
-		common.Log.Warningf("Failed to load balance network node; no load balancer resolved for id: %s", balancerID)
+		common.Log.Warningf("Failed to load balance node; no load balancer resolved for id: %s", balancerID)
 		natsutil.Nack(msg)
 		return
 	}
@@ -462,7 +462,7 @@ func consumeLoadBalancerBalanceNodeMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to load balance network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to load balance node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
@@ -498,12 +498,12 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !balancerIDOk {
-		common.Log.Warningf("Failed to unbalance network node; no load balancer id provided")
+		common.Log.Warningf("Failed to unbalance node; no load balancer id provided")
 		natsutil.Nack(msg)
 		return
 	}
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to load balance network node; no network node id provided")
+		common.Log.Warningf("Failed to load balance node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -513,7 +513,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	balancer := &LoadBalancer{}
 	db.Where("id = ?", balancerID).Find(&balancer)
 	if balancer == nil || balancer.ID == uuid.Nil {
-		common.Log.Warningf("Failed to remove network node from load balancer; no load balancer resolved for id: %s", balancerID)
+		common.Log.Warningf("Failed to remove node from load balancer; no load balancer resolved for id: %s", balancerID)
 		natsutil.Nack(msg)
 		return
 	}
@@ -521,7 +521,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to remove network node from load balancer; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to remove node from load balancer; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
@@ -543,12 +543,12 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS deploy network node message: %s", msg)
+	common.Log.Debugf("Consuming NATS deploy node message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal deploy network node message; %s", err.Error())
+		common.Log.Warningf("Failed to umarshal deploy node message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -556,7 +556,7 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to deploy network node; no network node id provided")
+		common.Log.Warningf("Failed to deploy node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -566,14 +566,14 @@ func consumeDeployNodeMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to deploy network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to deploy node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.deploy(db)
 	if err != nil {
-		common.Log.Warningf("Failed to deploy network node; %s", err.Error())
+		common.Log.Debugf("Attempt to deploy node did not succeed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsDeployNodeTimeout)
 		return
 	}
@@ -588,12 +588,12 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS terminated network node deletion message: %s", msg)
+	common.Log.Debugf("Consuming NATS terminated node deletion message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal terminated network node deletion message; %s", err.Error())
+		common.Log.Warningf("Failed to umarshal terminated node deletion message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -601,7 +601,7 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to delete terminated network node; no network node id provided")
+		common.Log.Warningf("Failed to delete terminated node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -611,14 +611,14 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to delete terminated network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to delete terminated node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	loadBalancerAssociations := db.Model(&node).Association("LoadBalancers").Count()
 	if loadBalancerAssociations > 0 {
-		common.Log.Debugf("Unable to delete terminated network node: %s; %d load balancer association pending", node.ID, loadBalancerAssociations)
+		common.Log.Debugf("Unable to delete terminated node: %s; %d load balancer association pending", node.ID, loadBalancerAssociations)
 		node.unbalance(db)
 		return
 	}
@@ -633,7 +633,7 @@ func consumeDeleteTerminatedNodeMsg(msg *stan.Msg) {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		err := errors[0]
-		common.Log.Warningf("Failed to delete terminated network node; %s", err.Error())
+		common.Log.Warningf("Failed to delete terminated node; %s", err.Error())
 		natsutil.AttemptNack(msg, natsDeleteTerminatedNodeTimeout)
 		return
 	}
@@ -648,12 +648,12 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS resolve network node host message: %s", msg)
+	common.Log.Debugf("Consuming NATS resolve node host message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal resolve network node host message; %s", err.Error())
+		common.Log.Warningf("Failed to umarshal resolve node host message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -661,7 +661,7 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to resolve host for network node; no network node id provided")
+		common.Log.Warningf("Failed to resolve host for node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -671,20 +671,20 @@ func consumeResolveNodeHostMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve host for network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to resolve host for node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.resolveHost(db)
 	if err != nil {
-		common.Log.Warningf("Failed to resolve network node host; %s", err.Error())
+		common.Log.Debugf("Attempt to resolve node host did not succeed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsResolveNodeHostTimeout)
 		return
 	}
 
 	msg.Ack()
-	natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg.Data)
+	natsutil.NatsStreamingPublish(natsResolveNodePeerURLSubject, msg.Data) // FIXME? should this check if node == p2p?
 }
 
 func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
@@ -694,12 +694,12 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS resolve network node peer url message: %s", msg)
+	common.Log.Debugf("Consuming NATS resolve node peer url message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal resolve network node peer url message; %s", err.Error())
+		common.Log.Warningf("Failed to umarshal resolve node peer url message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -707,7 +707,7 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to resolve peer url for network node; no network node id provided")
+		common.Log.Warningf("Failed to resolve peer url for node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -717,14 +717,14 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.resolvePeerURL(db)
 	if err != nil {
-		common.Log.Warningf("Failed to resolve network node peer url; %s", err.Error())
+		common.Log.Debugf("Attempt to resolve node peer url did not succeed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsResolveNodePeerURLTimeout)
 		return
 	}
@@ -759,7 +759,7 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	peerURL, peerURLOk := params["peer_url"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to add network peer; no network node id provided")
+		common.Log.Warningf("Failed to add network peer; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -775,14 +775,14 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.addPeer(peerURL)
 	if err != nil {
-		common.Log.Warningf("Failed to add network peer; %s", err.Error())
+		common.Log.Debugf("Attempt to to add network peer failed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsAddNodePeerTimeout)
 		return
 	}
@@ -811,7 +811,7 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	peerURL, peerURLOk := params["peer_url"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to remove network peer; no network node id provided")
+		common.Log.Warningf("Failed to remove network peer; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -827,14 +827,14 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve network node; no network node resolved for id: %s", nodeID)
+		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.removePeer(peerURL)
 	if err != nil {
-		common.Log.Warningf("Failed to remove network peer; %s", err.Error())
+		common.Log.Debugf("Attempt to remove network peer failed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
 		return
 	}

@@ -21,18 +21,15 @@ import (
 )
 
 const defaultDockerhubBaseURL = "https://hub.docker.com/v2/repositories"
-const defualtNodeLogRPP = int64(250)
+const defualtNodeLogRPP = int64(500)
 const nodeReachabilityTimeout = time.Millisecond * 2500
 const dockerRepoReachabilityTimeout = time.Millisecond * 2500
 
-const resolveGenesisTickerInterval = time.Millisecond * 10000
-const resolveGenesisTickerTimeout = time.Minute * 20
-const resolveHostTickerInterval = time.Millisecond * 5000
-const resolveHostTickerTimeout = time.Minute * 10
-const resolvePeerTickerInterval = time.Millisecond * 5000
-const resolvePeerTickerTimeout = time.Minute * 20
+const resolveGenesisTimeout = time.Minute * 10
+const resolveHostTimeout = time.Minute * 5
+const resolvePeerTimeout = time.Second * 30
 const securityGroupTerminationTickerInterval = time.Millisecond * 30000
-const securityGroupTerminationTickerTimeout = time.Minute * 10
+const securityGroupTerminationTimeout = time.Minute * 5
 
 const nodeConfigClient = "client"
 const nodeConfigCredentials = "credentials"
@@ -53,6 +50,7 @@ const nodeConfigVpcID = "vpc_id"
 
 const nodeStatusFailed = "failed"
 const nodeStatusGenesis = "genesis"
+const nodeStatusPeering = "peering"
 const nodeStatusRunning = "running"
 const nodeStatusUnreachable = "unreachable"
 
@@ -510,7 +508,6 @@ func (n *Node) deploy(db *gorm.DB) error {
 		switch err.(type) {
 		case *bootnodesInitialized:
 			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
-
 			err := p2pAPI.RequireBootnodes(db, n.UserID, &n.NetworkID, n)
 			if err != nil {
 				common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
@@ -519,14 +516,13 @@ func (n *Node) deploy(db *gorm.DB) error {
 
 			return n._deploy(network, bootnodes, db)
 		default:
-			msg := fmt.Sprintf("Failed to deploy node %s to network: %s; %s", n.ID, *network.Name, err.Error())
-			common.Log.Warning(msg)
+			msg := fmt.Sprintf("Attempt to deploy node %s did not succeed; network: %s; %s", n.ID, *network.Name, err.Error())
+			common.Log.Debugf(msg)
 			return errors.New(msg)
 		}
 	} else {
 		if p2p, p2pOk := cfg[nodeConfigP2P].(bool); p2pOk {
 			if p2p {
-				common.Log.Debugf("Attempting to require peer-to-peer network genesis for node: %s", n.ID)
 				return n.requireGenesis(network, bootnodes, db)
 			}
 			common.Log.Debugf("Attempting to deploy non-p2p node: %s", n.ID)
@@ -537,33 +533,48 @@ func (n *Node) deploy(db *gorm.DB) error {
 }
 
 func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) error {
-	common.Log.Debugf("Attempting to resolve network genesis...")
+	common.Log.Debugf("Attempting to require peer-to-peer network genesis for node: %s", n.ID)
 
 	if n.Role != nil && *n.Role == nodeRoleIPFS {
 		common.Log.Debugf("Short-circuiting genesis block resolution for IPFS node: %s", n.ID)
 		return n._deploy(network, bootnodes, db)
 	}
 
-	ticker := time.NewTicker(resolveGenesisTickerInterval)
-	startedAt := time.Now()
-	for {
-		select {
-		case <-ticker.C:
-			if time.Now().Sub(startedAt) >= resolveGenesisTickerTimeout {
-				desc := fmt.Sprintf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTickerTimeout)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				ticker.Stop()
-				return errors.New(desc)
-			}
-
-			stats, _ := network.Stats()
-			if stats != nil && stats.Block > 0 {
-				ticker.Stop()
-				return n._deploy(network, bootnodes, db)
-			}
-		}
+	if time.Now().Sub(n.CreatedAt) >= resolveGenesisTimeout {
+		desc := fmt.Sprintf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTimeout)
+		n.updateStatus(db, "failed", &desc)
+		common.Log.Warning(desc)
+		return errors.New(desc)
 	}
+
+	stats, _ := network.Stats()
+	if stats == nil || stats.Block == 0 {
+		desc := "awaiting genesis peers..."
+		n.updateStatus(db, nodeStatusPeering, &desc)
+		return fmt.Errorf("Node deployment awaiting network genesis; node: %s; network: %s", n.ID, network.ID)
+	}
+
+	return n._deploy(network, bootnodes, db)
+	// ticker := time.NewTicker(resolveGenesisTickerInterval)
+	// startedAt := time.Now()
+	// for {
+	// 	select {
+	// 	case <-ticker.C:
+	// 		if time.Now().Sub(startedAt) >= resolveGenesisTickerTimeout {
+	// 			desc := fmt.Sprintf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTickerTimeout)
+	// 			n.updateStatus(db, "failed", &desc)
+	// 			common.Log.Warning(desc)
+	// 			ticker.Stop()
+	// 			return errors.New(desc)
+	// 		}
+
+	// 		stats, _ := network.Stats()
+	// 		if stats != nil && stats.Block > 0 {
+	// 			ticker.Stop()
+	// 			return n._deploy(network, bootnodes, db)
+	// 		}
+	// 	}
+	// }
 }
 
 func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
@@ -844,8 +855,8 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	if n.Host == nil {
-		if time.Now().Sub(n.CreatedAt) >= resolveHostTickerTimeout {
-			desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTickerTimeout)
+		if time.Now().Sub(n.CreatedAt) >= resolveHostTimeout {
+			desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
 			n.updateStatus(db, "failed", &desc)
 			common.Log.Warning(desc)
 			return fmt.Errorf(desc)
@@ -861,7 +872,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 	cfgJSON, _ := json.Marshal(cfg)
 	*n.Config = json.RawMessage(cfgJSON)
-	n.Status = common.StringOrNil(nodeStatusRunning)
+	n.Status = common.StringOrNil(nodeStatusPeering)
 	db.Save(&n)
 
 	role, roleOk := cfg[nodeConfigRole].(string)
@@ -957,8 +968,8 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	if peerURL == nil {
-		if time.Now().Sub(n.CreatedAt) >= resolvePeerTickerTimeout {
-			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTickerTimeout)
+		if time.Now().Sub(n.CreatedAt) >= resolvePeerTimeout {
+			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTimeout)
 			n.updateStatus(db, "failed", &desc)
 			common.Log.Warning(desc)
 			return fmt.Errorf(desc)
@@ -968,8 +979,17 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
+	if n.Bootnode {
+		err := network.AddBootnode(db, *peerURL)
+		if err != nil {
+			common.Log.Warningf("Failed to add peer url as bootnode; peer url: %s; network: %s; %s", *peerURL, network.ID, err.Error())
+		}
+	}
+
 	cfgJSON, _ := json.Marshal(cfg)
 	*n.Config = json.RawMessage(cfgJSON)
+	n.Status = common.StringOrNil(nodeStatusRunning)
+	n.Description = nil
 	db.Save(&n)
 
 	if role == nodeRolePeer || role == nodeRoleFull || role == nodeRoleValidator {
@@ -1027,8 +1047,8 @@ func (n *Node) undeploy() error {
 						return
 					}
 
-					if time.Now().Sub(startedAt) >= securityGroupTerminationTickerTimeout {
-						common.Log.Warningf("Failed to unregister security groups for network node with id: %s; timing out after %v...", n.ID, securityGroupTerminationTickerTimeout)
+					if time.Now().Sub(startedAt) >= securityGroupTerminationTimeout {
+						common.Log.Warningf("Failed to unregister security groups for network node with id: %s; timing out after %v...", n.ID, securityGroupTerminationTimeout)
 						ticker.Stop()
 						return
 					}

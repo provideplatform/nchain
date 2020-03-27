@@ -53,9 +53,7 @@ func ethClonableDisabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {
 	mc.AddBehavior("NodeCount", func(opts ...interface{}) types.GomegaMatcher {
 		return gstruct.PointTo(BeEquivalentTo(0))
 	}, defaultMatcherOptions())
-	mc.AddBehavior("AvailablePeerCount", func(opts ...interface{}) types.GomegaMatcher {
-		return BeEquivalentTo(0)
-	}, defaultMatcherOptions())
+
 	// mc.AddBehavior("InvokeJSONRPC", func(opts ...interface{}) types.GomegaMatcher {
 	// 	return Equal("")
 	// }, defaultMatcherOptions())

@@ -32,22 +32,22 @@ func InitGethP2PProvider(rpcURL *string, ntwrk common.Configurable) *GethP2PProv
 func (p *GethP2PProvider) DefaultEntrypoint() []string {
 	cmd := make([]string, 0)
 
-	cfg := p.network.ParseConfig()
-	if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
-		chainspecJSON, _ := json.Marshal(chainspec)
-		cmd = append(
-			cmd,
-			"echo",
-			fmt.Sprintf("'%s'", string(chainspecJSON)),
-			">",
-			"genesis.json",
-			"&&",
-			"geth",
-			"init",
-			"genesis.json",
-			"&&",
-		)
-	}
+	// cfg := p.network.ParseConfig()
+	// if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+	// 	chainspecJSON, _ := json.Marshal(chainspec)
+	// 	cmd = append(
+	// 		cmd,
+	// 		"echo",
+	// 		fmt.Sprintf("'%s'", string(chainspecJSON)),
+	// 		">",
+	// 		"genesis.json",
+	// 		"&&",
+	// 		"geth",
+	// 		"init",
+	// 		"genesis.json",
+	// 		"&&",
+	// 	)
+	// }
 
 	cmd = append(
 		cmd,
@@ -57,12 +57,14 @@ func (p *GethP2PProvider) DefaultEntrypoint() []string {
 		"--rpc",
 		"--rpcaddr", "0.0.0.0",
 		"--rpccorsdomain", "*",
-		"--rpcapi", "eth,net,web3,shh",
+		"--rpcapi", "admin,eth,miner,net,web3,shh",
 		"--ws",
+		"--wsaddr", "0.0.0.0",
+		"--wsapi", "eth,net,web3,shh",
 		"--wsorigins", "*",
 		"--graphql",
 		"--shh",
-		"--verbosity", "5",
+		"--verbosity", "6",
 	)
 
 	return cmd

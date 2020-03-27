@@ -83,7 +83,7 @@ func ListQuery() *gorm.DB {
 	return dbconf.DatabaseConnection().Select("networks.id, networks.created_at, networks.application_id, networks.user_id, networks.name, networks.description, networks.chain_id, networks.network_id, networks.sidechain_id, networks.config")
 }
 
-// MutexKey returns a key key for the given network id, which is guaranteed to be
+// MutexKey returns a key for the given network id, which is guaranteed to be
 // unique-per-network, which represents the distributed lock for the network
 func MutexKey(networkID uuid.UUID) string {
 	return fmt.Sprintf("network.%s.mutex", networkID.String())
@@ -379,6 +379,7 @@ func (n *Network) Update() bool {
 
 // SetConfig sets the network config in-memory
 func (n *Network) SetConfig(cfg map[string]interface{}) {
+	// FIXME-- use mutex?
 	n.Config = common.MarshalConfig(cfg)
 }
 
@@ -421,8 +422,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 				common.Log.Warningf("Failed to resolve and balance explorer urls for network node: %s; timing out after %v", n.ID.String(), hostReachabilityTimeout)
 				if !isLoadBalanced {
 					cfg["block_explorer_url"] = nil
-					cfgJSON, _ := json.Marshal(cfg)
-					*n.Config = json.RawMessage(cfgJSON)
+					n.SetConfig(cfg)
 					db.Save(n)
 				}
 				ticker.Stop()
@@ -442,8 +442,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 						common.Log.Debugf("Block explorer reachable via port %d; node id: %s", defaultWebappPort, n.ID)
 
 						cfg["block_explorer_url"] = fmt.Sprintf("http://%s:%v", *node.Host, defaultWebappPort)
-						cfgJSON, _ := json.Marshal(cfg)
-						*n.Config = json.RawMessage(cfgJSON)
+						n.SetConfig(cfg)
 
 						nodeCfg["url"] = cfg["block_explorer_url"]
 						nodeCfgJSON, _ := json.Marshal(nodeCfg)
@@ -460,8 +459,7 @@ func (n *Network) resolveAndBalanceExplorerUrls(db *gorm.DB, node *Node) {
 				}
 			} else if !isLoadBalanced {
 				cfg["block_explorer_url"] = nil
-				cfgJSON, _ := json.Marshal(cfg)
-				*n.Config = json.RawMessage(cfgJSON)
+				n.SetConfig(cfg)
 				db.Save(n)
 			}
 		}
@@ -543,18 +541,14 @@ func (n *Network) resolveAndBalanceJSONRPCAndWebsocketURLs(db *gorm.DB, node *No
 				cfg[networkConfigWebsocketURL] = nil
 			}
 
-			cfgJSON, _ := json.Marshal(cfg)
-			*n.Config = json.RawMessage(cfgJSON)
-
+			n.SetConfig(cfg)
 			db.Save(n)
 		}
 	} else if !isLoadBalanced {
 		cfg[networkConfigJSONRPCURL] = nil
 		cfg[networkConfigWebsocketURL] = nil
 
-		cfgJSON, _ := json.Marshal(cfg)
-		*n.Config = json.RawMessage(cfgJSON)
-
+		n.SetConfig(cfg)
 		db.Save(n)
 	}
 }
@@ -838,22 +832,27 @@ func (n *Network) WebsocketURL() string {
 // addPeer adds the given peer url to the network topology and notifies other peers of the new peer's existence
 func (n *Network) addPeer(peerURL string) error {
 	// FIXME: batch this so networks with lots of nodes still perform well
-	nodes, err := n.Nodes()
+	nodes, err := n.ReachableNodes()
 	if err != nil {
 		common.Log.Warningf("Failed to retrieve network nodes for broadcasting peer url addition %s; %s", peerURL, err.Error())
 	}
 
 	common.Log.Debugf("Attempting to broadcast peer url %s for inclusion on network %s by %d nodes", peerURL, n.ID, len(nodes))
 	for _, node := range nodes {
-		params := map[string]interface{}{
-			"node_id":  node.ID,
-			"peer_url": peerURL,
-		}
-		payload, _ := json.Marshal(params)
-		_, err := natsutil.NatsStreamingPublishAsync(natsAddNodePeerSubject, payload)
-		if err != nil {
-			common.Log.Warningf("Failed to add peer %s to network: %s; %s", peerURL, n.ID, err.Error())
-			return err
+		nodePeerURL := node.peerURL()
+		if nodePeerURL != nil && *nodePeerURL != peerURL {
+			params := map[string]interface{}{
+				"node_id":  node.ID,
+				"peer_url": peerURL,
+			}
+			payload, _ := json.Marshal(params)
+			_, err := natsutil.NatsStreamingPublishAsync(natsAddNodePeerSubject, payload)
+			if err != nil {
+				common.Log.Warningf("Failed to add peer %s to network: %s; %s", peerURL, n.ID, err.Error())
+				return err
+			}
+		} else if nodePeerURL != nil && *nodePeerURL == peerURL {
+			common.Log.Debugf("Not broadcasting peer url to matching node: %s; peer url: %s", node.ID, peerURL)
 		}
 	}
 	common.Log.Debugf("Broadcast peer url %s for inclusion on network %s by %d nodes", peerURL, n.ID, len(nodes))
@@ -863,7 +862,7 @@ func (n *Network) addPeer(peerURL string) error {
 // removePeer removes the given peer url to the network topology and notifies other peers of the new peer's existence
 func (n *Network) removePeer(peerURL string) error {
 	// FIXME: batch this so networks with lots of nodes still perform well
-	nodes, err := n.Nodes()
+	nodes, err := n.ReachableNodes()
 	if err != nil {
 		common.Log.Warningf("Failed to retrieve network nodes for broadcasting peer url removal %s; %s", peerURL, err.Error())
 	}
@@ -902,20 +901,6 @@ func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string
 	}
 
 	return nil, fmt.Errorf("JSON-RPC invocation not supported by network %s", n.ID)
-}
-
-// NodeCount retrieves a count of platform-managed network nodes
-func (n *Network) NodeCount() (count *uint64) {
-	dbconf.DatabaseConnection().Model(&Node{}).Where("nodes.network_id = ?", n.ID).Count(&count)
-	return count
-}
-
-// AvailablePeerCount retrieves a count of platform-managed network nodes which also have the 'peer' or 'full' role
-// and currently are listed with a status of 'running'; this method does not currently check real-time availability
-// of these peers-- it is assumed the are still available. FIXME?
-func (n *Network) AvailablePeerCount() (count uint64) {
-	dbconf.DatabaseConnection().Model(&Node{}).Where("nodes.network_id = ? AND nodes.status = 'running' AND nodes.role IN ('peer', 'full', 'validator')", n.ID).Count(&count)
-	return count
 }
 
 // BootnodesTxt retrieves the current bootnodes string for the network; this value can be used
@@ -962,9 +947,26 @@ func (n *Network) BootnodesTxt() (*string, error) {
 	return txt, err
 }
 
+// AddBootnode is a mutually-exclusive operation that appends a peer url to the network bootnodes config
+func (n *Network) AddBootnode(db *gorm.DB, peerURL string) error {
+	return redisutil.WithRedlock(n.MutexKey(), func() error {
+		cfg := n.ParseConfig()
+		peers := make([]string, 0)
+		if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
+			copy(peers, bootnodes)
+		}
+
+		cfg["bootnodes"] = append(peers, peerURL)
+		n.SetConfig(cfg)
+		db.Save(&n)
+
+		return nil
+	})
+}
+
 // Bootnodes retrieves a list of network bootnodes
 func (n *Network) Bootnodes() (nodes []*Node, err error) {
-	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.bootnode = true AND nodes.status = ?", n.ID, nodeStatusRunning)
+	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.bootnode = true AND nodes.status IN (?, ?, ?)", n.ID, nodeStatusRunning, nodeStatusGenesis, nodeStatusPeering)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
 }
@@ -972,13 +974,20 @@ func (n *Network) Bootnodes() (nodes []*Node, err error) {
 // BootnodesCount returns a count of the number of bootnodes on the network
 func (n *Network) BootnodesCount() (count uint64) {
 	db := dbconf.DatabaseConnection()
-	db.Model(&Node{}).Where("nodes.network_id = ? AND nodes.bootnode = true AND nodes.status = ?", n.ID, nodeStatusRunning).Count(&count)
+	db.Model(&Node{}).Where("nodes.network_id = ? AND nodes.bootnode = true AND nodes.status IN (?, ?, ?)", n.ID, nodeStatusRunning, nodeStatusGenesis, nodeStatusPeering).Count(&count)
 	return count
 }
 
 // Nodes retrieves a list of network nodes; FIXME: support pagination
 func (n *Network) Nodes() (nodes []*Node, err error) {
 	query := dbconf.DatabaseConnection().Where("nodes.network_id = ?", n.ID)
+	query.Order("created_at ASC").Find(&nodes)
+	return nodes, err
+}
+
+// ReachableNodes retrieves a list of running network nodes; FIXME: support pagination
+func (n *Network) ReachableNodes() (nodes []*Node, err error) {
+	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.status IN (?)", n.ID, nodeStatusRunning)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
 }

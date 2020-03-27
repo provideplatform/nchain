@@ -297,12 +297,6 @@ package network_test
 // 					It("should return network status", func() {
 // 						// Expect(n.Status()).To(mc.MatchBehaviorFor("Status"))
 // 					})
-// 					It("should return NodeCount", func() {
-// 						Expect(n.NodeCount()).To(mc.MatchBehaviorFor("NodeCount"))
-// 					})
-// 					It("should return AvailablePeerCount", func() {
-// 						Expect(n.AvailablePeerCount()).To(mc.MatchBehaviorFor("AvailablePeerCount"))
-// 					})
 // 					It("should return bootnodes txt", func() {
 // 						// Expect(n.BootnodesTxt()).To(mc.MatchBehaviorFor("BootnodesTxt"))
 // 					})

@@ -35,9 +35,7 @@ func ethClonableDisabledConfigNetwork2233222202220() (n *fixtures.FixtureMatcher
 	mc.AddBehavior("NodeCount", func(opts ...interface{}) types.GomegaMatcher {
 		return gstruct.PointTo(BeEquivalentTo(0))
 	}, defaultMatcherOptions())
-	mc.AddBehavior("AvailablePeerCount", func(opts ...interface{}) types.GomegaMatcher {
-		return BeEquivalentTo(0)
-	}, defaultMatcherOptions())
+
 	mc.AddBehavior("Network type", func(opts ...interface{}) types.GomegaMatcher {
 		if opts[0] == "eth" {
 			return BeTrue()
