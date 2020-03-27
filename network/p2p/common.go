@@ -46,5 +46,5 @@ type API interface {
 	Upgrade() error
 
 	DefaultEntrypoint() []string
-	EnrichStartCommand() []string
+	EnrichStartCommand(bootnodes []string) []string
 }

@@ -32,64 +32,64 @@ func InitQuorumP2PProvider(rpcURL *string, ntwrk common.Configurable) *QuorumP2P
 func (p *QuorumP2PProvider) DefaultEntrypoint() []string {
 	cmd := make([]string, 0)
 
-	cfg := p.network.ParseConfig()
-	if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
-		chainspecJSON, _ := json.Marshal(chainspec)
-		for _, part := range []string{
-			"echo",
-			fmt.Sprintf("'%s'", string(chainspecJSON)),
-			">",
-			"genesis.json",
-		} {
-			cmd = append(cmd, part)
-		}
+	// cfg := p.network.ParseConfig()
+	// if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+	// 	chainspecJSON, _ := json.Marshal(chainspec)
+	// 	cmd = append(
+	// 		cmd,
+	// 		"echo",
+	// 		fmt.Sprintf("'%s'", string(chainspecJSON)),
+	// 		">",
+	// 		"genesis.json",
+	// 		"&&",
+	// 		"geth",
+	// 		"init",
+	// 		"genesis.json",
+	// 		"&&",
+	// 	)
+	// }
 
-		cmd = append(cmd, "&&")
-
-		for _, part := range []string{
-			"geth",
-			"init",
-			"genesis.json",
-		} {
-			cmd = append(cmd, part)
-		}
-	}
-
-	if len(cmd) > 0 {
-		cmd = append(cmd, "&&")
-	}
-
-	for _, part := range []string{
+	cmd = append(
+		cmd,
 		"geth",
 		"--nousb",
 		"--gcmode", "archive",
 		"--rpc",
 		"--rpcaddr", "0.0.0.0",
 		"--rpccorsdomain", "*",
-		"--rpcapi", "eth,net,web3,shh",
+		"--rpcapi", "admin,eth,miner,net,web3,shh",
 		"--ws",
+		"--wsaddr", "0.0.0.0",
+		"--wsapi", "eth,net,web3,shh",
 		"--wsorigins", "*",
 		"--graphql",
 		"--shh",
-		"--verbosity", "5",
-	} {
-		cmd = append(cmd, part)
-	}
+		"--verbosity", "6",
+	)
 
 	return cmd
 }
 
 // EnrichStartCommand returns the cmd to append to the command to start the container
-func (p *QuorumP2PProvider) EnrichStartCommand() []string {
+func (p *QuorumP2PProvider) EnrichStartCommand(bootnodes []string) []string {
 	cmd := make([]string, 0)
 	cfg := p.network.ParseConfig()
 	if networkID, networkIDOk := cfg["network_id"].(float64); networkIDOk {
-		cmd = append(cmd, "--networkid")
-		cmd = append(cmd, fmt.Sprintf("%d", uint64(networkID)))
+		cmd = append(cmd, "--networkid", fmt.Sprintf("%d", uint64(networkID)))
 	}
-	if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
-		cmd = append(cmd, "--bootnodes")
-		cmd = append(cmd, fmt.Sprintf("\"%s\"", p.FormatBootnodes(bootnodes)))
+
+	cfgBootnodes, cfgBootnodesOk := cfg["bootnodes"].([]string)
+	if len(bootnodes) > 0 || (cfgBootnodesOk && len(cfgBootnodes) > 0) {
+		_bootnodes := make([]string, 0)
+		for i := range bootnodes {
+			_bootnodes = append(_bootnodes, bootnodes[i])
+		}
+		if cfgBootnodesOk {
+			for i := range cfgBootnodes {
+				_bootnodes = append(_bootnodes, cfgBootnodes[i])
+			}
+		}
+		cmd = append(cmd, "--bootnodes", p.FormatBootnodes(_bootnodes))
 	}
 
 	return cmd

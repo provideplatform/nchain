@@ -528,12 +528,28 @@ func (n *Node) deploy(db *gorm.DB) error {
 			common.Log.Debugf("Attempting to deploy non-p2p node: %s", n.ID)
 			return n._deploy(network, bootnodes, db)
 		}
+
 		return n.requireGenesis(network, bootnodes, db) // default assumes p2p
 	}
 }
 
 func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	common.Log.Debugf("Attempting to require peer-to-peer network genesis for node: %s", n.ID)
+
+	if len(bootnodes) > 0 {
+		common.Log.Debugf("Short-circuiting genesis block resolution for node: %s; %d bootnode(s) resolved for peering", n.ID, len(bootnodes))
+		return n._deploy(network, bootnodes, db)
+	}
+
+	// cfg := network.ParseConfig()
+	// if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk && len(bootnodes) > 0 {
+	// 	for i := range bootnodes {
+	// 		return n._deploy(network, bootnodes, db)
+	// 		n.addPeer(bootnodes[i])
+	// 	}
+	// 	common.Log.Debugf("Short-circuiting genesis block resolution for node: %s; %d bootnode(s) resolved for peering", n.ID, len(bootnodes))
+	// 	return n._deploy(network, bootnodes, db)
+	// }
 
 	if n.Role != nil && *n.Role == nodeRoleIPFS {
 		common.Log.Debugf("Short-circuiting genesis block resolution for IPFS node: %s", n.ID)
@@ -630,6 +646,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		if !isPeerToPeer && !p2pOk && roleOk {
 			// coerce p2p flag if applicable for role
 			isP2P = role == nodeRoleFull || role == nodeRolePeer || role == nodeRoleValidator || role == nodeRoleBlockExplorer
+			cfg[nodeConfigP2P] = isP2P
 		}
 
 		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
@@ -688,14 +705,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 				return err
 			}
 
-			if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
-				envOverrides[networkConfigEnvBootnodes] = bnodes
-			} else {
-				bootnodesTxt, err := network.BootnodesTxt()
-				if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-					envOverrides[networkConfigEnvBootnodes] = bootnodesTxt
-				}
-			}
+			// if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
+			// 	envOverrides[networkConfigEnvBootnodes] = bnodes
+			// } else {
+			// 	bootnodesTxt, err := network.BootnodesTxt()
+			// 	if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+			// 		envOverrides[networkConfigEnvBootnodes] = bootnodesTxt
+			// 	}
+			// }
 
 			networkChain, networkChainOk := networkCfg[networkConfigChain].(string)
 			if _, chainOk := envOverrides[networkConfigChain].(string); !chainOk {
@@ -750,7 +767,14 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 
 		if p2pAPI != nil {
-			cmdEnrichment := p2pAPI.EnrichStartCommand()
+			_bootnodes := make([]string, 0)
+			for i := range bootnodes {
+				peerURL := bootnodes[i].peerURL()
+				if peerURL != nil {
+					_bootnodes = append(_bootnodes, *peerURL)
+				}
+			}
+			cmdEnrichment := p2pAPI.EnrichStartCommand(_bootnodes)
 			for i := range cmdEnrichment {
 				_entrypoint = append(_entrypoint, &cmdEnrichment[i])
 			}

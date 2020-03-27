@@ -241,27 +241,39 @@ func (n *Network) requireBootnodes(db *gorm.DB, pending *Node) ([]*Node, error) 
 			return err
 		}
 
-		bootnodes, err = n.Bootnodes()
-		if err != nil {
-			common.Log.Warningf("Failed to resolve bootnodes for network: %s", n.ID)
-			return err
-		}
-
-		if len(bootnodes) == 0 {
-			cfg := n.ParseConfig()
-			if cfgBootnodes, cfgBootnodesOk := cfg[networkConfigBootnodes].([]interface{}); cfgBootnodesOk {
-				if len(cfgBootnodes) > 0 {
-					for _, peerURL := range cfgBootnodes {
-						tmpnode := &Node{}
-						tmpnode.SetConfig(map[string]interface{}{
-							"peer_url": peerURL,
-						})
-						bootnodes = append(bootnodes, tmpnode)
-					}
+		cfg := n.ParseConfig()
+		if cfgBootnodes, cfgBootnodesOk := cfg[networkConfigBootnodes].([]interface{}); cfgBootnodesOk {
+			if len(cfgBootnodes) > 0 {
+				for _, peerURL := range cfgBootnodes {
+					tmpnode := &Node{}
+					tmpnode.SetConfig(map[string]interface{}{
+						"peer_url": peerURL,
+					})
+					bootnodes = append(bootnodes, tmpnode)
 				}
-
 			}
 		}
+
+		// bootnodes, err = n.Bootnodes()
+		// if err != nil {
+		// 	common.Log.Warningf("Failed to resolve bootnodes for network: %s", n.ID)
+		// 	return err
+		// }
+
+		// if len(bootnodes) == 0 {
+		// 	cfg := n.ParseConfig()
+		// 	if cfgBootnodes, cfgBootnodesOk := cfg[networkConfigBootnodes].([]interface{}); cfgBootnodesOk {
+		// 		if len(cfgBootnodes) > 0 {
+		// 			for _, peerURL := range cfgBootnodes {
+		// 				tmpnode := &Node{}
+		// 				tmpnode.SetConfig(map[string]interface{}{
+		// 					"peer_url": peerURL,
+		// 				})
+		// 				bootnodes = append(bootnodes, tmpnode)
+		// 			}
+		// 		}
+		// 	}
+		// }
 
 		return nil
 	})

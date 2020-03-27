@@ -55,16 +55,26 @@ func (p *ParityP2PProvider) DefaultEntrypoint() []string {
 }
 
 // EnrichStartCommand returns the cmd to append to the command to start the container
-func (p *ParityP2PProvider) EnrichStartCommand() []string {
+func (p *ParityP2PProvider) EnrichStartCommand(bootnodes []string) []string {
 	cmd := make([]string, 0)
 	cfg := p.network.ParseConfig()
 	if networkID, networkIDOk := cfg["network_id"].(float64); networkIDOk {
 		cmd = append(cmd, "--chain")
 		cmd = append(cmd, fmt.Sprintf("%f", networkID))
 	}
-	if bootnodes, bootnodesOk := cfg["bootnodes"].([]string); bootnodesOk {
-		cmd = append(cmd, "--bootnodes")
-		cmd = append(cmd, fmt.Sprintf("\"%s\"", p.FormatBootnodes(bootnodes)))
+
+	cfgBootnodes, cfgBootnodesOk := cfg["bootnodes"].([]string)
+	if len(bootnodes) > 0 || (cfgBootnodesOk && len(cfgBootnodes) > 0) {
+		_bootnodes := make([]string, 0)
+		for i := range bootnodes {
+			_bootnodes = append(_bootnodes, bootnodes[i])
+		}
+		if cfgBootnodesOk {
+			for i := range cfgBootnodes {
+				_bootnodes = append(_bootnodes, cfgBootnodes[i])
+			}
+		}
+		cmd = append(cmd, "--bootnodes", p.FormatBootnodes(_bootnodes))
 	}
 
 	encryptedCfg, _ := p.network.DecryptedConfig()
