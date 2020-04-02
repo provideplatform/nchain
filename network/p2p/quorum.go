@@ -53,6 +53,7 @@ func (p *QuorumP2PProvider) DefaultEntrypoint() []string {
 		cmd,
 		"geth",
 		"--nousb",
+		"--nodiscover",
 		"--gcmode", "archive",
 		"--rpc",
 		"--rpcaddr", "0.0.0.0",

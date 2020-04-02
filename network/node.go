@@ -497,39 +497,46 @@ func (n *Node) deploy(db *gorm.DB) error {
 	n.updateStatus(db, "pending", nil)
 
 	cfg := n.ParseConfig()
-	p2pAPI, err := n.p2pAPIClient()
-	if err != nil {
-		common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
-		return err
+
+	isP2P, p2pOk := cfg[nodeConfigP2P].(bool)
+	role, roleOk := cfg[nodeConfigRole].(string)
+	isPeerToPeer := p2pOk && isP2P
+	if !isPeerToPeer && !p2pOk && roleOk {
+		// coerce p2p flag if applicable for role
+		isP2P = role == nodeRoleFull || role == nodeRolePeer || role == nodeRoleValidator || role == nodeRoleBlockExplorer
+		cfg[nodeConfigP2P] = isP2P
 	}
 
-	bootnodes, err := network.requireBootnodes(db, n)
-	if err != nil {
-		switch err.(type) {
-		case *bootnodesInitialized:
-			common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
-			err := p2pAPI.RequireBootnodes(db, n.UserID, &n.NetworkID, n)
-			if err != nil {
-				common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
-				return err
-			}
+	if isPeerToPeer {
+		p2pAPI, err := n.p2pAPIClient()
+		if err != nil {
+			common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
+			return err
+		}
 
-			return n._deploy(network, bootnodes, db)
-		default:
-			msg := fmt.Sprintf("Attempt to deploy node %s did not succeed; network: %s; %s", n.ID, *network.Name, err.Error())
-			common.Log.Debugf(msg)
-			return errors.New(msg)
+		bootnodes, err := network.requireBootnodes(db, n)
+		if err != nil {
+			switch err.(type) {
+			case *bootnodesInitialized:
+				common.Log.Debugf("Bootnode initialized for network: %s; node: %s; waiting for genesis to complete and peer resolution to become possible", *network.Name, n.ID.String())
+				err := p2pAPI.RequireBootnodes(db, n.UserID, &n.NetworkID, n)
+				if err != nil {
+					common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
+					return err
+				}
+
+				return n._deploy(network, bootnodes, db)
+			default:
+				msg := fmt.Sprintf("Attempt to deploy node %s did not succeed; network: %s; %s", n.ID, *network.Name, err.Error())
+				common.Log.Debugf(msg)
+				return errors.New(msg)
+			}
+		} else {
+			return n.requireGenesis(network, bootnodes, db) // default assumes p2p
 		}
 	} else {
-		if p2p, p2pOk := cfg[nodeConfigP2P].(bool); p2pOk {
-			if p2p {
-				return n.requireGenesis(network, bootnodes, db)
-			}
-			common.Log.Debugf("Attempting to deploy non-p2p node: %s", n.ID)
-			return n._deploy(network, bootnodes, db)
-		}
-
-		return n.requireGenesis(network, bootnodes, db) // default assumes p2p
+		common.Log.Debugf("Attempting to deploy non-p2p node: %s", n.ID)
+		return n._deploy(network, []*Node{}, db)
 	}
 }
 
@@ -604,7 +611,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	taskRole, taskRoleOk := cfg[nodeConfigTaskRole].(string)
 	// script, scriptOk := cfg["script"].(map[string]interface{})
 	_, targetOk := cfg[nodeConfigTargetID].(string)
-	role, roleOk := cfg[nodeConfigRole].(string)
+	role, _ := cfg[nodeConfigRole].(string)
 	region, regionOk := cfg[nodeConfigRegion].(string)
 	vpc, _ := cfg[nodeConfigVpcID].(string)
 	env, envOk := cfg[nodeConfigEnv].(map[string]interface{})
@@ -643,11 +650,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 	if targetOk && regionOk {
 		isPeerToPeer := p2pOk && isP2P
-		if !isPeerToPeer && !p2pOk && roleOk {
-			// coerce p2p flag if applicable for role
-			isP2P = role == nodeRoleFull || role == nodeRolePeer || role == nodeRoleValidator || role == nodeRoleBlockExplorer
-			cfg[nodeConfigP2P] = isP2P
-		}
 
 		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
 		securityGroupIds, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)

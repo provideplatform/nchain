@@ -32,27 +32,21 @@ func InitGethP2PProvider(rpcURL *string, ntwrk common.Configurable) *GethP2PProv
 func (p *GethP2PProvider) DefaultEntrypoint() []string {
 	cmd := make([]string, 0)
 
-	// cfg := p.network.ParseConfig()
-	// if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
-	// 	chainspecJSON, _ := json.Marshal(chainspec)
-	// 	cmd = append(
-	// 		cmd,
-	// 		"echo",
-	// 		fmt.Sprintf("'%s'", string(chainspecJSON)),
-	// 		">",
-	// 		"genesis.json",
-	// 		"&&",
-	// 		"geth",
-	// 		"init",
-	// 		"genesis.json",
-	// 		"&&",
-	// 	)
-	// }
+	cfg := p.network.ParseConfig()
+	if chainspec, chainspecOk := cfg["chainspec"].(map[string]interface{}); chainspecOk {
+		chainspecJSON, _ := json.Marshal(chainspec)
+		cmd = append(
+			cmd,
+			fmt.Sprintf("/bin/sh -c 'tee genesis.json <<<'%s'", string(chainspecJSON)),
+			"geth init genesis.json &&",
+		)
+	}
 
 	cmd = append(
 		cmd,
 		"geth",
 		"--nousb",
+		"--nodiscover",
 		"--gcmode", "archive",
 		"--rpc",
 		"--rpcaddr", "0.0.0.0",
