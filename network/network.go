@@ -46,6 +46,8 @@ const networkConfigWebsocketPort = "websocket_port"
 const networkConfigIsBcoinNetwork = "is_bcoin_network"
 const networkConfigIsEthereumNetwork = "is_ethereum_network"
 const networkConfigIsHandshakeNetwork = "is_handshake_network"
+const networkConfigIsHyperledgerBesuNetwork = "is_hyperledger_besu_network"
+const networkConfigIsHyperledgerFabricNetwork = "is_hyperledger_fabric_network"
 const networkConfigIsQuorumNetwork = "is_quorum_network"
 
 const networkConfigEnvBootnodes = "BOOTNODES"
@@ -765,6 +767,8 @@ func (n *Network) Validate() bool {
 		_, isBcoinNetworkOk := config[networkConfigIsBcoinNetwork].(bool)
 		_, isEthereumNetworkOk := config[networkConfigIsEthereumNetwork].(bool)
 		_, isHandshakeNetworkOk := config[networkConfigIsHandshakeNetwork].(bool)
+		_, isHyperLedgerBesuNetworkOk := config[networkConfigIsHyperledgerBesuNetwork].(bool)
+		_, isHyperLedgerFabricNetworkOk := config[networkConfigIsHyperledgerFabricNetwork].(bool)
 		_, isQuorumNetworkOk := config[networkConfigIsQuorumNetwork].(bool)
 
 		if !isBcoinNetworkOk && platform != nil && platform == p2p.PlatformBcoin {
@@ -773,6 +777,10 @@ func (n *Network) Validate() bool {
 			config[networkConfigIsEthereumNetwork] = true
 		} else if !isHandshakeNetworkOk && platform != nil && platform == p2p.PlatformHandshake {
 			config[networkConfigIsHandshakeNetwork] = true
+		} else if !isHyperLedgerBesuNetworkOk && platform != nil && platform == p2p.PlatformHyperledgerBesu {
+			config[networkConfigIsHyperledgerBesuNetwork] = true
+		} else if !isHyperLedgerFabricNetworkOk && platform != nil && platform == p2p.PlatformHyperledgerFabric {
+			config[networkConfigIsHyperledgerFabricNetwork] = true
 		} else if !isQuorumNetworkOk && platform != nil && platform == p2p.PlatformQuorum {
 			config[networkConfigIsEthereumNetwork] = true
 			config[networkConfigIsQuorumNetwork] = true
@@ -1056,6 +1064,10 @@ func (n *Network) p2pAPIClient() (p2p.API, error) {
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
 	case p2p.ProviderGeth:
 		apiClient = p2p.InitGethP2PProvider(common.StringOrNil(rpcURL), n)
+	case p2p.ProviderHyperledgerBesu:
+		return nil, fmt.Errorf("besu p2p provider not yet implemented")
+	case p2p.ProviderHyperledgerFabric:
+		apiClient = p2p.InitHyperledgerFabricP2PProvider(common.StringOrNil(rpcURL), n)
 	case p2p.ProviderParity:
 		apiClient = p2p.InitParityP2PProvider(common.StringOrNil(rpcURL), n)
 	case p2p.ProviderQuorum:

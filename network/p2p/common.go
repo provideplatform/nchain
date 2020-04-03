@@ -15,8 +15,11 @@ const PlatformEVM = "evm"
 // PlatformHandshake handshake platform
 const PlatformHandshake = "handshake"
 
-// PlatformHyperledger hyperledger platform
-const PlatformHyperledger = "hyperledger"
+// PlatformHyperledgerBesu hyperledger besu platform
+const PlatformHyperledgerBesu = "hyperledger_besu"
+
+// PlatformHyperledgerFabric hyperledger fabric platform
+const PlatformHyperledgerFabric = "hyperledger_fabric"
 
 // PlatformQuorum quorum platform
 const PlatformQuorum = "quorum"
@@ -26,6 +29,12 @@ const ProviderBcoin = "bcoin"
 
 // ProviderGeth geth p2p provider
 const ProviderGeth = "geth"
+
+// ProviderHyperledgerBesu besu p2p provider
+const ProviderHyperledgerBesu = "hyperledger_besu"
+
+// ProviderHyperledgerFabric fabric p2p provider
+const ProviderHyperledgerFabric = "hyperledger_fabric"
 
 // ProviderParity parity p2p provider
 const ProviderParity = "parity"
