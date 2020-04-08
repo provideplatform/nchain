@@ -25,6 +25,7 @@ type Account struct {
 	WalletID      *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
 	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
 	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+	Type          *string    `json:"type,omitempty"`
 
 	HDDerivationPath *string `json:"hd_derivation_path,omitempty"` // i.e. m/44'/60'/0'/0
 	PublicKey        *string `sql:"type:bytea" json:"public_key,omitempty"`
