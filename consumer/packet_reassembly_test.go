@@ -1,4 +1,6 @@
-package consumer
+// +build unit
+
+package consumer_test
 
 import (
 	"testing"
