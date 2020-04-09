@@ -36,6 +36,9 @@ const ProviderHyperledgerBesu = "hyperledger_besu"
 // ProviderHyperledgerFabric fabric p2p provider
 const ProviderHyperledgerFabric = "hyperledger_fabric"
 
+// ProviderNethermind nethermind p2p provider
+const ProviderNethermind = "nethermind"
+
 // ProviderParity parity p2p provider
 const ProviderParity = "parity"
 

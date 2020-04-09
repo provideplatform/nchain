@@ -1194,6 +1194,8 @@ func (n *Node) p2pAPIClient() (p2p.API, error) {
 		return nil, fmt.Errorf("besu p2p provider not yet implemented")
 	case p2p.ProviderHyperledgerFabric:
 		apiClient = p2p.InitHyperledgerFabricP2PProvider(rpcURL, n.Network)
+	case p2p.ProviderNethermind:
+		apiClient = p2p.InitNethermindP2PProvider(rpcURL, n.Network)
 	case p2p.ProviderParity:
 		apiClient = p2p.InitParityP2PProvider(rpcURL, n.Network)
 	case p2p.ProviderQuorum:
