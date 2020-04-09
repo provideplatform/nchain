@@ -39,7 +39,7 @@ require (
 	github.com/onsi/ginkgo v1.10.3
 	github.com/onsi/gomega v1.7.1
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200401222925-3d8405ffd118
+	github.com/provideservices/provide-go v0.0.0-20200408130333-6659a607b4c4
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915 // indirect

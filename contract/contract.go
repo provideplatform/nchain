@@ -240,10 +240,20 @@ func (c *Contract) Create() bool {
 						"params":             params,
 						"published_at":       time.Now(),
 					})
+
 					err := natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
+						c.Errors = append(c.Errors, &provide.Error{
+							Message: common.StringOrNil(err.Error()),
+						})
+						success = false
 					}
+
+					// err := consumer.BroadcastFragments(txCreationMsg, false, common.StringOrNil(natsTxCreateSubject))
+					// if err != nil {
+					// 	common.Log.Warningf("Failed to broadcast fragmented contract deployment message; %s", err.Error())
+					// }
 				}
 			}
 			return success
