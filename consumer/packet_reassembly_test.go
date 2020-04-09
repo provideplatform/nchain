@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/goldmine/consumer"
 )
 
 func TestBroadcastFragments(t *testing.T) {
