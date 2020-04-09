@@ -9,7 +9,7 @@ import (
 )
 
 func TestBroadcastFragments(t *testing.T) {
-	err := BroadcastFragments(payloadFactory(), false, common.StringOrNil("org.next.hop"))
+	err := consumer.BroadcastFragments(payloadFactory(), false, common.StringOrNil("org.next.hop"))
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}
