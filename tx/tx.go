@@ -586,7 +586,14 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 		err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
 
-	if err == nil {
+	if err != nil {
+		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *network.Name, signer.String(), err.Error())
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
+		})
+		desc := err.Error()
+		t.updateStatus(db, "failed", &desc)
+	} else {
 		broadcastAt := time.Now()
 		t.BroadcastAt = &broadcastAt
 	}
@@ -607,6 +614,8 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
+		desc := err.Error()
+		t.updateStatus(db, "failed", &desc)
 	}
 
 	return err
