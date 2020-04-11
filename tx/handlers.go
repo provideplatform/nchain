@@ -111,21 +111,6 @@ func createTransactionHandler(c *gin.Context) {
 
 	db := dbconf.DatabaseConnection()
 
-	if tx.Signer != nil {
-		if tx.AccountID != nil {
-			provide.RenderError("provided signer and account_id to tx creation, which is ambiguous", 400, c)
-			return
-		}
-
-		account := &wallet.Account{}
-		db.Where("address = ?", tx.Signer).Find(&account)
-		if account == nil || account.ID == uuid.Nil {
-			provide.RenderError("failed to resolve signer account address to account", 404, c)
-			return
-		}
-		tx.AccountID = &account.ID
-	}
-
 	if tx.Create(db) {
 		provide.Render(tx, 201, c)
 	} else {
@@ -227,6 +212,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	publicKey, publicKeyOk := params["public_key"].(string)
 	privateKey, privateKeyOk := params["private_key"].(string)
 	gas, gasOk := params["gas"].(float64)
+	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
 
 	ref, err := uuid.NewV4()
@@ -245,7 +231,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	}
 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
 		if execution.Wallet != nil {
-			err := fmt.Errorf("invalid request specifying a account_idand wallet")
+			err := fmt.Errorf("invalid request specifying a account_id and wallet")
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
@@ -258,6 +244,10 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 
 	if gasOk {
 		execution.Gas = &gas
+	}
+
+	if gasPriceOk {
+		execution.GasPrice = &gasPrice
 	}
 
 	if nonceOk {
@@ -451,10 +441,15 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	gas, gasOk := params["gas"].(float64)
+	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
 
 	if gasOk {
 		execution.Gas = &gas
+	}
+
+	if gasPriceOk {
+		execution.GasPrice = &gasPrice
 	}
 
 	if nonceOk {

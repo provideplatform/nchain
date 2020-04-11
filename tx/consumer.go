@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,7 +32,7 @@ const txMsgTimeout = int64(txAckWait * 3)
 
 const natsTxCreateSubject = "goldmine.tx.create"
 const natsTxCreateMaxInFlight = 2048
-const txCreateAckWait = time.Second * 10
+const txCreateAckWait = time.Second * 30
 const txCreateMsgTimeout = int64(txCreateAckWait * 5)
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
@@ -206,7 +207,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		WalletID:      walletID,
 		Path:          common.StringOrNil(hdDerivationPath),
 		To:            nil,
-		Value:         &txValue{value: big.NewInt(int64(value.(float64)))},
+		Value:         &TxValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:   &publishedAtTime,
 	}
 	tx.setParams(txParams)
@@ -221,8 +222,47 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
-		common.Log.Warning(errmsg)
-		natsutil.AttemptNack(msg, txCreateMsgTimeout)
+
+		ropstenSubsidyFaucetApplicationID, _ := uuid.FromString("146ab73e-b2eb-4386-8c6f-93663792c741")
+		const ropstenSubsidyFaucetAddress = "0x96f1027FEe06A15f42E48180705a2ecB2F846985"
+		const ropstenSubsidyFaucetDripValue = int64(1000000000000000000)
+		networkSubsidyFaucetExists := tx.NetworkID.String() == "66d44f30-9092-4182-a3c4-bc02736d6ae5" // HACK
+		faucetSubsidyEligible := strings.Contains(errmsg, "insufficient funds") && networkSubsidyFaucetExists
+		if faucetSubsidyEligible {
+			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
+
+			out := []string{}
+			db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", ropstenSubsidyFaucetApplicationID, ropstenSubsidyFaucetAddress).Pluck("id", &out)
+			if out == nil || len(out) == 0 || len(out[0]) == 0 {
+				common.Log.Warningf("Failed to retrieve configured subsidy faucet signing identity for faucet address: %s; faucet application id: %s", ropstenSubsidyFaucetAddress, ropstenSubsidyFaucetApplicationID)
+			} else {
+				faucetAccountID, _ := uuid.FromString(out[0])
+				faucetBeneficiary, _ := tx.signerFactory(db)
+				faucetBeneficiaryAddress := faucetBeneficiary.Address()
+				faucetGas := int64(210000)
+				faucetTx := &Transaction{
+					ApplicationID: &ropstenSubsidyFaucetApplicationID,
+					Data:          common.StringOrNil("0x"),
+					NetworkID:     contract.NetworkID,
+					AccountID:     &faucetAccountID,
+					To:            common.StringOrNil(faucetBeneficiaryAddress),
+					Value:         &TxValue{value: big.NewInt(ropstenSubsidyFaucetDripValue - faucetGas)},
+				}
+
+				if faucetTx.Create(db) {
+					common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", tx.NetworkID)
+					contract.TransactionID = &tx.ID
+					db.Save(&contract)
+					common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
+				}
+
+				// FIXME-- should this logic change?
+				natsutil.AttemptNack(msg, txCreateMsgTimeout)
+			}
+		} else {
+			common.Log.Warning(errmsg)
+			natsutil.AttemptNack(msg, txCreateMsgTimeout)
+		}
 	}
 }
 
@@ -276,6 +316,12 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 					if !gasOk {
 						gas = float64(0)
 					}
+					var gasPrice *uint64
+					gp, gpOk := txParams["gas_price"].(float64)
+					if gpOk {
+						_gasPrice := uint64(gp)
+						gasPrice = &_gasPrice
+					}
 					var nonce *uint64
 					if nonceFloat, nonceOk := txParams["nonce"].(float64); nonceOk {
 						nonceUint := uint64(nonceFloat)
@@ -286,7 +332,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 
 					if publicKeyOk && privateKeyOk {
 						common.Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
-						tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas))
+						tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas), gasPrice)
 						if err == nil {
 							if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
 								err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
@@ -381,7 +427,7 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, acc
 		WalletID:      walletID,
 		Path:          hdDerivationPath,
 		To:            c.Address,
-		Value:         &txValue{value: value},
+		Value:         &TxValue{value: value},
 		Params:        _txParamsJSON,
 		Ref:           ref,
 	}

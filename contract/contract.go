@@ -305,6 +305,7 @@ func (c *Contract) ExecuteFromTx(
 	// method := execution.Method
 	// params := execution.Params
 	gas := execution.Gas
+	gasPrice := execution.GasPrice
 	nonce := execution.Nonce
 	// publishedAt := execution.PublishedAt
 
@@ -318,6 +319,10 @@ func (c *Contract) ExecuteFromTx(
 		gas = &gas64
 	}
 	txParams["gas"] = gas
+
+	if gasPrice != nil {
+		txParams["gas_price"] = gasPrice
+	}
 
 	if nonce != nil {
 		txParams["nonce"] = *nonce

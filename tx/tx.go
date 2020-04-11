@@ -57,7 +57,7 @@ type Transaction struct {
 	// Network-agnostic tx fields
 	Signer      *string          `sql:"-" json:"signer,omitempty"`
 	To          *string          `json:"to"`
-	Value       *txValue         `sql:"not null;type:text" json:"value"`
+	Value       *TxValue         `sql:"not null;type:text" json:"value"`
 	Data        *string          `json:"data"`
 	Hash        *string          `json:"hash"`
 	Status      *string          `sql:"not null;default:'pending'" json:"status"`
@@ -68,7 +68,7 @@ type Transaction struct {
 	// Ephemeral fields for managing the tx/rx and tracing lifecycles
 	Response *contract.ExecutionResponse `sql:"-" json:"-"`
 	SignedTx interface{}                 `sql:"-" json:"-"`
-	Traces   interface{}                 `sql:"-" json:"traces"`
+	Traces   interface{}                 `sql:"-" json:"traces,omitempty"`
 
 	// Transaction metadata/instrumentation
 	Block          *uint64    `json:"block"`
@@ -130,6 +130,13 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			gas = float64(0)
 		}
 
+		var gasPrice *uint64
+		gp, gpOk := params["gas_price"].(float64)
+		if gpOk {
+			_gasPrice := uint64(gp)
+			gasPrice = &_gasPrice
+		}
+
 		var nonce *uint64
 		if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
 			nonceUint := uint64(nonceFloat)
@@ -138,19 +145,22 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 		if txs.Account != nil {
 			if txs.Account.PrivateKey != nil {
+				common.Log.Debugf("ATTEMPTING TO SIGN...")
 				privateKey, _ := common.DecryptECDSAPrivateKey(*txs.Account.PrivateKey)
-				_privateKey := hex.EncodeToString(ethcrypto.FromECDSA(privateKey))
 				signedTx, hash, err = provide.EVMSignTx(
 					txs.Network.ID.String(),
 					txs.Network.RPCURL(),
 					txs.Account.Address,
-					_privateKey,
+					hex.EncodeToString(ethcrypto.FromECDSA(privateKey)),
 					tx.To,
 					tx.Data,
 					tx.Value.BigInt(),
 					nonce,
 					uint64(gas),
+					gasPrice,
 				)
+
+				common.Log.Debugf("%s", signedTx)
 
 				if err == nil {
 					accessedAt := time.Now()
@@ -199,6 +209,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				tx.Value.BigInt(),
 				nonce,
 				uint64(gas),
+				gasPrice,
 			)
 		}
 	} else {
@@ -221,15 +232,23 @@ func (txs *TransactionSigner) String() string {
 	return "(misconfigured tx signer)"
 }
 
-type txValue struct {
+// TxValue provides JSON marshaling and gorm driver support for wrapping/unwrapping big.Int
+type TxValue struct {
 	value *big.Int
 }
 
-func (v *txValue) Value() (driver.Value, error) {
+// NewTxValue is a convenience method to return a TxValue
+func NewTxValue(val int64) *TxValue {
+	return &TxValue{value: big.NewInt(val)}
+}
+
+// Value returns the underlying big.Int as a string for use by the gorm driver (psql)
+func (v *TxValue) Value() (driver.Value, error) {
 	return v.value.String(), nil
 }
 
-func (v *txValue) Scan(val interface{}) error {
+// Scan reads the persisted value using the gorm driver and marshals it into a TxValue
+func (v *TxValue) Scan(val interface{}) error {
 	v.value = new(big.Int)
 	if str, ok := val.(string); ok {
 		v.value.SetString(str, 10)
@@ -237,15 +256,15 @@ func (v *txValue) Scan(val interface{}) error {
 	return nil
 }
 
-func (v *txValue) BigInt() *big.Int {
+func (v *TxValue) BigInt() *big.Int {
 	return v.value
 }
 
-func (v *txValue) MarshalJSON() ([]byte, error) {
+func (v *TxValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *txValue) UnmarshalJSON(data []byte) error {
+func (v *TxValue) UnmarshalJSON(data []byte) error {
 	v.value = new(big.Int)
 	v.value.SetString(string(data), 10)
 	return nil
@@ -368,13 +387,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
 						natsutil.NatsStreamingPublish(natsTxReceiptSubject, txReceiptMsg)
-					} else {
-						desc := err.Error()
-						t.updateStatus(db, "failed", &desc)
 					}
 				}
 			}
-			return rowsAffected > 0 && len(t.Errors) == 0
 		}
 	}
 	return false
@@ -421,6 +436,24 @@ func (t *Transaction) Validate() bool {
 			Message: common.StringOrNil("Transaction network did not match wallet network in application context"),
 		})
 	}
+
+	if t.Signer != nil {
+		if t.AccountID != nil {
+			t.Errors = append(t.Errors, &provide.Error{
+				Message: common.StringOrNil("provided signer and account_id to tx creation, which is ambiguous"),
+			})
+		} else {
+			account := &wallet.Account{}
+			db.Where("address = ?", t.Signer).Find(&account)
+			if account == nil || account.ID == uuid.Nil {
+				t.Errors = append(t.Errors, &provide.Error{
+					Message: common.StringOrNil("failed to resolve signer account address to account"),
+				})
+			}
+			t.AccountID = &account.ID
+		}
+	}
+
 	return len(t.Errors) == 0
 }
 
@@ -553,17 +586,9 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 		err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *network.Name)
 	}
 
-	if err != nil {
-		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *network.Name, signer.String(), err.Error())
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		desc := err.Error()
-		t.updateStatus(db, "failed", &desc)
-	} else {
+	if err == nil {
 		broadcastAt := time.Now()
 		t.BroadcastAt = &broadcastAt
-		db.Save(&t)
 	}
 
 	return err
@@ -582,8 +607,6 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
-		desc := err.Error()
-		t.updateStatus(db, "failed", &desc)
 	}
 
 	return err
