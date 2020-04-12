@@ -129,6 +129,7 @@ func TestWalletCreate(t *testing.T) {
 		big.NewInt(0),
 		&zerouint64,
 		uint64(0),
+		nil,
 	)
 
 	if signedTx == nil {
