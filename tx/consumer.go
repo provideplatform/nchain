@@ -250,10 +250,12 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 				}
 
 				if faucetTx.Create(db) {
-					common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", tx.NetworkID)
+					db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
+
+					common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", *faucetTx.To)
 					contract.TransactionID = &tx.ID
 					db.Save(&contract)
-					common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
+					common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
 				}
 
 				// FIXME-- should this logic change?
@@ -777,14 +779,11 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
-		if msg.Redelivered { // FIXME-- implement proper dead-letter logic; only set tx to failed upon deadletter
-			desc := fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error())
-			common.Log.Warningf(desc)
-			tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		}
-
+		common.Log.Warningf(fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error()))
 		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
+		common.Log.Debugf("fetched tx receipt for hash: %s", *tx.Hash)
+		tx.updateStatus(db, "success", nil)
 		msg.Ack()
 	}
 }

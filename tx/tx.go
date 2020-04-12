@@ -111,7 +111,7 @@ func (txs *TransactionSigner) Address() string {
 
 // Sign implements the Signer interface
 func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash *string, err error) {
-	if tx == nil || tx.Data == nil {
+	if tx == nil {
 		err := errors.New("cannot sign nil transaction payload")
 		common.Log.Warning(err.Error())
 		return nil, nil, err
@@ -145,7 +145,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 		if txs.Account != nil {
 			if txs.Account.PrivateKey != nil {
-				common.Log.Debugf("ATTEMPTING TO SIGN...")
 				privateKey, _ := common.DecryptECDSAPrivateKey(*txs.Account.PrivateKey)
 				signedTx, hash, err = provide.EVMSignTx(
 					txs.Network.ID.String(),
@@ -159,8 +158,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 					uint64(gas),
 					gasPrice,
 				)
-
-				common.Log.Debugf("%s", signedTx)
 
 				if err == nil {
 					accessedAt := time.Now()
@@ -256,14 +253,17 @@ func (v *TxValue) Scan(val interface{}) error {
 	return nil
 }
 
+// BigInt returns the value represented as big.Int
 func (v *TxValue) BigInt() *big.Int {
 	return v.value
 }
 
+// MarshalJSON marshals the tx value to bytes
 func (v *TxValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
+// UnmarshalJSON sets the tx value big.Int from its string representation
 func (v *TxValue) UnmarshalJSON(data []byte) error {
 	v.value = new(big.Int)
 	v.value.SetString(string(data), 10)
@@ -387,6 +387,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					if err == nil {
 						txReceiptMsg, _ := json.Marshal(t)
 						natsutil.NatsStreamingPublish(natsTxReceiptSubject, txReceiptMsg)
+
+						return true
 					}
 				}
 			}
