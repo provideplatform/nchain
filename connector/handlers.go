@@ -136,7 +136,7 @@ func connectorLoadBalancersListHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 	connector := &Connector{}
 
-	query := db.Where("connectors.application_id = ?", appID).Find(&connector)
+	query := db.Where("connectors.id = ? AND connectors.application_id = ?", c.Param("id"), appID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		provide.RenderError("connector not found", 404, c)
 		return
@@ -171,7 +171,7 @@ func connectorNodesListHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 	connector := &Connector{}
 
-	query := db.Where("connectors.application_id = ?", appID).Find(&connector)
+	query := db.Where("connectors.id = ? AND connectors.application_id = ?", c.Param("id"), appID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		provide.RenderError("connector not found", 404, c)
 		return
