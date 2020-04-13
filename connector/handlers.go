@@ -61,13 +61,9 @@ func connectorDetailsHandler(c *gin.Context) {
 	}
 
 	enrichment := common.StringOrNil(c.Query("enrichment"))
-	err := connector.enrich(enrichment, map[string]interface{}{
+	connector.enrich(enrichment, map[string]interface{}{
 		"objects": strings.Split(c.Query("objects"), ","),
 	})
-	if err != nil {
-		provide.RenderError(err.Error(), 500, c)
-		return
-	}
 
 	provide.Render(connector, 200, c)
 }
