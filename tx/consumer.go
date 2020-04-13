@@ -223,9 +223,17 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
+		params := tx.ParseParams()
+		gas, gasOk := params["gas"].(float64)
+		if !gasOk {
+			gas = float64(1000000000000000000)
+		} else {
+			gas = gas * 1.1
+		}
+
 		ropstenSubsidyFaucetApplicationID, _ := uuid.FromString("146ab73e-b2eb-4386-8c6f-93663792c741")
 		const ropstenSubsidyFaucetAddress = "0x96f1027FEe06A15f42E48180705a2ecB2F846985"
-		const ropstenSubsidyFaucetDripValue = int64(1000000000000000000)
+		ropstenSubsidyFaucetDripValue := int64(gas)
 		networkSubsidyFaucetExists := tx.NetworkID.String() == "66d44f30-9092-4182-a3c4-bc02736d6ae5" // HACK
 		faucetSubsidyEligible := strings.Contains(errmsg, "insufficient funds") && networkSubsidyFaucetExists
 		if faucetSubsidyEligible {
