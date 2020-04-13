@@ -27,23 +27,23 @@ import (
 
 const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 2048
-const txAckWait = time.Second * 10
+const txAckWait = time.Second * 15
 const txMsgTimeout = int64(txAckWait * 3)
 
 const natsTxCreateSubject = "goldmine.tx.create"
 const natsTxCreateMaxInFlight = 2048
 const txCreateAckWait = time.Second * 30
-const txCreateMsgTimeout = int64(txCreateAckWait * 5)
+const txCreateMsgTimeout = int64(txCreateAckWait * 3)
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
-const txFinalizeAckWait = time.Second * 10
-const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 3)
+const txFinalizeAckWait = time.Second * 15
+const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 
 const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
-const txReceiptAckWait = time.Second * 10
-const txReceiptMsgTimeout = int64(txReceiptAckWait * 3)
+const txReceiptAckWait = time.Second * 15
+const txReceiptMsgTimeout = int64(txReceiptAckWait * 6)
 
 var waitGroup sync.WaitGroup
 
