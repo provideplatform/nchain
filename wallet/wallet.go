@@ -215,13 +215,13 @@ func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, err
 	if masterKey == nil {
 		return nil, fmt.Errorf("failed to reinitialize master key to attempt account derivation at path: %s", pathstr)
 	}
-	common.Log.Debugf("reinitialized master key to attempt account derivation at path: %s; key; %s", pathstr, masterKey)
+	common.Log.Debugf("reinitialized master key to attempt account derivation at path: %s", pathstr)
 
 	childKey, err := masterKey.NewChildKey(0x80000000 + coin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize child key at derivation path: m/%d'/%d'; %s", *w.Purpose, coin, err.Error())
 	}
-	common.Log.Debugf("derived child key at derivation path: m/%d'/%d'; key: %s", *w.Purpose, coin, childKey)
+	common.Log.Debugf("derived child key at derivation path: m/%d'/%d'", *w.Purpose, coin)
 
 	w0 := &Wallet{
 		Path:    &pathstr,
@@ -234,7 +234,7 @@ func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize child key at derivation path: m/%d'/%d'/%d'; %s", *w.Purpose, coin, account, err.Error())
 	}
-	common.Log.Debugf("derived child key at derivation path: m/%d'/%d'/%d'; key: %s", *w.Purpose, coin, account, childKey)
+	common.Log.Debugf("derived child key at derivation path: m/%d'/%d'/%d'", *w.Purpose, coin, account)
 
 	w1 := &Wallet{
 		Path:    &pathstr,
@@ -385,7 +385,7 @@ func (w *Wallet) generate(db *gorm.DB) error {
 	w.Seed = &seedstr
 	w.populate(masterKey)
 
-	common.Log.Debugf("generated HD wallet master seed; mnemonic: %s; %d-byte seed; xpub: %s; xprv: %s", mnemonic, len(seed), *w.PublicKey, *w.PrivateKey)
+	common.Log.Debugf("generated HD wallet %d-byte master seed with mnemonic; xpub: %s", len(seed), *w.PublicKey)
 	return nil
 }
 
