@@ -94,8 +94,8 @@ func (p *GethP2PProvider) EnrichStartCommand(bootnodes []string) []string {
 }
 
 // FetchTxReceipt fetch a transaction receipt given its hash
-func (p *GethP2PProvider) FetchTxReceipt(hash, signerAddress string) (*provide.TxReceipt, error) {
-	receipt, err := evmFetchTxReceipt(p.networkID, *p.rpcURL, hash, signerAddress)
+func (p *GethP2PProvider) FetchTxReceipt(signerAddress, hash string) (*provide.TxReceipt, error) {
+	receipt, err := evmFetchTxReceipt(p.networkID, *p.rpcURL, signerAddress, hash)
 	if err != nil {
 		return nil, err
 	}

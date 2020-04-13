@@ -64,8 +64,8 @@ type API interface {
 	AddPeer(string) error
 	RemovePeer(string) error
 	ParsePeerURL(string) (*string, error)
-	FetchTxReceipt(string, string) (*provide.TxReceipt, error)
-	FetchTxTraces(string) (*provide.TxTrace, error)
+	FetchTxReceipt(signerAddress, hash string) (*provide.TxReceipt, error)
+	FetchTxTraces(hash string) (*provide.TxTrace, error)
 	FormatBootnodes([]string) string
 	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
 	ResolvePeerURL() (*string, error)
@@ -76,7 +76,7 @@ type API interface {
 	EnrichStartCommand(bootnodes []string) []string
 }
 
-func evmFetchTxReceipt(rpcClientKey, rpcURL, hash, signerAddress string) (*types.Receipt, error) {
+func evmFetchTxReceipt(rpcClientKey, rpcURL, signerAddress, hash string) (*types.Receipt, error) {
 	receipt, err := provide.EVMGetTxReceipt(rpcClientKey, rpcURL, hash, signerAddress)
 	if err != nil {
 		common.Log.Warningf("failed to fetch tx receipt; %s", err.Error())
