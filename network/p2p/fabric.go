@@ -2,11 +2,13 @@ package p2p
 
 import (
 	"errors"
+	"math/big"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
+	provide "github.com/provideservices/provide-go"
 )
 
 // HyperledgerFabricP2PProvider is a network.p2p.API implementing the hyperledger fabric API
@@ -14,14 +16,16 @@ type HyperledgerFabricP2PProvider struct {
 	rpcClientKey *string
 	rpcURL       *string
 	network      common.Configurable
+	networkID    string
 }
 
 // InitHyperledgerFabricP2PProvider initializes and returns the parity p2p provider
-func InitHyperledgerFabricP2PProvider(rpcURL *string, ntwrk common.Configurable) *HyperledgerFabricP2PProvider {
+func InitHyperledgerFabricP2PProvider(rpcURL *string, networkID string, ntwrk common.Configurable) *HyperledgerFabricP2PProvider {
 	return &HyperledgerFabricP2PProvider{
 		rpcClientKey: rpcURL,
 		rpcURL:       rpcURL,
 		network:      ntwrk,
+		networkID:    networkID,
 	}
 }
 
@@ -42,6 +46,16 @@ func (p *HyperledgerFabricP2PProvider) DefaultEntrypoint() []string {
 func (p *HyperledgerFabricP2PProvider) EnrichStartCommand(bootnodes []string) []string {
 	cmd := make([]string, 0)
 	return cmd
+}
+
+// FetchTxReceipt fetch a transaction receipt given its hash
+func (p *HyperledgerFabricP2PProvider) FetchTxReceipt(hash, signerAddress string) (*provide.TxReceipt, error) {
+	return nil, errors.New("fabric does not impl FetchTxReceipt()")
+}
+
+// FetchTxTraces fetch transaction traces given its hash
+func (p *HyperledgerFabricP2PProvider) FetchTxTraces(string) (*provide.TxTrace, error) {
+	return nil, errors.New("fabric does not impl FetchTxTraces()")
 }
 
 // AcceptNonReservedPeers allows non-reserved peers to connect
@@ -77,6 +91,11 @@ func (p *HyperledgerFabricP2PProvider) RemovePeer(peerURL string) error {
 // ResolvePeerURL attempts to resolve one or more viable peer urls
 func (p *HyperledgerFabricP2PProvider) ResolvePeerURL() (*string, error) {
 	return nil, errors.New("fabric p2p provider does not impl ResolvePeerURL()")
+}
+
+// ResolveTokenContract attempts to resolve the given token contract details for the contract at a given address
+func (p *HyperledgerFabricP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *big.Int, *string, error) {
+	return nil, nil, nil, errors.New("fabric p2p provider does not impl ResolveTokenContract()")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes

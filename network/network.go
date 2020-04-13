@@ -955,7 +955,7 @@ func (n *Network) BootnodesTxt() (*string, error) {
 
 	var txt *string
 
-	p2pAPI, err := n.p2pAPIClient()
+	p2pAPI, err := n.P2PAPIClient()
 	if err == nil {
 		txt = common.StringOrNil(p2pAPI.FormatBootnodes(peerURLs))
 	} else {
@@ -1045,8 +1045,8 @@ func (n *Network) IsHandshakeNetwork() bool {
 	return false
 }
 
-// p2pAPIClient returns an instance of the network's underlying p2p.API, if that is possible given the network config
-func (n *Network) p2pAPIClient() (p2p.API, error) {
+// P2PAPIClient returns an instance of the network's underlying p2p.API, if that is possible given the network config
+func (n *Network) P2PAPIClient() (p2p.API, error) {
 	cfg := n.ParseConfig()
 	client, clientOk := cfg[nodeConfigClient].(string)
 	if !clientOk {
@@ -1063,17 +1063,17 @@ func (n *Network) p2pAPIClient() (p2p.API, error) {
 	case p2p.ProviderBcoin:
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
 	case p2p.ProviderGeth:
-		apiClient = p2p.InitGethP2PProvider(common.StringOrNil(rpcURL), n)
+		apiClient = p2p.InitGethP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	case p2p.ProviderHyperledgerBesu:
 		return nil, fmt.Errorf("besu p2p provider not yet implemented")
 	case p2p.ProviderHyperledgerFabric:
-		apiClient = p2p.InitHyperledgerFabricP2PProvider(common.StringOrNil(rpcURL), n)
+		apiClient = p2p.InitHyperledgerFabricP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	case p2p.ProviderNethermind:
-		apiClient = p2p.InitNethermindP2PProvider(common.StringOrNil(rpcURL), n)
+		apiClient = p2p.InitNethermindP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	case p2p.ProviderParity:
-		apiClient = p2p.InitParityP2PProvider(common.StringOrNil(rpcURL), n)
+		apiClient = p2p.InitParityP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	case p2p.ProviderQuorum:
-		apiClient = p2p.InitQuorumP2PProvider(common.StringOrNil(rpcURL), n)
+		apiClient = p2p.InitQuorumP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	default:
 		return nil, fmt.Errorf("Failed to resolve p2p provider for network %s; unsupported client", n.ID)
 	}

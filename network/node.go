@@ -508,7 +508,7 @@ func (n *Node) deploy(db *gorm.DB) error {
 	}
 
 	if isPeerToPeer {
-		p2pAPI, err := n.p2pAPIClient()
+		p2pAPI, err := n.P2PAPIClient()
 		if err != nil {
 			common.Log.Warningf("Failed to deploy network node with id: %s; %s", n.ID, err.Error())
 			return err
@@ -701,7 +701,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		if isPeerToPeer {
 			common.Log.Debugf("Applying peer-to-peer environment sanity rules to deploy network node: %s; role: %s", n.ID, role)
-			p2pAPI, err = n.p2pAPIClient()
+			p2pAPI, err = n.P2PAPIClient()
 			if err != nil {
 				err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
 				return err
@@ -952,7 +952,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	_, regionOk := cfg[nodeConfigRegion].(string)
 
 	if regionOk {
-		p2pAPI, err = n.p2pAPIClient()
+		p2pAPI, err = n.P2PAPIClient()
 		if err != nil {
 			common.Log.Warningf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
 			return err
@@ -1164,8 +1164,8 @@ func (n *Node) orchestrationAPIClient() (orchestration.API, error) {
 	return apiClient, nil
 }
 
-// p2pAPIClient returns an instance of the node's underlying p2p.API
-func (n *Node) p2pAPIClient() (p2p.API, error) {
+// P2PAPIClient returns an instance of the node's underlying p2p.API
+func (n *Node) P2PAPIClient() (p2p.API, error) {
 	cfg := n.ParseConfig()
 	client, clientOk := cfg[nodeConfigClient].(string)
 	if !clientOk {
@@ -1189,17 +1189,17 @@ func (n *Node) p2pAPIClient() (p2p.API, error) {
 	case p2p.ProviderBcoin:
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
 	case p2p.ProviderGeth:
-		apiClient = p2p.InitGethP2PProvider(rpcURL, n.Network)
+		apiClient = p2p.InitGethP2PProvider(rpcURL, n.NetworkID.String(), n.Network)
 	case p2p.ProviderHyperledgerBesu:
 		return nil, fmt.Errorf("besu p2p provider not yet implemented")
 	case p2p.ProviderHyperledgerFabric:
-		apiClient = p2p.InitHyperledgerFabricP2PProvider(rpcURL, n.Network)
+		apiClient = p2p.InitHyperledgerFabricP2PProvider(rpcURL, n.NetworkID.String(), n.Network)
 	case p2p.ProviderNethermind:
-		apiClient = p2p.InitNethermindP2PProvider(rpcURL, n.Network)
+		apiClient = p2p.InitNethermindP2PProvider(rpcURL, n.NetworkID.String(), n.Network)
 	case p2p.ProviderParity:
-		apiClient = p2p.InitParityP2PProvider(rpcURL, n.Network)
+		apiClient = p2p.InitParityP2PProvider(rpcURL, n.NetworkID.String(), n.Network)
 	case p2p.ProviderQuorum:
-		apiClient = p2p.InitQuorumP2PProvider(rpcURL, n.Network)
+		apiClient = p2p.InitQuorumP2PProvider(rpcURL, n.NetworkID.String(), n.Network)
 	default:
 		return nil, fmt.Errorf("Failed to resolve p2p provider for network node %s; unsupported client", n.ID)
 	}
@@ -1208,7 +1208,7 @@ func (n *Node) p2pAPIClient() (p2p.API, error) {
 }
 
 func (n *Node) addPeer(peerURL string) error {
-	apiClient, err := n.p2pAPIClient()
+	apiClient, err := n.P2PAPIClient()
 	if err != nil {
 		common.Log.Warningf("Failed to add peer; %s", err.Error())
 		return err
@@ -1217,7 +1217,7 @@ func (n *Node) addPeer(peerURL string) error {
 }
 
 func (n *Node) removePeer(peerURL string) error {
-	apiClient, err := n.p2pAPIClient()
+	apiClient, err := n.P2PAPIClient()
 	if err != nil {
 		common.Log.Warningf("Failed to remove peer; %s", err.Error())
 		return err
@@ -1226,7 +1226,7 @@ func (n *Node) removePeer(peerURL string) error {
 }
 
 func (n *Node) acceptNonReservedPeers() error {
-	apiClient, err := n.p2pAPIClient()
+	apiClient, err := n.P2PAPIClient()
 	if err != nil {
 		common.Log.Warningf("Failed to accept non-reserved peers; %s", err.Error())
 		return err
@@ -1235,7 +1235,7 @@ func (n *Node) acceptNonReservedPeers() error {
 }
 
 func (n *Node) dropNonReservedPeers() error {
-	apiClient, err := n.p2pAPIClient()
+	apiClient, err := n.P2PAPIClient()
 	if err != nil {
 		common.Log.Warningf("Failed to drop non-reserved peers; %s", err.Error())
 		return err
@@ -1244,7 +1244,7 @@ func (n *Node) dropNonReservedPeers() error {
 }
 
 func (n *Node) upgrade() error {
-	apiClient, err := n.p2pAPIClient()
+	apiClient, err := n.P2PAPIClient()
 	if err != nil {
 		common.Log.Warningf("Failed to execute upgrade; %s", err.Error())
 		return err

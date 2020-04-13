@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/jinzhu/gorm"
@@ -22,14 +24,16 @@ type ParityP2PProvider struct {
 	rpcClientKey *string
 	rpcURL       *string
 	network      common.Configurable
+	networkID    string
 }
 
 // InitParityP2PProvider initializes and returns the parity p2p provider
-func InitParityP2PProvider(rpcURL *string, ntwrk common.Configurable) *ParityP2PProvider {
+func InitParityP2PProvider(rpcURL *string, networkID string, ntwrk common.Configurable) *ParityP2PProvider {
 	return &ParityP2PProvider{
 		rpcClientKey: rpcURL,
 		rpcURL:       rpcURL,
 		network:      ntwrk,
+		networkID:    networkID,
 	}
 }
 
@@ -117,6 +121,48 @@ func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
 }
 
+// FetchTxReceipt fetch a transaction receipt given its hash
+func (p *ParityP2PProvider) FetchTxReceipt(hash, signerAddress string) (*provide.TxReceipt, error) {
+	receipt, err := evmFetchTxReceipt(p.networkID, *p.rpcURL, hash, signerAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	logs := make([]interface{}, 0)
+	for _, log := range receipt.Logs {
+		logs = append(logs, *log)
+	}
+
+	return &provide.TxReceipt{
+		TxHash:            receipt.TxHash,
+		ContractAddress:   receipt.ContractAddress,
+		GasUsed:           receipt.GasUsed,
+		BlockHash:         receipt.BlockHash,
+		BlockNumber:       receipt.BlockNumber,
+		TransactionIndex:  receipt.TransactionIndex,
+		PostState:         receipt.PostState,
+		Status:            receipt.Status,
+		CumulativeGasUsed: receipt.CumulativeGasUsed,
+		Bloom:             receipt.Bloom,
+		Logs:              logs,
+	}, nil
+}
+
+// FetchTxTraces fetch transaction traces given its hash
+func (p *ParityP2PProvider) FetchTxTraces(hash string) (*provide.TxTrace, error) {
+	traces, err := evmFetchTxTraces(p.networkID, *p.rpcURL, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	// HACK!!!
+	prvdTraces := &provide.TxTrace{}
+	rawTraces, _ := json.Marshal(traces)
+	json.Unmarshal(rawTraces, &prvdTraces)
+
+	return prvdTraces, nil
+}
+
 // FormatBootnodes formats the given peer urls as a valid bootnodes param
 func (p *ParityP2PProvider) FormatBootnodes(bootnodes []string) string {
 	return strings.Join(bootnodes, ",")
@@ -146,6 +192,17 @@ func (p *ParityP2PProvider) ResolvePeerURL() (*string, error) {
 		}
 	}
 	return nil, errors.New("Failed to resolve peer url for parity_enode json-rpc response")
+}
+
+// ResolveTokenContract attempts to resolve the given token contract details for the contract at a given address
+func (p *ParityP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *big.Int, *string, error) {
+	switch receipt.(type) {
+	case *types.Receipt:
+		contractAddress := receipt.(*types.Receipt).ContractAddress
+		return evmResolveTokenContract(*p.rpcClientKey, *p.rpcURL, artifact, contractAddress.Hex(), signerAddress)
+	}
+
+	return nil, nil, nil, errors.New("given tx receipt was of invalid type")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes

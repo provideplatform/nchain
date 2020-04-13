@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -624,42 +624,50 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 }
 
 func (t *Transaction) fetchReceipt(db *gorm.DB, network *network.Network, signerAddress string) error {
-	if network.IsEthereumNetwork() {
-		receipt, err := provide.EVMGetTxReceipt(network.ID.String(), network.RPCURL(), *t.Hash, signerAddress)
-		if err != nil {
-			return err
-		}
-
-		common.Log.Debugf("Fetched ethereum tx receipt for tx hash: %s", *t.Hash)
-		traces, traceErr := provide.EVMTraceTx(network.ID.String(), network.RPCURL(), t.Hash)
-		if traceErr != nil {
-			common.Log.Warningf("failed to fetch ethereum tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
-			return traceErr
-		}
-		t.Response = &contract.ExecutionResponse{
-			Receipt:     receipt,
-			Traces:      traces,
-			Transaction: t,
-		}
-		t.Traces = traces
-
-		err = t.handleEthereumTxReceipt(db, network, signerAddress, receipt)
-		if err != nil {
-			common.Log.Warningf("failed to handle fetched ethereum tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
-			return err
-		}
-		t.handleEthereumTxTraces(db, network, signerAddress, traces.(*provide.EthereumTxTraceResponse), receipt)
-	}
-
-	return nil
-}
-
-func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Network, signerAddress string, receipt *types.Receipt) error {
-	client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
+	p2pAPI, err := network.P2PAPIClient()
 	if err != nil {
-		common.Log.Warningf("unable to handle ethereum tx receipt; %s", err.Error())
 		return err
 	}
+
+	if t.Hash == nil {
+		return fmt.Errorf("unable to fetch tx receipt for nil tx hash; tx id: %s", t.ID)
+	}
+
+	receipt, err := p2pAPI.FetchTxReceipt(signerAddress, *t.Hash)
+	if err != nil {
+		return err
+	}
+
+	common.Log.Debugf("Fetched tx receipt for tx hash: %s", *t.Hash)
+	t.Response = &contract.ExecutionResponse{
+		Receipt:     receipt,
+		Transaction: t,
+	}
+
+	err = t.handleTxReceipt(db, network, signerAddress, receipt)
+	if err != nil {
+		common.Log.Warningf("failed to handle fetched tx receipt for tx hash: %s; %s", *t.Hash, err.Error())
+		return err
+	}
+
+	traces, traceErr := p2pAPI.FetchTxTraces(*t.Hash)
+	if traceErr != nil {
+		common.Log.Warningf("failed to fetch tx trace for tx hash: %s; %s", *t.Hash, traceErr.Error())
+		return traceErr
+	}
+
+	t.Traces = traces
+	t.Response.Traces = t.Traces
+
+	return t.handleTxTraces(db, network, signerAddress, traces, receipt)
+}
+
+func (t *Transaction) handleTxReceipt(
+	db *gorm.DB,
+	network *network.Network,
+	signerAddress string,
+	receipt *provide.TxReceipt,
+) error {
 	if t.To == nil {
 		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, receipt.ContractAddress.Hex())
 		params := t.ParseParams()
@@ -688,6 +696,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 			errs = tok.Errors
 			return
 		}
+
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)
 		if kontract == nil || kontract.ID == uuid.Nil {
 			kontract = &contract.Contract{
@@ -700,7 +709,7 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 			}
 			if kontract.Create() {
 				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
-				kontract.ResolveTokenContract(db, network, &signerAddress, client, receipt, tokenCreateFn)
+				kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 			} else {
 				common.Log.Warningf("failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
 			}
@@ -708,29 +717,32 @@ func (t *Transaction) handleEthereumTxReceipt(db *gorm.DB, network *network.Netw
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
 			kontract.Address = common.StringOrNil(receipt.ContractAddress.Hex())
 			db.Save(&kontract)
-			kontract.ResolveTokenContract(db, network, &signerAddress, client, receipt, tokenCreateFn)
+			kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 		}
 	}
+
 	return nil
 }
 
-func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Network, signerAddress string, traces *provide.EthereumTxTraceResponse, receipt *types.Receipt) {
+func (t *Transaction) handleTxTraces(
+	db *gorm.DB,
+	network *network.Network,
+	signerAddress string,
+	traces *provide.TxTrace,
+	receipt *provide.TxReceipt,
+) error {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {
-		common.Log.Debugf("failed to resolve contract as sender of contract-internal opcode tracing functionality")
-		return
-	}
-	artifact := kontract.CompiledArtifact()
-	if artifact == nil {
-		common.Log.Warningf("failed to resolve compiled contract artifact required for contract-internal opcode tracing functionality")
-		return
+		common.Log.Debugf("contract not resolved as sender of contract-internal opcode")
+		return nil
 	}
 
-	// client, err := provide.EVMDialJsonRpc(network.ID.String(), network.rpcURL())
-	// if err != nil {
-	// 	common.Log.Warningf("unable to handle ethereum tx traces; %s", err.Error())
-	// 	return
-	// }
+	artifact := kontract.CompiledArtifact()
+	if artifact == nil {
+		errmsg := fmt.Sprintf("failed to resolve compiled contract artifact required for contract-internal opcode tracing functionality; contract id: %s", kontract.ID)
+		common.Log.Warning(errmsg)
+		return errors.New(errmsg)
+	}
 
 	for _, result := range traces.Result {
 		if result.Type != nil && *result.Type == "create" {
@@ -756,11 +768,12 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 				common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", name, fingerprint, *contractAddr, *t.Hash)
 				if strings.HasSuffix(*contractCode, fingerprint) {
 					common.Log.Debugf("Observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", name, *contractAddr, fingerprint, *t.Hash)
-
 					params, _ := json.Marshal(map[string]interface{}{
 						"compiled_artifact": dependency,
 					})
+
 					rawParams := json.RawMessage(params)
+
 					internalContract := &contract.Contract{
 						ApplicationID: t.ApplicationID,
 						NetworkID:     t.NetworkID,
@@ -770,14 +783,10 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 						Address:       contractAddr,
 						Params:        &rawParams,
 					}
+
 					if internalContract.Create() {
 						common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
-						client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
-						if err != nil {
-							common.Log.Warningf("unable to attempt token creation for contract-internal tx; %s", err.Error())
-							return
-						}
-						internalContract.ResolveTokenContract(db, network, &signerAddress, client, receipt,
+						internalContract.ResolveTokenContract(db, network, signerAddress, receipt,
 							func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 								common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
@@ -794,16 +803,20 @@ func (t *Transaction) handleEthereumTxTraces(db *gorm.DB, network *network.Netwo
 								createdToken = tok.Create()
 								tokenID = tok.ID
 								errs = tok.Errors
-								return
+
+								return createdToken, tokenID, errs
 							})
 					} else {
 						common.Log.Warningf("failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
 					}
+
 					break
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
 // RefreshDetails populates transaction details which were not necessarily available upon broadcast, including network-specific metadata and VM execution tracing if applicable
@@ -812,14 +825,19 @@ func (t *Transaction) RefreshDetails() error {
 		return nil
 	}
 
-	var err error
 	network, _ := t.GetNetwork()
-	if network.IsEthereumNetwork() {
-		t.Traces, err = provide.EVMTraceTx(network.ID.String(), network.RPCURL(), t.Hash)
+	p2pAPI, clientErr := network.P2PAPIClient()
+	if clientErr != nil {
+		return clientErr
 	}
+
+	var err error
+	t.Traces, err = p2pAPI.FetchTxTraces(*t.Hash)
 	if err != nil {
+		common.Log.Warningf("failed to fetch tx trace for tx hash: %s; %s", *t.Hash, err.Error())
 		return err
 	}
+
 	return nil
 }
 

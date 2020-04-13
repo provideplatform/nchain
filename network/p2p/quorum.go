@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -17,14 +19,16 @@ type QuorumP2PProvider struct {
 	rpcClientKey *string
 	rpcURL       *string
 	network      common.Configurable
+	networkID    string
 }
 
 // InitQuorumP2PProvider initializes and returns the geth p2p provider
-func InitQuorumP2PProvider(rpcURL *string, ntwrk common.Configurable) *QuorumP2PProvider {
+func InitQuorumP2PProvider(rpcURL *string, networkID string, ntwrk common.Configurable) *QuorumP2PProvider {
 	return &QuorumP2PProvider{
 		rpcClientKey: rpcURL,
 		rpcURL:       rpcURL,
 		network:      ntwrk,
+		networkID:    networkID,
 	}
 }
 
@@ -106,6 +110,48 @@ func (p *QuorumP2PProvider) DropNonReservedPeers() error {
 	return errors.New("quorum does not implement DropNonReservedPeers()")
 }
 
+// FetchTxReceipt fetch a transaction receipt given its hash
+func (p *QuorumP2PProvider) FetchTxReceipt(hash, signerAddress string) (*provide.TxReceipt, error) {
+	receipt, err := evmFetchTxReceipt(p.networkID, *p.rpcURL, hash, signerAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	logs := make([]interface{}, 0)
+	for _, log := range receipt.Logs {
+		logs = append(logs, *log)
+	}
+
+	return &provide.TxReceipt{
+		TxHash:            receipt.TxHash,
+		ContractAddress:   receipt.ContractAddress,
+		GasUsed:           receipt.GasUsed,
+		BlockHash:         receipt.BlockHash,
+		BlockNumber:       receipt.BlockNumber,
+		TransactionIndex:  receipt.TransactionIndex,
+		PostState:         receipt.PostState,
+		Status:            receipt.Status,
+		CumulativeGasUsed: receipt.CumulativeGasUsed,
+		Bloom:             receipt.Bloom,
+		Logs:              logs,
+	}, nil
+}
+
+// FetchTxTraces fetch transaction traces given its hash
+func (p *QuorumP2PProvider) FetchTxTraces(hash string) (*provide.TxTrace, error) {
+	traces, err := evmFetchTxTraces(p.networkID, *p.rpcURL, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	// HACK!!!
+	prvdTraces := &provide.TxTrace{}
+	rawTraces, _ := json.Marshal(traces)
+	json.Unmarshal(rawTraces, &prvdTraces)
+
+	return prvdTraces, nil
+}
+
 // AddPeer adds a peer by its peer url
 func (p *QuorumP2PProvider) AddPeer(peerURL string) error {
 	var resp interface{}
@@ -150,6 +196,17 @@ func (p *QuorumP2PProvider) RemovePeer(peerURL string) error {
 // ResolvePeerURL attempts to resolve one or more viable peer urls
 func (p *QuorumP2PProvider) ResolvePeerURL() (*string, error) {
 	return nil, errors.New("quorum p2p provider does not impl ResolvePeerURL()")
+}
+
+// ResolveTokenContract attempts to resolve the given token contract details for the contract at a given address
+func (p *QuorumP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *big.Int, *string, error) {
+	switch receipt.(type) {
+	case *types.Receipt:
+		contractAddress := receipt.(*types.Receipt).ContractAddress
+		return evmResolveTokenContract(*p.rpcClientKey, *p.rpcURL, artifact, contractAddress.Hex(), signerAddress)
+	}
+
+	return nil, nil, nil, errors.New("given tx receipt was of invalid type")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes
