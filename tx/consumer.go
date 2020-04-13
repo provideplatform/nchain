@@ -43,7 +43,7 @@ const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 const natsTxReceiptSubject = "goldmine.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 15
-const txReceiptMsgTimeout = int64(txReceiptAckWait * 6)
+const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
 
 var waitGroup sync.WaitGroup
 
