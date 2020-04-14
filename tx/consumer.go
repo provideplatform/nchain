@@ -781,7 +781,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	tx := &Transaction{}
 	db.Where("id = ?", transactionID).Find(&tx)
-	if transaction == nil || transaction.ID == uuid.Nil {
+	if tx == nil || tx.ID == uuid.Nil {
 		common.Log.Warningf("Failed to fetch tx receipt; no tx resolved for id: %s", transactionID)
 		natsutil.Nack(msg)
 		return
