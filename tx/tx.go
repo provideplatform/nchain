@@ -385,8 +385,10 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				} else {
 					err = t.broadcast(db, signer.Network, signer)
 					if err == nil {
-						txReceiptMsg, _ := json.Marshal(t)
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, txReceiptMsg)
+						payload, _ := json.Marshal(map[string]interface{}{
+							"transaction_id": t.ID.String(),
+						})
+						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 
 						return true
 					}

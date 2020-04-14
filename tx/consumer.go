@@ -761,20 +761,31 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	common.Log.Debugf("Consuming NATS tx receipt message: %s", msg)
 
-	db := dbconf.DatabaseConnection()
+	var params map[string]interface{}
 
-	var tx *Transaction
-
-	err := json.Unmarshal(msg.Data, &tx)
+	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		desc := fmt.Sprintf("Failed to umarshal tx receipt message; %s", err.Error())
-		common.Log.Warningf(desc)
-		tx.updateStatus(db, "failed", common.StringOrNil(desc))
+		common.Log.Warningf("Failed to umarshal load balancer provisioning message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
 
-	tx.Reload()
+	transactionID, transactionIDOk := params["transaction_id"].(string)
+	if !transactionIDOk {
+		common.Log.Warningf("Failed to consume NATS tx receipt message; no transaction id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	tx := &Transaction{}
+	db.Where("id = ?", transactionID).Find(&tx)
+	if transaction == nil || transaction.ID == uuid.Nil {
+		common.Log.Warningf("Failed to fetch tx receipt; no tx resolved for id: %s", transactionID)
+		natsutil.Nack(msg)
+		return
+	}
 
 	signer, err := tx.signerFactory(db)
 	if err != nil {
