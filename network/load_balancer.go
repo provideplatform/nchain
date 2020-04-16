@@ -396,9 +396,10 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
 					case orchestration.ProviderAzure:
 						dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
-							"azure_tenant_id":     nil,
-							"azure_client_id":     nil,
-							"azure_client_secret": nil,
+							"azure_tenant_id":       nil,
+							"azure_subscription_id": nil,
+							"azure_client_id":       nil,
+							"azure_client_secret":   nil,
 						}, *common.DefaultInfrastructureAzureRegion)
 					case orchestration.ProviderGoogle:
 						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
@@ -717,9 +718,10 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 						case orchestration.ProviderAzure:
 							// FIXME
 							dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
-								"azure_tenant_id":     nil,
-								"azure_client_id":     nil,
-								"azure_client_secret": nil,
+								"azure_tenant_id":       nil,
+								"azure_subscription_id": nil,
+								"azure_client_id":       nil,
+								"azure_client_secret":   nil,
 							}, *common.DefaultInfrastructureAzureRegion)
 						case orchestration.ProviderGoogle:
 							// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)

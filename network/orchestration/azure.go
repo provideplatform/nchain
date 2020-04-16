@@ -1,6 +1,8 @@
 package orchestration
 
 import (
+	"context"
+
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -8,16 +10,39 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/route53"
+
+	azurewrapper "github.com/kthomas/go-azure-wrapper"
+	"github.com/provideapp/goldmine/common"
 )
 
 // AzureOrchestrationProvider is a network.orchestration.API implementing the Azure API
 type AzureOrchestrationProvider struct {
-	region string
+	region         string
+	tenantID       string
+	subscriptionID string
+	clientID       string
+	clientSecret   string
 }
 
 // InitAzureOrchestrationProvider initializes and returns the Microsoft Azure infrastructure orchestration provider
 func InitAzureOrchestrationProvider(credentials map[string]interface{}, region string) *AzureOrchestrationProvider {
-	return nil
+	tenantID, tenantIDOk := credentials["azure_tenant_id"].(string)
+	subscriptionID, subscriptionIDOk := credentials["azure_subscription_id"].(string)
+	clientID, clientIDOk := credentials["azure_client_id"].(string)
+	clientSecret, clientSecretOk := credentials["azure_client_secret"].(string)
+
+	if !tenantIDOk || !subscriptionIDOk || !clientIDOk || !clientSecretOk {
+		common.Log.Warning("Failed to initialize Azure orchestration API provider; tenant_id, subscription_id, client_id and client_secret are all required credentials")
+		return nil
+	}
+
+	return &AzureOrchestrationProvider{
+		region:         region,
+		tenantID:       tenantID,
+		subscriptionID: subscriptionID,
+		clientID:       clientID,
+		clientSecret:   clientSecret,
+	}
 }
 
 func (p *AzureOrchestrationProvider) CreateLoadBalancer(vpcID *string, name *string, securityGroupIds []string, listeners []*elb.Listener) (response *elb.CreateLoadBalancerOutput, err error) {
@@ -127,8 +152,8 @@ func (p *AzureOrchestrationProvider) GetSecurityGroups() (response *ec2.Describe
 	return nil, nil
 }
 
-func (p *AzureOrchestrationProvider) StartContainer(image, taskDefinition *string, taskRole, launchType, cluster, vpcName *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error) {
-	return nil, nil
+func (p *AzureOrchestrationProvider) StartContainer(image, taskDefinition *string, taskRole, launchType, resourceGroupName, virtualNetworkID *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error) {
+	return azurewrapper.StartContainer(context.TODO(), p.subscriptionID, p.region, *resourceGroupName, image, virtualNetworkID, cpu, memory, entrypoint, securityGroupIds, subnetIds, overrides, security)
 }
 
 func (p *AzureOrchestrationProvider) StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error) {
