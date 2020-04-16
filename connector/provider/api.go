@@ -9,6 +9,7 @@ import (
 const ElasticsearchConnectorProvider = "elasticsearch"
 const IPFSConnectorProvider = "ipfs"
 const MongoDBConnectorProvider = "mongodb"
+const NATSConnectorProvider = "nats"
 const RESTConnectorProvider = "rest"
 const RedisConnectorProvider = "redis"
 const TableauConnectorProvider = "tableau"

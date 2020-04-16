@@ -430,6 +430,15 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 			db.Model(c),
 			c.mergedConfig(),
 		)
+	case provider.NATSConnectorProvider:
+		apiClient = provider.InitNATSProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
 	case provider.RESTConnectorProvider:
 		apiClient = provider.InitRESTProvider(
 			c.ID,
