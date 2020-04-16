@@ -31,7 +31,8 @@ type NATSProvider struct {
 func InitNATSProvider(connectorID uuid.UUID, networkID, applicationID, organizationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *NATSProvider {
 	region, regionOk := config["region"].(string)
 	apiURL, _ := config["api_url"].(string)
-	if connectorID == uuid.Nil || !regionOk || networkID == nil || *networkID == uuid.Nil {
+	apiPort, apiPortOk := config["api_port"].(float64)
+	if connectorID == uuid.Nil || !regionOk || !apiPortOk || networkID == nil || *networkID == uuid.Nil {
 		return nil
 	}
 	return &NATSProvider{
@@ -43,6 +44,7 @@ func InitNATSProvider(connectorID uuid.UUID, networkID, applicationID, organizat
 		organizationID: organizationID,
 		region:         common.StringOrNil(region),
 		apiURL:         common.StringOrNil(apiURL),
+		apiPort:        int(apiPort),
 	}
 }
 
@@ -78,8 +80,14 @@ func (p *NATSProvider) rawConfig() *json.RawMessage {
 	return &_cfgJSON
 }
 
-// Deprovision undeploys all associated nodes
+// Deprovision undeploys all associated nodes and load balancers and removes them from the NATS connector
 func (p *NATSProvider) Deprovision() error {
+	loadBalancers := make([]*network.LoadBalancer, 0)
+	p.model.Association("LoadBalancers").Find(&loadBalancers)
+	for _, balancer := range loadBalancers {
+		p.model.Association("LoadBalancers").Delete(balancer)
+	}
+
 	nodes := make([]*network.Node, 0)
 	p.model.Association("Nodes").Find(&nodes)
 	for _, node := range nodes {
@@ -88,19 +96,43 @@ func (p *NATSProvider) Deprovision() error {
 		node.Delete()
 	}
 
+	for _, balancer := range loadBalancers {
+		msg, _ := json.Marshal(map[string]interface{}{
+			"load_balancer_id": balancer.ID,
+		})
+		natsutil.NatsStreamingPublish(natsLoadBalancerDeprovisioningSubject, msg)
+	}
+
 	return nil
 }
 
 // Provision configures a new load balancer and the initial NATS nodes and associates the resources with the NATS connector
 func (p *NATSProvider) Provision() error {
-	msg, _ := json.Marshal(map[string]interface{}{
-		"connector_id": p.connectorID,
-	})
-	natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
+	loadBalancer := &network.LoadBalancer{
+		NetworkID:      *p.networkID,
+		ApplicationID:  p.applicationID,
+		OrganizationID: p.organizationID,
+		Type:           common.StringOrNil(NATSConnectorProvider),
+		Description:    common.StringOrNil(fmt.Sprintf("NATS Connector Load Balancer")),
+		Region:         p.region,
+		Config:         p.rawConfig(),
+	}
 
-	err := p.ProvisionNode()
-	if err != nil {
-		common.Log.Warning(err.Error())
+	if loadBalancer.Create() {
+		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
+		p.model.Association("LoadBalancers").Append(loadBalancer)
+
+		msg, _ := json.Marshal(map[string]interface{}{
+			"connector_id": p.connectorID,
+		})
+		natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
+
+		err := p.ProvisionNode()
+		if err != nil {
+			common.Log.Warning(err.Error())
+		}
+	} else {
+		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
 	}
 
 	return nil
@@ -127,6 +159,16 @@ func (p *NATSProvider) ProvisionNode() error {
 		common.Log.Debugf("Created node %s on connector: %s", node.ID, p.connectorID)
 		p.model.Association("Nodes").Append(node)
 
+		loadBalancers := make([]*network.LoadBalancer, 0)
+		p.model.Association("LoadBalancers").Find(&loadBalancers)
+		for _, balancer := range loadBalancers {
+			msg, _ := json.Marshal(map[string]interface{}{
+				"load_balancer_id": balancer.ID.String(),
+				"node_id":          node.ID.String(),
+			})
+			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
+		}
+
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID.String(),
 		})
@@ -138,12 +180,12 @@ func (p *NATSProvider) ProvisionNode() error {
 	return nil
 }
 
-// Reachable returns true if the Tableau API provider is available
+// Reachable returns true if the NATS API provider is available
 func (p *NATSProvider) Reachable() bool {
-	nodes := make([]*network.Node, 0)
-	p.model.Association("Nodes").Find(&nodes)
-	for _, node := range nodes {
-		if node.ReachableOnPort(uint(p.apiPort)) {
+	loadBalancers := make([]*network.LoadBalancer, 0)
+	p.model.Association("LoadBalancers").Find(&loadBalancers)
+	for _, loadBalancer := range loadBalancers {
+		if loadBalancer.ReachableOnPort(uint(p.apiPort)) {
 			return true
 		}
 	}
