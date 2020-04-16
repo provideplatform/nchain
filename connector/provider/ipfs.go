@@ -29,7 +29,6 @@ type IPFSProvider struct {
 	region         *string
 	apiURL         *string
 	apiPort        int
-	gatewayPort    int
 }
 
 // InitIPFSProvider initializes and returns the IPFS connector API provider
@@ -37,8 +36,7 @@ func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID, organizat
 	region, regionOk := config["region"].(string)
 	apiURL, _ := config["api_url"].(string)
 	apiPort, apiPortOk := config["api_port"].(float64)
-	gatewayPort, gatewayPortOk := config["gateway_port"].(float64)
-	if connectorID == uuid.Nil || !regionOk || !apiPortOk || !gatewayPortOk || networkID == nil || *networkID == uuid.Nil {
+	if connectorID == uuid.Nil || !regionOk || !apiPortOk || networkID == nil || *networkID == uuid.Nil {
 		return nil
 	}
 	return &IPFSProvider{
@@ -51,7 +49,6 @@ func InitIPFSProvider(connectorID uuid.UUID, networkID, applicationID, organizat
 		region:         common.StringOrNil(region),
 		apiURL:         common.StringOrNil(apiURL),
 		apiPort:        int(apiPort),
-		gatewayPort:    int(gatewayPort),
 	}
 }
 
