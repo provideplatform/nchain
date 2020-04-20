@@ -326,10 +326,10 @@ func nodeLogsHandler(c *gin.Context) {
 	if node == nil || node.ID == uuid.Nil {
 		provide.RenderError("network node not found", 404, c)
 		return
-	} else if userID != nil && *node.UserID != *userID {
+	} else if userID != nil && node.UserID != nil && *node.UserID != *userID {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if appID != nil && *node.ApplicationID != *appID {
+	} else if appID != nil && node.ApplicationID != nil && *node.ApplicationID != *appID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
