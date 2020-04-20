@@ -224,7 +224,11 @@ func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEnti
 		common.Log.Debugf("created agreement via baseline connector; %s", resp)
 	}
 
-	return resp, nil
+	entity := &ConnectedEntity{}
+	respJSON, _ := json.Marshal(resp)
+	json.Unmarshal(respJSON, &entity)
+
+	return entity, nil
 }
 
 // Read impl for BaselineProvider
