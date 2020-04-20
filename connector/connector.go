@@ -82,6 +82,21 @@ func (c *Connector) enrich(enrichment *string, params map[string]interface{}) er
 	return nil
 }
 
+func (c *Connector) createEntity(params map[string]interface{}) (interface{}, error) {
+	apiClient, err := c.connectorAPI()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve connector API for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+
+	resp, err := apiClient.Create(params)
+	if err != nil {
+		common.Log.Warningf("failed to create connected entity for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 // ParseConfig - parse the original JSON params used for Connector creation
 func (c *Connector) ParseConfig() map[string]interface{} {
 	cfg := map[string]interface{}{}
