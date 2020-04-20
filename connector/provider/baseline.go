@@ -202,18 +202,7 @@ func (p *BaselineProvider) Reachable() bool {
 // Create impl for BaselineProvider
 func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
 	apiClient := p.apiClientFactory(nil)
-	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", map[string]interface{}{
-		"query": "mutation createAgreement($input: inputAgreement!) {\n  createAgreement(input: $input) {\n    zkpPublicKeyOfSender\n    zkpPublicKeyOfRecipient\n    name\n  }\n}",
-		"variables": map[string]interface{}{
-			"input": map[string]interface{}{
-				"recipientAddress":     "0x5ACcdCCE3E60BD98Af2dc48aaf9D1E35E7EC8B5f",
-				"name":                 "CO-1234",
-				"description":          "CO for services",
-				"erc20ContractAddress": "0xcd234a471b72ba2f1ccf0a70fcaba648a5eecd8d",
-				"prevId":               "sow234",
-			},
-		},
-	}, p.tlsClientConfigFactory())
+	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", params), p.tlsClientConfigFactory())
 
 	if err != nil {
 		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
