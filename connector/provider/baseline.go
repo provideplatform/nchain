@@ -202,7 +202,7 @@ func (p *BaselineProvider) Reachable() bool {
 // Create impl for BaselineProvider
 func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
 	apiClient := p.apiClientFactory(nil)
-	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", params), p.tlsClientConfigFactory())
+	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", params, p.tlsClientConfigFactory())
 
 	if err != nil {
 		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
