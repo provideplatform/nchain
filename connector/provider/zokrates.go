@@ -31,7 +31,8 @@ type ZokratesProvider struct {
 func InitZokratesProvider(connectorID uuid.UUID, networkID, applicationID, organizationID *uuid.UUID, model *gorm.DB, config map[string]interface{}) *ZokratesProvider {
 	region, regionOk := config["region"].(string)
 	apiURL, _ := config["api_url"].(string)
-	if connectorID == uuid.Nil || !regionOk || networkID == nil || *networkID == uuid.Nil {
+	apiPort, apiPortOk := config["api_port"].(float64)
+	if connectorID == uuid.Nil || !regionOk || !apiPortOk || networkID == nil || *networkID == uuid.Nil {
 		return nil
 	}
 	return &ZokratesProvider{
@@ -43,6 +44,7 @@ func InitZokratesProvider(connectorID uuid.UUID, networkID, applicationID, organ
 		organizationID: organizationID,
 		region:         common.StringOrNil(region),
 		apiURL:         common.StringOrNil(apiURL),
+		apiPort:        int(apiPort),
 	}
 }
 
