@@ -1,12 +1,14 @@
 package provider
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
+	provide "github.com/provideservices/provide-go"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -48,7 +50,7 @@ func InitBaselineProvider(connectorID uuid.UUID, networkID, applicationID, organ
 	}
 }
 
-func (p *BaselineProvider) apiClientFactory(basePath *string) *ipfs.Shell {
+func (p *BaselineProvider) apiClientFactory(basePath *string) *provide.APIClient {
 	uri := ""
 	if basePath != nil {
 		uri = *basePath
@@ -59,7 +61,11 @@ func (p *BaselineProvider) apiClientFactory(basePath *string) *ipfs.Shell {
 		return nil
 	}
 
-	return ipfs.NewShell(*apiURL)
+	parts := strings.Split(*apiURL, "://")
+	return &provide.APIClient{
+		Host:   parts[len(parts)-1],
+		Scheme: parts[0],
+	}
 }
 
 func (p *BaselineProvider) apiURLFactory(path string) *string {
@@ -195,7 +201,30 @@ func (p *BaselineProvider) Reachable() bool {
 
 // Create impl for BaselineProvider
 func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
-	return nil, errors.New("create not implemented for Baseline connectors")
+	apiClient := p.apiClientFactory(nil)
+	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", map[string]interface{}{
+		"query": "mutation createAgreement($input: inputAgreement!) {\n  createAgreement(input: $input) {\n    zkpPublicKeyOfSender\n    zkpPublicKeyOfRecipient\n    name\n  }\n}",
+		"variables": map[string]interface{}{
+			"input": map[string]interface{}{
+				"recipientAddress":     "0x5ACcdCCE3E60BD98Af2dc48aaf9D1E35E7EC8B5f",
+				"name":                 "CO-1234",
+				"description":          "CO for services",
+				"erc20ContractAddress": "0xcd234a471b72ba2f1ccf0a70fcaba648a5eecd8d",
+				"prevId":               "sow234",
+			},
+		},
+	}, p.tlsClientConfigFactory())
+
+	if err != nil {
+		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
+		return nil, err
+	}
+
+	if status == 201 {
+		common.Log.Debugf("created agreement via baseline connector; %s", resp)
+	}
+
+	return resp, nil
 }
 
 // Read impl for BaselineProvider
@@ -221,4 +250,15 @@ func (p *BaselineProvider) List(params map[string]interface{}) ([]*ConnectedEnti
 // Query impl for BaselineProvider
 func (p *BaselineProvider) Query(q string) (interface{}, error) {
 	return nil, errors.New("query not implemented for Baseline connectors")
+}
+
+func (p *BaselineProvider) tlsClientConfigFactory() *tls.Config {
+	var tlsConfig *tls.Config
+	if common.DefaultInfrastructureUsesSelfSignedCertificate {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+
+	return tlsConfig
 }
