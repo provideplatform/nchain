@@ -38,7 +38,8 @@ func InstallWalletsAPI(r *gin.Engine) {
 func createAccountHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -64,6 +65,10 @@ func createAccountHandler(c *gin.Context) {
 		account.UserID = userID
 	}
 
+	if organizationID != nil {
+		account.OrganizationID = organizationID
+	}
+
 	if account.Create() {
 		provide.Render(account, 201, c)
 	} else {
@@ -76,7 +81,8 @@ func createAccountHandler(c *gin.Context) {
 func accountsListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -96,6 +102,8 @@ func accountsListHandler(c *gin.Context) {
 		query = query.Where("accounts.application_id = ?", appID)
 	} else if userID != nil {
 		query = query.Where("accounts.user_id = ?", userID)
+	} else if organizationID != nil {
+		query = query.Where("accounts.organization_id = ?", organizationID)
 	}
 
 	query = query.Where("networks.enabled = ?", true)
@@ -115,7 +123,8 @@ func accountsListHandler(c *gin.Context) {
 func accountDetailsHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -126,10 +135,13 @@ func accountDetailsHandler(c *gin.Context) {
 	if account == nil || account.ID == uuid.Nil {
 		provide.RenderError("account not found", 404, c)
 		return
-	} else if appID != nil && *account.ApplicationID != *appID {
+	} else if appID != nil && account.ApplicationID != nil && *account.ApplicationID != *appID {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if userID != nil && *account.UserID != *userID {
+	} else if userID != nil && account.UserID != nil && *account.UserID != *userID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if organizationID != nil && account.OrganizationID != nil && *account.OrganizationID != *organizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -157,7 +169,8 @@ func accountDetailsHandler(c *gin.Context) {
 func accountBalanceHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -167,10 +180,13 @@ func accountBalanceHandler(c *gin.Context) {
 	if account == nil || account.ID == uuid.Nil {
 		provide.RenderError("account not found", 404, c)
 		return
-	} else if appID != nil && *account.ApplicationID != *appID {
+	} else if appID != nil && (account.ApplicationID == nil || *account.ApplicationID != *appID) {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if userID != nil && *account.UserID != *userID {
+	} else if userID != nil && (account.UserID == nil || *account.UserID != *userID) {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if organizationID != nil && (account.OrganizationID == nil || *account.OrganizationID != *organizationID) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -188,7 +204,8 @@ func accountBalanceHandler(c *gin.Context) {
 func createWalletHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -214,6 +231,10 @@ func createWalletHandler(c *gin.Context) {
 		wallet.UserID = userID
 	}
 
+	if organizationID != nil {
+		wallet.OrganizationID = organizationID
+	}
+
 	if wallet.Create() {
 		wallet.decrypt()
 		provide.Render(wallet, 201, c)
@@ -227,7 +248,8 @@ func createWalletHandler(c *gin.Context) {
 func walletsListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -242,6 +264,8 @@ func walletsListHandler(c *gin.Context) {
 		query = query.Where("wallets.application_id = ?", appID)
 	} else if userID != nil {
 		query = query.Where("wallets.user_id = ?", userID)
+	} else if organizationID != nil {
+		query = query.Where("wallets.organization_id = ?", organizationID)
 	}
 	query = query.Order("wallets.created_at DESC")
 
@@ -256,6 +280,7 @@ func walletsListHandler(c *gin.Context) {
 func walletDetailsHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -267,10 +292,13 @@ func walletDetailsHandler(c *gin.Context) {
 	if wallet == nil || wallet.ID == uuid.Nil {
 		provide.RenderError("wallet not found", 404, c)
 		return
-	} else if appID != nil && *wallet.ApplicationID != *appID {
+	} else if appID != nil && (wallet.ApplicationID == nil && *wallet.ApplicationID != *appID) {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if userID != nil && *wallet.UserID != *userID {
+	} else if userID != nil && (wallet.UserID == nil || *wallet.UserID != *userID) {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if organizationID != nil && (wallet.OrganizationID == nil || *wallet.OrganizationID != *organizationID) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -282,7 +310,8 @@ func walletDetailsHandler(c *gin.Context) {
 func walletAccountsListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	userID := provide.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -295,10 +324,13 @@ func walletAccountsListHandler(c *gin.Context) {
 	if wallet == nil || wallet.ID == uuid.Nil {
 		provide.RenderError("wallet not found", 404, c)
 		return
-	} else if appID != nil && *wallet.ApplicationID != *appID {
+	} else if appID != nil && (wallet.ApplicationID == nil || *wallet.ApplicationID != *appID) {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if userID != nil && *wallet.UserID != *userID {
+	} else if userID != nil && (wallet.UserID == nil || *wallet.UserID != *userID) {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if organizationID != nil && (wallet.OrganizationID == nil || *wallet.OrganizationID != *organizationID) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}

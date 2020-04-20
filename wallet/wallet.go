@@ -25,9 +25,10 @@ import (
 // supports derivation of up to 2,147,483,648 associated addresses per hardened account.
 type Wallet struct {
 	provide.Model
-	WalletID      *uuid.UUID `sql:"-" json:"wallet_id,omitempty"`
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
-	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+	WalletID       *uuid.UUID `sql:"-" json:"wallet_id,omitempty"`
+	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID         *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+	OrganizationID *uuid.UUID `sql:"type:uuid" json:"organization_id,omitempty"`
 
 	Path        *string    `sql:"-" json:"path,omitempty"`
 	Purpose     *int       `sql:"not null;default:44" json:"purpose,omitempty"`
@@ -81,13 +82,13 @@ func (w *Wallet) SetID(walletID uuid.UUID) {
 func (w *Wallet) Validate() bool {
 	w.Errors = make([]*provide.Error, 0)
 
-	if w.ApplicationID == nil && w.UserID == nil {
+	if w.ApplicationID == nil && w.UserID == nil && w.OrganizationID == nil {
 		w.Errors = append(w.Errors, &provide.Error{
-			Message: common.StringOrNil("no application or user identifier provided"),
+			Message: common.StringOrNil("no application, user or organization identifier provided"),
 		})
-	} else if w.ApplicationID != nil && w.UserID != nil {
+	} else if w.ApplicationID != nil && (w.UserID != nil || w.OrganizationID != nil) {
 		w.Errors = append(w.Errors, &provide.Error{
-			Message: common.StringOrNil("only an application OR user identifier should be provided"),
+			Message: common.StringOrNil("only an application OR user or organization identifier should be provided"),
 		})
 	}
 	if w.Purpose == nil {

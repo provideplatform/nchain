@@ -21,11 +21,12 @@ import (
 // Account represents a single address associated with a specific network and application or user
 type Account struct {
 	provide.Model
-	NetworkID     *uuid.UUID `sql:"type:uuid" json:"network_id,omitempty"`
-	WalletID      *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
-	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
-	Type          *string    `json:"type,omitempty"`
+	NetworkID      *uuid.UUID `sql:"type:uuid" json:"network_id,omitempty"`
+	WalletID       *uuid.UUID `sql:"type:uuid" json:"wallet_id,omitempty"`
+	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
+	UserID         *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+	OrganizationID *uuid.UUID `sql:"type:uuid" json:"organization_id,omitempty"`
+	Type           *string    `json:"type,omitempty"`
 
 	HDDerivationPath *string `json:"hd_derivation_path,omitempty"` // i.e. m/44'/60'/0'/0
 	PublicKey        *string `sql:"type:bytea" json:"public_key,omitempty"`
@@ -165,13 +166,13 @@ func (a *Account) Validate() bool {
 			Message: common.StringOrNil(fmt.Sprintf("invalid network association attempted with network id: %s", a.NetworkID.String())),
 		})
 	}
-	if a.ApplicationID == nil && a.UserID == nil {
+	if a.ApplicationID == nil && a.UserID == nil && a.OrganizationID == nil {
 		a.Errors = append(a.Errors, &provide.Error{
-			Message: common.StringOrNil("no application or user identifier provided"),
+			Message: common.StringOrNil("no application, user or organization identifier provided"),
 		})
-	} else if a.ApplicationID != nil && a.UserID != nil {
+	} else if a.ApplicationID != nil && (a.UserID != nil || a.OrganizationID != nil) {
 		a.Errors = append(a.Errors, &provide.Error{
-			Message: common.StringOrNil("only an application OR user identifier should be provided"),
+			Message: common.StringOrNil("only an application OR user or organization identifier should be provided"),
 		})
 	}
 	var err error
