@@ -365,7 +365,7 @@ func (c *Connector) Validate() bool {
 			Message: common.StringOrNil("Unable to deploy connector using unspecified network"),
 		})
 	}
-	if c.Type == nil || (strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "nats" && strings.ToLower(*c.Type) != "rest" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
+	if c.Type == nil || (strings.ToLower(*c.Type) != "baseline" && strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "nats" && strings.ToLower(*c.Type) != "rest" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
 		c.Errors = append(c.Errors, &provide.Error{
 			Message: common.StringOrNil("Unable to define connector of invalid type"),
 		})
@@ -403,6 +403,15 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 	var apiClient provider.API
 
 	switch *c.Type {
+	case provider.BaselineConnectorProvider:
+		apiClient = provider.InitBaselineProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
 	case provider.ElasticsearchConnectorProvider:
 		apiClient = provider.InitElasticsearchProvider(
 			c.ID,

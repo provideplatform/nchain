@@ -6,6 +6,7 @@ import (
 	"github.com/provideservices/provide-go"
 )
 
+const BaselineConnectorProvider = "baseline"
 const ElasticsearchConnectorProvider = "elasticsearch"
 const IPFSConnectorProvider = "ipfs"
 const MongoDBConnectorProvider = "mongodb"
