@@ -201,10 +201,19 @@ func (p *ZokratesProvider) Reachable() bool {
 
 // Create impl for ZokratesProvider
 func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
-	// TODO: inject a signed NATS bearer JWT into params as `jwt`
+	uri := "compile"
+	circuitID, circuitIDOk := params["circuit_id"].(string)
+	if circuitIDOk {
+		// generate-proof
+		uri = circuitID
+	}
+
+	if uri == "compile" {
+		// TODO: inject a signed NATS bearer JWT into params as `jwt`
+	}
 
 	apiClient := p.apiClientFactory(nil)
-	status, resp, err := apiClient.PostWithTLSClientConfig("compile", params, p.tlsClientConfigFactory())
+	status, resp, err := apiClient.PostWithTLSClientConfig(uri, params, p.tlsClientConfigFactory())
 
 	if err != nil {
 		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
@@ -218,13 +227,17 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	entity := &ConnectedEntity{}
 	respJSON, _ := json.Marshal(resp)
 	json.Unmarshal(respJSON, &entity)
-	
-	if name, nameOk := params["name"].(string) {
+
+	if name, nameOk := params["name"].(string); nameOk {
 		entity.Name = &name
 	}
 
-	if source, sourceOk := params["source"].(string) {
+	if source, sourceOk := params["source"].(string); sourceOk {
 		entity.Source = &source
+	}
+
+	if entity.Raw == nil {
+		entity.Raw = common.StringOrNil(string(respJSON))
 	}
 
 	return entity, nil
@@ -232,7 +245,7 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 
 // Read impl for ZokratesProvider
 func (p *ZokratesProvider) Read(id string) (*ConnectedEntity, error) {
-	return nil, errors.New("read not implemented for Zokrates connectors")
+	return errors.New("read not implemented for Zokrates connectors")
 }
 
 // Update impl for ZokratesProvider

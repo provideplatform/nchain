@@ -201,6 +201,8 @@ func (p *BaselineProvider) Reachable() bool {
 
 // Create impl for BaselineProvider
 func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
+	// golang DTO validation
+
 	apiClient := p.apiClientFactory(nil)
 	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", params, p.tlsClientConfigFactory())
 
