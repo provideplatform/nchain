@@ -60,6 +60,7 @@ type ConnectedEntity struct {
 	Name       *string                `json:"name,omitempty"`
 	Raw        *string                `json:"raw,omitempty"`
 	Size       *uint64                `json:"size,omitempty"`
+	Source     *string                `json:"source,omitempty"`
 
 	// relations
 	Parent   *ConnectedEntity    `json:"parent,omitempty"`

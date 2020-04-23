@@ -1,12 +1,14 @@
 package provider
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
+	"github.com/provideservices/provide-go"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -48,18 +50,22 @@ func InitZokratesProvider(connectorID uuid.UUID, networkID, applicationID, organ
 	}
 }
 
-func (p *ZokratesProvider) apiClientFactory(basePath *string) *ipfs.Shell {
+func (p *ZokratesProvider) apiClientFactory(basePath *string) *provide.APIClient {
 	uri := ""
 	if basePath != nil {
 		uri = *basePath
 	}
 	apiURL := p.apiURLFactory(uri)
 	if apiURL == nil {
-		common.Log.Warningf("unable to initialize Zokrates api client factory")
+		common.Log.Warningf("unable to initialize zokrates api client factory")
 		return nil
 	}
 
-	return ipfs.NewShell(*apiURL)
+	parts := strings.Split(*apiURL, "://")
+	return &provide.APIClient{
+		Host:   parts[len(parts)-1],
+		Scheme: parts[0],
+	}
 }
 
 func (p *ZokratesProvider) apiURLFactory(path string) *string {
@@ -195,7 +201,33 @@ func (p *ZokratesProvider) Reachable() bool {
 
 // Create impl for ZokratesProvider
 func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
-	return nil, errors.New("create not implemented for Zokrates connectors")
+	// TODO: inject a signed NATS bearer JWT into params as `jwt`
+
+	apiClient := p.apiClientFactory(nil)
+	status, resp, err := apiClient.PostWithTLSClientConfig("compile", params, p.tlsClientConfigFactory())
+
+	if err != nil {
+		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
+		return nil, err
+	}
+
+	if status == 201 {
+		common.Log.Debugf("created agreement via baseline connector; %s", resp)
+	}
+
+	entity := &ConnectedEntity{}
+	respJSON, _ := json.Marshal(resp)
+	json.Unmarshal(respJSON, &entity)
+	
+	if name, nameOk := params["name"].(string) {
+		entity.Name = &name
+	}
+
+	if source, sourceOk := params["source"].(string) {
+		entity.Source = &source
+	}
+
+	return entity, nil
 }
 
 // Read impl for ZokratesProvider
@@ -221,4 +253,15 @@ func (p *ZokratesProvider) List(params map[string]interface{}) ([]*ConnectedEnti
 // Query impl for ZokratesProvider
 func (p *ZokratesProvider) Query(q string) (interface{}, error) {
 	return nil, errors.New("query not implemented for Zokrates connectors")
+}
+
+func (p *ZokratesProvider) tlsClientConfigFactory() *tls.Config {
+	var tlsConfig *tls.Config
+	if common.DefaultInfrastructureUsesSelfSignedCertificate {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+
+	return tlsConfig
 }
