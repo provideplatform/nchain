@@ -245,7 +245,7 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 
 // Read impl for ZokratesProvider
 func (p *ZokratesProvider) Read(id string) (*ConnectedEntity, error) {
-	return errors.New("read not implemented for Zokrates connectors")
+	return nil, errors.New("read not implemented for Zokrates connectors")
 }
 
 // Update impl for ZokratesProvider
