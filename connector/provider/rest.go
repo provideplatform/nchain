@@ -198,8 +198,8 @@ func (p *RESTProvider) Create(params map[string]interface{}) (*ConnectedEntity, 
 	return nil, errors.New("create not implemented for REST connectors")
 }
 
-// Read impl for RESTProvider
-func (p *RESTProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for RESTProvider
+func (p *RESTProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for REST connectors")
 }
 

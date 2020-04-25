@@ -198,8 +198,8 @@ func (p *RedisProvider) Create(params map[string]interface{}) (*ConnectedEntity,
 	return nil, errors.New("create not implemented for Redis connectors")
 }
 
-// Read impl for RedisProvider
-func (p *RedisProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for RedisProvider
+func (p *RedisProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for Redis connectors")
 }
 

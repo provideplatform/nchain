@@ -254,8 +254,8 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	return entity, nil
 }
 
-// Read impl for ZokratesProvider -- fetches the verifying key for a given circuit id
-func (p *ZokratesProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for ZokratesProvider -- fetches the verifying key for a given circuit id
+func (p *ZokratesProvider) Find(id string) (*ConnectedEntity, error) {
 	apiClient := p.apiClientFactory(nil)
 	status, resp, err := apiClient.GetWithTLSClientConfig(fmt.Sprintf("vk/%s", id), map[string]interface{}{}, p.tlsClientConfigFactory())
 

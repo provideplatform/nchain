@@ -32,10 +32,10 @@ type API interface {
 	ProvisionNode() error
 	Reachable() bool
 
-	// "data-like" connector-specific resource apis, starting with CRUD (i.e.,
+	// CRUD-like connector-specific resource apis, starting with CRUD (i.e.,
 	// this is a proxy interface to the underlying provider such as IPFS)
 	Create(params map[string]interface{}) (*ConnectedEntity, error)
-	Read(id string) (*ConnectedEntity, error)
+	Find(id string) (*ConnectedEntity, error)
 	Update(id string, params map[string]interface{}) error
 	Delete(id string) error
 

@@ -198,8 +198,8 @@ func (p *MongoDBProvider) Create(params map[string]interface{}) (*ConnectedEntit
 	return nil, errors.New("create not implemented for MongoDB connectors")
 }
 
-// Read impl for MongoDBProvider
-func (p *MongoDBProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for MongoDBProvider
+func (p *MongoDBProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for MongoDB connectors")
 }
 

@@ -198,8 +198,8 @@ func (p *NATSProvider) Create(params map[string]interface{}) (*ConnectedEntity, 
 	return nil, errors.New("create not implemented for NATS connectors")
 }
 
-// Read impl for NATSProvider
-func (p *NATSProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for NATSProvider
+func (p *NATSProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for NATS connectors")
 }
 

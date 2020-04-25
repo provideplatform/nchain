@@ -222,8 +222,8 @@ func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	return entity, nil
 }
 
-// Read impl for BaselineProvider
-func (p *BaselineProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for BaselineProvider
+func (p *BaselineProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for Baseline connectors")
 }
 

@@ -201,8 +201,8 @@ func (p *ElasticsearchProvider) Create(params map[string]interface{}) (*Connecte
 	return nil, errors.New("create not implemented for Elasticsearch connectors")
 }
 
-// Read impl for ElasticsearchProvider
-func (p *ElasticsearchProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for ElasticsearchProvider
+func (p *ElasticsearchProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for Elasticsearch connectors")
 }
 

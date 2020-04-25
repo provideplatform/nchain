@@ -158,8 +158,8 @@ func (p *TableauProvider) Create(params map[string]interface{}) (*ConnectedEntit
 	return nil, errors.New("create not implemented for Tableau connectors")
 }
 
-// Read impl for TableauProvider
-func (p *TableauProvider) Read(id string) (*ConnectedEntity, error) {
+// Find impl for TableauProvider
+func (p *TableauProvider) Find(id string) (*ConnectedEntity, error) {
 	return nil, errors.New("read not implemented for Tableau connectors")
 }
 

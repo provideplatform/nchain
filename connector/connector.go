@@ -97,6 +97,21 @@ func (c *Connector) createEntity(params map[string]interface{}) (interface{}, er
 	return resp, nil
 }
 
+func (c *Connector) findEntity(id string) (interface{}, error) {
+	apiClient, err := c.connectorAPI()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve connector API for %s connector: %s; %s", *c.Type, c.ID, err.Error())
+	}
+
+	resp, err := apiClient.Find(id)
+	if err != nil {
+		common.Log.Warningf("failed to resolve connected entity %s for %s connector: %s; %s", *c.Type, id, c.ID, err.Error())
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 // ParseConfig - parse the original JSON params used for Connector creation
 func (c *Connector) ParseConfig() map[string]interface{} {
 	cfg := map[string]interface{}{}
