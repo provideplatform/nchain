@@ -216,17 +216,28 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	status, resp, err := apiClient.PostWithTLSClientConfig(uri, params, p.tlsClientConfigFactory())
 
 	if err != nil {
-		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
+		msg := "failed to compile circuit"
+		if circuitIDOk {
+			msg = fmt.Sprintf("failed to generate proof for circuit: %s", circuitID)
+		}
+
+		common.Log.Warningf("%s; %s", msg, err.Error())
 		return nil, err
 	}
 
-	if status == 201 {
-		common.Log.Debugf("created agreement via baseline connector; %s", resp)
+	if status == 201 && !circuitIDOk {
+		common.Log.Debugf("compiled circuit via zokrates connector; %s", resp)
+	} else if status == 201 {
+		common.Log.Debugf(fmt.Sprintf("generate proof for circuit: %s; response: %s", circuitID, resp))
 	}
 
 	entity := &ConnectedEntity{}
 	respJSON, _ := json.Marshal(resp)
 	json.Unmarshal(respJSON, &entity)
+
+	if circuitIDOk {
+		entity.ID = &circuitID
+	}
 
 	if name, nameOk := params["name"].(string); nameOk {
 		entity.Name = &name
@@ -243,9 +254,31 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	return entity, nil
 }
 
-// Read impl for ZokratesProvider
+// Read impl for ZokratesProvider -- fetches the verifying key for a given circuit id
 func (p *ZokratesProvider) Read(id string) (*ConnectedEntity, error) {
-	return nil, errors.New("read not implemented for Zokrates connectors")
+	apiClient := p.apiClientFactory(nil)
+	status, resp, err := apiClient.GetWithTLSClientConfig(fmt.Sprintf("vk/%s", id), map[string]interface{}{}, p.tlsClientConfigFactory())
+
+	if err != nil {
+		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
+		return nil, err
+	}
+
+	if status == 201 {
+		common.Log.Debugf("created agreement via baseline connector; %s", resp)
+	}
+
+	entity := &ConnectedEntity{}
+	respJSON, _ := json.Marshal(resp)
+	json.Unmarshal(respJSON, &entity)
+
+	entity.ID = &id
+
+	if entity.Raw == nil {
+		entity.Raw = common.StringOrNil(string(respJSON))
+	}
+
+	return entity, nil
 }
 
 // Update impl for ZokratesProvider
