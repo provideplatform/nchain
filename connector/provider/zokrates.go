@@ -205,7 +205,7 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	circuitID, circuitIDOk := params["circuit_id"].(string)
 	if circuitIDOk {
 		// generate-proof
-		uri = fmt.Sprintf("generate-proof/%s", circuitID)
+		uri = "generate-proof"
 	}
 
 	if uri == "compile" {
