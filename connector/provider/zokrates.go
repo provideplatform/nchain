@@ -272,7 +272,7 @@ func (p *ZokratesProvider) Find(id string) (*ConnectedEntity, error) {
 	respJSON, _ := json.Marshal(resp)
 	json.Unmarshal(respJSON, &entity)
 
-	entity.ID = &id
+	entity.ID = common.StringOrNil(id)
 
 	if entity.Raw == nil {
 		entity.Raw = common.StringOrNil(string(respJSON))

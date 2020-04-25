@@ -19,10 +19,11 @@ func InstallConnectorsAPI(r *gin.Engine) {
 	r.GET("/api/v1/connectors/:id", connectorDetailsHandler)
 	r.DELETE("/api/v1/connectors/:id", deleteConnectorHandler)
 
-	// r.GET("/api/v1/connectors/:id/entities", connectorEntitiesListHandler)
+	r.GET("/api/v1/connectors/:id/entities", connectorEntitiesListHandler)
 	r.POST("/api/v1/connectors/:id/entities", connectorEntityCreateHandler)
 	r.GET("/api/v1/connectors/:id/entities/:entityId", connectorEntityDetailsHandler)
-	// r.DELETE("/api/v1/connectors/:id/entities/:entityId", connectorEntityDeleteHandler)
+	r.PUT("/api/v1/connectors/:id/entities/:entityId", updateConnectorEntityHandler)
+	r.DELETE("/api/v1/connectors/:id/entities/:entityId", deleteConnectorEntityHandler)
 
 	r.GET("/api/v1/connectors/:id/load_balancers", connectorLoadBalancersListHandler)
 	r.GET("/api/v1/connectors/:id/nodes", connectorNodesListHandler)
@@ -191,6 +192,39 @@ func connectorNodesListHandler(c *gin.Context) {
 	provide.Render(nodes, 200, c)
 }
 
+func connectorEntitiesListHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	var connector = &Connector{}
+	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		provide.RenderError("connector not found", 404, c)
+		return
+	}
+	if *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	params := map[string]interface{}{}
+	queryParams := c.Request.URL.Query()
+	for k := range queryParams {
+		params[k] = queryParams[k]
+	}
+
+	resp, err := connector.listEntities(params)
+	if err != nil {
+		provide.RenderError(err.Error(), 500, c)
+		return
+	}
+
+	provide.Render(resp, 201, c)
+}
+
 func connectorEntityCreateHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
 	if appID == nil {
@@ -249,11 +283,78 @@ func connectorEntityDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	resp, err := connector.findEntity(c.Param("id"))
+	resp, err := connector.findEntity(c.Param("entityId"))
 	if err != nil {
 		provide.RenderError(err.Error(), 500, c)
 		return
 	}
 
 	provide.Render(resp, 201, c)
+}
+
+func updateConnectorEntityHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	params := map[string]interface{}{}
+	err = json.Unmarshal(buf, &params)
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	var connector = &Connector{}
+	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		provide.RenderError("connector not found", 404, c)
+		return
+	}
+	if *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	err = connector.updateEntity(c.Param("entityId"), params)
+	if err != nil {
+		provide.RenderError(err.Error(), 500, c)
+		return
+	}
+
+	provide.Render(nil, 204, c)
+}
+
+func deleteConnectorEntityHandler(c *gin.Context) {
+	appID := provide.AuthorizedSubjectID(c, "application")
+	if appID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	var connector = &Connector{}
+	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&connector)
+	if connector == nil || connector.ID == uuid.Nil {
+		provide.RenderError("connector not found", 404, c)
+		return
+	}
+	if *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	err := connector.deleteEntity(c.Param("entityId"))
+	if err != nil {
+		provide.RenderError(err.Error(), 500, c)
+		return
+	}
+
+	provide.Render(nil, 204, c)
 }
