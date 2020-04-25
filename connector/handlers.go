@@ -238,19 +238,6 @@ func connectorEntityDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	buf, err := c.GetRawData()
-	if err != nil {
-		provide.RenderError(err.Error(), 400, c)
-		return
-	}
-
-	params := map[string]interface{}{}
-	err = json.Unmarshal(buf, &params)
-	if err != nil {
-		provide.RenderError(err.Error(), 400, c)
-		return
-	}
-
 	var connector = &Connector{}
 	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
