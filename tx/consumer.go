@@ -226,48 +226,57 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		params := tx.ParseParams()
 		gas, gasOk := params["gas"].(float64)
 		if !gasOk {
-			gas = float64(1000000000000000000)
+			gas = float64(100000000000000000)
 		} else {
 			gas = gas * 1.1
 		}
 
-		ropstenSubsidyFaucetApplicationID, _ := uuid.FromString("146ab73e-b2eb-4386-8c6f-93663792c741")
-		const ropstenSubsidyFaucetAddress = "0x96f1027FEe06A15f42E48180705a2ecB2F846985"
-		ropstenSubsidyFaucetDripValue := int64(gas)
-		networkSubsidyFaucetExists := tx.NetworkID.String() == "66d44f30-9092-4182-a3c4-bc02736d6ae5" // HACK
+		// FIXME-- read from environment config
+		networkSubsidyFaucetApplicationAddressMapping := map[string]interface{}{
+			"66d44f30-9092-4182-a3c4-bc02736d6ae5": map[string]interface{}{
+				"01554e22-3d7a-44a3-9c65-6bcabaa08c38": "0xdD2F8052bE76FA1456e096526db5C0F12B0af564",
+				"146ab73e-b2eb-4386-8c6f-93663792c741": "0x96f1027FEe06A15f42E48180705a2ecB2F846985",
+			},
+		}
+		networkSubsidyFaucetDripValue := int64(gas)
+		networkSubsidyFaucets, networkSubsidyFaucetExists := networkSubsidyFaucetApplicationAddressMapping[tx.NetworkID.String()].(map[string]interface{})
 		faucetSubsidyEligible := strings.Contains(errmsg, "insufficient funds") && networkSubsidyFaucetExists
-		if faucetSubsidyEligible {
+
+		if faucetSubsidyEligible && len(networkSubsidyFaucets) > 0 {
 			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
 
-			out := []string{}
-			db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", ropstenSubsidyFaucetApplicationID, ropstenSubsidyFaucetAddress).Pluck("id", &out)
-			if out == nil || len(out) == 0 || len(out[0]) == 0 {
-				common.Log.Warningf("Failed to retrieve configured subsidy faucet signing identity for faucet address: %s; faucet application id: %s", ropstenSubsidyFaucetAddress, ropstenSubsidyFaucetApplicationID)
-			} else {
-				faucetAccountID, _ := uuid.FromString(out[0])
-				faucetBeneficiary, _ := tx.signerFactory(db)
-				faucetBeneficiaryAddress := faucetBeneficiary.Address()
-				faucetGas := int64(210000)
-				faucetTx := &Transaction{
-					ApplicationID: &ropstenSubsidyFaucetApplicationID,
-					Data:          common.StringOrNil("0x"),
-					NetworkID:     contract.NetworkID,
-					AccountID:     &faucetAccountID,
-					To:            common.StringOrNil(faucetBeneficiaryAddress),
-					Value:         &TxValue{value: big.NewInt(ropstenSubsidyFaucetDripValue - faucetGas)},
+			for networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress := range networkSubsidyFaucets {
+				out := []string{}
+				db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress).Pluck("id", &out)
+				if out == nil || len(out) == 0 || len(out[0]) == 0 {
+					common.Log.Warningf("Failed to retrieve configured subsidy faucet signing identity for faucet address: %s; faucet application id: %s", networkSubsidyFaucetAddress, networkSubsidyFaucetApplicationID)
+				} else {
+					faucetApplicationID, _ := uuid.FromString(networkSubsidyFaucetApplicationID)
+					faucetAccountID, _ := uuid.FromString(out[0])
+					faucetBeneficiary, _ := tx.signerFactory(db)
+					faucetBeneficiaryAddress := faucetBeneficiary.Address()
+					faucetGas := int64(210000)
+					faucetTx := &Transaction{
+						ApplicationID: &faucetApplicationID,
+						Data:          common.StringOrNil("0x"),
+						NetworkID:     contract.NetworkID,
+						AccountID:     &faucetAccountID,
+						To:            common.StringOrNil(faucetBeneficiaryAddress),
+						Value:         &TxValue{value: big.NewInt(networkSubsidyFaucetDripValue - faucetGas)},
+					}
+
+					if faucetTx.Create(db) {
+						db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
+
+						common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", *faucetTx.To)
+						contract.TransactionID = &tx.ID
+						db.Save(&contract)
+						common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
+					}
+
+					natsutil.AttemptNack(msg, txCreateMsgTimeout)
+					break
 				}
-
-				if faucetTx.Create(db) {
-					db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-
-					common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", *faucetTx.To)
-					contract.TransactionID = &tx.ID
-					db.Save(&contract)
-					common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
-				}
-
-				// FIXME-- should this logic change?
-				natsutil.AttemptNack(msg, txCreateMsgTimeout)
 			}
 		} else {
 			common.Log.Warning(errmsg)
