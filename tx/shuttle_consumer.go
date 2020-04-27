@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	dbconf "github.com/kthomas/go-db-config"
 	"github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -110,6 +111,11 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network not resolved for contract with address: %s; %s", from, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
+	}
+
+	if network.IsEthereumNetwork() {
+		fromAddr := ethcommon.HexToAddress(from)
+		from = fromAddr.Hex()
 	}
 
 	p2pAPI, err := network.P2PAPIClient()
