@@ -77,6 +77,16 @@ func Find(db *gorm.DB, networkID uuid.UUID, addr string) *Contract {
 	return cntract
 }
 
+// FindByTxID - retrieve a specific contract for a given tx id
+func FindByTxID(db *gorm.DB, txID uuid.UUID) *Contract {
+	cntract := &Contract{}
+	db.Where("transaction_id = ?", txID).Find(&cntract)
+	if cntract == nil || cntract.ID == uuid.Nil {
+		return nil
+	}
+	return cntract
+}
+
 // GetNetwork - retrieve the associated contract network
 func (c *Contract) GetNetwork() (*network.Network, error) {
 	db := dbconf.DatabaseConnection()

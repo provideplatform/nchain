@@ -26,6 +26,8 @@ const natsNetworkContractCreateInvocationSubject = "goldmine.contract.create"
 const natsNetworkContractCreateInvocationMaxInFlight = 32
 const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
 
+const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
+
 type natsLogEventMessage struct {
 	Address         *string                `json:"address,omitempty"`
 	Block           uint64                 `json:"block,omitempty"`
@@ -63,7 +65,7 @@ func init() {
 	createNatsNetworkContractCreateInvocationSubscriptions(&waitGroup)
 }
 
-func cachedContractArtifacts(networkID uuid.UUID, addr string) (*Contract, *abi.ABI) {
+func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contract, *abi.ABI) {
 	var cachedContracts map[string]*Contract
 	if cachedCntrcts, cachedCntrctsOk := cachedNetworkContracts[networkID.String()]; cachedCntrctsOk {
 		cachedContracts = cachedCntrcts
@@ -88,9 +90,22 @@ func cachedContractArtifacts(networkID uuid.UUID, addr string) (*Contract, *abi.
 		contract = cachedContract
 	} else {
 		common.Log.Debugf("Contract cache miss; attempting to load contract from persistent storage for network: %s; address: %s", networkID, addr)
-		contract = Find(db, networkID, addr)
+
+		out := []string{}
+		db.Table("transactions").Select("id").Where("transactions.hash = ?", txHash).Pluck("id", &out)
+		if len(out) == 0 {
+			common.Log.Debugf("Contract lookup failed for address: %s; no tx resolved for hash: %s", addr, txHash)
+			return nil, nil
+		}
+		txID, err := uuid.FromString(out[0])
+		if err != nil {
+			common.Log.Debugf("Contract lookup failed for address: %s; no tx resolved for hash: %s; %s", addr, txHash, err.Error())
+			return nil, nil
+		}
+
+		contract = FindByTxID(db, txID)
 		if contract == nil || contract.ID == uuid.Nil {
-			common.Log.Debugf("Contract lookup failed; unable to continue log message ingestion on network: %s; address: %s", networkID, addr)
+			common.Log.Debugf("Contract lookup failed for address: %s; no contract resolved for tx hash: %s", addr, txHash)
 			return nil, nil
 		}
 
@@ -140,47 +155,61 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 		eventIDHex := eventID.Hex()
 		common.Log.Debugf("Attempting to publish parsed log emission event with id: %s", eventIDHex)
 
-		contract, contractABI := cachedContractArtifacts(networkUUID, *evtmsg.Address)
-		if contract != nil && contractABI != nil {
-			abievt, err := contractABI.EventByID(eventID)
+		contract, contractABI := cachedContractArtifacts(networkUUID, *evtmsg.Address, *evtmsg.TransactionHash)
+		if contract == nil {
+			common.Log.Debugf("No contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
+			natsutil.Nack(msg)
+			return
+		}
+		if contractABI == nil {
+			common.Log.Debugf("No contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
+			natsutil.Nack(msg)
+			return
+		}
+
+		abievt, err := contractABI.EventByID(eventID)
+		if err != nil {
+			common.Log.Warningf("Failed to publish log emission event with id: %s; %s", eventIDHex, err.Error())
+			natsutil.Nack(msg)
+			return
+		}
+
+		mappedValues := map[string]interface{}{}
+		err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
+		if err != nil {
+			common.Log.Warningf("Failed to ingest log event with id: %s; unpacking values failed; %s", eventIDHex, err.Error())
+			return
+		}
+
+		var subject string
+		if sub, subOk := mappedValues["subject"].(string); subOk {
+			subject = sub
+		}
+
+		if typ, typeOk := mappedValues["contractType"].(string); typeOk {
+			evtmsg.Type = &typ
+		}
+
+		evtmsg.Params = mappedValues
+
+		payload, _ := json.Marshal(evtmsg)
+		common.Log.Debugf("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
+
+		qualifiedSubject := contract.qualifiedSubject(subject)
+		if qualifiedSubject != nil {
+			err = natsutil.NatsPublish(*qualifiedSubject, payload)
 			if err != nil {
-				common.Log.Warningf("Failed to publish log emission event with id: %s; %s", eventIDHex, err.Error())
-				return
-			}
-
-			mappedValues := map[string]interface{}{}
-			err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
-			if err != nil {
-				common.Log.Warningf("Failed to ingest log event with id: %s; unpacking values failed; %s", eventIDHex, err.Error())
-				return
-			}
-
-			evtmsg.Params = mappedValues
-
-			payload, _ := json.Marshal(evtmsg)
-			common.Log.Debugf("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
-
-			var subject string
-			if sub, subOk := mappedValues["subject"].(string); subOk {
-				subject = sub
-			}
-
-			qualifiedSubject := contract.qualifiedSubject(subject)
-			if qualifiedSubject != nil {
-				err = natsutil.NatsPublish(*qualifiedSubject, payload)
-				if err != nil {
-					common.Log.Warningf("Failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
-					natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
-				} else {
-					common.Log.Debugf("Published %d-byte log event with id: %s; subject: %s", len(payload), eventIDHex, *qualifiedSubject)
-					msg.Ack()
-				}
+				common.Log.Warningf("Failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
+				natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
 			} else {
-				common.Log.Debugf("Dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
-				natsutil.Nack(msg)
+				common.Log.Debugf("Published %d-byte log event with id: %s; subject: %s", len(payload), eventIDHex, *qualifiedSubject)
+				if subject == natsShuttleContractDeployedSubject { // HACK!!!
+					natsutil.NatsStreamingPublish(subject, payload)
+				}
+				msg.Ack()
 			}
 		} else {
-			common.Log.Debugf("No contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
+			common.Log.Debugf("Dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
 			natsutil.Nack(msg)
 		}
 	} else {
