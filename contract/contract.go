@@ -178,6 +178,39 @@ func (c *Contract) ReadEthereumContractAbi() (*abi.ABI, error) {
 	return _abi, nil
 }
 
+// ResolveCompiledDependencyArtifact returns the compiled artifact if matched to the given descriptor;
+// in the case of EVM-based solidity contracts, the descriptor can be a contract name or its raw bytecode
+func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *provide.CompiledArtifact {
+	artifact := c.CompiledArtifact()
+	if artifact == nil {
+		return nil
+	}
+
+	var dependencyArtifact *provide.CompiledArtifact
+
+	for _, dep := range artifact.Deps {
+		dependency := dep.(map[string]interface{})
+		name, nameOk := dependency["name"].(string)
+		fingerprint, fingerprintOk := dependency["fingerprint"].(string)
+		if !nameOk && !fingerprintOk {
+			continue
+		}
+
+		common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s", name, fingerprint, *c.Address)
+		if name == descriptor {
+			depJSON, _ := json.Marshal(dependency)
+			json.Unmarshal(depJSON, &dependencyArtifact)
+			break
+		} else if strings.HasSuffix(descriptor, fingerprint) {
+			depJSON, _ := json.Marshal(dependency)
+			json.Unmarshal(depJSON, &dependencyArtifact)
+			break
+		}
+	}
+
+	return dependencyArtifact
+}
+
 // Create and persist a new contract
 func (c *Contract) Create() bool {
 	db := dbconf.DatabaseConnection()

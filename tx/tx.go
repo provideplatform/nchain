@@ -762,60 +762,54 @@ func (t *Transaction) handleTxTraces(
 			resultJSON, _ := json.Marshal(result)
 			common.Log.Debugf("Observed contract-internal CREATE opcode resulting in deployed contract at address: %s; tx hash: %s; code: %s; tracing result: %s", *contractAddr, *t.Hash, *contractCode, string(resultJSON))
 
-			for _, dep := range artifact.Deps {
-				dependency := dep.(map[string]interface{})
-				name := dependency["name"].(string)
-				fingerprint, fingerprintOk := dependency["fingerprint"].(string)
-				if !fingerprintOk {
-					continue
-				}
+			dep := kontract.ResolveCompiledDependencyArtifact(*contractCode)
+			if dep != nil {
+				if dep.Fingerprint != nil {
+					common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", dep.Name, dep.Fingerprint, *contractAddr, *t.Hash)
+					if strings.HasSuffix(*contractCode, *dep.Fingerprint) {
+						common.Log.Debugf("Observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", dep.Name, *contractAddr, dep.Fingerprint, *t.Hash)
+						params, _ := json.Marshal(map[string]interface{}{
+							"compiled_artifact": dep,
+						})
 
-				common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", name, fingerprint, *contractAddr, *t.Hash)
-				if strings.HasSuffix(*contractCode, fingerprint) {
-					common.Log.Debugf("Observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", name, *contractAddr, fingerprint, *t.Hash)
-					params, _ := json.Marshal(map[string]interface{}{
-						"compiled_artifact": dependency,
-					})
+						rawParams := json.RawMessage(params)
 
-					rawParams := json.RawMessage(params)
+						internalContract := &contract.Contract{
+							ApplicationID: t.ApplicationID,
+							NetworkID:     t.NetworkID,
+							ContractID:    &kontract.ID,
+							TransactionID: &t.ID,
+							Name:          common.StringOrNil(dep.Name),
+							Address:       contractAddr,
+							Params:        &rawParams,
+						}
 
-					internalContract := &contract.Contract{
-						ApplicationID: t.ApplicationID,
-						NetworkID:     t.NetworkID,
-						ContractID:    &kontract.ID,
-						TransactionID: &t.ID,
-						Name:          common.StringOrNil(name),
-						Address:       contractAddr,
-						Params:        &rawParams,
+						if internalContract.Create() {
+							common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
+							internalContract.ResolveTokenContract(db, network, signerAddress, receipt,
+								func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
+									common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+
+									tok := &token.Token{
+										ApplicationID: c.ApplicationID,
+										NetworkID:     c.NetworkID,
+										ContractID:    &c.ID,
+										Name:          common.StringOrNil(name),
+										Symbol:        common.StringOrNil(symbol),
+										Decimals:      decimals.Uint64(),
+										Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
+									}
+
+									createdToken = tok.Create()
+									tokenID = tok.ID
+									errs = tok.Errors
+
+									return createdToken, tokenID, errs
+								})
+						} else {
+							common.Log.Warningf("failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
+						}
 					}
-
-					if internalContract.Create() {
-						common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
-						internalContract.ResolveTokenContract(db, network, signerAddress, receipt,
-							func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
-								common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
-
-								tok := &token.Token{
-									ApplicationID: c.ApplicationID,
-									NetworkID:     c.NetworkID,
-									ContractID:    &c.ID,
-									Name:          common.StringOrNil(name),
-									Symbol:        common.StringOrNil(symbol),
-									Decimals:      decimals.Uint64(),
-									Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
-								}
-
-								createdToken = tok.Create()
-								tokenID = tok.ID
-								errs = tok.Errors
-
-								return createdToken, tokenID, errs
-							})
-					} else {
-						common.Log.Warningf("failed to create contract for %s contract-internal creation tx %s", *network.Name, *t.Hash)
-					}
-
-					break
 				}
 			}
 		}

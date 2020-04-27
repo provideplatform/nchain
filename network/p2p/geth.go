@@ -122,7 +122,8 @@ func (p *GethP2PProvider) FetchTxReceipt(signerAddress, hash string) (*provide.T
 
 // FetchTxTraces fetch transaction traces given its hash
 func (p *GethP2PProvider) FetchTxTraces(hash string) (*provide.TxTrace, error) {
-	traces, err := evmFetchTxTraces(p.networkID, *p.rpcURL, hash)
+	traces := map[string]interface{}{}
+	err := provide.EVMInvokeJsonRpcClient(p.networkID, *p.rpcURL, "debug_traceTransaction", []interface{}{hash}, &traces)
 	if err != nil {
 		return nil, err
 	}
