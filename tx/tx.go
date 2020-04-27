@@ -765,9 +765,9 @@ func (t *Transaction) handleTxTraces(
 			dep := kontract.ResolveCompiledDependencyArtifact(*contractCode)
 			if dep != nil {
 				if dep.Fingerprint != nil {
-					common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", dep.Name, dep.Fingerprint, *contractAddr, *t.Hash)
+					common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", dep.Name, *dep.Fingerprint, *contractAddr, *t.Hash)
 					if strings.HasSuffix(*contractCode, *dep.Fingerprint) {
-						common.Log.Debugf("Observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", dep.Name, *contractAddr, dep.Fingerprint, *t.Hash)
+						common.Log.Debugf("Observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", dep.Name, *contractAddr, *dep.Fingerprint, *t.Hash)
 						params, _ := json.Marshal(map[string]interface{}{
 							"compiled_artifact": dep,
 						})
