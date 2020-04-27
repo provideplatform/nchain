@@ -405,6 +405,9 @@ func (t *Transaction) GetContract(db *gorm.DB) *contract.Contract {
 	if t.To != nil {
 		c = &contract.Contract{}
 		db.Where("network_id = ? AND address = ?", t.NetworkID, t.To).Find(&c)
+	} else {
+		c = &contract.Contract{}
+		db.Where("transaction_id = ?", t.NetworkID, t.ID).Find(&c)
 	}
 	return c
 }
