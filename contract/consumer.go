@@ -186,13 +186,17 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 			subject = sub
 		}
 
+		evtmsg.Params = mappedValues
 		if typ, typeOk := mappedValues["contractType"].(string); typeOk {
-			evtmsg.Type = &typ
+			evtmsg.Params["type"] = typ
+			delete(evtmsg.Params, "contractType")
 		}
 
-		evtmsg.Params = mappedValues
+		evtmsg.Params["by"] = *evtmsg.Address
+		evtmsg.Params["tx_hash"] = *evtmsg.TransactionHash
+		evtmsg.Params["network_id"] = networkUUID.String()
 
-		payload, _ := json.Marshal(evtmsg)
+		payload, _ := json.Marshal(evtmsg.Params)
 		common.Log.Debugf("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
 
 		qualifiedSubject := contract.qualifiedSubject(subject)

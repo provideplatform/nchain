@@ -59,21 +59,21 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 		return
 	}
 
-	from, fromOk := params["from"].(string)
-	address, addressOk := params["address"].(string)
+	address, addressOk := params["addr"].(string)
+	byAddr, byOk := params["by"].(string)
 	networkID, networkIDOk := params["network_id"].(string)
 	name, nameOk := params["name"].(string) // name of the dependency
-	txHash, txHashOk := params["hash"].(string)
+	txHash, txHashOk := params["tx_hash"].(string)
 	contractType, _ := params["type"].(string)
 
-	if !fromOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; from address required")
+	if !addressOk {
+		common.Log.Warning("Failed to handle shuttle.contract.deployed message; contract address required")
 		natsutil.Nack(msg)
 		return
 	}
 
-	if !addressOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; contract address required")
+	if !byOk {
+		common.Log.Warning("Failed to handle shuttle.contract.deployed message; by address required")
 		natsutil.Nack(msg)
 		return
 	}
@@ -98,36 +98,36 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 
 	cntrct := &contract.Contract{}
 	db := dbconf.DatabaseConnection()
-	db.Where("network_id = ? AND address = ?", networkID, from).Find(&cntrct)
+	db.Where("network_id = ? AND address = ?", networkID, byAddr).Find(&cntrct)
 
 	if cntrct == nil || cntrct.ID == uuid.Nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; contract not resolved for address: %s", from)
+		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; contract not resolved for address: %s", byAddr)
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
 
 	network, err := cntrct.GetNetwork()
 	if err != nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network not resolved for contract with address: %s; %s", from, err.Error())
+		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network not resolved for contract with address: %s; %s", byAddr, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
 
 	if network.IsEthereumNetwork() {
-		fromAddr := ethcommon.HexToAddress(from)
-		from = fromAddr.Hex()
+		address = ethcommon.HexToAddress(address).Hex()
+		byAddr = ethcommon.HexToAddress(byAddr).Hex()
 	}
 
 	p2pAPI, err := network.P2PAPIClient()
 	if err != nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network P2P API client not resolved for contract with address: %s; %s", from, err.Error())
+		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network P2P API client not resolved for contract with address: %s; %s", byAddr, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
 
 	receipt, err := p2pAPI.FetchTxReceipt(*cntrct.Address, txHash)
 	if err != nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; failed to fetch tx receipt for contract with address: %s; %s", from, err.Error())
+		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; failed to fetch tx receipt for contract with address: %s; %s", byAddr, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
