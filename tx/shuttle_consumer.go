@@ -134,7 +134,7 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 
 	dependency := cntrct.ResolveCompiledDependencyArtifact(name)
 	if dependency == nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; contract at address %s unable to resolved dependency: %s", from, name)
+		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; contract at address %s unable to resolved dependency: %s", byAddr, name)
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
