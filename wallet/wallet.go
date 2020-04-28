@@ -86,9 +86,13 @@ func (w *Wallet) Validate() bool {
 		w.Errors = append(w.Errors, &provide.Error{
 			Message: common.StringOrNil("no application, user or organization identifier provided"),
 		})
-	} else if w.ApplicationID != nil && (w.UserID != nil || w.OrganizationID != nil) {
+	} else if w.ApplicationID != nil && w.UserID != nil {
 		w.Errors = append(w.Errors, &provide.Error{
 			Message: common.StringOrNil("only an application OR user or organization identifier should be provided"),
+		})
+	} else if w.UserID != nil && w.OrganizationID != nil {
+		w.Errors = append(w.Errors, &provide.Error{
+			Message: common.StringOrNil("only a user OR organization identifier should be provided"),
 		})
 	}
 	if w.Purpose == nil {

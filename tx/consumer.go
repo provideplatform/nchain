@@ -329,6 +329,8 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 				} else {
 					common.Log.Debugf("Failed tx errors: %s", *tx.Errors[0].Message)
 					txParams := tx.ParseParams()
+					// TODO: support signed transactions
+
 					publicKey, publicKeyOk := txParams["public_key"].(interface{})
 					privateKey, privateKeyOk := txParams["private_key"].(interface{})
 					gas, gasOk := txParams["gas"].(float64)
