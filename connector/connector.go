@@ -440,7 +440,7 @@ func (c *Connector) Validate() bool {
 			Message: common.StringOrNil("Unable to deploy connector using unspecified network"),
 		})
 	}
-	if c.Type == nil || (strings.ToLower(*c.Type) != "baseline" && strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "nats" && strings.ToLower(*c.Type) != "rest" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
+	if c.Type == nil || (strings.ToLower(*c.Type) != "baseline" && strings.ToLower(*c.Type) != "elasticsearch" && strings.ToLower(*c.Type) != "ipfs" && strings.ToLower(*c.Type) != "mongodb" && strings.ToLower(*c.Type) != "nats" && strings.ToLower(*c.Type) != "provide" && strings.ToLower(*c.Type) != "rest" && strings.ToLower(*c.Type) != "redis" && strings.ToLower(*c.Type) != "tableau" && strings.ToLower(*c.Type) != "zokrates") {
 		c.Errors = append(c.Errors, &provide.Error{
 			Message: common.StringOrNil("Unable to define connector of invalid type"),
 		})
@@ -516,6 +516,15 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 		)
 	case provider.NATSConnectorProvider:
 		apiClient = provider.InitNATSProvider(
+			c.ID,
+			&c.NetworkID,
+			c.ApplicationID,
+			c.OrganizationID,
+			db.Model(c),
+			c.mergedConfig(),
+		)
+	case provider.ProvideConnectorProvider:
+		apiClient = provider.InitProvideProvider(
 			c.ID,
 			&c.NetworkID,
 			c.ApplicationID,
