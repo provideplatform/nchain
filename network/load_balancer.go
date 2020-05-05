@@ -352,7 +352,7 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 					_, err := orchestrationAPI.DeleteTargetGroup(common.StringOrNil(targetGroupArn.(string)))
 					if err != nil {
 						common.Log.Warningf("Failed to delete load balanced target group: %s; %s", targetGroupArn, err.Error())
-						return err
+						// FIXME-- dispatch async via NATS
 					}
 				}
 			}
@@ -367,7 +367,7 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 								common.Log.Debugf("Attempted to delete security group %s which does not exist for balancer: %s", securityGroupID.(string), l.ID)
 							default:
 								common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
-								return err
+								// FIXME-- dispatch async via NATS
 							}
 						}
 					}
@@ -380,7 +380,7 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 							if err != nil {
 								desc := fmt.Sprintf("Failed to delete cert in region: %s; %s", region, err.Error())
 								common.Log.Warning(desc)
-								return fmt.Errorf(desc)
+								// FIXME-- dispatch async via NATS
 							}
 						}
 					}
@@ -409,9 +409,8 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 						if dnsName, dnsNameOk := item.(string); dnsNameOk {
 							_, err := dnsAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
 							if err != nil {
-								desc := fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error())
-								common.Log.Warning(desc)
-								return fmt.Errorf(desc)
+								common.Log.Warning(fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error()))
+								// FIXME-- dispatch async via NATS
 							}
 						}
 					}
