@@ -667,7 +667,6 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	var params map[string]interface{}
 
 	nack := func(msg *stan.Msg, errmsg string, dropPacket bool) {
-		common.Log.Warningf("Failed to handle NATS tx finalize message; %s", errmsg)
 		if dropPacket {
 			common.Log.Debugf("Dropping tx packet (seq: %d) on the floor; %s", msg.Sequence, errmsg)
 			msg.Ack()
