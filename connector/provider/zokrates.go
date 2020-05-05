@@ -233,7 +233,17 @@ func (p *ZokratesProvider) Create(params map[string]interface{}) (*ConnectedEnti
 
 	entity := &ConnectedEntity{}
 	respJSON, _ := json.Marshal(resp)
-	json.Unmarshal(respJSON, &entity)
+	err = json.Unmarshal(respJSON, &entity)
+
+	if err != nil {
+		msg := "failed to compile circuit"
+		if circuitIDOk {
+			msg = fmt.Sprintf("failed to generate proof for circuit: %s", circuitID)
+		}
+
+		common.Log.Warningf("%s; %s", msg, err.Error())
+		return nil, err
+	}
 
 	if circuitIDOk {
 		entity.ID = &circuitID
