@@ -219,12 +219,38 @@ func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	respJSON, _ := json.Marshal(resp)
 	json.Unmarshal(respJSON, &entity)
 
+	if entity.Raw == nil {
+		entity.Raw = common.StringOrNil(string(respJSON))
+	}
+
 	return entity, nil
 }
 
 // Find impl for BaselineProvider
 func (p *BaselineProvider) Find(id string) (*ConnectedEntity, error) {
-	return nil, errors.New("read not implemented for Baseline connectors")
+	apiClient := p.apiClientFactory(nil)
+	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", map[string]interface{}{
+		"query": fmt.Sprintf("{ agreement(id: \"%s\") { _id, linkedId, buyerSignature, supplierSignature} } ", id),
+	}, p.tlsClientConfigFactory())
+
+	if err != nil {
+		common.Log.Warningf("failed to fetch baseline protocol document with id %s; %s", id, err.Error())
+		return nil, err
+	}
+
+	if status == 200 {
+		common.Log.Debugf("fetched baseline protocol document with id %s via baseline connector; %s", id, resp)
+	}
+
+	entity := &ConnectedEntity{}
+	respJSON, _ := json.Marshal(resp)
+	json.Unmarshal(respJSON, &entity)
+
+	if entity.Raw == nil {
+		entity.Raw = common.StringOrNil(string(respJSON))
+	}
+
+	return entity, nil
 }
 
 // Update impl for BaselineProvider
@@ -239,7 +265,52 @@ func (p *BaselineProvider) Delete(id string) error {
 
 // List impl for BaselineProvider
 func (p *BaselineProvider) List(params map[string]interface{}) ([]*ConnectedEntity, error) {
-	return nil, errors.New("list not implemented for Baseline connectors")
+	apiClient := p.apiClientFactory(nil)
+
+	var status int
+	var resp interface{}
+	var err error
+
+	if id, idOk := params["id"].(string); idOk {
+		status, resp, err = apiClient.PostWithTLSClientConfig("graphql", map[string]interface{}{
+			"query": fmt.Sprintf("{ agreement(id: \"%s\") { _id, linkedId, buyerSignature, supplierSignature} } ", id),
+		}, p.tlsClientConfigFactory())
+	} else {
+		status, resp, err = apiClient.PostWithTLSClientConfig("graphql", map[string]interface{}{
+			"query": "{ agreements { _id, linkedId, buyerSignature, supplierSignature} } ",
+		}, p.tlsClientConfigFactory())
+	}
+
+	if err != nil {
+		common.Log.Warningf("failed to list baseline protocol documents; %s", err.Error())
+		return nil, err
+	}
+
+	entities := make([]*ConnectedEntity, 0)
+
+	if status == 200 {
+		respJSON, _ := json.Marshal(resp)
+		json.Unmarshal(respJSON, &entities)
+
+		if id, idOk := params["id"].(string); idOk {
+			status, resp, err = apiClient.PostWithTLSClientConfig("graphql", map[string]interface{}{
+				"query": fmt.Sprintf("{ agreementByLinkedId(linkedId: \"%s\") { _id, linkedId, buyerSignature, supplierSignature} } ", id),
+			}, p.tlsClientConfigFactory())
+		}
+
+		for _, entity := range entities {
+			if entity.Raw == nil {
+				entityJSON, _ := json.Marshal(entity)
+				entity.Raw = common.StringOrNil(string(entityJSON))
+			}
+		}
+
+		common.Log.Debugf("fetched %d baseline protocol documents via baseline connector", len(entities))
+	} else {
+		return nil, fmt.Errorf("failed to fetch connected entities via baseline connector; status: %d", status)
+	}
+
+	return entities, nil
 }
 
 // Query impl for BaselineProvider
