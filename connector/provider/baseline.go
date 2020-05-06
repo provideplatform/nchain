@@ -217,7 +217,12 @@ func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEnti
 
 	entity := &ConnectedEntity{}
 	respJSON, _ := json.Marshal(resp)
-	json.Unmarshal(respJSON, &entity)
+	err = json.Unmarshal(respJSON, &entity)
+
+	if err != nil {
+		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
+		return nil, err
+	}
 
 	if entity.Raw == nil {
 		entity.Raw = common.StringOrNil(string(respJSON))
@@ -244,7 +249,12 @@ func (p *BaselineProvider) Find(id string) (*ConnectedEntity, error) {
 
 	entity := &ConnectedEntity{}
 	respJSON, _ := json.Marshal(resp)
-	json.Unmarshal(respJSON, &entity)
+	err = json.Unmarshal(respJSON, &entity)
+
+	if err != nil {
+		common.Log.Warningf("failed to fetch baseline protocol document with id %s; %s", id, err.Error())
+		return nil, err
+	}
 
 	if entity.Raw == nil {
 		entity.Raw = common.StringOrNil(string(respJSON))
@@ -255,7 +265,30 @@ func (p *BaselineProvider) Find(id string) (*ConnectedEntity, error) {
 
 // Update impl for BaselineProvider
 func (p *BaselineProvider) Update(id string, params map[string]interface{}) error {
-	return errors.New("update not implemented for Baseline connectors")
+	// golang DTO validation
+
+	apiClient := p.apiClientFactory(nil)
+	status, resp, err := apiClient.PostWithTLSClientConfig("graphql", params, p.tlsClientConfigFactory())
+
+	if err != nil {
+		common.Log.Warningf("failed to update baseline protocol; %s", err.Error())
+		return err
+	}
+
+	if status == 200 || status == 202 || status == 204 {
+		common.Log.Debugf("updated baseline protocol; %s", resp)
+	}
+
+	entity := &ConnectedEntity{}
+	respJSON, _ := json.Marshal(resp)
+	err = json.Unmarshal(respJSON, &entity)
+
+	if err != nil {
+		common.Log.Warningf("failed to update baseline protocol; failed handling baseline api response; %s", err.Error())
+		return err
+	}
+
+	return nil
 }
 
 // Delete impl for BaselineProvider
