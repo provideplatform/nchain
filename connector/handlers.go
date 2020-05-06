@@ -222,7 +222,7 @@ func connectorEntitiesListHandler(c *gin.Context) {
 		return
 	}
 
-	provide.Render(resp, 201, c)
+	provide.Render(resp, 200, c)
 }
 
 func connectorEntityCreateHandler(c *gin.Context) {
@@ -289,7 +289,7 @@ func connectorEntityDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	provide.Render(resp, 201, c)
+	provide.Render(resp, 200, c)
 }
 
 func updateConnectorEntityHandler(c *gin.Context) {

@@ -219,7 +219,7 @@ func (p *BaselineProvider) Create(params map[string]interface{}) (*ConnectedEnti
 	respJSON, _ := json.Marshal(resp)
 	err = json.Unmarshal(respJSON, &entity)
 
-	if err != nil {
+	if err != nil && entity == nil {
 		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
 		return nil, err
 	}
