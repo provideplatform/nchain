@@ -21,10 +21,12 @@ DO
 $do$
 BEGIN
    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE  rolname = 'goldmine') THEN
-      CREATE ROLE goldmine LOGIN PASSWORD 'prvdgoldmine';
+      CREATE ROLE goldmine WITH SUPERUSER LOGIN PASSWORD 'prvdgoldmine';
    END IF;
 END
 $do$;
+
+SET ROLE goldmine;
 
 --
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
