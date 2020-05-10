@@ -408,8 +408,8 @@ func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster
 		if task.LastStatus != nil {
 			taskStatus = strings.ToLower(*task.LastStatus)
 		}
-		if taskStatus != awsTaskStatusRunning {
-			return nil, fmt.Errorf("Unable to resolve network interfaces for container status: %s; task id: %s", taskStatus, taskID)
+		if taskStatus != awsTaskStatusRunning && task.StoppedAt != nil {
+			return nil, fmt.Errorf("Unable to resolve network interfaces for container status: %s; task id: %s stopped at %s", taskStatus, taskID, *task.StoppedAt)
 		}
 
 		if len(task.Attachments) > 0 {
