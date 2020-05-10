@@ -17,6 +17,15 @@
 -- SET client_min_messages = warning;
 -- SET row_security = off;
 
+DO
+$do$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE  rolname = 'goldmine') THEN
+      CREATE ROLE goldmine LOGIN PASSWORD 'prvdgoldmine';
+   END IF;
+END
+$do$;
+
 --
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
 --
