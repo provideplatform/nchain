@@ -142,6 +142,17 @@ func (c *Connector) listEntities(params map[string]interface{}) (interface{}, er
 	return resp, nil
 }
 
+// emitPubsubMessage emits a message
+func (c *Connector) emitPubsubMessage() error {
+	msg, _ := json.Marshal(c)
+	return natsutil.NatsPublish(c.pubsubSubject(), msg)
+}
+
+// pubsubSubject returns the pubsub subject
+func (c *Connector) pubsubSubject() string {
+	return fmt.Sprintf("network.%s.connector.%s", c.NetworkID.String(), c.ID.String())
+}
+
 func (c *Connector) updateEntity(id string, params map[string]interface{}) error {
 	apiClient, err := c.connectorAPI()
 	if err != nil {
@@ -356,6 +367,7 @@ func (c *Connector) Reload(db *gorm.DB) {
 
 // UpdateStatus allows for the status of the connector to be updated with an optional description
 func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string) {
+	statusChanged := false
 	var prevStatus string
 	if c.Status != nil {
 		prevStatus = *c.Status
@@ -363,6 +375,7 @@ func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string
 
 	if status != prevStatus {
 		c.Status = common.StringOrNil(status)
+		statusChanged = true
 	}
 
 	c.Description = description
@@ -374,12 +387,16 @@ func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string
 				Message: common.StringOrNil(err.Error()),
 			})
 		}
-	} else if status == "available" && status != prevStatus {
-		common.Log.Debugf("Connector become available; dispatching denormalize configuration message for connector: %s", c.ID)
-		msg, _ := json.Marshal(map[string]interface{}{
-			"connector_id": c.ID,
-		})
-		natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
+	} else if statusChanged {
+		c.emitPubsubMessage()
+
+		if status == "available" {
+			common.Log.Debugf("Connector become available; dispatching denormalize configuration message for connector: %s", c.ID)
+			msg, _ := json.Marshal(map[string]interface{}{
+				"connector_id": c.ID,
+			})
+			natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
+		}
 	}
 }
 
@@ -421,6 +438,7 @@ func (c *Connector) Create() bool {
 		if !db.NewRecord(c) {
 			success := rowsAffected > 0
 			if success {
+				c.emitPubsubMessage()
 				msg, _ := json.Marshal(map[string]interface{}{
 					"connector_id": c.ID,
 				})
