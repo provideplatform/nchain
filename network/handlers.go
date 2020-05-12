@@ -342,9 +342,9 @@ func nodeLogsHandler(c *gin.Context) {
 		limit = defualtNodeLogRPP
 	}
 
-	startFromHead := true
-	if c.Query("start_from_head") == "false" {
-		startFromHead = false
+	startFromHead := false
+	if c.Query("start_from_head") == "true" {
+		startFromHead = true
 	}
 
 	logs, err := node.Logs(startFromHead, &limit, common.StringOrNil(page))
