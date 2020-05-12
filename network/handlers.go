@@ -342,7 +342,12 @@ func nodeLogsHandler(c *gin.Context) {
 		limit = defualtNodeLogRPP
 	}
 
-	logs, err := node.Logs(false, &limit, common.StringOrNil(page))
+	startFromHead := true
+	if c.Query("start_from_head") == "false" {
+		startFromHead = false
+	}
+
+	logs, err := node.Logs(startFromHead, &limit, common.StringOrNil(page))
 	if err != nil {
 		provide.RenderError(fmt.Sprintf("log retrieval failed; %s", err.Error()), 500, c)
 		return
