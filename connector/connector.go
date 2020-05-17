@@ -31,6 +31,7 @@ type Connector struct {
 	Description     *string          `json:"description"`
 	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+	IsVirtual       *boolean         `json:"is_virtual,omitempty`
 	AccessedAt      *time.Time       `json:"accessed_at,omitempty"`
 
 	Details *Details `sql:"-" json:"details,omitempty"`
