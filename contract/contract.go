@@ -348,6 +348,9 @@ func (c *Contract) ExecuteFromTx(
 	// publishedAt := execution.PublishedAt
 
 	txParams := map[string]interface{}{}
+	if c.Address != nil {
+		txParams["to"] = *c.Address
+	}
 
 	accountID := accountFn(account, txParams)
 	walletID := walletFn(wallet, txParams)

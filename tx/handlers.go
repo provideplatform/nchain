@@ -434,10 +434,20 @@ func contractExecutionHandler(c *gin.Context) {
 			provide.RenderError(err.Error(), 422, c)
 			return
 		}
+		wllt := &wallet.Wallet{}
 		wallet := &wallet.Wallet{}
 		wallet.SetID(*execution.WalletID)
 		wallet.Path = execution.HDPath
 		execution.Wallet = wallet
+
+		db.Where("id = ?", wallet.ID).Find(&wllt)
+		if wllt != nil && wllt.ID != uuid.Nil {
+			// FIXME-- parse HD path (fuck fix this mess....)
+			hardenedChild, _ := wllt.DeriveHardened(nil, uint32(60), uint32(0))
+			chain := uint32(0)
+			derivedAccount, _ := hardenedChild.DeriveAddress(nil, uint32(0), &chain)
+			execution.AccountAddress = &derivedAccount.Address
+		}
 	}
 
 	gas, gasOk := params["gas"].(float64)

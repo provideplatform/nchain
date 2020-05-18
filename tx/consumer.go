@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -27,7 +28,7 @@ import (
 
 const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 2048
-const txAckWait = time.Second * 15
+const txAckWait = time.Second * 30
 const txMsgTimeout = int64(txAckWait * 3)
 
 const natsTxCreateSubject = "goldmine.tx.create"
@@ -67,7 +68,7 @@ func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 			txAckWait,
 			natsTxSubject,
 			natsTxSubject,
-			consumeTxMsg,
+			consumeTxExecutionMsg,
 			txAckWait,
 			natsTxMaxInFlight,
 			nil,
@@ -231,58 +232,80 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 			gas = gas * 1.1
 		}
 
-		// FIXME-- read from environment config
-		networkSubsidyFaucetApplicationAddressMapping := map[string]interface{}{
-			"66d44f30-9092-4182-a3c4-bc02736d6ae5": map[string]interface{}{
-				"01554e22-3d7a-44a3-9c65-6bcabaa08c38": "0xdD2F8052bE76FA1456e096526db5C0F12B0af564",
-				"146ab73e-b2eb-4386-8c6f-93663792c741": "0x96f1027FEe06A15f42E48180705a2ecB2F846985",
-			},
-		}
-		networkSubsidyFaucetDripValue := int64(gas)
-		networkSubsidyFaucets, networkSubsidyFaucetExists := networkSubsidyFaucetApplicationAddressMapping[tx.NetworkID.String()].(map[string]interface{})
-		faucetSubsidyEligible := strings.Contains(errmsg, "insufficient funds") && networkSubsidyFaucetExists
-
-		if faucetSubsidyEligible && len(networkSubsidyFaucets) > 0 {
+		networkSubsidyFaucetDripValue := int64(gas) // FIXME-- configurable
+		faucetSubsidyEligible := strings.Contains(errmsg, "insufficient funds") && networkSubsidyFaucetExists(tx.NetworkID)
+		if faucetSubsidyEligible {
 			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
-
-			for networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress := range networkSubsidyFaucets {
-				out := []string{}
-				db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress).Pluck("id", &out)
-				if out == nil || len(out) == 0 || len(out[0]) == 0 {
-					common.Log.Warningf("Failed to retrieve configured subsidy faucet signing identity for faucet address: %s; faucet application id: %s", networkSubsidyFaucetAddress, networkSubsidyFaucetApplicationID)
-				} else {
-					faucetApplicationID, _ := uuid.FromString(networkSubsidyFaucetApplicationID)
-					faucetAccountID, _ := uuid.FromString(out[0])
-					faucetBeneficiary, _ := tx.signerFactory(db)
-					faucetBeneficiaryAddress := faucetBeneficiary.Address()
-					faucetGas := int64(210000)
-					faucetTx := &Transaction{
-						ApplicationID: &faucetApplicationID,
-						Data:          common.StringOrNil("0x"),
-						NetworkID:     contract.NetworkID,
-						AccountID:     &faucetAccountID,
-						To:            common.StringOrNil(faucetBeneficiaryAddress),
-						Value:         &TxValue{value: big.NewInt(networkSubsidyFaucetDripValue - faucetGas)},
-					}
-
-					if faucetTx.Create(db) {
-						db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-
-						common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", *faucetTx.To)
-						contract.TransactionID = &tx.ID
-						db.Save(&contract)
-						common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
-					}
-
-					natsutil.AttemptNack(msg, txCreateMsgTimeout)
-					break
-				}
+			faucetBeneficiary, _ := tx.signerFactory(db)
+			faucetBeneficiaryAddress := faucetBeneficiary.Address()
+			err = subsidize(
+				db,
+				tx.NetworkID,
+				faucetBeneficiaryAddress,
+				networkSubsidyFaucetDripValue,
+			)
+			if err == nil {
+				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
+				common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
+				contract.TransactionID = &tx.ID
+				db.Save(&contract)
 			}
 		} else {
 			common.Log.Warning(errmsg)
-			natsutil.AttemptNack(msg, txCreateMsgTimeout)
+		}
+
+		natsutil.AttemptNack(msg, txCreateMsgTimeout)
+	}
+}
+
+func networkSubsidyFaucets(networkID uuid.UUID) map[string]interface{} {
+	// FIXME-- read from environment config
+	networkSubsidyFaucetApplicationAddressMapping := map[string]interface{}{
+		"66d44f30-9092-4182-a3c4-bc02736d6ae5": map[string]interface{}{
+			"01554e22-3d7a-44a3-9c65-6bcabaa08c38": "0xdD2F8052bE76FA1456e096526db5C0F12B0af564",
+			"146ab73e-b2eb-4386-8c6f-93663792c741": "0x96f1027FEe06A15f42E48180705a2ecB2F846985",
+		},
+	}
+	if networkSubsidyFaucets, networkSubsidyFaucetExists := networkSubsidyFaucetApplicationAddressMapping[networkID.String()].(map[string]interface{}); networkSubsidyFaucetExists {
+		return networkSubsidyFaucets
+	}
+	return nil
+}
+
+func networkSubsidyFaucetExists(networkID uuid.UUID) bool {
+	return networkSubsidyFaucets(networkID) != nil
+}
+
+// subsidize the given beneficiary with a drip equal to the given val
+func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val int64) error {
+	for networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress := range networkSubsidyFaucets(networkID) {
+		out := []string{}
+		db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress).Pluck("id", &out)
+		if out == nil || len(out) == 0 || len(out[0]) == 0 {
+			common.Log.Warningf("Failed to retrieve configured subsidy faucet signing identity for faucet address: %s; faucet application id: %s", networkSubsidyFaucetAddress, networkSubsidyFaucetApplicationID)
+		} else {
+			faucetApplicationID, _ := uuid.FromString(networkSubsidyFaucetApplicationID)
+			faucetAccountID, _ := uuid.FromString(out[0])
+			faucetGas := int64(210000) // FIXME-- parameterize
+			faucetTx := &Transaction{
+				ApplicationID: &faucetApplicationID,
+				Data:          common.StringOrNil("0x"),
+				NetworkID:     networkID,
+				AccountID:     &faucetAccountID,
+				To:            common.StringOrNil(beneficiary),
+				Value:         &TxValue{value: big.NewInt(val - faucetGas)},
+			}
+
+			if faucetTx.Create(db) {
+				common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
+				break
+			} else {
+				common.Log.Debugf("failed to broadcast subsidy faucet tx to beneficiary: %s; %s", beneficiary, *faucetTx.Errors[0].Message)
+			}
 		}
 	}
+
+	return nil
 }
 
 func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
@@ -357,19 +380,26 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 						if err == nil {
 							if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
 								err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+								return nil, err
 							} else {
 								err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
 								common.Log.Warning(err.Error())
+								return nil, err
 							}
 						}
 
 						if err != nil {
 							err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
 							common.Log.Warning(err.Error())
+							return nil, err
 						}
 					} else {
 						err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
+						if len(tx.Errors) > 0 {
+							err = fmt.Errorf("%s; %s", err.Error(), *tx.Errors[0].Message)
+						}
 						common.Log.Warning(err.Error())
+						return nil, err
 					}
 				}
 
@@ -569,7 +599,7 @@ func wfunc(w interface{}, txParams map[string]interface{}) *uuid.UUID {
 	return &uuid.Nil
 }
 
-func consumeTxMsg(msg *stan.Msg) {
+func consumeTxExecutionMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
 	execution := &contract.Execution{}
@@ -647,7 +677,37 @@ func consumeTxMsg(msg *stan.Msg) {
 	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
 
 	if err != nil {
-		common.Log.Warningf("Failed to execute contract; %s", err.Error())
+		common.Log.Debugf("contract execution failed; %s", err.Error())
+
+		if execution.AccountAddress != nil {
+			var gas float64
+			if execution.Gas == nil {
+				gas = float64(100000000000000000)
+			} else {
+				gas = *execution.Gas * 1.1
+			}
+
+			networkSubsidyFaucetDripValue := int64(gas) // FIXME-- configurable
+			faucetSubsidyEligible := strings.Contains(err.Error(), "insufficient funds") && networkSubsidyFaucetExists(cntract.NetworkID)
+
+			if faucetSubsidyEligible {
+				common.Log.Debugf("Contract execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", cntract.NetworkID)
+				faucetBeneficiaryAddress := *execution.AccountAddress
+				err = subsidize(
+					db,
+					cntract.NetworkID,
+					faucetBeneficiaryAddress,
+					networkSubsidyFaucetDripValue,
+				)
+				if err == nil {
+					common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
+				}
+			}
+
+		} else {
+			common.Log.Warningf("Failed to execute contract; %s", err.Error())
+		}
+
 		natsutil.AttemptNack(msg, txMsgTimeout)
 	} else {
 		logmsg := fmt.Sprintf("Executed contract: %s", *cntract.Address)
