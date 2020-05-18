@@ -700,7 +700,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 					networkSubsidyFaucetDripValue,
 				)
 				if err == nil {
-					tx = &Transaction{}
+					tx = &tx.Transaction{}
 					db.Where("ref = ?", execution.Ref).Find(&tx)
 					if tx != nil && tx.ID != uuid.Nil {
 						db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
