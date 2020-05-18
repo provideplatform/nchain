@@ -31,7 +31,7 @@ type Connector struct {
 	Description     *string          `json:"description"`
 	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
-	IsVirtual       *bool            `json:"is_virtual,omitempty"`
+	IsVirtual       bool             `json:"is_virtual,omitempty"`
 	AccessedAt      *time.Time       `json:"accessed_at,omitempty"`
 
 	Details *Details `sql:"-" json:"details,omitempty"`
@@ -391,7 +391,7 @@ func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string
 	} else if statusChanged {
 		c.emitPubsubMessage()
 
-		if status == "available" {
+		if !c.IsVirtual && status == "available" {
 			common.Log.Debugf("Connector become available; dispatching denormalize configuration message for connector: %s", c.ID)
 			msg, _ := json.Marshal(map[string]interface{}{
 				"connector_id": c.ID,
@@ -440,10 +440,13 @@ func (c *Connector) Create() bool {
 			success := rowsAffected > 0
 			if success {
 				c.emitPubsubMessage()
-				msg, _ := json.Marshal(map[string]interface{}{
-					"connector_id": c.ID,
-				})
-				natsutil.NatsStreamingPublish(natsConnectorProvisioningSubject, msg)
+
+				if !c.IsVirtual {
+					msg, _ := json.Marshal(map[string]interface{}{
+						"connector_id": c.ID,
+					})
+					natsutil.NatsStreamingPublish(natsConnectorProvisioningSubject, msg)
+				}
 			}
 			return success
 		}
