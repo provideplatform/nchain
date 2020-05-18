@@ -671,7 +671,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 
 	tx := &Transaction{}
 	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
+		return txCreatefunc(tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	}
 
 	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
