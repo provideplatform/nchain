@@ -1,12 +1,16 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -48,7 +52,7 @@ func InitMongoDBProvider(connectorID uuid.UUID, networkID, applicationID, organi
 	}
 }
 
-func (p *MongoDBProvider) apiClientFactory(basePath *string) *ipfs.Shell {
+func (p *MongoDBProvider) apiClientFactory(basePath *string) *mongo.Client {
 	uri := ""
 	if basePath != nil {
 		uri = *basePath
@@ -59,19 +63,52 @@ func (p *MongoDBProvider) apiClientFactory(basePath *string) *ipfs.Shell {
 		return nil
 	}
 
-	return ipfs.NewShell(*apiURL)
-}
-
-func (p *MongoDBProvider) apiURLFactory(path string) *string {
-	if p.apiURL == nil {
+	mongoURL := strings.Replace(*apiURL, "https://", "mongodb://", -1) // FIXME
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(mongoURL))
+	if err != nil {
+		common.Log.Warningf("failed to establish mongodb connection for connector: %s; %s", p.connectorID, err.Error())
 		return nil
 	}
 
+	return client
+}
+
+func (p *MongoDBProvider) apiURLFactory(path string) *string {
 	suffix := ""
 	if path != "" {
 		suffix = fmt.Sprintf("/%s", path)
 	}
-	return common.StringOrNil(fmt.Sprintf("%s%s", *p.apiURL, suffix))
+
+	// FIXME
+	nodes := make([]*network.Node, 0)
+	p.model.Association("Nodes").Find(&nodes)
+	if len(nodes) > 0 {
+		if nodes[0].IPv4 != nil {
+			var user *string
+			var passwd *string
+			if env, envOk := p.config["env"].(map[string]interface{}); envOk {
+				if usr, usrok := env["MONGO_INITDB_ROOT_USERNAME"].(string); usrok {
+					user = &usr
+				}
+				if password, passwordOk := env["MONGO_INITDB_ROOT_PASSWORD"].(string); passwordOk {
+					passwd = &password
+				}
+			}
+			if user != nil && passwd != nil {
+				return common.StringOrNil(fmt.Sprintf("mongodb://%s:%s@%s:%d%s", *user, *passwd, *nodes[0].IPv4, p.apiPort, suffix))
+			} else {
+				return common.StringOrNil(fmt.Sprintf("mongodb://%s:%d%s", *nodes[0].IPv4, p.apiPort, suffix))
+			}
+		}
+	}
+
+	// FIXME-- prefer the below to the above!!! rethink which connector types get load balanced and which represent clustered services that can receive a direct connection to a single node...
+	// if p.apiURL == nil {
+	// 	return nil
+	// }
+
+	// return common.StringOrNil(fmt.Sprintf("%s%s", *p.apiURL, suffix))
+	return nil
 }
 
 func (p *MongoDBProvider) rawConfig() *json.RawMessage {
@@ -195,7 +232,44 @@ func (p *MongoDBProvider) Reachable() bool {
 
 // Create impl for MongoDBProvider
 func (p *MongoDBProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
-	return nil, errors.New("create not implemented for MongoDB connectors")
+	var entity *ConnectedEntity
+	var err error
+
+	mongo := p.apiClientFactory(nil)
+	if mongo == nil {
+		return nil, fmt.Errorf("failed to establish mongodb connection for connector: %s; %s", p.connectorID, err.Error())
+	}
+	defer mongo.Disconnect(context.Background())
+
+	if db, dbok := params["db"].(string); dbok {
+		mongoDB := mongo.Database(db)
+
+		usr, usrok := params["user"].(string)
+		passwd, passwdok := params["password"].(string)
+		roles, rolesok := params["roles"].([]interface{})
+		if usrok && passwdok && rolesok {
+			result := mongoDB.RunCommand(
+				context.Background(),
+				&bson.M{
+					"createUser": usr,
+					"pwd":        passwd,
+					"roles":      roles,
+				},
+			)
+			err = result.Err()
+			if err != nil {
+				err = fmt.Errorf("failed to execute createUser command via mongodb connector: %s; %s", p.connectorID, err.Error())
+			}
+		} else {
+			err = fmt.Errorf("failed to execute arbitrary mongodb command via mongodb connector: %s; only createUser is currently implemented", p.connectorID)
+		}
+	}
+
+	if err != nil {
+		common.Log.Warning(err.Error())
+	}
+
+	return entity, err
 }
 
 // Find impl for MongoDBProvider

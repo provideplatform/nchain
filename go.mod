@@ -43,6 +43,7 @@ require (
 	github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
+	go.mongodb.org/mongo-driver v1.3.3
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
