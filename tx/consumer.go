@@ -669,7 +669,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 		return
 	}
 
-	var tx Transaction
+	tx := &tx.Transaction{}
 	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
 		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	}
@@ -700,7 +700,6 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 					networkSubsidyFaucetDripValue,
 				)
 				if err == nil {
-					tx = &tx.Transaction{}
 					db.Where("ref = ?", execution.Ref).Find(&tx)
 					if tx != nil && tx.ID != uuid.Nil {
 						db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
