@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres" // PostgreSQL dialect
+
+	"github.com/kthomas/go-db-config"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -48,7 +51,7 @@ func InitSQLProvider(connectorID uuid.UUID, networkID, applicationID, organizati
 	}
 }
 
-func (p *SQLProvider) apiClientFactory(basePath *string) *ipfs.Shell {
+func (p *SQLProvider) apiClientFactory(basePath *string) *gorm.DB {
 	uri := ""
 	if basePath != nil {
 		uri = *basePath
@@ -59,18 +62,39 @@ func (p *SQLProvider) apiClientFactory(basePath *string) *ipfs.Shell {
 		return nil
 	}
 
-	return ipfs.NewShell(*apiURL)
-}
+	dbcfg := &dbconf.DBConfig{
+		DatabaseHost: strings.Replace(*apiURL, "https://", "", -1), // FIXME
+		DatabasePort: uint(p.apiPort),
+	}
 
-func (p *SQLProvider) apiURLFactory(path string) *string {
-	if p.apiURL == nil {
+	if env, envOk := p.config["env"].(map[string]interface{}); envOk {
+		if usr, usrok := env["POSTGRES_USER"].(string); usrok {
+			dbcfg.DatabaseUser = usr
+		}
+		if password, passwordOk := env["POSTGRES_PASSWORD"].(string); passwordOk {
+			dbcfg.DatabasePassword = password
+		}
+	}
+
+	client, err := dbconf.DatabaseConnectionFactory(dbcfg)
+	if err != nil {
+		common.Log.Warningf("failed to establish sql connection for connector: %s; %s", p.connectorID, err.Error())
 		return nil
 	}
 
+	return client
+}
+
+func (p *SQLProvider) apiURLFactory(path string) *string {
 	suffix := ""
 	if path != "" {
 		suffix = fmt.Sprintf("/%s", path)
 	}
+
+	if p.apiURL == nil {
+		return nil
+	}
+
 	return common.StringOrNil(fmt.Sprintf("%s%s", *p.apiURL, suffix))
 }
 
@@ -195,7 +219,40 @@ func (p *SQLProvider) Reachable() bool {
 
 // Create impl for SQLProvider
 func (p *SQLProvider) Create(params map[string]interface{}) (*ConnectedEntity, error) {
-	return nil, errors.New("create not implemented for SQL connectors")
+	var entity *ConnectedEntity
+	var err error
+
+	dbconn := p.apiClientFactory(nil)
+	if dbconn == nil {
+		return nil, fmt.Errorf("failed to establish sql connection for connector: %s; %s", p.connectorID, err.Error())
+	}
+	defer dbconn.Close()
+
+	if db, dbok := params["db"].(string); dbok {
+		usr, usrok := params["user"].(string)
+		passwd, passwdok := params["password"].(string)
+		if usrok && passwdok {
+			// FIXME-- don't default to superuser... :\
+			result := dbconn.Exec("CREATE USER ? WITH SUPERUSER; ALTER USER ? WITH PASSWORD '?'", usr, usr, passwd)
+			err = result.Error
+			if err != nil {
+				err = fmt.Errorf("failed to execute CREATE USER command via sql connector: %s; %s", p.connectorID, err.Error())
+			}
+		}
+		if err == nil {
+			result := dbconn.Exec("CREATE DATABASE ? OWNER ?", db, usr)
+			err = result.Error
+			if err != nil {
+				err = fmt.Errorf("failed to execute CREATE DATABASE command via sql connector: %s; %s", p.connectorID, err.Error())
+			}
+		}
+	}
+
+	if err != nil {
+		common.Log.Warning(err.Error())
+	}
+
+	return entity, err
 }
 
 // Find impl for SQLProvider
