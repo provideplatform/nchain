@@ -51,12 +51,8 @@ func InitSQLProvider(connectorID uuid.UUID, networkID, applicationID, organizati
 	}
 }
 
-func (p *SQLProvider) apiClientFactory(basePath *string) *gorm.DB {
-	uri := ""
-	if basePath != nil {
-		uri = *basePath
-	}
-	apiURL := p.apiURLFactory(uri)
+func (p *SQLProvider) apiClientFactory(dbname string) *gorm.DB {
+	apiURL := p.apiURLFactory("")
 	if apiURL == nil {
 		common.Log.Warningf("unable to initialize SQL api client factory")
 		return nil
@@ -69,7 +65,8 @@ func (p *SQLProvider) apiClientFactory(basePath *string) *gorm.DB {
 	dbcfg := &dbconf.DBConfig{
 		DatabaseHost:    hostParts[0],
 		DatabasePort:    uint(p.apiPort),
-		DatabaseSSLMode: "enable",
+		DatabaseName:    dbname,
+		DatabaseSSLMode: "require",
 	}
 
 	if env, envOk := p.config["env"].(map[string]interface{}); envOk {
@@ -243,25 +240,33 @@ func (p *SQLProvider) Create(params map[string]interface{}) (*ConnectedEntity, e
 	var entity *ConnectedEntity
 	var err error
 
-	dbconn := p.apiClientFactory(nil)
+	db, dbok := params["db"].(string)
+	dbconn := p.apiClientFactory(db)
 	if dbconn == nil {
 		return nil, fmt.Errorf("failed to establish sql connection for connector: %s", p.connectorID)
 	}
 	defer dbconn.Close()
 
-	if db, dbok := params["db"].(string); dbok {
+	if dbok {
 		usr, usrok := params["user"].(string)
 		passwd, passwdok := params["password"].(string)
 		if usrok && passwdok {
-			// FIXME-- don't default to superuser... :\
-			result := dbconn.Exec("CREATE USER ? WITH SUPERUSER; ALTER USER ? WITH PASSWORD '?'", usr, usr, passwd)
+			result := dbconn.Exec(fmt.Sprintf("CREATE USER %s", usr))
 			err = result.Error
 			if err != nil {
 				err = fmt.Errorf("failed to execute CREATE USER command via sql connector: %s; %s", p.connectorID, err.Error())
+				return nil, err
+			}
+
+			// FIXME-- don't default to superuser... :\
+			result = dbconn.Exec(fmt.Sprintf("ALTER USER %s WITH SUPERUSER PASSWORD '%s'", usr, passwd))
+			if err != nil {
+				err = fmt.Errorf("failed to execute ALTER USER command via sql connector: %s; %s", p.connectorID, err.Error())
+				return nil, err
 			}
 		}
 		if err == nil {
-			result := dbconn.Exec("CREATE DATABASE ? OWNER ?", db, usr)
+			result := dbconn.Exec(fmt.Sprintf("CREATE DATABASE %s OWNER %s", db, usr))
 			err = result.Error
 			if err != nil {
 				err = fmt.Errorf("failed to execute CREATE DATABASE command via sql connector: %s; %s", p.connectorID, err.Error())
