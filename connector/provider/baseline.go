@@ -299,6 +299,9 @@ func (p *BaselineProvider) Delete(id string) error {
 // List impl for BaselineProvider
 func (p *BaselineProvider) List(params map[string]interface{}) ([]*ConnectedEntity, error) {
 	apiClient := p.apiClientFactory(nil)
+	if apiClient == nil {
+		return nil, fmt.Errorf("failed to resolve baseline api client for connector: %s", p.connectorID)
+	}
 
 	var status int
 	var resp interface{}
