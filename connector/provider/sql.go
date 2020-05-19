@@ -67,8 +67,9 @@ func (p *SQLProvider) apiClientFactory(basePath *string) *gorm.DB {
 	hostParts := strings.Split(dbHost, portSuffix)
 
 	dbcfg := &dbconf.DBConfig{
-		DatabaseHost: hostParts[0],
-		DatabasePort: uint(p.apiPort),
+		DatabaseHost:    hostParts[0],
+		DatabasePort:    uint(p.apiPort),
+		DatabaseSSLMode: "enable",
 	}
 
 	if env, envOk := p.config["env"].(map[string]interface{}); envOk {
