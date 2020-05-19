@@ -95,8 +95,8 @@ func (p *SQLProvider) apiURLFactory(path string) *string {
 	nodes := make([]*network.Node, 0)
 	p.model.Association("Nodes").Find(&nodes)
 	if len(nodes) > 0 {
-		if nodes[0].IPv4 != nil {
-			return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].IPv4, p.apiPort, suffix))
+		if nodes[0].Host != nil {
+			return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].Host, p.apiPort, suffix))
 		}
 	}
 
