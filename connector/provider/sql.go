@@ -9,7 +9,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres" // PostgreSQL dialect
 
-	"github.com/kthomas/go-db-config"
+	dbconf "github.com/kthomas/go-db-config"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -91,11 +91,23 @@ func (p *SQLProvider) apiURLFactory(path string) *string {
 		suffix = fmt.Sprintf("/%s", path)
 	}
 
-	if p.apiURL == nil {
-		return nil
+	// FIXME
+	nodes := make([]*network.Node, 0)
+	p.model.Association("Nodes").Find(&nodes)
+	if len(nodes) > 0 {
+		if nodes[0].IPv4 != nil {
+			return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].IPv4, p.apiPort, suffix))
+		}
 	}
 
-	return common.StringOrNil(fmt.Sprintf("%s%s", *p.apiURL, suffix))
+	// FIXME-- prefer the below to the above!!! rethink which connector types get load balanced and which represent clustered services that can receive a direct connection to a single node...
+	// if p.apiURL == nil {
+	// 	return nil
+	// }
+
+	// return common.StringOrNil(fmt.Sprintf("%s%s", *p.apiURL, suffix))
+
+	return nil
 }
 
 func (p *SQLProvider) rawConfig() *json.RawMessage {
@@ -224,7 +236,7 @@ func (p *SQLProvider) Create(params map[string]interface{}) (*ConnectedEntity, e
 
 	dbconn := p.apiClientFactory(nil)
 	if dbconn == nil {
-		return nil, fmt.Errorf("failed to establish sql connection for connector: %s; %s", p.connectorID, err.Error())
+		return nil, fmt.Errorf("failed to establish sql connection for connector: %s", p.connectorID)
 	}
 	defer dbconn.Close()
 

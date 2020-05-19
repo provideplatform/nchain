@@ -96,9 +96,9 @@ func (p *MongoDBProvider) apiURLFactory(path string) *string {
 			}
 			if user != nil && passwd != nil {
 				return common.StringOrNil(fmt.Sprintf("mongodb://%s:%s@%s:%d%s", *user, *passwd, *nodes[0].IPv4, p.apiPort, suffix))
-			} else {
-				return common.StringOrNil(fmt.Sprintf("mongodb://%s:%d%s", *nodes[0].IPv4, p.apiPort, suffix))
 			}
+
+			return common.StringOrNil(fmt.Sprintf("mongodb://%s:%d%s", *nodes[0].IPv4, p.apiPort, suffix))
 		}
 	}
 
