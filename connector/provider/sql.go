@@ -71,6 +71,7 @@ func (p *SQLProvider) apiClientFactory(dbname string) *gorm.DB {
 
 	if env, envOk := p.config["env"].(map[string]interface{}); envOk {
 		if usr, usrok := env["POSTGRES_USER"].(string); usrok {
+			dbcfg.DatabaseName = usr
 			dbcfg.DatabaseUser = usr
 		}
 		if password, passwordOk := env["POSTGRES_PASSWORD"].(string); passwordOk {
