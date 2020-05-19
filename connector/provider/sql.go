@@ -96,7 +96,11 @@ func (p *SQLProvider) apiURLFactory(path string) *string {
 	p.model.Association("Nodes").Find(&nodes)
 	if len(nodes) > 0 {
 		if nodes[0].Host != nil {
-			return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].Host, p.apiPort, suffix))
+			if strings.Contains(*nodes[0].Host, fmt.Sprintf(":%d", p.apiPort)) {
+				return common.StringOrNil(fmt.Sprintf("%s%s", *nodes[0].Host, suffix))
+			} else {
+				return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].Host, p.apiPort, suffix))
+			}
 		}
 	}
 
