@@ -82,6 +82,14 @@ func (p *SQLProvider) apiClientFactory(basePath *string) *gorm.DB {
 
 	client, err := dbconf.DatabaseConnectionFactory(dbcfg)
 	if err != nil {
+		if strings.Index(err.Error(), "SSL is not enabled") != -1 {
+			dbcfg.DatabaseSSLMode = "disable"
+			client, err = dbconf.DatabaseConnectionFactory(dbcfg)
+			if err == nil {
+				// HACK ;)
+				return client
+			}
+		}
 		common.Log.Warningf("failed to establish sql connection for connector: %s; %s", p.connectorID, err.Error())
 		return nil
 	}
