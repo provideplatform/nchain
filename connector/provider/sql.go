@@ -62,8 +62,12 @@ func (p *SQLProvider) apiClientFactory(basePath *string) *gorm.DB {
 		return nil
 	}
 
+	dbHost := strings.Replace(*apiURL, "https://", "", -1) // FIXME
+	portSuffix := fmt.Sprintf(":%d", p.apiPort)
+	hostParts := strings.Split(dbHost, portSuffix)
+
 	dbcfg := &dbconf.DBConfig{
-		DatabaseHost: strings.Replace(*apiURL, "https://", "", -1), // FIXME
+		DatabaseHost: hostParts[0],
 		DatabasePort: uint(p.apiPort),
 	}
 
@@ -95,12 +99,12 @@ func (p *SQLProvider) apiURLFactory(path string) *string {
 	nodes := make([]*network.Node, 0)
 	p.model.Association("Nodes").Find(&nodes)
 	if len(nodes) > 0 {
-		if nodes[0].Host != nil {
-			if strings.Contains(*nodes[0].Host, fmt.Sprintf(":%d", p.apiPort)) {
-				return common.StringOrNil(fmt.Sprintf("%s%s", *nodes[0].Host, suffix))
-			} else {
-				return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].Host, p.apiPort, suffix))
+		if nodes[0].IPv4 != nil {
+			if strings.Contains(*nodes[0].IPv4, fmt.Sprintf(":%d", p.apiPort)) {
+				return common.StringOrNil(fmt.Sprintf("%s%s", *nodes[0].IPv4, suffix))
 			}
+
+			return common.StringOrNil(fmt.Sprintf("%s:%d%s", *nodes[0].IPv4, p.apiPort, suffix))
 		}
 	}
 
