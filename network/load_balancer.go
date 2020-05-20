@@ -902,29 +902,14 @@ func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {
 	cfg := l.ParseConfig()
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
 
-	orchestrationAPI, err := l.orchestrationAPIClient()
-	if err != nil {
-		err := fmt.Errorf("Failed to unregister security groups for load balancer with id: %s; %s", l.ID, err.Error())
-		common.Log.Warningf(err.Error())
-		return err
-	}
-
 	if securityGroupIdsOk {
 		for i := range securityGroupIds {
 			securityGroupID := securityGroupIds[i].(string)
-
-			_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
-			if err != nil {
-				if aerr, ok := err.(awserr.Error); ok {
-					switch aerr.Code() {
-					case "InvalidGroup.NotFound":
-						common.Log.Debugf("Attempted to unregister security group which does not exist for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
-					default:
-						common.Log.Warningf("Failed to unregister security group for load balancer with id: %s; security group id: %s", l.ID, securityGroupID)
-						return err
-					}
-				}
-			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"load_balancer_id":  l.ID.String(),
+				"security_group_id": securityGroupID,
+			})
+			natsutil.NatsStreamingPublish(natsUnregisterLoadBalancerSecurityGroupSubject, payload)
 		}
 
 		delete(cfg, "target_security_group_ids")

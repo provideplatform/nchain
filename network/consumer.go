@@ -29,6 +29,11 @@ const natsLoadBalancerProvisioningMaxInFlight = 32
 const natsLoadBalancerProvisioningInvocationTimeout = time.Second * 15
 const natsLoadBalancerProvisioningTimeout = int64(time.Minute * 10)
 
+const natsUnregisterLoadBalancerSecurityGroupSubject = "goldmine.loadbalancer.securitygroup.unregister"
+const natsUnregisterLoadBalancerSecurityGroupMaxInFlight = 32
+const natsUnregisterLoadBalancerSecurityGroupInvocationTimeout = time.Second * 10
+const natsUnregisterLoadBalancerSecurityGroupTimeout = int64(time.Minute * 10)
+
 const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
 const natsLoadBalancerBalanceNodeMaxInFlight = 32
 const natsLoadBalancerBalanceNodeInvocationTimeout = time.Second * 15
@@ -98,6 +103,7 @@ func init() {
 	createNatsLoadBalancerDeprovisioningSubscriptions(&waitGroup)
 	createNatsLoadBalancerBalanceNodeSubscriptions(&waitGroup)
 	createNatsLoadBalancerUnbalanceNodeSubscriptions(&waitGroup)
+	createNatsUnregisterLoadBalancerSecurityGroupSubscriptions(&waitGroup)
 	createNatsDeployNodeSubscriptions(&waitGroup)
 	createNatsDeleteTerminatedNodeSubscriptions(&waitGroup)
 	createNatsResolveNodeHostSubscriptions(&waitGroup)
@@ -172,6 +178,20 @@ func createNatsLoadBalancerUnbalanceNodeSubscriptions(wg *sync.WaitGroup) {
 			consumeLoadBalancerUnbalanceNodeMsg,
 			natsLoadBalancerUnbalanceNodeInvocationTimeout,
 			natsLoadBalancerUnbalanceNodeMaxInFlight,
+			nil,
+		)
+	}
+}
+
+func createNatsUnregisterLoadBalancerSecurityGroupSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsUnregisterLoadBalancerSecurityGroupInvocationTimeout,
+			natsUnregisterLoadBalancerSecurityGroupSubject,
+			natsUnregisterLoadBalancerSecurityGroupSubject,
+			consumeUnregisterLoadBalancerSecurityGroupMsg,
+			natsUnregisterLoadBalancerSecurityGroupInvocationTimeout,
+			natsUnregisterLoadBalancerSecurityGroupMaxInFlight,
 			nil,
 		)
 	}
@@ -554,6 +574,65 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 		common.Log.Debugf("Load balancer node removal succeeded; ACKing NATS message: %s", balancer.ID)
 		msg.Ack()
 	}
+}
+
+func consumeUnregisterLoadBalancerSecurityGroupMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+		}
+	}()
+
+	common.Log.Debugf("Consuming NATS unregister load balancer security groups message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal unregister load balancer security groups message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	balancerID, balancerIDOk := params["load_balancer_id"].(string)
+	securityGroupID, securityGroupIDOk := params["security_group_id"].(string)
+
+	if !balancerIDOk {
+		common.Log.Warningf("Failed to unregister load balancer security groups; no node id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	if !securityGroupIDOk {
+		common.Log.Warningf("Failed to unregister load balancer security groups; no security group id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	balancer := &LoadBalancer{}
+	db.Where("id = ?", nodeID).Find(&balancer)
+	if node == nil || node.ID == uuid.Nil {
+		common.Log.Warningf("Failed to resolve load balancer; no balancer resolved for id: %s", balancerID)
+		natsutil.Nack(msg)
+		return
+	}
+
+	orchestrationAPI, err := node.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to unregister security groups for network load balancer %s; %s", balancerID, err.Error())
+		common.Log.Warningf(err.Error())
+		return
+	}
+
+	_, err = orchestrationAPI.DeleteSecurityGroup(securityGroupID)
+	if err != nil {
+		common.Log.Debugf("Failed to unregister security group for network load balancer with id: %s; security group id: %s", balancer.ID, securityGroupID)
+		natsutil.AttemptNack(msg, natsUnregisterLoadBalancerSecurityGroupTimeout)
+		return
+	}
+
+	msg.Ack()
 }
 
 func consumeDeployNodeMsg(msg *stan.Msg) {
