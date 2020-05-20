@@ -579,7 +579,7 @@ func consumeLoadBalancerUnbalanceNodeMsg(msg *stan.Msg) {
 func consumeUnregisterLoadBalancerSecurityGroupMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+			natsutil.AttemptNack(msg, natsUnregisterLoadBalancerSecurityGroupTimeout)
 		}
 	}()
 
@@ -629,6 +629,65 @@ func consumeUnregisterLoadBalancerSecurityGroupMsg(msg *stan.Msg) {
 	if err != nil {
 		common.Log.Debugf("Failed to unregister security group for network load balancer with id: %s; security group id: %s", balancer.ID, securityGroupID)
 		natsutil.AttemptNack(msg, natsUnregisterLoadBalancerSecurityGroupTimeout)
+		return
+	}
+
+	msg.Ack()
+}
+
+func consumeUnregisterLoadBalancerCertificateGroupMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsUnregisterLoadBalancerSecurityGroupTimeout)
+		}
+	}()
+
+	common.Log.Debugf("Consuming NATS unregister load balancer certificate message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal unregister load balancer certificate message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	balancerID, balancerIDOk := params["load_balancer_id"].(string)
+	certificateID, certificateIDOk := params["certificate_id"].(string)
+
+	if !balancerIDOk {
+		common.Log.Warningf("Failed to unregister load balancer security groups; no load balancer id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	if !certificateIDOk {
+		common.Log.Warningf("Failed to unregister load balancer certificate; no certificate id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	balancer := &LoadBalancer{}
+	db.Where("id = ?", nodeID).Find(&balancer)
+	if node == nil || node.ID == uuid.Nil {
+		common.Log.Warningf("Failed to resolve load balancer; no balancer resolved for id: %s", balancerID)
+		natsutil.Nack(msg)
+		return
+	}
+
+	orchestrationAPI, err := node.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to unregister certificate for network load balancer %s; %s", balancerID, err.Error())
+		common.Log.Warningf(err.Error())
+		return
+	}
+
+	_, err := orchestrationAPI.DeleteCertificate(&certificateID)
+	if err != nil {
+		common.Log.Warningf("Failed to delete cert in region: %s; %s", region, err.Error())
+		natsutil.AttemptNack(msg, natsUnregisterLoadBalancerCertificateTimeout)
 		return
 	}
 
@@ -944,7 +1003,7 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 func consumeUnregisterNodeSecurityGroupMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+			natsutil.AttemptNack(msg, natsUnregisterNodeSecurityGroupTimeout)
 		}
 	}()
 

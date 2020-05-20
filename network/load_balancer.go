@@ -357,61 +357,45 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 				}
 			}
 
-			if securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{}); securityGroupIdsOk {
-				for _, securityGroupID := range securityGroupIds {
-					_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID.(string))
-					if err != nil {
-						if aerr, ok := err.(awserr.Error); ok {
-							switch aerr.Code() {
-							case "InvalidGroup.NotFound":
-								common.Log.Debugf("Attempted to delete security group %s which does not exist for balancer: %s", securityGroupID.(string), l.ID)
-							default:
-								common.Log.Warningf("Failed to delete security group with id: %s; %s", securityGroupID.(string), err.Error())
-								// FIXME-- dispatch async via NATS
-							}
-						}
+			l.unregisterSecurityGroups(db)
+
+			if certificates, certificatesOk := cfg["certificates"].(map[string]interface{}); certificatesOk {
+				for _, certificate := range certificates {
+					if certificateID, certificateIDOk := certificate.(string); certificateIDOk {
+						payload, _ := json.Marshal(map[string]interface{}{
+							"load_balancer_id": l.ID.String(),
+							"certificate_id":   certificateID,
+						})
+						natsutil.NatsStreamingPublish(natsUnregisterLoadBalancerCertificateSubject, payload)
 					}
 				}
+			}
 
-				if certificates, certificatesOk := cfg["certificates"].(map[string]interface{}); certificatesOk {
-					for _, certificate := range certificates {
-						if certificateArn, certificateArnOk := certificate.(string); certificateArnOk {
-							_, err := orchestrationAPI.DeleteCertificate(&certificateArn)
-							if err != nil {
-								desc := fmt.Sprintf("Failed to delete cert in region: %s; %s", region, err.Error())
-								common.Log.Warning(desc)
-								// FIXME-- dispatch async via NATS
-							}
-						}
-					}
+			if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk && !common.DefaultInfrastructureUsesSelfSignedCertificate {
+				var dnsAPI orchestration.API
+				switch targetID {
+				case orchestration.ProviderAWS:
+					dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
+						"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
+						"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
+					}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
+				case orchestration.ProviderAzure:
+					dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
+						"azure_tenant_id":       nil,
+						"azure_subscription_id": nil,
+						"azure_client_id":       nil,
+						"azure_client_secret":   nil,
+					}, *common.DefaultInfrastructureAzureRegion)
+				case orchestration.ProviderGoogle:
+					// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
 				}
 
-				if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk && !common.DefaultInfrastructureUsesSelfSignedCertificate {
-					var dnsAPI orchestration.API
-					switch targetID {
-					case orchestration.ProviderAWS:
-						dnsAPI = orchestration.InitAWSOrchestrationProvider(map[string]interface{}{
-							"aws_access_key_id":     *common.DefaultInfrastructureAWSConfig.AccessKeyId,
-							"aws_secret_access_key": *common.DefaultInfrastructureAWSConfig.SecretAccessKey,
-						}, *common.DefaultInfrastructureAWSConfig.DefaultRegion)
-					case orchestration.ProviderAzure:
-						dnsAPI = orchestration.InitAzureOrchestrationProvider(map[string]interface{}{
-							"azure_tenant_id":       nil,
-							"azure_subscription_id": nil,
-							"azure_client_id":       nil,
-							"azure_client_secret":   nil,
-						}, *common.DefaultInfrastructureAzureRegion)
-					case orchestration.ProviderGoogle:
-						// apiClient = orchestration.InitGoogleOrchestrationProvider(credentials)
-					}
-
-					for _, item := range dns {
-						if dnsName, dnsNameOk := item.(string); dnsNameOk {
-							_, err := dnsAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
-							if err != nil {
-								common.Log.Warning(fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error()))
-								// FIXME-- dispatch async via NATS
-							}
+				for _, item := range dns {
+					if dnsName, dnsNameOk := item.(string); dnsNameOk {
+						_, err := dnsAPI.DeleteDNSRecord(common.DefaultInfrastructureRoute53HostedZoneID, dnsName, "CNAME", []string{*l.Host}, 300)
+						if err != nil {
+							common.Log.Warning(fmt.Sprintf("Failed to delete DNS record for load balancer %s in region: %s; %s", l.ID, region, err.Error()))
+							// FIXME-- dispatch async via NATS
 						}
 					}
 				}
