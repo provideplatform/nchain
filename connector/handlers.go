@@ -31,12 +31,21 @@ func InstallConnectorsAPI(r *gin.Engine) {
 
 func connectorsListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
 
-	query := dbconf.DatabaseConnection().Where("connectors.application_id = ?", appID)
+	query := dbconf.DatabaseConnection()
+
+	if appID != nil {
+		query = query.Where("connectors.application_id = ?", appID)
+	}
+
+	if orgID != nil {
+		query = query.Where("connectors.organization_id = ?", orgID)
+	}
 
 	if c.Query("type") != "" {
 		query = query.Where("connectors.type = ?", c.Query("type"))
@@ -50,6 +59,8 @@ func connectorsListHandler(c *gin.Context) {
 
 func connectorDetailsHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -61,7 +72,11 @@ func connectorDetailsHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && *orgID != *connector.OrganizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -76,7 +91,8 @@ func connectorDetailsHandler(c *gin.Context) {
 
 func createConnectorHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -94,10 +110,7 @@ func createConnectorHandler(c *gin.Context) {
 		return
 	}
 	connector.ApplicationID = appID
-
-	if connector.OrganizationID != nil {
-		common.Log.Warningf("setting organization_id on connector via creation API; needs audit! at this time, org authorization not yet implemented in goldmine")
-	}
+	connector.OrganizationID = orgID
 
 	if connector.Create() {
 		provide.Render(connector, 201, c)
@@ -110,7 +123,8 @@ func createConnectorHandler(c *gin.Context) {
 
 func deleteConnectorHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -121,7 +135,11 @@ func deleteConnectorHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && connector.ApplicationID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && connector.ApplicationID != nil && *orgID != *connector.ApplicationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -134,7 +152,8 @@ func deleteConnectorHandler(c *gin.Context) {
 
 func connectorLoadBalancersListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -142,7 +161,15 @@ func connectorLoadBalancersListHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 	connector := &Connector{}
 
-	query := db.Where("connectors.id = ? AND connectors.application_id = ?", c.Param("id"), appID).Find(&connector)
+	query := db.Where("connectors.id = ?", c.Param("id"))
+	if appID != nil {
+		query = query.Where("connectors.application_id = ?", appID)
+	}
+	if orgID != nil {
+		query = query.Where("connectors.organization_id = ?", orgID)
+	}
+	query.Find(&connector)
+
 	if connector == nil || connector.ID == uuid.Nil {
 		provide.RenderError("connector not found", 404, c)
 		return
@@ -169,7 +196,8 @@ func connectorLoadBalancersListHandler(c *gin.Context) {
 
 func connectorNodesListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -177,7 +205,15 @@ func connectorNodesListHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 	connector := &Connector{}
 
-	query := db.Where("connectors.id = ? AND connectors.application_id = ?", c.Param("id"), appID).Find(&connector)
+	query := db.Where("connectors.id = ?", c.Param("id"))
+	if appID != nil {
+		query = query.Where("connectors.application_id = ?", appID)
+	}
+	if orgID != nil {
+		query = query.Where("connectors.organization_id = ?", orgID)
+	}
+	query.Find(&connector)
+
 	if connector == nil || connector.ID == uuid.Nil {
 		provide.RenderError("connector not found", 404, c)
 		return
@@ -194,7 +230,8 @@ func connectorNodesListHandler(c *gin.Context) {
 
 func connectorEntitiesListHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -205,7 +242,11 @@ func connectorEntitiesListHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && connector.ApplicationID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && connector.OrganizationID != nil && *orgID != *connector.OrganizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -227,7 +268,8 @@ func connectorEntitiesListHandler(c *gin.Context) {
 
 func connectorEntityCreateHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -251,7 +293,11 @@ func connectorEntityCreateHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && connector.ApplicationID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && connector.OrganizationID != nil && *orgID != *connector.OrganizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -267,7 +313,8 @@ func connectorEntityCreateHandler(c *gin.Context) {
 
 func connectorEntityDetailsHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -278,7 +325,11 @@ func connectorEntityDetailsHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && connector.ApplicationID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && connector.OrganizationID != nil && *orgID != *connector.OrganizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -294,7 +345,8 @@ func connectorEntityDetailsHandler(c *gin.Context) {
 
 func updateConnectorEntityHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -318,7 +370,11 @@ func updateConnectorEntityHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && connector.ApplicationID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && connector.OrganizationID != nil && *orgID != *connector.OrganizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -334,7 +390,8 @@ func updateConnectorEntityHandler(c *gin.Context) {
 
 func deleteConnectorEntityHandler(c *gin.Context) {
 	appID := provide.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := provide.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -345,7 +402,11 @@ func deleteConnectorEntityHandler(c *gin.Context) {
 		provide.RenderError("connector not found", 404, c)
 		return
 	}
-	if *appID != *connector.ApplicationID {
+	if appID != nil && connector.ApplicationID != nil && *appID != *connector.ApplicationID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+	if orgID != nil && connector.OrganizationID != nil && *orgID != *connector.OrganizationID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
