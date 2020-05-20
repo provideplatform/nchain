@@ -358,18 +358,7 @@ func (l *LoadBalancer) Deprovision(db *gorm.DB) error {
 			}
 
 			l.unregisterSecurityGroups(db)
-
-			if certificates, certificatesOk := cfg["certificates"].(map[string]interface{}); certificatesOk {
-				for _, certificate := range certificates {
-					if certificateID, certificateIDOk := certificate.(string); certificateIDOk {
-						payload, _ := json.Marshal(map[string]interface{}{
-							"load_balancer_id": l.ID.String(),
-							"certificate_id":   certificateID,
-						})
-						natsutil.NatsStreamingPublish(natsUnregisterLoadBalancerCertificateSubject, payload)
-					}
-				}
-			}
+			l.unregisterCertificates(db)
 
 			if dns, dnsOk := cfg["dns"].([]interface{}); dnsOk && !common.DefaultInfrastructureUsesSelfSignedCertificate {
 				var dnsAPI orchestration.API
@@ -816,7 +805,7 @@ func (l *LoadBalancer) unbalanceNode(db *gorm.DB, node *Node) error {
 									case "TargetGroupNotFound":
 										common.Log.Debugf("Failed to deregister target from load balanced target group in region: %s; target group does not exist", region)
 									default:
-										common.Log.Warningf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
+										common.Log.Debugf("Failed to deregister target from load balanced target group in region: %s; %s", region, err.Error())
 										return err
 									}
 								}
@@ -878,6 +867,25 @@ func (l *LoadBalancer) UpdateStatus(db *gorm.DB, status string, description *str
 			})
 		}
 	}
+}
+
+func (l *LoadBalancer) unregisterCertificates(db *gorm.DB) error {
+	common.Log.Debugf("Attempting to unregister certificates for load balancer with id: %s", l.ID)
+
+	cfg := l.ParseConfig()
+	if certificates, certificatesOk := cfg["certificates"].(map[string]interface{}); certificatesOk {
+		for _, certificate := range certificates {
+			if certificateID, certificateIDOk := certificate.(string); certificateIDOk {
+				payload, _ := json.Marshal(map[string]interface{}{
+					"load_balancer_id": l.ID.String(),
+					"certificate_id":   certificateID,
+				})
+				natsutil.NatsStreamingPublish(natsUnregisterLoadBalancerCertificateSubject, payload)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (l *LoadBalancer) unregisterSecurityGroups(db *gorm.DB) error {

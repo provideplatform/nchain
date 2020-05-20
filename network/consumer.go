@@ -29,6 +29,11 @@ const natsLoadBalancerProvisioningMaxInFlight = 32
 const natsLoadBalancerProvisioningInvocationTimeout = time.Second * 15
 const natsLoadBalancerProvisioningTimeout = int64(time.Minute * 10)
 
+const natsUnregisterLoadBalancerCertificateSubject = "goldmine.loadbalancer.certificate.unregister"
+const natsUnregisterLoadBalancerCertificateMaxInFlight = 32
+const natsUnregisterLoadBalancerCertificateInvocationTimeout = time.Second * 10
+const natsUnregisterLoadBalancerCertificateTimeout = int64(time.Minute * 10)
+
 const natsUnregisterLoadBalancerSecurityGroupSubject = "goldmine.loadbalancer.securitygroup.unregister"
 const natsUnregisterLoadBalancerSecurityGroupMaxInFlight = 32
 const natsUnregisterLoadBalancerSecurityGroupInvocationTimeout = time.Second * 10
@@ -103,6 +108,7 @@ func init() {
 	createNatsLoadBalancerDeprovisioningSubscriptions(&waitGroup)
 	createNatsLoadBalancerBalanceNodeSubscriptions(&waitGroup)
 	createNatsLoadBalancerUnbalanceNodeSubscriptions(&waitGroup)
+	createNatsUnregisterLoadBalancerCertificateSubscriptions(&waitGroup)
 	createNatsUnregisterLoadBalancerSecurityGroupSubscriptions(&waitGroup)
 	createNatsDeployNodeSubscriptions(&waitGroup)
 	createNatsDeleteTerminatedNodeSubscriptions(&waitGroup)
@@ -192,6 +198,20 @@ func createNatsUnregisterLoadBalancerSecurityGroupSubscriptions(wg *sync.WaitGro
 			consumeUnregisterLoadBalancerSecurityGroupMsg,
 			natsUnregisterLoadBalancerSecurityGroupInvocationTimeout,
 			natsUnregisterLoadBalancerSecurityGroupMaxInFlight,
+			nil,
+		)
+	}
+}
+
+func createNatsUnregisterLoadBalancerCertificateSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsUnregisterLoadBalancerCertificateInvocationTimeout,
+			natsUnregisterLoadBalancerCertificateSubject,
+			natsUnregisterLoadBalancerCertificateSubject,
+			consumeUnregisterLoadBalancerCertificateMsg,
+			natsUnregisterLoadBalancerCertificateInvocationTimeout,
+			natsUnregisterLoadBalancerCertificateMaxInFlight,
 			nil,
 		)
 	}
@@ -611,14 +631,14 @@ func consumeUnregisterLoadBalancerSecurityGroupMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	balancer := &LoadBalancer{}
-	db.Where("id = ?", nodeID).Find(&balancer)
-	if node == nil || node.ID == uuid.Nil {
+	db.Where("id = ?", balancerID).Find(&balancer)
+	if balancer == nil || balancer.ID == uuid.Nil {
 		common.Log.Warningf("Failed to resolve load balancer; no balancer resolved for id: %s", balancerID)
 		natsutil.Nack(msg)
 		return
 	}
 
-	orchestrationAPI, err := node.orchestrationAPIClient()
+	orchestrationAPI, err := balancer.orchestrationAPIClient()
 	if err != nil {
 		err := fmt.Errorf("Failed to unregister security groups for network load balancer %s; %s", balancerID, err.Error())
 		common.Log.Warningf(err.Error())
@@ -635,7 +655,7 @@ func consumeUnregisterLoadBalancerSecurityGroupMsg(msg *stan.Msg) {
 	msg.Ack()
 }
 
-func consumeUnregisterLoadBalancerCertificateGroupMsg(msg *stan.Msg) {
+func consumeUnregisterLoadBalancerCertificateMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
 			natsutil.AttemptNack(msg, natsUnregisterLoadBalancerSecurityGroupTimeout)
@@ -670,23 +690,23 @@ func consumeUnregisterLoadBalancerCertificateGroupMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	balancer := &LoadBalancer{}
-	db.Where("id = ?", nodeID).Find(&balancer)
-	if node == nil || node.ID == uuid.Nil {
+	db.Where("id = ?", balancerID).Find(&balancer)
+	if balancer == nil || balancer.ID == uuid.Nil {
 		common.Log.Warningf("Failed to resolve load balancer; no balancer resolved for id: %s", balancerID)
 		natsutil.Nack(msg)
 		return
 	}
 
-	orchestrationAPI, err := node.orchestrationAPIClient()
+	orchestrationAPI, err := balancer.orchestrationAPIClient()
 	if err != nil {
 		err := fmt.Errorf("Failed to unregister certificate for network load balancer %s; %s", balancerID, err.Error())
 		common.Log.Warningf(err.Error())
 		return
 	}
 
-	_, err := orchestrationAPI.DeleteCertificate(&certificateID)
+	_, err = orchestrationAPI.DeleteCertificate(&certificateID)
 	if err != nil {
-		common.Log.Warningf("Failed to delete cert in region: %s; %s", region, err.Error())
+		common.Log.Warningf("Failed to delete cert; %s", err.Error())
 		natsutil.AttemptNack(msg, natsUnregisterLoadBalancerCertificateTimeout)
 		return
 	}
