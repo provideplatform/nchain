@@ -69,6 +69,11 @@ const natsRemoveNodePeerMaxInFlight = 32
 const natsRemoveNodePeerInvocationTimeout = time.Second * 10
 const natsRemoveNodePeerTimeout = int64(time.Minute * 10)
 
+const natsUnregisterNodeSecurityGroupSubject = "goldmine.node.securitygroup.unregister"
+const natsUnregisterNodeSecurityGroupMaxInFlight = 32
+const natsUnregisterNodeSecurityGroupInvocationTimeout = time.Second * 10
+const natsUnregisterNodeSecurityGroupTimeout = int64(time.Minute * 10)
+
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 
 type natsBlockFinalizedMsg struct {
@@ -99,6 +104,7 @@ func init() {
 	createNatsResolveNodePeerURLSubscriptions(&waitGroup)
 	createNatsAddNodePeerSubscriptions(&waitGroup)
 	createNatsRemoveNodePeerSubscriptions(&waitGroup)
+	createNatsUnregisterNodeSecurityGroupSubscriptions(&waitGroup)
 }
 
 func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
@@ -250,6 +256,20 @@ func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 			consumeRemoveNodePeerMsg,
 			natsRemoveNodePeerInvocationTimeout,
 			natsRemoveNodePeerMaxInFlight,
+			nil,
+		)
+	}
+}
+
+func createNatsUnregisterNodeSecurityGroupSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsUnregisterNodeSecurityGroupInvocationTimeout,
+			natsUnregisterNodeSecurityGroupSubject,
+			natsUnregisterNodeSecurityGroupSubject,
+			consumeUnregisterNodeSecurityGroupMsg,
+			natsUnregisterNodeSecurityGroupInvocationTimeout,
+			natsUnregisterNodeSecurityGroupMaxInFlight,
 			nil,
 		)
 	}
@@ -836,6 +856,65 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	if err != nil {
 		common.Log.Debugf("Attempt to remove network peer failed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+		return
+	}
+
+	msg.Ack()
+}
+
+func consumeUnregisterNodeSecurityGroupMsg(msg *stan.Msg) {
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+		}
+	}()
+
+	common.Log.Debugf("Consuming NATS unregister node security groups message: %s", msg)
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal unregister node security groups message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	nodeID, nodeIDOk := params["node_id"].(string)
+	securityGroupID, securityGroupIDOk := params["security_group_id"].(string)
+
+	if !nodeIDOk {
+		common.Log.Warningf("Failed to unregister node security groups; no node id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	if !securityGroupIDOk {
+		common.Log.Warningf("Failed to unregister node security groups; no security group id provided")
+		natsutil.Nack(msg)
+		return
+	}
+
+	db := dbconf.DatabaseConnection()
+
+	node := &Node{}
+	db.Where("id = ?", nodeID).Find(&node)
+	if node == nil || node.ID == uuid.Nil {
+		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
+		natsutil.Nack(msg)
+		return
+	}
+
+	orchestrationAPI, err := node.orchestrationAPIClient()
+	if err != nil {
+		err := fmt.Errorf("Failed to unregister security groups for network node %s; %s", node.ID, err.Error())
+		common.Log.Warningf(err.Error())
+		return
+	}
+
+	_, err = orchestrationAPI.DeleteSecurityGroup(securityGroupID)
+	if err != nil {
+		common.Log.Debugf("Failed to unregister security group for network node with id: %s; security group id: %s", node.ID, securityGroupID)
+		natsutil.AttemptNack(msg, natsUnregisterNodeSecurityGroupTimeout)
 		return
 	}
 

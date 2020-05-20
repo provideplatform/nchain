@@ -1107,22 +1107,14 @@ func (n *Node) unregisterSecurityGroups() error {
 	_, regionOk := cfg[nodeConfigRegion].(string)
 	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
 
-	orchestrationAPI, err := n.orchestrationAPIClient()
-	if err != nil {
-		err := fmt.Errorf("Failed to unregistry security groups for network node %s; %s", n.ID, err.Error())
-		common.Log.Warningf(err.Error())
-		return err
-	}
-
 	if regionOk && securityGroupIdsOk {
 		for i := range securityGroupIds {
 			securityGroupID := securityGroupIds[i].(string)
-
-			_, err := orchestrationAPI.DeleteSecurityGroup(securityGroupID)
-			if err != nil {
-				common.Log.Warningf("Failed to unregister security group for network node with id: %s; security group id: %s", n.ID, securityGroupID)
-				return err
-			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"node_id":           n.ID.String(),
+				"security_group_id": securityGroupID,
+			})
+			natsutil.NatsStreamingPublish(natsUnregisterNodeSecurityGroupSubject, payload)
 		}
 	}
 
