@@ -606,7 +606,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	networkCfg := network.ParseConfig()
 
 	image, imageOk := cfg[nodeConfigImage].(string)
-	resources, resourcesOk := cfg[nodeConfigResources].(map[string]interface{})
+	resources, resourcesOk := cfg[nodeConfigResources].(map[string]interface{}) // TODO-- make Resources struct
 	entrypoint, entrypointOk := cfg[nodeConfigEntrypoint].([]string)
 	taskRole, taskRoleOk := cfg[nodeConfigTaskRole].(string)
 	// script, scriptOk := cfg["script"].(map[string]interface{})
@@ -616,7 +616,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	vpc, _ := cfg[nodeConfigVpcID].(string)
 	env, envOk := cfg[nodeConfigEnv].(map[string]interface{})
 	encryptedEnv, encryptedEnvOk := encryptedCfg[nodeConfigEnv].(map[string]interface{})
-	securityCfg, securityCfgOk := cfg[nodeConfigSecurity].(map[string]interface{})
+	securityCfg, securityCfgOk := cfg[nodeConfigSecurity].(map[string]interface{}) // TODO-- make Security struct
 	isP2P, p2pOk := cfg[nodeConfigP2P].(bool)
 
 	if networkEnv, networkEnvOk := networkCfg[nodeConfigEnv].(map[string]interface{}); envOk && networkEnvOk {

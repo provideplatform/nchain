@@ -28,6 +28,8 @@ type NetworkInterface struct {
 	PrivateIPv6 *string
 }
 
+// TODO!!! FIXME!!!!!!!!! define structs for everything :D
+
 // API defines an interface for implementations to orchestrate cloud or on-premise infrastructure
 type API interface {
 	CreateLoadBalancer(vpcID *string, name *string, securityGroupIds []string, listeners []*elb.Listener) (response *elb.CreateLoadBalancerOutput, err error)

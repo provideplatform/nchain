@@ -2,6 +2,8 @@ package orchestration
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -153,7 +155,11 @@ func (p *AzureOrchestrationProvider) GetSecurityGroups() (response *ec2.Describe
 }
 
 func (p *AzureOrchestrationProvider) StartContainer(image, taskDefinition *string, taskRole, launchType, resourceGroupName, virtualNetworkID *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error) {
-	return azurewrapper.StartContainer(context.TODO(), p.subscriptionID, p.region, *resourceGroupName, image, virtualNetworkID, cpu, memory, entrypoint, securityGroupIds, subnetIds, overrides, security)
+	if resourceGroupName == nil {
+		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-%d", time.Now().Unix()))
+	}
+	_, ids, err := azurewrapper.StartContainer(context.TODO(), p.subscriptionID, p.region, *resourceGroupName, image, virtualNetworkID, cpu, memory, entrypoint, securityGroupIds, subnetIds, overrides, security)
+	return ids, err
 }
 
 func (p *AzureOrchestrationProvider) StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error) {
