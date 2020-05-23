@@ -188,12 +188,12 @@ func (p *AzureOrchestrationProvider) StartContainer(image, taskDefinition *strin
 		// AzureClientSecret
 	}
 
-	result := StartContainer(params, creds)
-	if result.err != nil {
-		panic(fmt.Sprintf("%s", result.err.Error()))
+	result := azurewrapper.StartContainer(params, creds)
+	if result.Err != nil {
+		panic(fmt.Sprintf("%s", result.Err.Error()))
 	}
-	println(fmt.Sprintf("container: %+v", result.containerIds))
-	return result.containerIds, result.err
+	println(fmt.Sprintf("container: %+v", result.ContainerIds))
+	return result.ContainerIds, result.Err
 }
 
 func (p *AzureOrchestrationProvider) StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error) {
