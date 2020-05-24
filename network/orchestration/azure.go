@@ -14,6 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 
 	azurewrapper "github.com/kthomas/go-azure-wrapper"
+	provide "github.com/provideservices/provide-go"
+
 	"github.com/provideapp/goldmine/common"
 )
 
@@ -44,6 +46,15 @@ func InitAzureOrchestrationProvider(credentials map[string]interface{}, region s
 		subscriptionID: subscriptionID,
 		clientID:       clientID,
 		clientSecret:   clientSecret,
+	}
+}
+
+func (p *AzureOrchestrationProvider) targetCredentials() *provide.TargetCredentials {
+	return &provide.TargetCredentials{
+		AzureTenantID:       common.StringOrNil(p.tenantID),
+		AzureSubscriptionID: common.StringOrNil(p.subscriptionID),
+		AzureClientID:       common.StringOrNil(p.clientID),
+		AzureClientSecret:   common.StringOrNil(p.clientSecret),
 	}
 }
 
@@ -143,15 +154,8 @@ func (p *AzureOrchestrationProvider) AuthorizeSecurityGroupIngress(securityGroup
 }
 
 func (p *AzureOrchestrationProvider) CreateSecurityGroup(name, description string, vpcID *string, cfg map[string]interface{}) ([]string, error) {
-	vpc := ""
-	if (vpcID == nil) {
-		vpc = "goldmine-vpc"
-	}
-	else {
-		vpc = *vpcID
-	}
-	id, err := azurewrapper.UpsertResourceGroup(ctx.TODO(), "goldmine", vpc, region)
-	return [*id], err
+	id, err := azurewrapper.UpsertResourceGroup(context.TODO(), p.targetCredentials(), p.region, name)
+	return []string{*id}, err
 }
 
 func (p *AzureOrchestrationProvider) DeleteSecurityGroup(securityGroupID string) (interface{}, error) {
@@ -162,17 +166,25 @@ func (p *AzureOrchestrationProvider) GetSecurityGroups() (response *ec2.Describe
 	return nil, nil
 }
 
-func (p *AzureOrchestrationProvider) StartContainer(image, taskDefinition *string, taskRole, launchType, resourceGroupName, virtualNetworkID *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error) {
+func (p *AzureOrchestrationProvider) StartContainer(
+	image, taskDefinition *string,
+	taskRole, launchType, resourceGroupName, virtualNetworkID *string,
+	cpu, memory *int64,
+	entrypoint []*string,
+	securityGroupIds []string,
+	subnetIds []string,
+	overrides, security map[string]interface{},
+) (taskIds []string, err error) {
 	if resourceGroupName == nil {
 		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-%d", time.Now().Unix()))
 	}
-	
+
 	params := &provide.ContainerParams{
-		Region:            region,
-		ResourceGroupName: resourceGroupName,
+		Region:            p.region,
+		ResourceGroupName: *resourceGroupName,
 		Image:             image,
 		VirtualNetworkID:  virtualNetworkID,
-		Cpu:               cpu,
+		CPU:               cpu,
 		Memory:            memory,
 		Entrypoint:        entrypoint,
 		SecurityGroupIds:  securityGroupIds,
@@ -181,18 +193,11 @@ func (p *AzureOrchestrationProvider) StartContainer(image, taskDefinition *strin
 		Security:          security,
 	}
 
-	creds := &provide.TargetCredentials{
-		AzureSubscriptionID: p.subscriptionID,
-		// AzureTenantID
-		// AzureClientID
-		// AzureClientSecret
+	result := azurewrapper.StartContainer(params, p.targetCredentials())
+	if result.Err != nil {
+		return taskIds, result.Err
 	}
 
-	result := azurewrapper.StartContainer(params, creds)
-	if result.Err != nil {
-		panic(fmt.Sprintf("%s", result.Err.Error()))
-	}
-	println(fmt.Sprintf("container: %+v", result.ContainerIds))
 	return result.ContainerIds, result.Err
 }
 

@@ -396,8 +396,8 @@ github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBH
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200520193141-a042d572b85c h1:e8JuBYA9zbw4CbxpqEjEz1J42wHXmyo5QNlhX5GZYcE=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200520193141-a042d572b85c/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
-github.com/kthomas/go-azure-wrapper v0.0.0-20200429092204-7085d264f3f3 h1:YhGZHlLlTgl6t5gbp8LJGg0onzNjinQOSmoPMi7sWQk=
-github.com/kthomas/go-azure-wrapper v0.0.0-20200429092204-7085d264f3f3/go.mod h1:vPHv8FgtB+XcvbNH05of/NN/Oi8Gkeqb6in5ndcxwvE=
+github.com/kthomas/go-azure-wrapper v0.0.0-20200523212532-ba4ef49ad675 h1:+mvWfpdjZOM75P3EKFdjGuDwmzpUPpGEI4cXsouYbDs=
+github.com/kthomas/go-azure-wrapper v0.0.0-20200523212532-ba4ef49ad675/go.mod h1:988+Rifmfn7MM1EiBqALCbnY5vbtVLYJPEZhsOIIVqI=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c h1:KIw63xEiZRfXkvq3iKJjofzJhT7hGoj3PLy7zK3jMjQ=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c/go.mod h1:oApzEAKQeLYMWVUCv09olaXsxUac+bSJCOLTOgw3Ekc=
 github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513 h1:lcgOk2ZGtDy87lMLWiZCXzNGe5vLprb8bPN84BsGqUY=
@@ -616,6 +616,8 @@ github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38i
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
 github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494 h1:PO2awfeEioVb7/zs8y5HmmEYbC30xMpCvn3KL08aCWk=
 github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
+github.com/provideservices/provide-go v0.0.0-20200523141458-b060cca21864 h1:k5/P21fSCV4Pi9kuD5WD1O/x3Bluy+b5jNstNmMo/FM=
+github.com/provideservices/provide-go v0.0.0-20200523141458-b060cca21864/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rjeczalik/notify v0.9.1/go.mod h1:rKwnCoCGeuQnwBtTSPL9Dad03Vh2n40ePRrjvIXnJho=
 github.com/rjeczalik/notify v0.9.2 h1:MiTWrPj55mNDHEiIX5YUSKefw/+lCQVoAFmD6oQm5w8=
@@ -834,6 +836,7 @@ google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9Ywl
 google.golang.org/appengine v1.4.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
 google.golang.org/appengine v1.6.1 h1:QzqyMA1tlu6CgqCDUtU9V+ZKhLFT2dkJuANu5QaxI3I=
 google.golang.org/appengine v1.6.1/go.mod h1:i06prIuMbXzDqacNJfV5OdTW448YApPu5ww/cMBSeb0=
+google.golang.org/appengine v1.6.5/go.mod h1:8WjMMxjGQR8xUklV/ARdw2HLXBOI7O7uCIDZVag1xfc=
 google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8/go.mod h1:JiN7NxoALGmiZfu7CAH4rXhgtRTLTxftemlI0sWmxmc=
 google.golang.org/genproto v0.0.0-20190307195333-5fe7a883aa19/go.mod h1:VzzqZJRnGkLBvHegQrXjBqPurQTc5/KpmUdxsrq26oE=
 google.golang.org/genproto v0.0.0-20190404172233-64821d5d2107/go.mod h1:VzzqZJRnGkLBvHegQrXjBqPurQTc5/KpmUdxsrq26oE=
