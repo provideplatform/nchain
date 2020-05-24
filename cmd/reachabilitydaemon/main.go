@@ -176,7 +176,7 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 			unreachableFn := func() {
 				lb.Reload(db)
 
-				if lb.Status != nil && *lb.Status == "deprovisioning" {
+				if lb.Status != nil && *lb.Status == "deprovisioning" && lb.Host != nil {
 					for i := range tcpPorts {
 						EvictReachabilityDaemon(&endpoint{
 							network: "tcp",
@@ -196,21 +196,25 @@ func requireLoadBalancerReachabilityDaemonInstances() {
 			}
 
 			for i := range tcpPorts {
-				RequireReachabilityDaemon(&endpoint{
-					network:     "tcp",
-					addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
-					reachable:   reachableFn,
-					unreachable: unreachableFn,
-				})
+				if lb.Host != nil {
+					RequireReachabilityDaemon(&endpoint{
+						network:     "tcp",
+						addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+						reachable:   reachableFn,
+						unreachable: unreachableFn,
+					})
+				}
 			}
 
 			for i := range udpPorts {
-				RequireReachabilityDaemon(&endpoint{
-					network:     "udp",
-					addr:        fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
-					reachable:   reachableFn,
-					unreachable: unreachableFn,
-				})
+				if lb.Host != nil {
+					RequireReachabilityDaemon(&endpoint{
+						network:     "tcp",
+						addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
+						reachable:   reachableFn,
+						unreachable: unreachableFn,
+					})
+				}
 			}
 		}
 	}
