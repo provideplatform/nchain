@@ -131,7 +131,6 @@ func initIfNotExists(cfg *dbconf.DBConfig, superuser, password string) error {
 		defaultNetworksErr := initDefaultNetworks(client)
 		if defaultNetworksErr != nil {
 			common.Log.Debugf("default networks not upserted in database %s; %s", cfg.DatabaseName, defaultNetworksErr.Error())
-			e
 		}
 	}
 
