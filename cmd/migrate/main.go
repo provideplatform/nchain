@@ -61,9 +61,23 @@ func main() {
 		panic(err)
 	}
 
+	initialMigration := false
+	_, _, versionErr := m.Version()
+	if versionErr != nil {
+		initialMigration = versionErr == migrate.ErrNilVersion
+	}
+
 	err = m.Up()
 	if err != nil && err != migrate.ErrNoChange {
 		common.Log.Warningf("migrations failed 4: %s", err.Error())
+	}
+
+	if initialMigration {
+		db, _ := dbconf.DatabaseConnectionFactory(cfg)
+		defaultNetworksErr := initDefaultNetworks(db)
+		if defaultNetworksErr != nil {
+			common.Log.Warningf("default networks not upserted in database %s; %s", cfg.DatabaseName, defaultNetworksErr.Error())
+		}
 	}
 }
 
@@ -126,11 +140,6 @@ func initIfNotExists(cfg *dbconf.DBConfig, superuser, password string) error {
 		if err != nil {
 			common.Log.Warningf("migrations failed; failed to create database %s using user %s; %s", cfg.DatabaseName, cfg.DatabaseUser, err.Error())
 			return err
-		}
-
-		defaultNetworksErr := initDefaultNetworks(client)
-		if defaultNetworksErr != nil {
-			common.Log.Debugf("default networks not upserted in database %s; %s", cfg.DatabaseName, defaultNetworksErr.Error())
 		}
 	}
 
