@@ -110,7 +110,11 @@ func createConnectorHandler(c *gin.Context) {
 		return
 	}
 	connector.ApplicationID = appID
-	connector.OrganizationID = orgID
+
+	if orgID != nil {
+		// HACK!!! FIXME!!! this should not happen conditionally
+		connector.OrganizationID = orgID
+	}
 
 	if connector.Create() {
 		provide.Render(connector, 201, c)

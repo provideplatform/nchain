@@ -618,6 +618,8 @@ github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494 h1:PO2a
 github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
 github.com/provideservices/provide-go v0.0.0-20200523141458-b060cca21864 h1:k5/P21fSCV4Pi9kuD5WD1O/x3Bluy+b5jNstNmMo/FM=
 github.com/provideservices/provide-go v0.0.0-20200523141458-b060cca21864/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
+github.com/provideservices/provide-go v0.0.0-20200526213800-fff7f17c56db h1:PdpSNJuLH39v8F9/tlJ9HxrHtsZEnkpsSLwIAU1LZkY=
+github.com/provideservices/provide-go v0.0.0-20200526213800-fff7f17c56db/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rjeczalik/notify v0.9.1/go.mod h1:rKwnCoCGeuQnwBtTSPL9Dad03Vh2n40ePRrjvIXnJho=
 github.com/rjeczalik/notify v0.9.2 h1:MiTWrPj55mNDHEiIX5YUSKefw/+lCQVoAFmD6oQm5w8=
