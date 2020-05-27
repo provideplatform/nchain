@@ -82,6 +82,7 @@ func (p *AWSOrchestrationProvider) GetLoadBalancers(loadBalancerName *string) (r
 // CreateLoadBalancerV2 needs docs
 func (p *AWSOrchestrationProvider) CreateLoadBalancerV2(vpcID, name, balancerType *string, securityGroupIDs []string) (response *elbv2.CreateLoadBalancerOutput, err error) {
 	return awswrapper.CreateLoadBalancerV2(p.accessKeyID, p.secretAccessKey, p.region, vpcID, name, balancerType, securityGroupIDs)
+
 }
 
 // CreateDefaultSubnets needs docs

@@ -427,7 +427,7 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 		return nil, err
 	}
 
-	if strings.ToLower(targetID) == "aws" && regionOk {
+	if regionOk {
 		response = &NodeLogsResponse{
 			Logs: make([]*NodeLog, 0),
 		}
@@ -461,11 +461,6 @@ func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeL
 		}
 
 		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s", n.ID)
-
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping logs for azure")
-		common.Log.Warning(desc)
-		return nil, nil
 	}
 
 	return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided", n.ID)
@@ -842,7 +837,6 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
 
 	if !taskIdsOk {
@@ -868,58 +862,52 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 		return err
 	}
 
-	if strings.ToLower(targetID) == "aws" && targetOk {
-		if regionOk {
-			interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
-			if err != nil {
-				err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
-				common.Log.Warningf(err.Error())
-				return err
-			}
-
-			if len(interfaces) > 0 {
-				networkInterface := interfaces[0]
-				n.Host = networkInterface.Host
-				n.IPv4 = networkInterface.IPv4
-				n.IPv6 = networkInterface.IPv6
-				n.PrivateIPv4 = networkInterface.PrivateIPv4
-				n.PrivateIPv6 = networkInterface.PrivateIPv6
-			}
-		}
-
-		if n.Host == nil {
-			if time.Now().Sub(n.CreatedAt) >= resolveHostTimeout {
-				desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return fmt.Errorf(desc)
-			}
-
-			return fmt.Errorf("Failed to resolve host for network node with id: %s", n.ID)
-		}
-
-		err = n.dropNonReservedPeers()
+	if regionOk {
+		interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
 		if err != nil {
-			common.Log.Debugf("Failed to set node to only accept connections from reserved peers; %s", err.Error())
+			err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+			common.Log.Warningf(err.Error())
+			return err
 		}
 
-		cfgJSON, _ := json.Marshal(cfg)
-		*n.Config = json.RawMessage(cfgJSON)
-		n.Status = common.StringOrNil(nodeStatusPeering)
-		db.Save(&n)
-
-		role, roleOk := cfg[nodeConfigRole].(string)
-		if roleOk {
-			if role == nodeRoleBlockExplorer {
-				go network.resolveAndBalanceExplorerUrls(db, n)
-			} else if role == nodeRoleIPFS {
-				go network.resolveAndBalanceIPFSUrls(db, n)
-			}
+		if len(interfaces) > 0 {
+			networkInterface := interfaces[0]
+			n.Host = networkInterface.Host
+			n.IPv4 = networkInterface.IPv4
+			n.IPv6 = networkInterface.IPv6
+			n.PrivateIPv4 = networkInterface.PrivateIPv4
+			n.PrivateIPv6 = networkInterface.PrivateIPv6
 		}
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping host resolving for azure")
-		common.Log.Warning(desc)
-		return nil
+	}
+
+	if n.Host == nil {
+		if time.Now().Sub(n.CreatedAt) >= resolveHostTimeout {
+			desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return fmt.Errorf(desc)
+		}
+
+		return fmt.Errorf("Failed to resolve host for network node with id: %s", n.ID)
+	}
+
+	err = n.dropNonReservedPeers()
+	if err != nil {
+		common.Log.Debugf("Failed to set node to only accept connections from reserved peers; %s", err.Error())
+	}
+
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+	n.Status = common.StringOrNil(nodeStatusPeering)
+	db.Save(&n)
+
+	role, roleOk := cfg[nodeConfigRole].(string)
+	if roleOk {
+		if role == nodeRoleBlockExplorer {
+			go network.resolveAndBalanceExplorerUrls(db, n)
+		} else if role == nodeRoleIPFS {
+			go network.resolveAndBalanceIPFSUrls(db, n)
+		}
 	}
 
 	return nil
@@ -932,7 +920,6 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
 
 	if !taskIdsOk {
@@ -964,82 +951,76 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	id := identifiers[len(identifiers)-1]
 	_, regionOk := cfg[nodeConfigRegion].(string)
 
-	if strings.ToLower(targetID) == "aws" && targetOk {
-		if regionOk {
-			p2pAPI, err = n.P2PAPIClient()
-			if err != nil {
-				common.Log.Warningf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
-				return err
-			}
+	if regionOk {
+		p2pAPI, err = n.P2PAPIClient()
+		if err != nil {
+			common.Log.Warningf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
+			return err
+		}
 
-			orchestrationAPI, err = n.orchestrationAPIClient()
-			if err != nil {
-				err := fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
-				common.Log.Warningf(err.Error())
-				return err
-			}
+		orchestrationAPI, err = n.orchestrationAPIClient()
+		if err != nil {
+			err := fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
+			common.Log.Warningf(err.Error())
+			return err
+		}
 
-			peerURL, err = p2pAPI.ResolvePeerURL()
-			if err != nil {
-				common.Log.Debugf("No peer url or equivalent resolved for network node %s; %s", n.ID, err.Error())
-			}
+		peerURL, err = p2pAPI.ResolvePeerURL()
+		if err != nil {
+			common.Log.Debugf("No peer url or equivalent resolved for network node %s; %s", n.ID, err.Error())
+		}
 
-			if peerURL == nil {
-				logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
-				if err == nil && logs != nil {
-					for i := range logs.Events {
-						event := logs.Events[i]
-						if event.Message != nil {
-							msg := string(*event.Message)
-							peerURL, err = p2pAPI.ParsePeerURL(msg)
-							if err == nil && peerURL != nil {
-								if n.IPv4 != nil && n.PrivateIPv4 != nil {
-									url := strings.Replace(*peerURL, *n.PrivateIPv4, *n.IPv4, 1)
-									url = strings.Replace(url, "127.0.0.1", *n.IPv4, 1)
-									peerURL = &url
-								}
-								cfg[nodeConfigPeerURL] = peerURL
-								break
+		if peerURL == nil {
+			logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
+			if err == nil && logs != nil {
+				for i := range logs.Events {
+					event := logs.Events[i]
+					if event.Message != nil {
+						msg := string(*event.Message)
+						peerURL, err = p2pAPI.ParsePeerURL(msg)
+						if err == nil && peerURL != nil {
+							if n.IPv4 != nil && n.PrivateIPv4 != nil {
+								url := strings.Replace(*peerURL, *n.PrivateIPv4, *n.IPv4, 1)
+								url = strings.Replace(url, "127.0.0.1", *n.IPv4, 1)
+								peerURL = &url
 							}
+							cfg[nodeConfigPeerURL] = peerURL
+							break
 						}
 					}
 				}
 			}
 		}
+	}
 
-		if peerURL == nil {
-			if time.Now().Sub(n.CreatedAt) >= resolvePeerTimeout {
-				desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTimeout)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return fmt.Errorf(desc)
-			}
-
-			return fmt.Errorf("Failed to resolve peer url for network node with id: %s", n.ID)
+	if peerURL == nil {
+		if time.Now().Sub(n.CreatedAt) >= resolvePeerTimeout {
+			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTimeout)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return fmt.Errorf(desc)
 		}
 
-		common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
-		if n.Bootnode {
-			err := network.AddBootnode(db, *peerURL)
-			if err != nil {
-				common.Log.Warningf("Failed to add peer url as bootnode; peer url: %s; network: %s; %s", *peerURL, network.ID, err.Error())
-			}
-		}
+		return fmt.Errorf("Failed to resolve peer url for network node with id: %s", n.ID)
+	}
 
-		cfgJSON, _ := json.Marshal(cfg)
-		*n.Config = json.RawMessage(cfgJSON)
-		n.Status = common.StringOrNil(nodeStatusRunning)
-		n.Description = nil
-		db.Save(&n)
-
-		if role == nodeRolePeer || role == nodeRoleFull || role == nodeRoleValidator {
-			go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
-			// TODO: determine if the node is running IPFS; if so: go network.resolveAndBalanceIPFSUrls(db, n)
+	common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
+	if n.Bootnode {
+		err := network.AddBootnode(db, *peerURL)
+		if err != nil {
+			common.Log.Warningf("Failed to add peer url as bootnode; peer url: %s; network: %s; %s", *peerURL, network.ID, err.Error())
 		}
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping peer url resolving for azure")
-		common.Log.Warning(desc)
-		return nil
+	}
+
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+	n.Status = common.StringOrNil(nodeStatusRunning)
+	n.Description = nil
+	db.Save(&n)
+
+	if role == nodeRolePeer || role == nodeRoleFull || role == nodeRoleValidator {
+		go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
+		// TODO: determine if the node is running IPFS; if so: go network.resolveAndBalanceIPFSUrls(db, n)
 	}
 
 	return nil
