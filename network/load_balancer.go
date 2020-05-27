@@ -479,7 +479,10 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 			securityGroupIDs, _ := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, common.StringOrNil(vpcID), securityCfg)
 			balancerCfg["target_security_group_ids"] = securityGroupIDs
 
-			loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID), l.Name, common.StringOrNil("application"), securityGroupIDs)
+			loadBalancersResp, err := orchestrationAPI.CreateLoadBalancerV2(common.StringOrNil(vpcID),
+				l.Name,
+				common.StringOrNil("application"),
+				securityGroupIDs)
 			if err != nil {
 				err := fmt.Errorf("Failed to provision AWS load balancer (v2); %s", err.Error())
 				common.Log.Warningf(err.Error())
@@ -510,11 +513,15 @@ func (l *LoadBalancer) Provision(db *gorm.DB) error {
 				}
 				return fmt.Errorf("%s", *l.Errors[0].Message)
 			}
-		} else {
-			err := fmt.Errorf("Failed to load balance node without region")
-			common.Log.Warningf(err.Error())
-			return err
+		} else if strings.ToLower(targetID) == "azure" {
+			desc := fmt.Sprintf("Skipping lprovision of load balancer in region: %s", region)
+			common.Log.Warning(desc)
+			return nil
 		}
+	} else {
+		err := fmt.Errorf("Failed to load balance node without region")
+		common.Log.Warningf(err.Error())
+		return err
 	}
 
 	return nil
@@ -753,6 +760,10 @@ func (l *LoadBalancer) balanceNode(db *gorm.DB, node *Node) error {
 				}
 				common.Log.Debugf("Upserted listener for load balanced target group %s in region: %s", targetGroupArn, region)
 			}
+		} else if strings.ToLower(targetID) == "azure" {
+			desc := fmt.Sprintf("Skipping lazy initialization of load balanced target group in region: %s", region)
+			common.Log.Warning(desc)
+			return nil
 		}
 	} else {
 		desc := fmt.Sprintf("Failed to resolve host configuration for lazy initialization of load balanced target group in region: %s", region)

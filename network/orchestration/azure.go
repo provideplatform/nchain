@@ -70,8 +70,13 @@ func (p *AzureOrchestrationProvider) GetLoadBalancers(loadBalancerName *string) 
 	return nil, nil
 }
 
+//CreateLoadBalancerV2 creates load balancer on Azure
 func (p *AzureOrchestrationProvider) CreateLoadBalancerV2(vpcID, name, balancerType *string, securityGroupIds []string) (response *elbv2.CreateLoadBalancerOutput, err error) {
-	return nil, nil
+	// returns empty array for azure showcase
+	return &elbv2.CreateLoadBalancerOutput{
+		LoadBalancers: []*elbv2.LoadBalancer{}}, nil
+	// elbv2.LoadBalancer{}
+
 }
 
 func (p *AzureOrchestrationProvider) CreateListenerV2(loadBalancerARN, targetGroupARN, protocol *string, port *int64, certificate interface{}) (*elbv2.CreateListenerOutput, error) {
@@ -201,19 +206,23 @@ func (p *AzureOrchestrationProvider) StartContainer(
 	return result.ContainerIds, result.Err
 }
 
+// StopContainer
 func (p *AzureOrchestrationProvider) StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error) {
 	return nil, nil
 }
 
 func (p *AzureOrchestrationProvider) GetContainerDetails(taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error) {
+	// todo
 	return nil, nil
 }
 
 func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
+	// todo
 	return nil, nil
 }
 
 func (p *AzureOrchestrationProvider) GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
+	// todo
 	return nil, nil
 }
 
@@ -222,5 +231,6 @@ func (p *AzureOrchestrationProvider) GetLogEvents(logGroupID string, logStreamID
 }
 
 func (p *AzureOrchestrationProvider) GetNetworkInterfaceDetails(networkInterfaceID string) (response *ec2.DescribeNetworkInterfacesOutput, err error) {
+	// todo
 	return nil, nil
 }
