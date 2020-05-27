@@ -3,7 +3,6 @@ package orchestration
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -159,8 +158,7 @@ func (p *AzureOrchestrationProvider) AuthorizeSecurityGroupIngress(securityGroup
 }
 
 func (p *AzureOrchestrationProvider) CreateSecurityGroup(name, description string, vpcID *string, cfg map[string]interface{}) ([]string, error) {
-	id, err := azurewrapper.UpsertResourceGroup(context.TODO(), p.targetCredentials(), p.region, name)
-	return []string{*id}, err
+	return []string{}, nil
 }
 
 func (p *AzureOrchestrationProvider) DeleteSecurityGroup(securityGroupID string) (interface{}, error) {
@@ -181,7 +179,25 @@ func (p *AzureOrchestrationProvider) StartContainer(
 	overrides, security map[string]interface{},
 ) (taskIds []string, err error) {
 	if resourceGroupName == nil {
-		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-%d", time.Now().Unix()))
+		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-0"))
+	}
+
+	_, err = azurewrapper.UpsertResourceGroup(context.TODO(), p.targetCredentials(), p.region, *resourceGroupName)
+	if err != nil {
+		common.Log.Warning(fmt.Sprintf("Failed to create Azure security group: %s", err.Error()))
+		return []string{}, err
+	}
+
+	containerCPU := cpu
+	if containerCPU == nil {
+		ccpu := int64(2)
+		containerCPU = &ccpu
+	}
+
+	containerMemory := memory
+	if containerMemory == nil {
+		cmem := int64(4)
+		containerMemory = &cmem
 	}
 
 	params := &provide.ContainerParams{
@@ -189,8 +205,8 @@ func (p *AzureOrchestrationProvider) StartContainer(
 		ResourceGroupName: *resourceGroupName,
 		Image:             image,
 		VirtualNetworkID:  virtualNetworkID,
-		CPU:               cpu,
-		Memory:            memory,
+		CPU:               containerCPU,
+		Memory:            containerMemory,
 		Entrypoint:        entrypoint,
 		SecurityGroupIds:  securityGroupIds,
 		SubnetIds:         subnetIds,

@@ -656,11 +656,19 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	if targetOk && regionOk {
 		isPeerToPeer := p2pOk && isP2P
 
+		var securityGroupIds []string
 		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-		securityGroupIds, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
-		if err != nil {
-			n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
-			return err
+
+		if strings.ToLower(target) == "aws" {
+			securityGroupIds, err = orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
+			if err != nil {
+				desc := fmt.Sprintf("Failed to create security group '%s' with security config %+v, error: %s", securityGroupDesc, securityCfg, err.Error())
+				common.Log.Warning(desc)
+				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
+				return err
+			}
+		} else if strings.ToLower(target) == "azure" {
+			securityGroupIds = []string{}
 		}
 
 		cfg[nodeConfigSecurity] = securityCfg
@@ -669,7 +677,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		n.SetConfig(cfg)
 		db.Save(&n)
 
-		common.Log.Debugf("Attempting to deploy network node in region: %s", region)
+		common.Log.Debugf("Attempting to deploy network node in region: %s, with config: %+v", region, cfg)
 		var imageRef *string
 
 		if imageOk {
