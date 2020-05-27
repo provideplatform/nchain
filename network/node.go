@@ -615,7 +615,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	entrypoint, entrypointOk := cfg[nodeConfigEntrypoint].([]string)
 	taskRole, taskRoleOk := cfg[nodeConfigTaskRole].(string)
 	// script, scriptOk := cfg["script"].(map[string]interface{})
-	_, targetOk := cfg[nodeConfigTargetID].(string)
+	target, targetOk := cfg[nodeConfigTargetID].(string)
 	role, _ := cfg[nodeConfigRole].(string)
 	region, regionOk := cfg[nodeConfigRegion].(string)
 	vpc, _ := cfg[nodeConfigVpcID].(string)
@@ -830,6 +830,9 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			"node_id": n.ID.String(),
 		})
 		natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
+	} else {
+		desc := fmt.Sprintf("Failed to deploy node in region %s, target %s; node config: %+v; encrypted config: %+v; network config: %+v; node: %+v", region, target, cfg, encryptedCfg, networkCfg, n)
+		common.Log.Warning(desc)
 	}
 
 	return nil
