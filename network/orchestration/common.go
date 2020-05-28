@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/route53"
+	provide "github.com/provideservices/provide-go"
 )
 
 // ProviderAWS aws orchestration provider
@@ -69,7 +70,7 @@ type API interface {
 	StartContainer(image, taskDefinition *string, taskRole, launchType, cluster, vpcName *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error)
 	StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error)
 	GetContainerDetails(taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error)
-	GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error)
+	GetContainerInterfaces(taskID string, cluster *string) ([]*provide.NetworkInterface, error)
 	GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error)
 	GetLogEvents(logGroupID string, logStreamID string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error)
 	GetNetworkInterfaceDetails(networkInterfaceID string) (response *ec2.DescribeNetworkInterfacesOutput, err error)

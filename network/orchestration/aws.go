@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	awswrapper "github.com/kthomas/go-aws-wrapper"
 	"github.com/provideapp/goldmine/common"
+	provide "github.com/provideservices/provide-go"
 )
 
 const awsTaskStatusRunning = "running"
@@ -393,8 +394,8 @@ func (p *AWSOrchestrationProvider) GetContainerDetails(taskID string, cluster *s
 }
 
 // GetContainerInterfaces retrieves the container interfaces
-func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
-	interfaces := make([]*NetworkInterface, 0)
+func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*provide.NetworkInterface, error) {
+	interfaces := make([]*provide.NetworkInterface, 0)
 
 	containerDetails, err := p.GetContainerDetails(taskID, nil)
 	if err != nil {
@@ -420,7 +421,7 @@ func (p *AWSOrchestrationProvider) GetContainerInterfaces(taskID string, cluster
 						interfaceDetails, err := p.GetNetworkInterfaceDetails(*kvp.Value)
 						if err == nil {
 							for _, netInterface := range interfaceDetails.NetworkInterfaces {
-								networkInterface := &NetworkInterface{
+								networkInterface := &provide.NetworkInterface{
 									PrivateIPv4: netInterface.PrivateIpAddress,
 								}
 
