@@ -224,7 +224,9 @@ func (p *AzureOrchestrationProvider) StartContainer(
 	}
 
 	id := result.ContainerIds[0]
+
 	networkInterfaces[id] = result.ContainerInterfaces[0]
+	common.Log.Debugf("StartContainer: Receiving network interface with values; %+v", networkInterfaces)
 
 	return result.ContainerIds, err
 }
@@ -241,13 +243,18 @@ func (p *AzureOrchestrationProvider) GetContainerDetails(taskID string, cluster 
 
 func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*provide.NetworkInterface, error) {
 	// todo
+	common.Log.Debugf("GetContainerInterfaces: Receiving network interface request for id: %s", taskID)
+
 	ints := make([]*provide.NetworkInterface, 1)
 	i := networkInterfaces[taskID]
+	common.Log.Debugf("GetContainerInterfaces: Receiving network interface: %+v", i)
+	common.Log.Debugf("GetContainerInterfaces: Current network interfaces: %+v", networkInterfaces)
 	if i == nil {
+		common.Log.Debugf("GetContainerInterfaces: sending empty response")
 		return []*provide.NetworkInterface{}, nil
 	}
 	ints[0] = i
-
+	common.Log.Debugf("GetContainerInterfaces: sending : %+v", ints)
 	return ints, nil
 }
 

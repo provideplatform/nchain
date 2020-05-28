@@ -849,7 +849,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 func (n *Node) resolveHost(db *gorm.DB) error {
 	network := n.relatedNetwork(db)
 	if network == nil {
-		return fmt.Errorf("Failed to resolve host for network node %s; no network resolved", n.ID)
+		return fmt.Errorf("resolveHost: Failed to resolve host for network node %s; no network resolved", n.ID)
 	}
 
 	cfg := n.ParseConfig()
@@ -857,7 +857,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
 
 	if !taskIdsOk {
-		return fmt.Errorf("Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
+		return fmt.Errorf("resolveHost: Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
 	}
 
 	identifiers := make([]string, 0)
@@ -866,7 +866,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	if len(identifiers) == 0 {
-		return fmt.Errorf("Unable to resolve network node host without any node identifiers")
+		return fmt.Errorf("resolveHost: Unable to resolve network node host without any node identifiers")
 	}
 
 	taskID := identifiers[len(identifiers)-1]
@@ -874,7 +874,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 	orchestrationAPI, err := n.orchestrationAPIClient()
 	if err != nil {
-		err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+		err := fmt.Errorf("resolveHost: Failed to resolve host for network node %s; %s", n.ID, err.Error())
 		common.Log.Warningf(err.Error())
 		return err
 	}
@@ -883,13 +883,14 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 		if regionOk {
 			interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
 			if err != nil {
-				err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+				err := fmt.Errorf("resolveHost: Failed to resolve host for network node %s; %s", n.ID, err.Error())
 				common.Log.Warningf(err.Error())
 				return err
 			}
 
 			if len(interfaces) > 0 {
 				networkInterface := interfaces[0]
+				common.Log.Debugf("resolveHost: Receiving network interface with values; %+v", networkInterface)
 				if networkInterface.Host == nil {
 					n.Host = networkInterface.IPv4
 				} else {
@@ -904,18 +905,18 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 		if n.Host == nil {
 			if time.Now().Sub(n.CreatedAt) >= resolveHostTimeout {
-				desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
+				desc := fmt.Sprintf("resolveHost: Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
 				return fmt.Errorf(desc)
 			}
 
-			return fmt.Errorf("Failed to resolve host for network node with id: %s", n.ID)
+			return fmt.Errorf("resolveHost: Failed to resolve host for network node with id: %s", n.ID)
 		}
 
 		err = n.dropNonReservedPeers()
 		if err != nil {
-			common.Log.Debugf("Failed to set node to only accept connections from reserved peers; %s", err.Error())
+			common.Log.Debugf("resolveHost: Failed to set node to only accept connections from reserved peers; %s", err.Error())
 		}
 
 		cfgJSON, _ := json.Marshal(cfg)
