@@ -396,8 +396,6 @@ github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBH
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200520193141-a042d572b85c h1:e8JuBYA9zbw4CbxpqEjEz1J42wHXmyo5QNlhX5GZYcE=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200520193141-a042d572b85c/go.mod h1:+nQpKJgT4NfXrKLoEPRoP6p4YS8RMgNrN8Shb2fjQJ4=
-github.com/kthomas/go-azure-wrapper v0.0.0-20200523212532-ba4ef49ad675 h1:+mvWfpdjZOM75P3EKFdjGuDwmzpUPpGEI4cXsouYbDs=
-github.com/kthomas/go-azure-wrapper v0.0.0-20200523212532-ba4ef49ad675/go.mod h1:988+Rifmfn7MM1EiBqALCbnY5vbtVLYJPEZhsOIIVqI=
 github.com/kthomas/go-azure-wrapper v0.0.0-20200528122414-3ad7ea791d58 h1:OfC34xaWBTuzXLNT/LihD3KVGcO40X+KWdwKYmb67IM=
 github.com/kthomas/go-azure-wrapper v0.0.0-20200528122414-3ad7ea791d58/go.mod h1:GMOYEcF95eGFz7E5rND0B4kCe8fvXT1Z+mkbWe3NoLk=
 github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c h1:KIw63xEiZRfXkvq3iKJjofzJhT7hGoj3PLy7zK3jMjQ=
@@ -618,10 +616,6 @@ github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38i
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
 github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494 h1:PO2awfeEioVb7/zs8y5HmmEYbC30xMpCvn3KL08aCWk=
 github.com/provideservices/provide-go v0.0.0-20200428060304-2e651f526494/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
-github.com/provideservices/provide-go v0.0.0-20200523141458-b060cca21864 h1:k5/P21fSCV4Pi9kuD5WD1O/x3Bluy+b5jNstNmMo/FM=
-github.com/provideservices/provide-go v0.0.0-20200523141458-b060cca21864/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
-github.com/provideservices/provide-go v0.0.0-20200526213800-fff7f17c56db h1:PdpSNJuLH39v8F9/tlJ9HxrHtsZEnkpsSLwIAU1LZkY=
-github.com/provideservices/provide-go v0.0.0-20200526213800-fff7f17c56db/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
 github.com/provideservices/provide-go v0.0.0-20200528112957-3754265a5550 h1:ihFJq/TPw7DRGN22zAkbR8qJraC6dBLVQ1Jm0ezjIMg=
 github.com/provideservices/provide-go v0.0.0-20200528112957-3754265a5550/go.mod h1:9pehDFAFDec95Efx8mgC3rG7Ko2mXC13AWGJby0RwvM=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=

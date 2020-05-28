@@ -853,7 +853,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
+	_, targetOk := cfg["target_id"].(string)
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
 
 	if !taskIdsOk {
