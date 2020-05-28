@@ -879,7 +879,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 		return err
 	}
 
-	if strings.ToLower(targetID) == "aws" && targetOk {
+	if targetOk {
 		if regionOk {
 			interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
 			if err != nil {
@@ -890,7 +890,11 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 			if len(interfaces) > 0 {
 				networkInterface := interfaces[0]
-				n.Host = networkInterface.Host
+				if networkInterface.Host == nil {
+					n.Host = networkInterface.IPv4
+				} else {
+					n.Host = networkInterface.Host
+				}
 				n.IPv4 = networkInterface.IPv4
 				n.IPv6 = networkInterface.IPv6
 				n.PrivateIPv4 = networkInterface.PrivateIPv4
@@ -927,10 +931,10 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 				go network.resolveAndBalanceIPFSUrls(db, n)
 			}
 		}
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping host resolving for azure")
-		common.Log.Warning(desc)
-		return nil
+		// } else if strings.ToLower(targetID) == "azure" {
+		// 	desc := fmt.Sprintf("Skipping host resolving for azure")
+		// 	common.Log.Warning(desc)
+		// 	return nil
 	}
 
 	return nil
