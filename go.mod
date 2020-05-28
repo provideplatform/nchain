@@ -24,7 +24,7 @@ require (
 	github.com/kthomas/go-amqputil v0.0.0-20170519114339-26cbf6ca712d // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
 	github.com/kthomas/go-aws-wrapper v0.0.0-20200520193141-a042d572b85c
-	github.com/kthomas/go-azure-wrapper v0.0.0-20200523212532-ba4ef49ad675
+	github.com/kthomas/go-azure-wrapper v0.0.0-20200528122414-3ad7ea791d58
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20190616094252-01c360658513
 	github.com/kthomas/go-natsutil v0.0.0-20200210083803-c5a5cc363cf7
@@ -40,7 +40,7 @@ require (
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200526213800-fff7f17c56db
+	github.com/provideservices/provide-go v0.0.0-20200528112957-3754265a5550
 	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
