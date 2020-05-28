@@ -27,8 +27,12 @@ type AzureOrchestrationProvider struct {
 	clientSecret   string
 }
 
+var networkInterfaces map[string]*provide.NetworkInterface
+
 // InitAzureOrchestrationProvider initializes and returns the Microsoft Azure infrastructure orchestration provider
 func InitAzureOrchestrationProvider(credentials map[string]interface{}, region string) *AzureOrchestrationProvider {
+	networkInterfaces = make(map[string]*provide.NetworkInterface)
+
 	tenantID, tenantIDOk := credentials["azure_tenant_id"].(string)
 	subscriptionID, subscriptionIDOk := credentials["azure_subscription_id"].(string)
 	clientID, clientIDOk := credentials["azure_client_id"].(string)
@@ -214,12 +218,15 @@ func (p *AzureOrchestrationProvider) StartContainer(
 		Security:          security,
 	}
 
-	result := azurewrapper.StartContainer(params, p.targetCredentials())
-	if result.Err != nil {
-		return taskIds, result.Err
+	result, err := azurewrapper.StartContainer(params, p.targetCredentials())
+	if err != nil {
+		return taskIds, err
 	}
 
-	return result.ContainerIds, result.Err
+	id := result.ContainerIds[0]
+	networkInterfaces[id] = result.ContainerInterfaces[0]
+
+	return result.ContainerIds, err
 }
 
 // StopContainer
@@ -232,9 +239,16 @@ func (p *AzureOrchestrationProvider) GetContainerDetails(taskID string, cluster 
 	return nil, nil
 }
 
-func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
+func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*provide.NetworkInterface, error) {
 	// todo
-	return nil, nil
+	ints := make([]*provide.NetworkInterface, 1)
+	i := networkInterfaces[taskID]
+	if i == nil {
+		return []*provide.NetworkInterface{}, nil
+	}
+	ints[0] = i
+
+	return ints, nil
 }
 
 func (p *AzureOrchestrationProvider) GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
