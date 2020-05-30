@@ -817,7 +817,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			overrides,
 			containerSecurity,
 		)
-		common.Log.Debugf("deploy: Receiving network interface with values; %+v", networkInterface)
+		common.Log.Debugf("deploy: Receiving network interface with values; %+v", networkInterfaces)
 
 		if err != nil || len(taskIds) == 0 {
 			desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
