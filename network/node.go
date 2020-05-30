@@ -817,6 +817,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			overrides,
 			containerSecurity,
 		)
+		common.Log.Debugf("deploy: Receiving network interface with values; %+v", networkInterface)
 
 		if err != nil || len(taskIds) == 0 {
 			desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
@@ -828,7 +829,6 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 
 		if len(networkInterfaces) > 0 { // azure returns at once
 			networkInterface := networkInterfaces[0]
-			common.Log.Debugf("deploy: Receiving network interface with values; %+v", networkInterface)
 			if networkInterface.Host == nil {
 				n.Host = networkInterface.IPv4
 			} else {
