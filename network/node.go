@@ -12,6 +12,8 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+
+	// "github.com/provideapp/goldmine/gpgputil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -800,7 +802,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			containerRole = &taskRole
 		}
 
-		taskIds, err := orchestrationAPI.StartContainer(
+		taskIds, networkInterfaces, err := orchestrationAPI.StartContainer(
 			imageRef,
 			nil,
 			containerRole,
@@ -822,6 +824,20 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			n.unregisterSecurityGroups()
 			common.Log.Warning(desc)
 			return errors.New(desc)
+		}
+
+		if len(networkInterfaces) > 0 { // azure returns at once
+			networkInterface := networkInterfaces[0]
+			common.Log.Debugf("deploy: Receiving network interface with values; %+v", networkInterface)
+			if networkInterface.Host == nil {
+				n.Host = networkInterface.IPv4
+			} else {
+				n.Host = networkInterface.Host
+			}
+			n.IPv4 = networkInterface.IPv4
+			n.IPv6 = networkInterface.IPv6
+			// n.PrivateIPv4 = networkInterface.PrivateIPv4
+			// n.PrivateIPv6 = networkInterface.PrivateIPv6
 		}
 
 		if imageRef != nil {

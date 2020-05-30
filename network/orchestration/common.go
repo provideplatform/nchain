@@ -67,7 +67,7 @@ type API interface {
 	DeleteSecurityGroup(securityGroupID string) (interface{}, error)
 	GetSecurityGroups() (response *ec2.DescribeSecurityGroupsOutput, err error)
 
-	StartContainer(image, taskDefinition *string, taskRole, launchType, cluster, vpcName *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, err error)
+	StartContainer(image, taskDefinition *string, taskRole, launchType, cluster, vpcName *string, cpu, memory *int64, entrypoint []*string, securityGroupIds []string, subnetIds []string, overrides, security map[string]interface{}) (taskIds []string, networkInterfaces []*provide.NetworkInterface, err error)
 	StopContainer(taskID string, cluster *string) (response *ecs.StopTaskOutput, err error)
 	GetContainerDetails(taskID string, cluster *string) (response *ecs.DescribeTasksOutput, err error)
 	GetContainerInterfaces(taskID string, cluster *string) ([]*provide.NetworkInterface, error)

@@ -181,7 +181,7 @@ func (p *AzureOrchestrationProvider) StartContainer(
 	securityGroupIds []string,
 	subnetIds []string,
 	overrides, security map[string]interface{},
-) (taskIds []string, err error) {
+) (taskIds []string, networkInterfaces []*provide.NetworkInterface, err error) {
 	if resourceGroupName == nil {
 		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-0"))
 	}
@@ -189,7 +189,7 @@ func (p *AzureOrchestrationProvider) StartContainer(
 	_, err = azurewrapper.UpsertResourceGroup(context.TODO(), p.targetCredentials(), p.region, *resourceGroupName)
 	if err != nil {
 		common.Log.Warning(fmt.Sprintf("Failed to create Azure security group: %s", err.Error()))
-		return []string{}, err
+		return []string{}, networkInterfaces, err
 	}
 
 	containerCPU := cpu
@@ -220,15 +220,17 @@ func (p *AzureOrchestrationProvider) StartContainer(
 
 	result, err := azurewrapper.StartContainer(params, p.targetCredentials())
 	if err != nil {
-		return taskIds, err
+		return taskIds, networkInterfaces, err
 	}
 
-	id := result.ContainerIds[0]
+	// i := provide.NetworkInterface{}
+	// copier.Copy(&i, res)
 
-	networkInterfaces[id] = result.ContainerInterfaces[0]
-	common.Log.Debugf("StartContainer: Receiving network interface with values; %+v", networkInterfaces)
+	// networkInterfaces[id] = &i
+	// common.Log.Debugf("StartContainer: Receiving network interface with values: %+v", res)
+	// common.Log.Debugf("StartContainer: Current network interfaces: %+v", networkInterfaces)
 
-	return result.ContainerIds, err
+	return result.ContainerIds, result.ContainerInterfaces, err
 }
 
 // StopContainer
