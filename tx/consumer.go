@@ -29,12 +29,12 @@ import (
 const natsTxSubject = "goldmine.tx"
 const natsTxMaxInFlight = 2048
 const txAckWait = time.Second * 30
-const txMsgTimeout = int64(txAckWait * 3)
+const txMsgTimeout = int64(txAckWait * 30)
 
 const natsTxCreateSubject = "goldmine.tx.create"
 const natsTxCreateMaxInFlight = 2048
 const txCreateAckWait = time.Second * 30
-const txCreateMsgTimeout = int64(txCreateAckWait * 3)
+const txCreateMsgTimeout = int64(txCreateAckWait * 30)
 
 const natsTxFinalizeSubject = "goldmine.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
