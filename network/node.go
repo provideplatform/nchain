@@ -847,6 +847,10 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	cfg := n.ParseConfig()
 	targetID, targetOk := cfg["target_id"].(string)
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
+	isP2P, isP2POk := cfg[nodeConfigP2P].(bool)
+	if !isP2POk {
+		isP2P = false
+	}
 
 	if !taskIdsOk {
 		return fmt.Errorf("Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
@@ -908,7 +912,11 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 		cfgJSON, _ := json.Marshal(cfg)
 		*n.Config = json.RawMessage(cfgJSON)
-		n.Status = common.StringOrNil(nodeStatusPeering)
+		if isP2P {
+			n.Status = common.StringOrNil(nodeStatusPeering)
+		} else {
+			n.Status = common.StringOrNil(nodeStatusRunning)
+		}
 		db.Save(&n)
 
 		role, roleOk := cfg[nodeConfigRole].(string)
