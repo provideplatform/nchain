@@ -71,16 +71,7 @@ func init() {
 
 	requireTLS = os.Getenv("REQUIRE_TLS") == "true"
 
-	lvl := os.Getenv("LOG_LEVEL")
-	if lvl == "" {
-		lvl = "INFO"
-	}
-	var endpoint *string
-	if os.Getenv("SYSLOG_ENDPOINT") != "" {
-		endpt := os.Getenv("SYSLOG_ENDPOINT")
-		endpoint = &endpt
-	}
-	Log = logger.NewLogger("goldmine", lvl, endpoint)
+	RequireLogger()
 
 	DefaultAWSConfig = awsconf.GetConfig()
 
@@ -134,4 +125,20 @@ func requireInfrastructureSupport() {
 	}
 
 	DefaultInfrastructureUsesSelfSignedCertificate = !(DefaultInfrastructureDomain != "" && DefaultInfrastructureRoute53HostedZoneID != "" && DefaultInfrastructureAWSConfig != nil && DefaultInfrastructureAWSConfig.DefaultCertificateArn != nil && *DefaultInfrastructureAWSConfig.DefaultCertificateArn != "")
+}
+
+// RequireLogger require the logger
+func RequireLogger() {
+	lvl := os.Getenv("LOG_LEVEL")
+	if lvl == "" {
+		lvl = "INFO"
+	}
+
+	var endpoint *string
+	if os.Getenv("SYSLOG_ENDPOINT") != "" {
+		endpt := os.Getenv("SYSLOG_ENDPOINT")
+		endpoint = &endpt
+	}
+
+	Log = logger.NewLogger("goldmine", lvl, endpoint)
 }
