@@ -75,7 +75,12 @@ func init() {
 	if lvl == "" {
 		lvl = "INFO"
 	}
-	Log = logger.NewLogger("goldmine", lvl, true)
+	var endpoint *string
+	if os.Getenv("SYSLOG_ENDPOINT") != "" {
+		endpt := os.Getenv("SYSLOG_ENDPOINT")
+		endpoint = &endpt
+	}
+	Log = logger.NewLogger("goldmine", lvl, endpoint)
 
 	DefaultAWSConfig = awsconf.GetConfig()
 
