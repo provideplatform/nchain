@@ -12,6 +12,8 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+
+	// "github.com/provideapp/goldmine/gpgputil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/goldmine/common"
@@ -656,11 +658,19 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 	if targetOk && regionOk {
 		isPeerToPeer := p2pOk && isP2P
 
+		var securityGroupIds []string
 		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-		securityGroupIds, err := orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
-		if err != nil {
-			n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
-			return err
+
+		if strings.ToLower(target) == "aws" {
+			securityGroupIds, err = orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
+			if err != nil {
+				desc := fmt.Sprintf("Failed to create security group '%s' with security config %+v, error: %s", securityGroupDesc, securityCfg, err.Error())
+				common.Log.Warning(desc)
+				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
+				return err
+			}
+		} else if strings.ToLower(target) == "azure" {
+			securityGroupIds = []string{}
 		}
 
 		cfg[nodeConfigSecurity] = securityCfg
@@ -669,7 +679,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		n.SetConfig(cfg)
 		db.Save(&n)
 
-		common.Log.Debugf("Attempting to deploy network node in region: %s", region)
+		common.Log.Debugf("Attempting to deploy network node in region: %s, with config: %+v", region, cfg)
 		var imageRef *string
 
 		if imageOk {
@@ -792,7 +802,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			containerRole = &taskRole
 		}
 
-		taskIds, err := orchestrationAPI.StartContainer(
+		taskIds, networkInterfaces, err := orchestrationAPI.StartContainer(
 			imageRef,
 			nil,
 			containerRole,
@@ -807,6 +817,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			overrides,
 			containerSecurity,
 		)
+		common.Log.Debugf("deploy: Receiving network interface with values; %d, %+v", len(networkInterfaces), *networkInterfaces[0])
 
 		if err != nil || len(taskIds) == 0 {
 			desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
@@ -814,6 +825,19 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 			n.unregisterSecurityGroups()
 			common.Log.Warning(desc)
 			return errors.New(desc)
+		}
+
+		if len(networkInterfaces) > 0 { // azure returns at once
+			networkInterface := networkInterfaces[0]
+			if networkInterface.Host == nil {
+				n.Host = networkInterface.IPv4
+			} else {
+				n.Host = networkInterface.Host
+			}
+			n.IPv4 = networkInterface.IPv4
+			n.IPv6 = networkInterface.IPv6
+			// n.PrivateIPv4 = networkInterface.PrivateIPv4
+			// n.PrivateIPv6 = networkInterface.PrivateIPv6
 		}
 
 		if imageRef != nil {
@@ -841,11 +865,11 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 func (n *Node) resolveHost(db *gorm.DB) error {
 	network := n.relatedNetwork(db)
 	if network == nil {
-		return fmt.Errorf("Failed to resolve host for network node %s; no network resolved", n.ID)
+		return fmt.Errorf("resolveHost: Failed to resolve host for network node %s; no network resolved", n.ID)
 	}
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
+	_, targetOk := cfg["target_id"].(string)
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
 	isP2P, isP2POk := cfg[nodeConfigP2P].(bool)
 	if !isP2POk {
@@ -853,7 +877,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	if !taskIdsOk {
-		return fmt.Errorf("Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
+		return fmt.Errorf("resolveHost: Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
 	}
 
 	identifiers := make([]string, 0)
@@ -862,7 +886,7 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 	}
 
 	if len(identifiers) == 0 {
-		return fmt.Errorf("Unable to resolve network node host without any node identifiers")
+		return fmt.Errorf("resolveHost: Unable to resolve network node host without any node identifiers")
 	}
 
 	taskID := identifiers[len(identifiers)-1]
@@ -870,23 +894,28 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 	orchestrationAPI, err := n.orchestrationAPIClient()
 	if err != nil {
-		err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+		err := fmt.Errorf("resolveHost: Failed to resolve host for network node %s; %s", n.ID, err.Error())
 		common.Log.Warningf(err.Error())
 		return err
 	}
 
-	if strings.ToLower(targetID) == "aws" && targetOk {
+	if targetOk {
 		if regionOk {
 			interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
 			if err != nil {
-				err := fmt.Errorf("Failed to resolve host for network node %s; %s", n.ID, err.Error())
+				err := fmt.Errorf("resolveHost: Failed to resolve host for network node %s; %s", n.ID, err.Error())
 				common.Log.Warningf(err.Error())
 				return err
 			}
 
 			if len(interfaces) > 0 {
 				networkInterface := interfaces[0]
-				n.Host = networkInterface.Host
+				common.Log.Debugf("resolveHost: Receiving network interface with values; %+v", networkInterface)
+				if networkInterface.Host == nil {
+					n.Host = networkInterface.IPv4
+				} else {
+					n.Host = networkInterface.Host
+				}
 				n.IPv4 = networkInterface.IPv4
 				n.IPv6 = networkInterface.IPv6
 				n.PrivateIPv4 = networkInterface.PrivateIPv4
@@ -896,18 +925,18 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 
 		if n.Host == nil {
 			if time.Now().Sub(n.CreatedAt) >= resolveHostTimeout {
-				desc := fmt.Sprintf("Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
+				desc := fmt.Sprintf("resolveHost: Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
 				n.updateStatus(db, "failed", &desc)
 				common.Log.Warning(desc)
 				return fmt.Errorf(desc)
 			}
 
-			return fmt.Errorf("Failed to resolve host for network node with id: %s", n.ID)
+			return fmt.Errorf("resolveHost: Failed to resolve host for network node with id: %s", n.ID)
 		}
 
 		err = n.dropNonReservedPeers()
 		if err != nil {
-			common.Log.Debugf("Failed to set node to only accept connections from reserved peers; %s", err.Error())
+			common.Log.Debugf("resolveHost: Failed to set node to only accept connections from reserved peers; %s", err.Error())
 		}
 
 		cfgJSON, _ := json.Marshal(cfg)
@@ -927,10 +956,10 @@ func (n *Node) resolveHost(db *gorm.DB) error {
 				go network.resolveAndBalanceIPFSUrls(db, n)
 			}
 		}
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping host resolving for azure")
-		common.Log.Warning(desc)
-		return nil
+		// } else if strings.ToLower(targetID) == "azure" {
+		// 	desc := fmt.Sprintf("Skipping host resolving for azure")
+		// 	common.Log.Warning(desc)
+		// 	return nil
 	}
 
 	return nil

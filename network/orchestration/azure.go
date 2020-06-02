@@ -3,7 +3,6 @@ package orchestration
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go/service/acm"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -28,8 +27,12 @@ type AzureOrchestrationProvider struct {
 	clientSecret   string
 }
 
+var networkInterfaces map[string]*provide.NetworkInterface
+
 // InitAzureOrchestrationProvider initializes and returns the Microsoft Azure infrastructure orchestration provider
 func InitAzureOrchestrationProvider(credentials map[string]interface{}, region string) *AzureOrchestrationProvider {
+	networkInterfaces = make(map[string]*provide.NetworkInterface)
+
 	tenantID, tenantIDOk := credentials["azure_tenant_id"].(string)
 	subscriptionID, subscriptionIDOk := credentials["azure_subscription_id"].(string)
 	clientID, clientIDOk := credentials["azure_client_id"].(string)
@@ -159,8 +162,7 @@ func (p *AzureOrchestrationProvider) AuthorizeSecurityGroupIngress(securityGroup
 }
 
 func (p *AzureOrchestrationProvider) CreateSecurityGroup(name, description string, vpcID *string, cfg map[string]interface{}) ([]string, error) {
-	id, err := azurewrapper.UpsertResourceGroup(context.TODO(), p.targetCredentials(), p.region, name)
-	return []string{*id}, err
+	return []string{}, nil
 }
 
 func (p *AzureOrchestrationProvider) DeleteSecurityGroup(securityGroupID string) (interface{}, error) {
@@ -179,9 +181,27 @@ func (p *AzureOrchestrationProvider) StartContainer(
 	securityGroupIds []string,
 	subnetIds []string,
 	overrides, security map[string]interface{},
-) (taskIds []string, err error) {
+) (taskIds []string, networkInterfaces []*provide.NetworkInterface, err error) {
 	if resourceGroupName == nil {
-		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-%d", time.Now().Unix()))
+		resourceGroupName = common.StringOrNil(fmt.Sprintf("prvd-0"))
+	}
+
+	_, err = azurewrapper.UpsertResourceGroup(context.TODO(), p.targetCredentials(), p.region, *resourceGroupName)
+	if err != nil {
+		common.Log.Warning(fmt.Sprintf("Failed to create Azure security group: %s", err.Error()))
+		return []string{}, networkInterfaces, err
+	}
+
+	containerCPU := cpu
+	if containerCPU == nil {
+		ccpu := int64(2)
+		containerCPU = &ccpu
+	}
+
+	containerMemory := memory
+	if containerMemory == nil {
+		cmem := int64(4)
+		containerMemory = &cmem
 	}
 
 	params := &provide.ContainerParams{
@@ -189,8 +209,8 @@ func (p *AzureOrchestrationProvider) StartContainer(
 		ResourceGroupName: *resourceGroupName,
 		Image:             image,
 		VirtualNetworkID:  virtualNetworkID,
-		CPU:               cpu,
-		Memory:            memory,
+		CPU:               containerCPU,
+		Memory:            containerMemory,
 		Entrypoint:        entrypoint,
 		SecurityGroupIds:  securityGroupIds,
 		SubnetIds:         subnetIds,
@@ -198,12 +218,19 @@ func (p *AzureOrchestrationProvider) StartContainer(
 		Security:          security,
 	}
 
-	result := azurewrapper.StartContainer(params, p.targetCredentials())
-	if result.Err != nil {
-		return taskIds, result.Err
+	result, err := azurewrapper.StartContainer(params, p.targetCredentials())
+	if err != nil {
+		return taskIds, networkInterfaces, err
 	}
 
-	return result.ContainerIds, result.Err
+	// i := provide.NetworkInterface{}
+	// copier.Copy(&i, res)
+
+	// networkInterfaces[id] = &i
+	// common.Log.Debugf("StartContainer: Receiving network interface with values: %+v", res)
+	// common.Log.Debugf("StartContainer: Current network interfaces: %+v", networkInterfaces)
+
+	return result.ContainerIds, result.ContainerInterfaces, err
 }
 
 // StopContainer
@@ -216,9 +243,21 @@ func (p *AzureOrchestrationProvider) GetContainerDetails(taskID string, cluster 
 	return nil, nil
 }
 
-func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*NetworkInterface, error) {
+func (p *AzureOrchestrationProvider) GetContainerInterfaces(taskID string, cluster *string) ([]*provide.NetworkInterface, error) {
 	// todo
-	return nil, nil
+	common.Log.Debugf("GetContainerInterfaces: Receiving network interface request for id: %s", taskID)
+
+	ints := make([]*provide.NetworkInterface, 1)
+	i := networkInterfaces[taskID]
+	common.Log.Debugf("GetContainerInterfaces: Receiving network interface: %+v", i)
+	common.Log.Debugf("GetContainerInterfaces: Current network interfaces: %+v", networkInterfaces)
+	if i == nil {
+		common.Log.Debugf("GetContainerInterfaces: sending empty response")
+		return []*provide.NetworkInterface{}, nil
+	}
+	ints[0] = i
+	common.Log.Debugf("GetContainerInterfaces: sending : %+v", ints)
+	return ints, nil
 }
 
 func (p *AzureOrchestrationProvider) GetContainerLogEvents(taskID string, cluster *string, startFromHead bool, startTime, endTime, limit *int64, nextToken *string) (response *cloudwatchlogs.GetLogEventsOutput, err error) {
