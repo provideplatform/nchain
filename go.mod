@@ -21,13 +21,13 @@ require (
 	github.com/ipfs/go-ipfs-api v0.0.2
 	github.com/jinzhu/gorm v1.9.12
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
-	github.com/kthomas/go-aws-wrapper v0.0.0-20200602060026-8ba3d453cf82
-	github.com/kthomas/go-azure-wrapper v0.0.0-20200602054838-1251c11e41eb
+	github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122
+	github.com/kthomas/go-azure-wrapper v0.0.0-20200602073514-5ee6e5f6bd49
 	github.com/kthomas/go-db-config v0.0.0-20190930131840-6f8768ecee4c
 	github.com/kthomas/go-logger v0.0.0-20200602072946-d7d72dfc2531
-	github.com/kthomas/go-natsutil v0.0.0-20200602041834-a3b53c6d4ae4
+	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05
 	github.com/kthomas/go-pgputil v0.0.0-20200602041635-b047a3b754f5
-	github.com/kthomas/go-redisutil v0.0.0-20200602041955-88812a3b302d
+	github.com/kthomas/go-redisutil v0.0.0-20200602073431-aa49de17e9ff
 	github.com/kthomas/go-self-signed-cert v0.0.0-20200602041729-f9878375d46e
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
 	github.com/libp2p/go-libp2p-core v0.3.0 // indirect
