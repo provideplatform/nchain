@@ -292,7 +292,7 @@ func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val int64) 
 		} else {
 			faucetApplicationID, _ := uuid.FromString(networkSubsidyFaucetApplicationID)
 			faucetAccountID, _ := uuid.FromString(out[0])
-			faucetGas := int64(210000) // FIXME-- parameterize
+			faucetGas := int64(210000 * 2) // FIXME-- parameterize
 			faucetTx := &Transaction{
 				ApplicationID: &faucetApplicationID,
 				Data:          common.StringOrNil("0x"),
@@ -694,7 +694,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 			}
 
 			networkSubsidyFaucetDripValue := int64(gas) // FIXME-- configurable
-			faucetSubsidyEligible := strings.Contains(err.Error(), "insufficient funds") && networkSubsidyFaucetExists(cntract.NetworkID)
+			faucetSubsidyEligible := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && networkSubsidyFaucetExists(cntract.NetworkID)
 
 			if faucetSubsidyEligible {
 				common.Log.Debugf("Contract execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", cntract.NetworkID)
