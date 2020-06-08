@@ -682,7 +682,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 		if execution.AccountAddress != nil {
 			var gas float64
 			if execution.Gas == nil {
-				gas = float64(100000000000000000)
+				gas = float64(100000000000000000 * 250) // FIXME-- use proper oracle
 			} else {
 				gas = *execution.Gas * 1.1
 			}
