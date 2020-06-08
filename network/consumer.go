@@ -715,11 +715,11 @@ func consumeUnregisterLoadBalancerCertificateMsg(msg *stan.Msg) {
 }
 
 func consumeDeployNodeMsg(msg *stan.Msg) {
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		natsutil.AttemptNack(msg, natsDeployNodeTimeout)
-	// 	}
-	// }()
+	defer func() {
+		if r := recover(); r != nil {
+			natsutil.AttemptNack(msg, natsDeployNodeTimeout)
+		}
+	}()
 
 	common.Log.Debugf("Consuming NATS deploy node message: %s", msg)
 	var params map[string]interface{}
