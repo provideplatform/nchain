@@ -265,6 +265,9 @@ func networkSubsidyFaucets(networkID uuid.UUID) map[string]interface{} {
 			"01554e22-3d7a-44a3-9c65-6bcabaa08c38": "0xdD2F8052bE76FA1456e096526db5C0F12B0af564",
 			"146ab73e-b2eb-4386-8c6f-93663792c741": "0x96f1027FEe06A15f42E48180705a2ecB2F846985",
 		},
+		"a5639994-f249-4eff-92f8-dd2467b5860e": map[string]interface{}{
+			"b2bc047e-536e-4680-9771-cbb47b98f478": "0x4A7471c60e64BA56910e31e6c9097B15C26d8B79",
+		},
 	}
 	if networkSubsidyFaucets, networkSubsidyFaucetExists := networkSubsidyFaucetApplicationAddressMapping[networkID.String()].(map[string]interface{}); networkSubsidyFaucetExists {
 		return networkSubsidyFaucets
