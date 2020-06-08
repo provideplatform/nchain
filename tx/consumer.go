@@ -233,7 +233,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		}
 
 		networkSubsidyFaucetDripValue := int64(gas) // FIXME-- configurable
-		faucetSubsidyEligible := strings.Contains(errmsg, "insufficient funds") && networkSubsidyFaucetExists(tx.NetworkID)
+		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && networkSubsidyFaucetExists(tx.NetworkID)
 		if faucetSubsidyEligible {
 			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
 			faucetBeneficiary, _ := tx.signerFactory(db)
