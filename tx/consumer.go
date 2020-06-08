@@ -261,12 +261,15 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 func networkSubsidyFaucets(networkID uuid.UUID) map[string]interface{} {
 	// FIXME-- read from environment config
 	networkSubsidyFaucetApplicationAddressMapping := map[string]interface{}{
-		"66d44f30-9092-4182-a3c4-bc02736d6ae5": map[string]interface{}{
+		"66d44f30-9092-4182-a3c4-bc02736d6ae5": map[string]interface{}{ // Ropsten
 			"01554e22-3d7a-44a3-9c65-6bcabaa08c38": "0xdD2F8052bE76FA1456e096526db5C0F12B0af564",
 			"146ab73e-b2eb-4386-8c6f-93663792c741": "0x96f1027FEe06A15f42E48180705a2ecB2F846985",
 		},
-		"a5639994-f249-4eff-92f8-dd2467b5860e": map[string]interface{}{
-			"b2bc047e-536e-4680-9771-cbb47b98f478": "0x4A7471c60e64BA56910e31e6c9097B15C26d8B79",
+		"8d31bf48-df6b-4a71-9d7c-3cb291111e27": map[string]interface{}{ // Kovan
+			"a5639994-f249-4eff-92f8-dd2467b5860e": "0x4A7471c60e64BA56910e31e6c9097B15C26d8B79",
+		},
+		"1b16996e-3595-4985-816c-043345d22f8c": map[string]interface{}{ // Görli
+			"31eafcd1-b977-4873-8e5b-fbe36f607a93": "0x6e689eE04621C21B9855BBc1c679d974e6fb632b",
 		},
 	}
 	if networkSubsidyFaucets, networkSubsidyFaucetExists := networkSubsidyFaucetApplicationAddressMapping[networkID.String()].(map[string]interface{}); networkSubsidyFaucetExists {
