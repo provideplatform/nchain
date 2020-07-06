@@ -41,7 +41,7 @@ var (
 	// TxFilters contains in-memory Filter instances used for real-time stream processing
 	TxFilters = map[string][]interface{}{}
 
-	// ConsumeNATSStreamingSubscriptions is a flag the indicates if the goldmine instance is running in API or consumer mode
+	// ConsumeNATSStreamingSubscriptions is a flag the indicates if the nchain instance is running in API or consumer mode
 	ConsumeNATSStreamingSubscriptions bool
 
 	// DefaultDockerhubOrganization is the default public Dockerhub organization to leverage when resolving repository names
@@ -80,7 +80,7 @@ func init() {
 		endpt := os.Getenv("SYSLOG_ENDPOINT")
 		endpoint = &endpt
 	}
-	Log = logger.NewLogger("goldmine", lvl, endpoint)
+	Log = logger.NewLogger("nchain", lvl, endpoint)
 
 	DefaultAWSConfig = awsconf.GetConfig()
 

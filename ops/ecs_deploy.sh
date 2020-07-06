@@ -64,14 +64,14 @@ setup_deployment_tools()
 docker_build()
 {
     echo 'Docker build...'
-    sudo docker build -t provide/goldmine .
+    sudo docker build -t provide/nchain .
 
     echo 'Docker tag...'
-    sudo docker tag provide/goldmine:latest "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+    sudo docker tag provide/nchain:latest "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/nchain:${buildRef}"
 
     echo 'Docker push...'
     $(aws ecr get-login --no-include-email --region us-east-1)
-    sudo docker push "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+    sudo docker push "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/nchain:${buildRef}"
 }
 
 ecs_deploy()
@@ -80,7 +80,7 @@ ecs_deploy()
     MUNGED_FILE=ecs-task-definition-UPDATED.json
 
     echo 'Listing images...'
-    ECR_IMAGE_DIGEST=$(aws ecr list-images --repository-name provide/goldmine | jq '.imageIds[0].imageDigest')
+    ECR_IMAGE_DIGEST=$(aws ecr list-images --repository-name provide/nchain | jq '.imageIds[0].imageDigest')
 
     echo 'Describing images...'
     ECR_IMAGE=$(aws ecr describe-images --repository-name "${ECR_REPOSITORY_NAME}" --image-ids imageDigest="${ECR_IMAGE_DIGEST}" | jq '.')
@@ -90,7 +90,7 @@ ecs_deploy()
 
     echo 'Manipulating task defintion...'
     echo $ECS_TASK_DEFINITION > $DEFINITION_FILE
-    sed -E "s/goldmine:[a-zA-Z0-9\.-]+/goldmine:${buildRef}/g" "./${DEFINITION_FILE}" > "./${MUNGED_FILE}"
+    sed -E "s/nchain:[a-zA-Z0-9\.-]+/nchain:${buildRef}/g" "./${DEFINITION_FILE}" > "./${MUNGED_FILE}"
 
     echo 'Registering task-definition...'
     ECS_TASK_DEFINITION_ID=$(aws ecs register-task-definition --family "${ECS_TASK_DEFINITION_FAMILY}" --cli-input-json "file://${MUNGED_FILE}" | jq '.taskDefinition.taskDefinitionArn' | sed -E 's/.*\/(.*)"$/\1/')

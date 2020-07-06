@@ -9,7 +9,7 @@ if [[ -z "${DATABASE_HOST}" ]]; then
 fi
 
 if [[ -z "${DATABASE_NAME}" ]]; then
-  DATABASE_NAME=goldmine_dev
+  DATABASE_NAME=nchain_dev
 fi
 
 if [[ -z "${DATABASE_PORT}" ]]; then
@@ -17,7 +17,7 @@ if [[ -z "${DATABASE_PORT}" ]]; then
 fi
 
 if [[ -z "${DATABASE_USER}" ]]; then
-  DATABASE_USER=goldmine
+  DATABASE_USER=nchain
 fi
 
 if [[ -z "${DATABASE_PASSWORD}" ]]; then
@@ -51,4 +51,4 @@ DATABASE_SSL_MODE=$DATABASE_SSL_MODE \
 DATABASE_SUPERUSER=$DATABASE_SUPERUSER \
 DATABASE_SUPERUSER_PASSWORD=$DATABASE_SUPERUSER_PASSWORD \
 LOG_LEVEL=$LOG_LEVEL \
-./.bin/goldmine_migrate
+./.bin/nchain_migrate

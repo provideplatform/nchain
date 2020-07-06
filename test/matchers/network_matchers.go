@@ -11,7 +11,7 @@ import (
 	"github.com/onsi/gomega/matchers"
 	"github.com/onsi/gomega/types"
 	"github.com/provideservices/provide-go"
-	// provideapp "github.com/provideapp/goldmine"
+	// provideapp "github.com/provideapp/nchain"
 )
 
 // ParseConfigNetworkMatcher to check the parsed config keys and values

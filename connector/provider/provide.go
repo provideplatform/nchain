@@ -10,8 +10,8 @@ import (
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 )
 
 // ProvideProvider is a connector.ProviderAPI implementing orchestration for Provide

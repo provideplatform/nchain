@@ -2,7 +2,7 @@ package fixtures
 
 import (
 	// . "github.com/onsi/gomega"
-	"github.com/provideapp/goldmine/test/matchers"
+	"github.com/provideapp/nchain/test/matchers"
 )
 
 // Fixture interface

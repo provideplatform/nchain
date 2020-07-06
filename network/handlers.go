@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -402,7 +402,7 @@ func createNodeHandler(c *gin.Context) {
 	}
 
 	if node.OrganizationID != nil {
-		provide.RenderError("unable to set organization_id on node creation API at this time; org authorization not yet implemented in goldmine", 400, c)
+		provide.RenderError("unable to set organization_id on node creation API at this time; org authorization not yet implemented in nchain", 400, c)
 		return
 	}
 

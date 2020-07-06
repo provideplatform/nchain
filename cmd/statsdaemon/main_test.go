@@ -7,9 +7,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGoldmineStatsdaemon(t *testing.T) {
+func TestNChainStatsdaemon(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Goldmine statsdaemon Suite")
+	RunSpecs(t, "NChain statsdaemon Suite")
 }
 
 var _ = Describe("Main", func() {

@@ -10,81 +10,81 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go"
 )
 
-const natsBlockFinalizedSubject = "goldmine.block.finalized"
+const natsBlockFinalizedSubject = "nchain.block.finalized"
 const natsBlockFinalizedSubjectMaxInFlight = 2048
 const natsBlockFinalizedInvocationTimeout = time.Second * 30
 const natsBlockFinalizedTimeout = int64(time.Minute * 1)
 
-const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
+const natsLoadBalancerDeprovisioningSubject = "nchain.loadbalancer.deprovision"
 const natsLoadBalancerDeprovisioningMaxInFlight = 64
 const natsLoadBalancerDeprovisioningInvocationTimeout = time.Second * 15
 const natsLoadBalancerDeprovisioningTimeout = int64(time.Minute * 10)
 
-const natsLoadBalancerProvisioningSubject = "goldmine.loadbalancer.provision"
+const natsLoadBalancerProvisioningSubject = "nchain.loadbalancer.provision"
 const natsLoadBalancerProvisioningMaxInFlight = 32
 const natsLoadBalancerProvisioningInvocationTimeout = time.Second * 15
 const natsLoadBalancerProvisioningTimeout = int64(time.Minute * 10)
 
-const natsUnregisterLoadBalancerCertificateSubject = "goldmine.loadbalancer.certificate.unregister"
+const natsUnregisterLoadBalancerCertificateSubject = "nchain.loadbalancer.certificate.unregister"
 const natsUnregisterLoadBalancerCertificateMaxInFlight = 32
 const natsUnregisterLoadBalancerCertificateInvocationTimeout = time.Second * 10
 const natsUnregisterLoadBalancerCertificateTimeout = int64(time.Minute * 10)
 
-const natsUnregisterLoadBalancerSecurityGroupSubject = "goldmine.loadbalancer.securitygroup.unregister"
+const natsUnregisterLoadBalancerSecurityGroupSubject = "nchain.loadbalancer.securitygroup.unregister"
 const natsUnregisterLoadBalancerSecurityGroupMaxInFlight = 32
 const natsUnregisterLoadBalancerSecurityGroupInvocationTimeout = time.Second * 10
 const natsUnregisterLoadBalancerSecurityGroupTimeout = int64(time.Minute * 10)
 
-const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
+const natsLoadBalancerBalanceNodeSubject = "nchain.node.balance"
 const natsLoadBalancerBalanceNodeMaxInFlight = 32
 const natsLoadBalancerBalanceNodeInvocationTimeout = time.Second * 15
 const natsLoadBalancerBalanceNodeTimeout = int64(time.Minute * 10)
 
-const natsLoadBalancerUnbalanceNodeSubject = "goldmine.node.unbalance"
+const natsLoadBalancerUnbalanceNodeSubject = "nchain.node.unbalance"
 const natsLoadBalancerUnbalanceNodeMaxInFlight = 32
 const natsLoadBalancerUnbalanceNodeInvocationTimeout = time.Second * 15
 const natsLoadBalancerUnbalanceNodeTimeout = int64(time.Minute * 10)
 
-const natsDeployNodeSubject = "goldmine.node.deploy"
+const natsDeployNodeSubject = "nchain.node.deploy"
 const natsDeployNodeMaxInFlight = 32
 const natsDeployNodeInvocationTimeout = time.Minute * 1
 const natsDeployNodeTimeout = int64(time.Minute * 10)
 
-const natsDeleteTerminatedNodeSubject = "goldmine.node.delete"
+const natsDeleteTerminatedNodeSubject = "nchain.node.delete"
 const natsDeleteTerminatedNodeMaxInFlight = 32
 const natsDeleteTerminatedNodeInvocationTimeout = time.Minute * 1
 const natsDeleteTerminatedNodeTimeout = int64(time.Minute * 10)
 
-const natsResolveNodeHostSubject = "goldmine.node.host.resolve"
+const natsResolveNodeHostSubject = "nchain.node.host.resolve"
 const natsResolveNodeHostMaxInFlight = 32
 const natsResolveNodeHostInvocationTimeout = time.Second * 10
 const natsResolveNodeHostTimeout = int64(time.Minute * 10)
 
-const natsResolveNodePeerURLSubject = "goldmine.node.peer.resolve"
+const natsResolveNodePeerURLSubject = "nchain.node.peer.resolve"
 const natsResolveNodePeerURLMaxInFlight = 32
 const natsResolveNodePeerURLInvocationTimeout = time.Second * 10
 const natsResolveNodePeerURLTimeout = int64(time.Minute * 10)
 
-const natsAddNodePeerSubject = "goldmine.node.peer.add"
+const natsAddNodePeerSubject = "nchain.node.peer.add"
 const natsAddNodePeerMaxInFlight = 32
 const natsAddNodePeerInvocationTimeout = time.Second * 10
 const natsAddNodePeerTimeout = int64(time.Minute * 10)
 
-const natsRemoveNodePeerSubject = "goldmine.node.peer.remove"
+const natsRemoveNodePeerSubject = "nchain.node.peer.remove"
 const natsRemoveNodePeerMaxInFlight = 32
 const natsRemoveNodePeerInvocationTimeout = time.Second * 10
 const natsRemoveNodePeerTimeout = int64(time.Minute * 10)
 
-const natsUnregisterNodeSecurityGroupSubject = "goldmine.node.securitygroup.unregister"
+const natsUnregisterNodeSecurityGroupSubject = "nchain.node.securitygroup.unregister"
 const natsUnregisterNodeSecurityGroupMaxInFlight = 32
 const natsUnregisterNodeSecurityGroupInvocationTimeout = time.Second * 10
 const natsUnregisterNodeSecurityGroupTimeout = int64(time.Minute * 10)
 
-const natsTxFinalizeSubject = "goldmine.tx.finalize"
+const natsTxFinalizeSubject = "nchain.tx.finalize"
 
 type natsBlockFinalizedMsg struct {
 	NetworkID *string `json:"network_id"`

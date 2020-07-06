@@ -27,7 +27,7 @@ _cgo_export.*
 
 .gocore-id_rsa
 
-goldmine
+nchain
 .server.crt
 .private.key
 

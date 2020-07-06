@@ -195,11 +195,11 @@ if [[ -z "${DATABASE_HOST}" ]]; then
 fi
 
 if [[ -z "${DATABASE_NAME}" ]]; then
-  DATABASE_NAME=goldmine_dev
+  DATABASE_NAME=nchain_dev
 fi
 
 if [[ -z "${DATABASE_USER}" ]]; then
-  DATABASE_USER=goldmine
+  DATABASE_USER=nchain
 fi
 
 if [[ -z "${DATABASE_PASSWORD}" ]]; then
@@ -270,4 +270,4 @@ DATABASE_PASSWORD=$DATABASE_PASSWORD \
 LOG_LEVEL=$LOG_LEVEL \
 REDIS_HOSTS=$REDIS_HOSTS \
 REDIS_DB_INDEX=$REDIS_DB_INDEX \
-./.bin/goldmine_consumer
+./.bin/nchain_consumer

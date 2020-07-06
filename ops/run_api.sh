@@ -245,7 +245,7 @@ if [[ -z "${DATABASE_HOST}" ]]; then
 fi
 
 if [[ -z "${DATABASE_NAME}" ]]; then
-  DATABASE_NAME=goldmine_dev
+  DATABASE_NAME=nchain_dev
 fi
 
 if [[ -z "${DATABASE_PORT}" ]]; then
@@ -253,7 +253,7 @@ if [[ -z "${DATABASE_PORT}" ]]; then
 fi
 
 if [[ -z "${DATABASE_USER}" ]]; then
-  DATABASE_USER=goldmine
+  DATABASE_USER=nchain
 fi
 
 if [[ -z "${DATABASE_PASSWORD}" ]]; then
@@ -351,4 +351,4 @@ PORT=$PORT \
 REDIS_HOSTS=$REDIS_HOSTS \
 REDIS_DB_INDEX=$REDIS_DB_INDEX \
 REQUIRE_TLS=$REQUIRE_TLS \
-./.bin/goldmine_api
+./.bin/nchain_api

@@ -1,4 +1,4 @@
-module github.com/provideapp/goldmine
+module github.com/provideapp/nchain
 
 go 1.13
 
@@ -38,7 +38,7 @@ require (
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200602074127-6898dccd0ba1
+	github.com/provideservices/provide-go v0.0.0-20200630033145-a5709cb75a1f
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect

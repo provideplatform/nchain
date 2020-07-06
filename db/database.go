@@ -8,7 +8,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres" // PostgreSQL dialect
 	dbconf "github.com/kthomas/go-db-config"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 )
 
 var (

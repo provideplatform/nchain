@@ -12,9 +12,9 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
-	"github.com/provideapp/goldmine/token"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
+	"github.com/provideapp/nchain/token"
 	provide "github.com/provideservices/provide-go"
 )
 

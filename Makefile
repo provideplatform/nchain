@@ -2,17 +2,17 @@
 
 clean:
 	rm -rf ./.bin 2>/dev/null || true
-	rm ./goldmine 2>/dev/null || true
+	rm ./nchain 2>/dev/null || true
 	go fix ./...
 	go clean -i ./...
 
 build: clean mod
 	go fmt ./...
-	go build -v -o ./.bin/goldmine_api ./cmd/api
-	go build -v -o ./.bin/goldmine_consumer ./cmd/consumer
-	go build -v -o ./.bin/goldmine_migrate ./cmd/migrate
-	go build -v -o ./.bin/goldmine_reachabilitydaemon ./cmd/reachabilitydaemon
-	go build -v -o ./.bin/goldmine_statsdaemon ./cmd/statsdaemon
+	go build -v -o ./.bin/nchain_api ./cmd/api
+	go build -v -o ./.bin/nchain_consumer ./cmd/consumer
+	go build -v -o ./.bin/nchain_migrate ./cmd/migrate
+	go build -v -o ./.bin/nchain_reachabilitydaemon ./cmd/reachabilitydaemon
+	go build -v -o ./.bin/nchain_statsdaemon ./cmd/statsdaemon
 
 ecs_deploy:
 	./ops/ecs_deploy.sh
@@ -24,8 +24,8 @@ lint:
 	./ops/lint.sh
 
 migrate: mod
-	rm -rf ./.bin/goldmine_migrate 2>/dev/null || true
-	go build -v -o ./.bin/goldmine_migrate ./cmd/migrate
+	rm -rf ./.bin/nchain_migrate 2>/dev/null || true
+	go build -v -o ./.bin/nchain_migrate ./cmd/migrate
 	./ops/migrate.sh
 
 mod:

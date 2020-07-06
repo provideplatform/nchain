@@ -21,8 +21,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	dbconf "github.com/kthomas/go-db-config"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

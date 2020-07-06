@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 	provide "github.com/provideservices/provide-go"
 )
 

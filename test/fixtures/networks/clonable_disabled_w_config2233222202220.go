@@ -4,8 +4,8 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
-	"github.com/provideapp/goldmine/test/fixtures"
-	"github.com/provideapp/goldmine/test/matchers"
+	"github.com/provideapp/nchain/test/fixtures"
+	"github.com/provideapp/nchain/test/matchers"
 )
 
 func ethClonableDisabledConfigNetwork2233222202220() (n *fixtures.FixtureMatcher) {

@@ -14,15 +14,15 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 	provide "github.com/provideservices/provide-go"
 )
 
 const resolveTokenTickerInterval = time.Millisecond * 5000
 const resolveTokenTickerTimeout = time.Minute * 1
 
-const natsTxCreateSubject = "goldmine.tx.create"
+const natsTxCreateSubject = "nchain.tx.create"
 
 // Contract instances must be associated with an application identifier.
 type Contract struct {

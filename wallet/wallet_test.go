@@ -9,8 +9,8 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/wallet"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/wallet"
 	provide "github.com/provideservices/provide-go"
 )
 

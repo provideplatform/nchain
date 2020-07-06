@@ -11,17 +11,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/connector"
-	"github.com/provideapp/goldmine/consumer"
-	"github.com/provideapp/goldmine/contract"
-	"github.com/provideapp/goldmine/filter"
-	"github.com/provideapp/goldmine/network"
-	"github.com/provideapp/goldmine/oracle"
-	"github.com/provideapp/goldmine/prices"
-	"github.com/provideapp/goldmine/token"
-	"github.com/provideapp/goldmine/tx"
-	"github.com/provideapp/goldmine/wallet"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/connector"
+	"github.com/provideapp/nchain/consumer"
+	"github.com/provideapp/nchain/contract"
+	"github.com/provideapp/nchain/filter"
+	"github.com/provideapp/nchain/network"
+	"github.com/provideapp/nchain/oracle"
+	"github.com/provideapp/nchain/prices"
+	"github.com/provideapp/nchain/token"
+	"github.com/provideapp/nchain/tx"
+	"github.com/provideapp/nchain/wallet"
 
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
@@ -57,7 +57,7 @@ func init() {
 }
 
 func main() {
-	common.Log.Debugf("starting goldmine API...")
+	common.Log.Debugf("starting nchain API...")
 	installSignalHandlers()
 
 	runAPI()
@@ -80,12 +80,12 @@ func main() {
 		}
 	}
 
-	common.Log.Debug("exiting goldmine API")
+	common.Log.Debug("exiting nchain API")
 	cancelF()
 }
 
 func installSignalHandlers() {
-	common.Log.Debug("installing signal handlers for goldmine API")
+	common.Log.Debug("installing signal handlers for nchain API")
 	sigs = make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	shutdownCtx, cancelF = context.WithCancel(context.Background())
@@ -93,7 +93,7 @@ func installSignalHandlers() {
 
 func shutdown() {
 	if atomic.AddUint32(&closing, 1) == 1 {
-		common.Log.Debug("shutting down goldmine API")
+		common.Log.Debug("shutting down nchain API")
 		cancelF()
 	}
 }

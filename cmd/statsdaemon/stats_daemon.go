@@ -24,8 +24,8 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 	"github.com/provideservices/provide-go"
 )
 
@@ -35,7 +35,7 @@ const defaultChainpointFlushInterval = time.Millisecond * 60000
 const defaultChainpointProofInterval = time.Millisecond * 60500
 const defaultStatsDaemonQueueSize = 8
 const defaultStatsTTL = time.Minute * 60
-const natsBlockFinalizedSubject = "goldmine.block.finalized"
+const natsBlockFinalizedSubject = "nchain.block.finalized"
 const networkStatsJsonRpcPollingTickerInterval = time.Millisecond * 2500
 const networkStatsMaxRecentBlockCacheSize = 8
 const networkStatsMinimumRecentBlockCacheSize = 3

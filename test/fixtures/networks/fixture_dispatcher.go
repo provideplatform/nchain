@@ -3,7 +3,7 @@ package networkfixtures
 import (
 	"fmt"
 
-	"github.com/provideapp/goldmine/test/fixtures"
+	"github.com/provideapp/nchain/test/fixtures"
 )
 
 // NetworkFixtureDispatcher to hold fixtures with matchers

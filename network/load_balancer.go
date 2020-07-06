@@ -16,8 +16,8 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network/orchestration"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network/orchestration"
 	provide "github.com/provideservices/provide-go"
 )
 

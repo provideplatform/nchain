@@ -9,25 +9,25 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 )
 
-const natsConnectorDeprovisioningSubject = "goldmine.connector.deprovision"
+const natsConnectorDeprovisioningSubject = "nchain.connector.deprovision"
 const natsConnectorDeprovisioningMaxInFlight = 64
 const natsConnectorDeprovisioningTimeout = int64(time.Minute * 10)
 const natsConnectorDeprovisioningInvocationTimeout = time.Second * 15
 
-const natsConnectorProvisioningSubject = "goldmine.connector.provision"
+const natsConnectorProvisioningSubject = "nchain.connector.provision"
 const natsConnectorProvisioningMaxInFlight = 64
 const natsConnectorProvisioningTimeout = int64(time.Minute * 10)
 const natsConnectorProvisioningInvocationTimeout = time.Second * 15
 
-const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability.resolve"
+const natsConnectorResolveReachabilitySubject = "nchain.connector.reachability.resolve"
 const natsConnectorResolveReachabilityMaxInFlight = 64
 const natsConnectorResolveReachabilityTimeout = int64(time.Minute * 10)
 const natsConnectorResolveReachabilityInvocationTimeout = time.Second * 10
 
-const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
+const natsConnectorDenormalizeConfigSubject = "nchain.connector.config.denormalize"
 const natsConnectorDenormalizeConfigMaxInFlight = 64
 const natsConnectorDenormalizeConfigTimeout = int64(time.Minute * 1)
 const natsConnectorDenormalizeConfigInvocationTimeout = time.Second * 5

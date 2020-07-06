@@ -18,12 +18,12 @@ import (
 	logger "github.com/kthomas/go-logger"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 	"github.com/provideservices/provide-go"
 )
 
-const natsLogTransceiverEmitSubject = "goldmine.logs.emit"
+const natsLogTransceiverEmitSubject = "nchain.logs.emit"
 
 const defaultLogTransceiverQueueSize = 512
 const defaultLogTransceiverMaximumBackoffMillis = 12800

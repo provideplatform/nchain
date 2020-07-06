@@ -16,8 +16,8 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network/p2p"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network/p2p"
 	provide "github.com/provideservices/provide-go"
 )
 
@@ -25,7 +25,7 @@ const defaultWebappPort = 3000
 const hostReachabilityTimeout = time.Minute * 5
 const hostReachabilityInterval = time.Millisecond * 2500
 const networkStateGenesis = "genesis"
-const natsNetworkContractCreateInvocationSubject = "goldmine.contract.persist"
+const natsNetworkContractCreateInvocationSubject = "nchain.contract.persist"
 
 const networkConfigBootnodes = "bootnodes"
 const networkConfigChain = "chain"

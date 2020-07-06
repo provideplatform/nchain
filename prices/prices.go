@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 )
 
 var CurrentPrices = &Prices{}

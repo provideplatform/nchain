@@ -8,12 +8,12 @@ package network_test
 // 	"time"
 
 // 	"github.com/jinzhu/gorm"
-// 	"github.com/provideapp/goldmine/common"
-// 	"github.com/provideapp/goldmine/contract"
-// 	"github.com/provideapp/goldmine/network"
-// 	"github.com/provideapp/goldmine/test"
-// 	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
-// 	"github.com/provideapp/goldmine/test/matchers"
+// 	"github.com/provideapp/nchain/common"
+// 	"github.com/provideapp/nchain/contract"
+// 	"github.com/provideapp/nchain/network"
+// 	"github.com/provideapp/nchain/test"
+// 	networkfixtures "github.com/provideapp/nchain/test/fixtures/networks"
+// 	"github.com/provideapp/nchain/test/matchers"
 
 // 	dbconf "github.com/kthomas/go-db-config"
 // 	uuid "github.com/kthomas/go.uuid"

@@ -11,12 +11,12 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 
-	"github.com/provideapp/goldmine/common"
-	_ "github.com/provideapp/goldmine/connector"
-	_ "github.com/provideapp/goldmine/consumer"
-	_ "github.com/provideapp/goldmine/contract"
-	_ "github.com/provideapp/goldmine/network"
-	_ "github.com/provideapp/goldmine/tx"
+	"github.com/provideapp/nchain/common"
+	_ "github.com/provideapp/nchain/connector"
+	_ "github.com/provideapp/nchain/consumer"
+	_ "github.com/provideapp/nchain/contract"
+	_ "github.com/provideapp/nchain/network"
+	_ "github.com/provideapp/nchain/tx"
 )
 
 const natsStreamingSubscriptionStatusTickerInterval = 5 * time.Second

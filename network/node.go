@@ -13,12 +13,12 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 
-	// "github.com/provideapp/goldmine/gpgputil"
+	// "github.com/provideapp/nchain/gpgputil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network/orchestration"
-	"github.com/provideapp/goldmine/network/p2p"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network/orchestration"
+	"github.com/provideapp/nchain/network/p2p"
 	provide "github.com/provideservices/provide-go"
 )
 

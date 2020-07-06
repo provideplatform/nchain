@@ -13,16 +13,16 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 )
 
-const natsLogTransceiverEmitSubject = "goldmine.logs.emit"
+const natsLogTransceiverEmitSubject = "nchain.logs.emit"
 const natsLogTransceiverEmitMaxInFlight = 1024
 const natsLogTransceiverEmitInvocationTimeout = time.Second * 10
 const natsLogTransceiverEmitTimeout = int64(time.Second * 30)
 
-const natsNetworkContractCreateInvocationSubject = "goldmine.contract.create"
+const natsNetworkContractCreateInvocationSubject = "nchain.contract.create"
 const natsNetworkContractCreateInvocationMaxInFlight = 32
 const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
 

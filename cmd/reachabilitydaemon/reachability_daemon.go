@@ -12,7 +12,7 @@ import (
 	"time"
 
 	logger "github.com/kthomas/go-logger"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 )
 
 const defaultReachabilityGracePeriod = uint32(2) // this is the number of unreachable attempts prior to marking an endpoint as unreachable

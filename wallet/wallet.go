@@ -17,7 +17,7 @@ import (
 	bip39 "github.com/tyler-smith/go-bip39"
 
 	"github.com/jinzhu/gorm"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 )
 
 // Wallet instances are logical collections of accounts; wallet instances are HD wallets

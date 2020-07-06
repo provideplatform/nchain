@@ -5,9 +5,9 @@ import (
 
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/test/fixtures"
-	"github.com/provideapp/goldmine/test/matchers"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/test/fixtures"
+	"github.com/provideapp/nchain/test/matchers"
 )
 
 func ethClonableEnabledEmptyConfigNetwork() (n *fixtures.FixtureMatcher) {

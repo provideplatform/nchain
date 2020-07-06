@@ -12,9 +12,9 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/connector/provider"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/connector/provider"
+	"github.com/provideapp/nchain/network"
 	provide "github.com/provideservices/provide-go"
 )
 

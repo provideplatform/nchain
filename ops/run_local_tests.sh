@@ -4,11 +4,11 @@ set -e
 echo "" > coverage.txt
 
 if [[ -z "${DATABASE_NAME}" ]]; then
-  DATABASE_NAME=goldmine_test
+  DATABASE_NAME=nchain_test
 fi
 
 if [[ -z "${DATABASE_USER}" ]]; then
-  DATABASE_USER=goldminetest
+  DATABASE_USER=nchaintest
 fi
 
 if [[ -z "${DATABASE_PASSWORD}" ]]; then

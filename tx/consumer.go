@@ -17,31 +17,31 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/contract"
-	"github.com/provideapp/goldmine/network"
-	"github.com/provideapp/goldmine/wallet"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/contract"
+	"github.com/provideapp/nchain/network"
+	"github.com/provideapp/nchain/wallet"
 	provide "github.com/provideservices/provide-go"
 )
 
 // TODO: should this be calculated dynamically against average blocktime for the network and subscriptions reestablished?
 
-const natsTxSubject = "goldmine.tx"
+const natsTxSubject = "nchain.tx"
 const natsTxMaxInFlight = 2048
 const txAckWait = time.Second * 30
 const txMsgTimeout = int64(txAckWait * 30)
 
-const natsTxCreateSubject = "goldmine.tx.create"
+const natsTxCreateSubject = "nchain.tx.create"
 const natsTxCreateMaxInFlight = 2048
 const txCreateAckWait = time.Second * 30
 const txCreateMsgTimeout = int64(txCreateAckWait * 30)
 
-const natsTxFinalizeSubject = "goldmine.tx.finalize"
+const natsTxFinalizeSubject = "nchain.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
 const txFinalizeAckWait = time.Second * 15
 const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 
-const natsTxReceiptSubject = "goldmine.tx.receipt"
+const natsTxReceiptSubject = "nchain.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 15
 const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)

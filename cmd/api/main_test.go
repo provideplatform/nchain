@@ -7,9 +7,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGoldmineAPI(t *testing.T) {
+func TestNChainAPI(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Goldmine API Suite")
+	RunSpecs(t, "NChain API Suite")
 }
 
 var _ = Describe("Main", func() {

@@ -9,8 +9,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
-	"github.com/provideapp/goldmine/common"
-	networkfixtures "github.com/provideapp/goldmine/test/fixtures/networks"
+	"github.com/provideapp/nchain/common"
+	networkfixtures "github.com/provideapp/nchain/test/fixtures/networks"
 )
 
 func defaultConfig() map[string]interface{} {

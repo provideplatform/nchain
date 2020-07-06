@@ -6,10 +6,10 @@
 #           AWS_SECRET_ACCESS_KEY=abc \
 #           AWS_DEFAULT_REGION=us-east-1 \
 #           AWS_DEFAULT_OUTPUT=json \
-#           ECR_REPOSITORY_NAME=provide/goldmine \
-#           ECS_TASK_DEFINITION_FAMILY=goldmine-fargate \
+#           ECR_REPOSITORY_NAME=provide/nchain \
+#           ECS_TASK_DEFINITION_FAMILY=nchain-fargate \
 #           ECS_CLUSTER=production \
-#           ECS_SERVICE_NAME=goldmine \
+#           ECS_SERVICE_NAME=nchain \
 #           '$WORKSPACE/ops/ci-process.sh'"
 set -o errexit # set -e
 set -o nounset # set -u
@@ -43,7 +43,7 @@ setup_go()
     export PATH=~/.local/bin:$GOBIN:$PATH
     echo "PATH is: '$PATH'"
     mkdir -p $GOPATH/src/github.com/provideapp
-    # ln -f -s `pwd` $GOPATH/src/github.com/provideapp/goldmine
+    # ln -f -s `pwd` $GOPATH/src/github.com/provideapp/nchain
     # echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 

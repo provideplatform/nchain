@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/network"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/network"
 )
 
 // Execution represents a request payload used to execute functionality encapsulated by a contract.
@@ -53,7 +53,7 @@ type ExecutionResponse struct {
 	Ref         *string     `json:"ref"`
 }
 
-const natsTxSubject = "goldmine.tx"
+const natsTxSubject = "nchain.tx"
 
 // ExecuteFromTx allows ephemeral contract execution
 func (e *Execution) ExecuteFromTx(

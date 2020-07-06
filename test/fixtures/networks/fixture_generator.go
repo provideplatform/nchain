@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/provideapp/goldmine/test/matchers"
+	"github.com/provideapp/nchain/test/matchers"
 )
 
 func NewNetworkFixtureFieldValues(name *string, values []interface{}) *NetworkFixtureFieldValues {

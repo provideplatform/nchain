@@ -16,7 +16,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Data for Name: networks; Type: TABLE DATA; Schema: public; Owner: goldmine
+-- Data for Name: networks; Type: TABLE DATA; Schema: public; Owner: nchain
 --
 
 INSERT INTO public.networks (id, created_at, name, description, is_production, sidechain_id, config, application_id, enabled, cloneable, network_id, user_id, chain_id) VALUES ('deca2436-21ba-4ff5-b225-ad1b0b2f5c59', '2018-01-13 22:00:47.947907+00', 'Ethereum mainnet', 'Ethereum mainnet', true, NULL, '{"block_explorer_url":"https://etherscan.io","chainspec_url":null,"cloneable_images":{},"is_ethereum_network":true,"json_rpc_url":"https://mainnet.infura.io/v3/fde5e81d5d3141a093def423db3eeb33","native_currency":"ETH","network_id":1,"websocket_url":null,"infura_websocket_url":"wss://mainnet.infura.io/v3/fde5e81d5d3141a093def423db3eeb33","platform":"evm"}', NULL, true, false, NULL, NULL, '1');

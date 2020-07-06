@@ -20,10 +20,10 @@ const TableauConnectorProvider = "tableau"
 const UnibrightConnectorProvider = "unibright"
 const ZokratesConnectorProvider = "zokrates"
 
-const natsConnectorDenormalizeConfigSubject = "goldmine.connector.config.denormalize"
-const natsConnectorResolveReachabilitySubject = "goldmine.connector.reachability.resolve"
-const natsLoadBalancerBalanceNodeSubject = "goldmine.node.balance"
-const natsLoadBalancerDeprovisioningSubject = "goldmine.loadbalancer.deprovision"
+const natsConnectorDenormalizeConfigSubject = "nchain.connector.config.denormalize"
+const natsConnectorResolveReachabilitySubject = "nchain.connector.reachability.resolve"
+const natsLoadBalancerBalanceNodeSubject = "nchain.node.balance"
+const natsLoadBalancerDeprovisioningSubject = "nchain.loadbalancer.deprovision"
 
 // API defines a provider interface for third-party software and service connectors,
 // providing an interface for infrastructure provisioning and deprovisioning and an

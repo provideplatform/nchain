@@ -3,7 +3,7 @@ package p2p
 import (
 	"fmt"
 
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 )
 
 const bcoinPoolIdentitySearchString = "Pool identity key:"

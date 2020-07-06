@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
+	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go"
 )
 

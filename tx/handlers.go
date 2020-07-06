@@ -9,11 +9,11 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/goldmine/common"
-	"github.com/provideapp/goldmine/contract"
-	"github.com/provideapp/goldmine/filter"
-	"github.com/provideapp/goldmine/network"
-	"github.com/provideapp/goldmine/wallet"
+	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/contract"
+	"github.com/provideapp/nchain/filter"
+	"github.com/provideapp/nchain/network"
+	"github.com/provideapp/nchain/wallet"
 	provide "github.com/provideservices/provide-go"
 )
 

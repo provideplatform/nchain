@@ -3,8 +3,8 @@ package networkfixtures
 import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
-	"github.com/provideapp/goldmine/test/fixtures"
-	"github.com/provideapp/goldmine/test/matchers"
+	"github.com/provideapp/nchain/test/fixtures"
+	"github.com/provideapp/nchain/test/matchers"
 )
 
 func ethClonableDisabledConfigNetwork0022201202220() (n *fixtures.FixtureMatcher) {

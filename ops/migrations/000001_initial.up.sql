@@ -20,13 +20,13 @@
 DO
 $do$
 BEGIN
-   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE  rolname = 'goldmine') THEN
-      CREATE ROLE goldmine WITH SUPERUSER LOGIN PASSWORD 'prvdgoldmine';
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE  rolname = 'nchain') THEN
+      CREATE ROLE nchain WITH SUPERUSER LOGIN PASSWORD 'prvdnchain';
    END IF;
 END
 $do$;
 
-SET ROLE goldmine;
+SET ROLE nchain;
 
 --
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
@@ -76,7 +76,7 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
--- Name: accounts; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: accounts; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.accounts (
@@ -97,7 +97,7 @@ CREATE TABLE public.accounts (
 ALTER TABLE public.accounts OWNER TO current_user;
 
 --
--- Name: bridges; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: bridges; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.bridges (
@@ -111,7 +111,7 @@ CREATE TABLE public.bridges (
 ALTER TABLE public.bridges OWNER TO current_user;
 
 --
--- Name: connectors; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: connectors; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.connectors (
@@ -132,7 +132,7 @@ CREATE TABLE public.connectors (
 ALTER TABLE public.connectors OWNER TO current_user;
 
 --
--- Name: connectors_load_balancers; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: connectors_load_balancers; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.connectors_load_balancers (
@@ -144,7 +144,7 @@ CREATE TABLE public.connectors_load_balancers (
 ALTER TABLE public.connectors_load_balancers OWNER TO current_user;
 
 --
--- Name: connectors_nodes; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: connectors_nodes; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.connectors_nodes (
@@ -156,7 +156,7 @@ CREATE TABLE public.connectors_nodes (
 ALTER TABLE public.connectors_nodes OWNER TO current_user;
 
 --
--- Name: contracts; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: contracts; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.contracts (
@@ -176,7 +176,7 @@ CREATE TABLE public.contracts (
 ALTER TABLE public.contracts OWNER TO current_user;
 
 --
--- Name: filters; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: filters; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.filters (
@@ -195,7 +195,7 @@ CREATE TABLE public.filters (
 ALTER TABLE public.filters OWNER TO current_user;
 
 --
--- Name: load_balancers; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: load_balancers; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.load_balancers (
@@ -219,7 +219,7 @@ CREATE TABLE public.load_balancers (
 ALTER TABLE public.load_balancers OWNER TO current_user;
 
 --
--- Name: load_balancers_nodes; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: load_balancers_nodes; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.load_balancers_nodes (
@@ -231,7 +231,7 @@ CREATE TABLE public.load_balancers_nodes (
 ALTER TABLE public.load_balancers_nodes OWNER TO current_user;
 
 --
--- Name: networks; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: networks; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.networks (
@@ -254,7 +254,7 @@ CREATE TABLE public.networks (
 ALTER TABLE public.networks OWNER TO current_user;
 
 --
--- Name: nodes; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: nodes; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.nodes (
@@ -280,7 +280,7 @@ CREATE TABLE public.nodes (
 ALTER TABLE public.nodes OWNER TO current_user;
 
 --
--- Name: oracles; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: oracles; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.oracles (
@@ -298,7 +298,7 @@ CREATE TABLE public.oracles (
 ALTER TABLE public.oracles OWNER TO current_user;
 
 --
--- Name: tokens; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: tokens; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.tokens (
@@ -320,7 +320,7 @@ CREATE TABLE public.tokens (
 ALTER TABLE public.tokens OWNER TO current_user;
 
 --
--- Name: transactions; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: transactions; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.transactions (
@@ -351,7 +351,7 @@ CREATE TABLE public.transactions (
 ALTER TABLE public.transactions OWNER TO current_user;
 
 --
--- Name: wallets; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: wallets; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.wallets (
@@ -371,7 +371,7 @@ CREATE TABLE public.wallets (
 ALTER TABLE public.wallets OWNER TO current_user;
 
 --
--- Name: wallets_accounts; Type: TABLE; Schema: public; Owner: goldmine
+-- Name: wallets_accounts; Type: TABLE; Schema: public; Owner: nchain
 --
 
 CREATE TABLE public.wallets_accounts (
@@ -383,7 +383,7 @@ CREATE TABLE public.wallets_accounts (
 ALTER TABLE public.wallets_accounts OWNER TO current_user;
 
 --
--- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.accounts
@@ -391,7 +391,7 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: bridges bridges_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: bridges bridges_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.bridges
@@ -399,7 +399,7 @@ ALTER TABLE ONLY public.bridges
 
 
 --
--- Name: connectors_load_balancers connectors_load_balancers_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors_load_balancers connectors_load_balancers_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors_load_balancers
@@ -407,7 +407,7 @@ ALTER TABLE ONLY public.connectors_load_balancers
 
 
 --
--- Name: connectors_nodes connectors_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors_nodes connectors_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors_nodes
@@ -415,7 +415,7 @@ ALTER TABLE ONLY public.connectors_nodes
 
 
 --
--- Name: connectors connectors_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors connectors_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors
@@ -423,7 +423,7 @@ ALTER TABLE ONLY public.connectors
 
 
 --
--- Name: contracts contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: contracts contracts_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.contracts
@@ -431,7 +431,7 @@ ALTER TABLE ONLY public.contracts
 
 
 --
--- Name: filters filters_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: filters filters_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.filters
@@ -439,7 +439,7 @@ ALTER TABLE ONLY public.filters
 
 
 --
--- Name: load_balancers_nodes load_balancers_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: load_balancers_nodes load_balancers_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.load_balancers_nodes
@@ -447,7 +447,7 @@ ALTER TABLE ONLY public.load_balancers_nodes
 
 
 --
--- Name: load_balancers load_balancers_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: load_balancers load_balancers_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.load_balancers
@@ -455,7 +455,7 @@ ALTER TABLE ONLY public.load_balancers
 
 
 --
--- Name: networks networks_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: networks networks_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.networks
@@ -463,7 +463,7 @@ ALTER TABLE ONLY public.networks
 
 
 --
--- Name: nodes nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: nodes nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.nodes
@@ -471,7 +471,7 @@ ALTER TABLE ONLY public.nodes
 
 
 --
--- Name: oracles oracles_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: oracles oracles_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.oracles
@@ -479,7 +479,7 @@ ALTER TABLE ONLY public.oracles
 
 
 --
--- Name: tokens tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: tokens tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.tokens
@@ -487,7 +487,7 @@ ALTER TABLE ONLY public.tokens
 
 
 --
--- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.transactions
@@ -495,7 +495,7 @@ ALTER TABLE ONLY public.transactions
 
 
 --
--- Name: wallets_accounts wallets_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: wallets_accounts wallets_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.wallets_accounts
@@ -503,7 +503,7 @@ ALTER TABLE ONLY public.wallets_accounts
 
 
 --
--- Name: wallets wallets_pkey; Type: CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: wallets wallets_pkey; Type: CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.wallets
@@ -511,371 +511,371 @@ ALTER TABLE ONLY public.wallets
 
 
 --
--- Name: idx_accounts_accessed_at; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_accounts_accessed_at; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_accounts_accessed_at ON public.accounts USING btree (accessed_at);
 
 
 --
--- Name: idx_accounts_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_accounts_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_accounts_application_id ON public.accounts USING btree (application_id);
 
 
 --
--- Name: idx_accounts_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_accounts_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_accounts_network_id ON public.accounts USING btree (network_id);
 
 
 --
--- Name: idx_accounts_user_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_accounts_user_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_accounts_user_id ON public.accounts USING btree (user_id);
 
 
 --
--- Name: idx_accounts_wallet_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_accounts_wallet_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_accounts_wallet_id ON public.accounts USING btree (wallet_id);
 
 
 --
--- Name: idx_bridges_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_bridges_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_bridges_application_id ON public.bridges USING btree (application_id);
 
 
 --
--- Name: idx_bridges_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_bridges_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_bridges_network_id ON public.bridges USING btree (network_id);
 
 
 --
--- Name: idx_chain_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_chain_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE UNIQUE INDEX idx_chain_id ON public.networks USING btree (chain_id);
 
 
 --
--- Name: idx_connectors_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_connectors_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_connectors_application_id ON public.connectors USING btree (application_id);
 
 
 --
--- Name: idx_connectors_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_connectors_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_connectors_network_id ON public.connectors USING btree (network_id);
 
 
 --
--- Name: idx_connectors_type; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_connectors_type; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_connectors_type ON public.connectors USING btree (type);
 
 
 --
--- Name: idx_contracts_accessed_at; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_contracts_accessed_at; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_contracts_accessed_at ON public.contracts USING btree (accessed_at);
 
 
 --
--- Name: idx_contracts_address; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_contracts_address; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_contracts_address ON public.contracts USING btree (address);
 
 
 --
--- Name: idx_contracts_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_contracts_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_contracts_application_id ON public.contracts USING btree (application_id);
 
 
 --
--- Name: idx_contracts_contract_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_contracts_contract_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_contracts_contract_id ON public.contracts USING btree (contract_id);
 
 
 --
--- Name: idx_contracts_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_contracts_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_contracts_network_id ON public.contracts USING btree (network_id);
 
 
 --
--- Name: idx_contracts_transaction_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_contracts_transaction_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE UNIQUE INDEX idx_contracts_transaction_id ON public.contracts USING btree (transaction_id);
 
 
 --
--- Name: idx_filters_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_filters_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_filters_application_id ON public.filters USING btree (application_id);
 
 
 --
--- Name: idx_filters_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_filters_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_filters_network_id ON public.filters USING btree (network_id);
 
 
 --
--- Name: idx_load_balancers_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_load_balancers_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_load_balancers_application_id ON public.load_balancers USING btree (application_id);
 
 
 --
--- Name: idx_load_balancers_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_load_balancers_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_load_balancers_network_id ON public.load_balancers USING btree (network_id);
 
 
 --
--- Name: idx_load_balancers_region; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_load_balancers_region; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_load_balancers_region ON public.load_balancers USING btree (region);
 
 
 --
--- Name: idx_load_balancers_status; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_load_balancers_status; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_load_balancers_status ON public.load_balancers USING btree (status);
 
 
 --
--- Name: idx_load_balancers_type; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_load_balancers_type; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_load_balancers_type ON public.load_balancers USING btree (type);
 
 
 --
--- Name: idx_network_nodes_type; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_network_nodes_type; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_network_nodes_type ON public.load_balancers USING btree (type);
 
 
 --
--- Name: idx_networks_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_networks_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_networks_application_id ON public.networks USING btree (application_id);
 
 
 --
--- Name: idx_networks_cloneable; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_networks_cloneable; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_networks_cloneable ON public.networks USING btree (cloneable);
 
 
 --
--- Name: idx_networks_enabled; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_networks_enabled; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_networks_enabled ON public.networks USING btree (enabled);
 
 
 --
--- Name: idx_networks_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_networks_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_networks_network_id ON public.networks USING btree (network_id);
 
 
 --
--- Name: idx_networks_user_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_networks_user_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_networks_user_id ON public.networks USING btree (user_id);
 
 
 --
--- Name: idx_nodes_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_nodes_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_nodes_application_id ON public.nodes USING btree (application_id);
 
 
 --
--- Name: idx_nodes_bootnode; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_nodes_bootnode; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_nodes_bootnode ON public.nodes USING btree (bootnode);
 
 
 --
--- Name: idx_nodes_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_nodes_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_nodes_network_id ON public.nodes USING btree (network_id);
 
 
 --
--- Name: idx_nodes_role; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_nodes_role; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_nodes_role ON public.nodes USING btree (role);
 
 
 --
--- Name: idx_nodes_status; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_nodes_status; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_nodes_status ON public.nodes USING btree (status);
 
 
 --
--- Name: idx_nodes_user_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_nodes_user_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_nodes_user_id ON public.nodes USING btree (user_id);
 
 
 --
--- Name: idx_oracles_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_oracles_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_oracles_application_id ON public.oracles USING btree (application_id);
 
 
 --
--- Name: idx_oracles_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_oracles_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_oracles_network_id ON public.oracles USING btree (network_id);
 
 
 --
--- Name: idx_tokens_accessed_at; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_tokens_accessed_at; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_tokens_accessed_at ON public.tokens USING btree (accessed_at);
 
 
 --
--- Name: idx_tokens_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_tokens_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_tokens_application_id ON public.tokens USING btree (application_id);
 
 
 --
--- Name: idx_tokens_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_tokens_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_tokens_network_id ON public.tokens USING btree (network_id);
 
 
 --
--- Name: idx_transactions_account_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_account_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_account_id ON public.transactions USING btree (account_id);
 
 
 --
--- Name: idx_transactions_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_application_id ON public.transactions USING btree (application_id);
 
 
 --
--- Name: idx_transactions_created_at; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_created_at; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_created_at ON public.transactions USING btree (created_at);
 
 
 --
--- Name: idx_transactions_hash; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_hash; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE UNIQUE INDEX idx_transactions_hash ON public.transactions USING btree (hash);
 
 
 --
--- Name: idx_transactions_network_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_network_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_network_id ON public.transactions USING btree (network_id);
 
 
 --
--- Name: idx_transactions_ref; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_ref; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_ref ON public.transactions USING btree (ref);
 
 
 --
--- Name: idx_transactions_status; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_status; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_status ON public.transactions USING btree (status);
 
 
 --
--- Name: idx_transactions_user_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_transactions_user_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_transactions_user_id ON public.transactions USING btree (user_id);
 
 
 --
--- Name: idx_wallets_application_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_wallets_application_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_wallets_application_id ON public.wallets USING btree (application_id);
 
 
 --
--- Name: idx_wallets_user_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_wallets_user_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_wallets_user_id ON public.wallets USING btree (user_id);
 
 
 --
--- Name: idx_wallets_wallet_id; Type: INDEX; Schema: public; Owner: goldmine
+-- Name: idx_wallets_wallet_id; Type: INDEX; Schema: public; Owner: nchain
 --
 
 CREATE INDEX idx_wallets_wallet_id ON public.wallets USING btree (wallet_id);
 
 
 --
--- Name: accounts accounts_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: accounts accounts_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.accounts
@@ -883,7 +883,7 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: accounts accounts_wallet_id_wallets_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: accounts accounts_wallet_id_wallets_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.accounts
@@ -891,7 +891,7 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: bridges bridges_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: bridges bridges_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.bridges
@@ -899,7 +899,7 @@ ALTER TABLE ONLY public.bridges
 
 
 --
--- Name: connectors_load_balancers connectors_load_balancers_connector_id_connectors_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors_load_balancers connectors_load_balancers_connector_id_connectors_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors_load_balancers
@@ -907,7 +907,7 @@ ALTER TABLE ONLY public.connectors_load_balancers
 
 
 --
--- Name: connectors_load_balancers connectors_load_balancers_load_balancer_id_load_balancers_id_fo; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors_load_balancers connectors_load_balancers_load_balancer_id_load_balancers_id_fo; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors_load_balancers
@@ -915,7 +915,7 @@ ALTER TABLE ONLY public.connectors_load_balancers
 
 
 --
--- Name: connectors connectors_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors connectors_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors
@@ -923,7 +923,7 @@ ALTER TABLE ONLY public.connectors
 
 
 --
--- Name: connectors_nodes connectors_nodes_connector_id_connectors_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors_nodes connectors_nodes_connector_id_connectors_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors_nodes
@@ -931,7 +931,7 @@ ALTER TABLE ONLY public.connectors_nodes
 
 
 --
--- Name: connectors_nodes connectors_nodes_node_id_nodes_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: connectors_nodes connectors_nodes_node_id_nodes_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.connectors_nodes
@@ -939,7 +939,7 @@ ALTER TABLE ONLY public.connectors_nodes
 
 
 --
--- Name: contracts contracts_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: contracts contracts_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.contracts
@@ -947,7 +947,7 @@ ALTER TABLE ONLY public.contracts
 
 
 --
--- Name: contracts contracts_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: contracts contracts_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.contracts
@@ -955,7 +955,7 @@ ALTER TABLE ONLY public.contracts
 
 
 --
--- Name: contracts contracts_transaction_id_transactions_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: contracts contracts_transaction_id_transactions_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.contracts
@@ -963,7 +963,7 @@ ALTER TABLE ONLY public.contracts
 
 
 --
--- Name: filters filters_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: filters filters_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.filters
@@ -971,7 +971,7 @@ ALTER TABLE ONLY public.filters
 
 
 --
--- Name: load_balancers_nodes load_balancers_load_balancer_id_load_balancers_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: load_balancers_nodes load_balancers_load_balancer_id_load_balancers_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.load_balancers_nodes
@@ -979,7 +979,7 @@ ALTER TABLE ONLY public.load_balancers_nodes
 
 
 --
--- Name: load_balancers load_balancers_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: load_balancers load_balancers_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.load_balancers
@@ -987,7 +987,7 @@ ALTER TABLE ONLY public.load_balancers
 
 
 --
--- Name: load_balancers_nodes load_balancers_node_id_nodes_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: load_balancers_nodes load_balancers_node_id_nodes_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.load_balancers_nodes
@@ -995,7 +995,7 @@ ALTER TABLE ONLY public.load_balancers_nodes
 
 
 --
--- Name: networks networks_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: networks networks_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.networks
@@ -1003,7 +1003,7 @@ ALTER TABLE ONLY public.networks
 
 
 --
--- Name: networks networks_sidechain_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: networks networks_sidechain_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.networks
@@ -1011,7 +1011,7 @@ ALTER TABLE ONLY public.networks
 
 
 --
--- Name: nodes nodes_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: nodes nodes_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.nodes
@@ -1019,7 +1019,7 @@ ALTER TABLE ONLY public.nodes
 
 
 --
--- Name: oracles oracles_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: oracles oracles_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.oracles
@@ -1027,7 +1027,7 @@ ALTER TABLE ONLY public.oracles
 
 
 --
--- Name: oracles oracles_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: oracles oracles_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.oracles
@@ -1035,7 +1035,7 @@ ALTER TABLE ONLY public.oracles
 
 
 --
--- Name: tokens tokens_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: tokens tokens_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.tokens
@@ -1043,7 +1043,7 @@ ALTER TABLE ONLY public.tokens
 
 
 --
--- Name: tokens tokens_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: tokens tokens_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.tokens
@@ -1051,7 +1051,7 @@ ALTER TABLE ONLY public.tokens
 
 
 --
--- Name: tokens tokens_sale_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: tokens tokens_sale_contract_id_contracts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.tokens
@@ -1059,7 +1059,7 @@ ALTER TABLE ONLY public.tokens
 
 
 --
--- Name: transactions transactions_account_id_accounts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: transactions transactions_account_id_accounts_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.transactions
@@ -1067,7 +1067,7 @@ ALTER TABLE ONLY public.transactions
 
 
 --
--- Name: transactions transactions_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: transactions transactions_network_id_networks_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.transactions
@@ -1075,7 +1075,7 @@ ALTER TABLE ONLY public.transactions
 
 
 --
--- Name: wallets wallets_wallet_id_wallets_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: goldmine
+-- Name: wallets wallets_wallet_id_wallets_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: nchain
 --
 
 ALTER TABLE ONLY public.wallets

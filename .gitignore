@@ -27,12 +27,12 @@ bin/
 .tmp/
 *.iml
 
-goldmine
-goldmine_api
-goldmine_consumer
-goldmine_migrate
-goldmine_reachabilitydaemon
-goldmine_statsdaemon
+nchain
+nchain_api
+nchain_consumer
+nchain_migrate
+nchain_reachabilitydaemon
+nchain_statsdaemon
 
 .gocore-id_rsa
 .server.crt

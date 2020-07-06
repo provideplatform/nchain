@@ -3,7 +3,7 @@
       "name": "curl",
       "repository_url": null,
       "setup_instructions": null,
-      "template": "curl -v -XPOST https://goldmine.provide.services/api/v1/contracts/{{ contractId }}/execution \\n-H 'content-type: application/json' \\-H 'authorization: bearer {{ apiToken }}' \\\n-d '{\"account_id\": \"{{ walletId }}\", \"method\": \"{{ method }}\", \"params\": {{ params }}, \"value\": {{ value }}}'"
+      "template": "curl -v -XPOST https://nchain.provide.services/api/v1/contracts/{{ contractId }}/execution \\n-H 'content-type: application/json' \\-H 'authorization: bearer {{ apiToken }}' \\\n-d '{\"account_id\": \"{{ walletId }}\", \"method\": \"{{ method }}\", \"params\": {{ params }}, \"value\": {{ value }}}'"
     },
     {
       "name": "golang",
@@ -27,7 +27,7 @@
       "name": "python",
       "repository_url": "https://github.com/provideservices/provide-python",
       "setup_instructions": "pip install prvd",
-      "template": "from prvd.goldmine import Goldmine\\n\\nclient = Goldmine('{{ apiToken }}')\\nparams = { 'account_id': '{{ identityId }}', 'method': '{{ method }}', 'value': {{ value }}, 'params': {{ params }} }\\nclient.execute_contract('{{ contractId }}', params)"
+      "template": "from prvd.nchain import NChain\\n\\nclient = NChain('{{ apiToken }}')\\nparams = { 'account_id': '{{ identityId }}', 'method': '{{ method }}', 'value': {{ value }}, 'params': {{ params }} }\\nclient.execute_contract('{{ contractId }}', params)"
     },
     {
       "name": "ruby",

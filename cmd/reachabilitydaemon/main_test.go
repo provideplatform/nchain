@@ -7,9 +7,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGoldmineReachabilitydaemon(t *testing.T) {
+func TestNChainReachabilitydaemon(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Goldmine reachabilitydaemon Suite")
+	RunSpecs(t, "NChain reachabilitydaemon Suite")
 }
 
 var _ = Describe("Main", func() {
