@@ -47,7 +47,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200630033145-a5709cb75a1f
+	github.com/provideservices/provide-go v0.0.0-20200707104606-353123840c98
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
 	google.golang.org/protobuf v1.25.0 // indirect

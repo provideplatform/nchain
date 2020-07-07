@@ -13,7 +13,6 @@ import (
 
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/connector"
-	"github.com/provideapp/nchain/consumer"
 	"github.com/provideapp/nchain/contract"
 	"github.com/provideapp/nchain/filter"
 	"github.com/provideapp/nchain/network"
@@ -52,7 +51,7 @@ func init() {
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 
-	consumer.RunAPIUsageDaemon()
+	// identcommon.RequireAPIAccounting()
 	filter.CacheTxFilters()
 }
 
