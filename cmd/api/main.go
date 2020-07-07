@@ -102,6 +102,8 @@ func runAPI() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
+	r.Use(identcommon.AccountingMiddleware())
+	r.Use(identcommon.RateLimitingMiddleware())
 	r.Use(provide.TrackAPICalls())
 
 	network.InstallNetworksAPI(r)
