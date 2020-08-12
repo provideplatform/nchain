@@ -28,13 +28,13 @@ import (
 
 const natsTxSubject = "nchain.tx"
 const natsTxMaxInFlight = 2048
-const txAckWait = time.Second * 30
-const txMsgTimeout = int64(txAckWait * 30)
+const txAckWait = time.Second * 60
+const txMsgTimeout = int64(txAckWait * 5)
 
 const natsTxCreateSubject = "nchain.tx.create"
 const natsTxCreateMaxInFlight = 2048
-const txCreateAckWait = time.Second * 30
-const txCreateMsgTimeout = int64(txCreateAckWait * 30)
+const txCreateAckWait = time.Second * 60
+const txCreateMsgTimeout = int64(txCreateAckWait * 5)
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
