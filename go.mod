@@ -3,21 +3,15 @@ module github.com/provideapp/nchain
 go 1.13
 
 require (
-	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/FactomProject/go-bip32 v0.3.5
 	github.com/FactomProject/go-bip39 v0.3.5 // indirect
 	github.com/FactomProject/go-bip44 v0.0.0-20190306062959-b541a96d8da9
-	github.com/Microsoft/go-winio v0.4.14 // indirect
-	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/aws/aws-sdk-go v1.31.8
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
-	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/docker/go-units v0.4.0 // indirect
 	github.com/ethereum/go-ethereum v1.9.12
 	github.com/gin-gonic/gin v1.6.3
 	github.com/golang-migrate/migrate v3.5.4+incompatible
@@ -44,13 +38,10 @@ require (
 	github.com/nats-io/stan.go v0.7.0
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200707104606-353123840c98
+	github.com/provideservices/provide-go v0.0.0-20200812062148-336011bcc329
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
-	google.golang.org/protobuf v1.25.0 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
