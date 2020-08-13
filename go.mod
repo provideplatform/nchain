@@ -12,7 +12,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
-	github.com/ethereum/go-ethereum v1.9.12
+	github.com/ethereum/go-ethereum v1.9.19
 	github.com/gin-gonic/gin v1.6.3
 	github.com/golang-migrate/migrate v3.5.4+incompatible
 	github.com/google/uuid v1.1.1 // indirect
@@ -39,7 +39,7 @@ require (
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200812062148-336011bcc329
+	github.com/provideservices/provide-go v0.0.0-20200813175543-ffcfaeab4fa8
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect

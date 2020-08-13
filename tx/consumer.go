@@ -339,7 +339,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 			data := fmt.Sprintf("0x%s", ethcommon.Bytes2Hex(invocationSig))
 			tx.Data = &data
 
-			if abiMethod.Const {
+			if abiMethod.IsConstant() {
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)

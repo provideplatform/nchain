@@ -82,7 +82,7 @@ func (e *Execution) ExecuteFromTx(
 
 		if _abi != nil {
 			if mthd, ok := _abi.Methods[e.Method]; ok {
-				if mthd.Const {
+				if mthd.IsConstant() {
 					return e.Contract.ExecuteFromTx(e, accountFn, walletFn, txCreateFn)
 				}
 			}
