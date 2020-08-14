@@ -224,25 +224,25 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
-		params := tx.ParseParams()
-		gas, gasOk := params["gas"].(float64)
-		if !gasOk {
-			gas = float64(100000000000000000)
-		} else {
-			gas = gas * 1.1
-		}
-
-		networkSubsidyFaucetDripValue := int64(gas) // FIXME-- configurable
 		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && networkSubsidyFaucetExists(tx.NetworkID)
 		if faucetSubsidyEligible {
 			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
 			faucetBeneficiary, _ := tx.signerFactory(db)
 			faucetBeneficiaryAddress := faucetBeneficiary.Address()
+
+			params := tx.ParseParams()
+			gas, gasOk := params["gas"].(float64)
+			if !gasOk {
+				gas = float64(210000 * 2) // FIXME-- parameterize
+			}
+			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
+
 			err = subsidize(
 				db,
 				tx.NetworkID,
 				faucetBeneficiaryAddress,
 				networkSubsidyFaucetDripValue,
+				int64(gas),
 			)
 			if err == nil {
 				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
@@ -283,7 +283,7 @@ func networkSubsidyFaucetExists(networkID uuid.UUID) bool {
 }
 
 // subsidize the given beneficiary with a drip equal to the given val
-func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val int64) error {
+func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas int64) error {
 	for networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress := range networkSubsidyFaucets(networkID) {
 		out := []string{}
 		db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress).Pluck("id", &out)
@@ -292,15 +292,18 @@ func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val int64) 
 		} else {
 			faucetApplicationID, _ := uuid.FromString(networkSubsidyFaucetApplicationID)
 			faucetAccountID, _ := uuid.FromString(out[0])
-			faucetGas := int64(210000 * 2) // FIXME-- parameterize
+			// faucetGas := int64(210000 * 2) // FIXME-- parameterize
 			faucetTx := &Transaction{
 				ApplicationID: &faucetApplicationID,
 				Data:          common.StringOrNil("0x"),
 				NetworkID:     networkID,
 				AccountID:     &faucetAccountID,
 				To:            common.StringOrNil(beneficiary),
-				Value:         &TxValue{value: big.NewInt(val - faucetGas)},
+				Value:         &TxValue{value: big.NewInt(val)},
 			}
+			faucetTx.setParams(map[string]interface{}{
+				"gas": gas,
+			})
 
 			if faucetTx.Create(db) {
 				common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
@@ -686,14 +689,15 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 		common.Log.Debugf("contract execution failed; %s", err.Error())
 
 		if execution.AccountAddress != nil {
-			var gas float64
-			if execution.Gas == nil {
-				gas = float64(100000000000000000 * 250) // FIXME-- use proper oracle
-			} else {
-				gas = *execution.Gas * 1.1
-			}
-
-			networkSubsidyFaucetDripValue := int64(gas) // FIXME-- configurable
+			// var gas float64
+			// if execution.Gas == nil {
+			// 	gas = float64(100000000000000000) // FIXME-- use proper oracle
+			// }
+			// gas, gasOk := params["gas"].(float64)
+			// if !gasOk {
+			// 	gas = float64(210000 * 2) // FIXME-- parameterize
+			// }
+			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
 			faucetSubsidyEligible := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && networkSubsidyFaucetExists(cntract.NetworkID)
 
 			if faucetSubsidyEligible {
@@ -704,6 +708,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 					cntract.NetworkID,
 					faucetBeneficiaryAddress,
 					networkSubsidyFaucetDripValue,
+					int64(210000*2),
 				)
 				if err == nil {
 					db.Where("ref = ?", execution.Ref).Find(&tx)
