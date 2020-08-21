@@ -398,30 +398,30 @@ func (c *Contract) ResolveTokenContract(
 			select {
 			case <-ticker.C:
 				if time.Now().Sub(startedAt) >= resolveTokenTickerTimeout {
-					common.Log.Warningf("Failed to resolve ERC20 token for contract: %s; timing out after %v", c.ID, resolveTokenTickerTimeout)
+					common.Log.Warningf("failed to resolve ERC20 token for contract: %s; timing out after %v", c.ID, resolveTokenTickerTimeout)
 					ticker.Stop()
 					return
 				}
 
 				artifact := c.CompiledArtifact()
 				if artifact == nil {
-					common.Log.Warningf("Unable to attempt token contract resolution for contract id %s; no compiled artifact", c.ID)
+					common.Log.Warningf("unable to attempt token contract resolution for contract id %s; no compiled artifact", c.ID)
 					return
 				}
 
 				name, decimals, symbol, err := p2pAPI.ResolveTokenContract(signerAddress, receipt, artifact)
 				if err != nil {
-					common.Log.Warningf("Failed to resolve token contract for contract id %s; %s", c.ID, err.Error())
+					common.Log.Debugf("contract id %s did not match a supported token contract standard; %s", c.ID, err.Error())
 					return
 				}
 
 				res, id, errs := tokenCreateFn(c, *name, decimals, *symbol)
 				if res {
-					common.Log.Debugf("Created token %s for associated %s contract: %s", id, *network.Name, c.ID)
+					common.Log.Debugf("created token %s for associated %s contract: %s", id, *network.Name, c.ID)
 					ticker.Stop()
 					return
 				} else if len(errs) > 0 {
-					common.Log.Warningf("Failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(errs), *errs[0].Message)
+					common.Log.Warningf("failed to create token for associated %s contract creation %s; %d errs: %s", *network.Name, c.ID, len(errs), *errs[0].Message)
 				}
 			}
 		}
