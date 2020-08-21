@@ -32,7 +32,6 @@ require (
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
 	github.com/libp2p/go-libp2p-core v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
-	github.com/mattn/go-sqlite3 v2.0.1+incompatible // indirect
 	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20191015012459-abf3d7f7f00c
 	github.com/multiformats/go-varint v0.0.2 // indirect
 	github.com/nats-io/stan.go v0.7.0
@@ -42,6 +41,7 @@ require (
 	github.com/provideservices/provide-go v0.0.0-20200813175543-ffcfaeab4fa8
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
+	google.golang.org/protobuf v1.25.0 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
