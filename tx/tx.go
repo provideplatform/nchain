@@ -525,6 +525,14 @@ func (t *Transaction) ParseParams() map[string]interface{} {
 	return params
 }
 
+// shouldSubsidize returns true if the transaction should be subsidized using the integration gas service
+func (t *Transaction) shouldSubsidize() bool {
+	if subsidize, subsidizeOk := t.ParseParams()["subsidize"].(bool); subsidizeOk {
+		return subsidize
+	}
+	return false
+}
+
 func (t *Transaction) updateStatus(db *gorm.DB, status string, description *string) {
 	t.Status = common.StringOrNil(status)
 	t.Description = description
