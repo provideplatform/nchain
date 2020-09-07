@@ -1,16 +1,17 @@
-FROM golang:1.13 AS builder
+FROM golang:1.15 AS builder
 
 RUN mkdir -p /go/src/github.com/provideapp
 ADD . /go/src/github.com/provideapp/nchain
 
 RUN mkdir ~/.ssh && cp /go/src/github.com/provideapp/nchain/ops/keys/ident-id_rsa ~/.ssh/id_rsa && chmod 0600 ~/.ssh/id_rsa && ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
-RUN git clone git@github.com:provideapp/ident.git /go/src/github.com/provideapp/ident && cd /go/src/github.com/provideapp/ident && git checkout master
+# FIXME -- use master instead of minified branch
+RUN git clone git@github.com:provideapp/ident.git /go/src/github.com/provideapp/ident && cd /go/src/github.com/provideapp/ident && git checkout minified
 RUN rm -rf ~/.ssh && rm -rf /go/src/github.com/provideapp/nchain/ops/keys
 
 WORKDIR /go/src/github.com/provideapp/nchain
 RUN make build
 
-FROM golang:1.13
+FROM golang:1.15
 
 RUN mkdir -p /nchain
 WORKDIR /nchain
