@@ -10,7 +10,8 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go"
+	api "github.com/provideservices/provide-go/api/nchain"
+	provide "github.com/provideservices/provide-go/common"
 )
 
 // InstallNetworksAPI installs the handlers using the given gin Engine
@@ -507,7 +508,7 @@ func networkStatusHandler(c *gin.Context) {
 			provide.RenderError("network not found", 404, c)
 			return
 		}
-		provide.Render(&provide.NetworkStatus{
+		provide.Render(&api.NetworkStatus{
 			ChainID: network.ChainID,
 			State:   common.StringOrNil(networkStateGenesis),
 			Syncing: true,

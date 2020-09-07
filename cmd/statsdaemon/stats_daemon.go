@@ -26,7 +26,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
-	"github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 const blockchainInfoWebsocketURL = "wss://ws.blockchain.info/inv"
@@ -705,7 +706,7 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *network.Network) *StatsDa
 
 	chainID := network.ChainID
 	if chainID == nil {
-		_chainID := hexutil.EncodeBig(provide.EVMGetChainID(network.ID.String(), network.RPCURL()))
+		_chainID := hexutil.EncodeBig(providecrypto.EVMGetChainID(network.ID.String(), network.RPCURL()))
 		chainID = &_chainID
 	}
 	sd.stats = &provide.NetworkStatus{

@@ -24,7 +24,9 @@ import (
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/token"
 	"github.com/provideapp/nchain/wallet"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
+	provideapi "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 const defaultDerivedCoinType = uint32(60)
@@ -146,7 +148,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 		if txs.Account != nil {
 			if txs.Account.PrivateKey != nil {
 				privateKey, _ := common.DecryptECDSAPrivateKey(*txs.Account.PrivateKey)
-				signedTx, hash, err = provide.EVMSignTx(
+				signedTx, hash, err = providecrypto.EVMSignTx(
 					txs.Network.ID.String(),
 					txs.Network.RPCURL(),
 					txs.Account.Address,
@@ -196,7 +198,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
-			signedTx, hash, err = provide.EVMSignTx(
+			signedTx, hash, err = providecrypto.EVMSignTx(
 				txs.Network.ID.String(),
 				txs.Network.RPCURL(),
 				derivedAccount.Address,
@@ -580,7 +582,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 
 	if network.IsEthereumNetwork() {
 		if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-			err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+			err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 		} else {
 			err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 		}
@@ -590,7 +592,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 				err = t.sign(db, signer)
 				if err == nil {
 					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-						err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+						err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 					} else {
 						err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 					}
@@ -679,7 +681,7 @@ func (t *Transaction) handleTxReceipt(
 	db *gorm.DB,
 	network *network.Network,
 	signerAddress string,
-	receipt *provide.TxReceipt,
+	receipt *provideapi.TxReceipt,
 ) error {
 	if t.To == nil {
 		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, receipt.ContractAddress.Hex())
@@ -741,8 +743,8 @@ func (t *Transaction) handleTxTraces(
 	db *gorm.DB,
 	network *network.Network,
 	signerAddress string,
-	traces *provide.TxTrace,
-	receipt *provide.TxReceipt,
+	traces *provideapi.TxTrace,
+	receipt *provideapi.TxReceipt,
 ) error {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {

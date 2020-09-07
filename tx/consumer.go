@@ -21,7 +21,9 @@ import (
 	"github.com/provideapp/nchain/contract"
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/wallet"
-	provide "github.com/provideservices/provide-go"
+	api "github.com/provideservices/provide-go/api"
+	provide "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 // TODO: should this be calculated dynamically against average blocktime for the network and subscriptions reestablished?
@@ -334,7 +336,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 	if network.IsEthereumNetwork() {
 		if abiMethod != nil {
 			common.Log.Debugf("Attempting to encode %d parameters %s prior to executing method %s on contract: %s", len(params), params, methodDescriptor, c.ID)
-			invocationSig, err := provide.EVMEncodeABI(abiMethod, params...)
+			invocationSig, err := providecrypto.EVMEncodeABI(abiMethod, params...)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to encode %d parameters prior to attempting execution of %s on contract: %s; %s", len(params), methodDescriptor, c.ID, err.Error())
 			}
@@ -344,7 +346,7 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 
 			if abiMethod.IsConstant() {
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
-				client, err := provide.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
+				client, err := providecrypto.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)
 				result, err = client.CallContract(context.TODO(), msg, nil)
 				if err != nil {
@@ -385,10 +387,10 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 
 					if publicKeyOk && privateKeyOk {
 						common.Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
-						tx.SignedTx, tx.Hash, err = provide.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas), gasPrice)
+						tx.SignedTx, tx.Hash, err = providecrypto.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas), gasPrice)
 						if err == nil {
 							if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
-								err = provide.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+								err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 								return nil, err
 							} else {
 								err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
@@ -823,7 +825,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	errors := result.GetErrors()
 	if len(errors) > 0 {
 		for _, err := range errors {
-			tx.Errors = append(tx.Errors, &provide.Error{
+			tx.Errors = append(tx.Errors, &api.Error{
 				Message: common.StringOrNil(err.Error()),
 			})
 		}

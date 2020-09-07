@@ -10,7 +10,7 @@ import (
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
 // NethermindP2PProvider is a network.p2p.API implementing the nethermind API

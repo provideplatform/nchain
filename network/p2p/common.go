@@ -15,7 +15,8 @@ import (
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 // PlatformBcoin bcoin platform
@@ -77,7 +78,7 @@ type API interface {
 }
 
 func evmFetchTxReceipt(rpcClientKey, rpcURL, signerAddress, hash string) (*types.Receipt, error) {
-	receipt, err := provide.EVMGetTxReceipt(rpcClientKey, rpcURL, hash, signerAddress)
+	receipt, err := providecrypto.EVMGetTxReceipt(rpcClientKey, rpcURL, hash, signerAddress)
 	if err != nil {
 		common.Log.Warningf("failed to fetch tx receipt; %s", err.Error())
 		return nil, err
@@ -86,7 +87,7 @@ func evmFetchTxReceipt(rpcClientKey, rpcURL, signerAddress, hash string) (*types
 }
 
 func evmFetchTxTraces(rpcClientKey, rpcURL, hash string) (*provide.EthereumTxTraceResponse, error) {
-	traces, err := provide.EVMTraceTx(rpcClientKey, rpcURL, &hash)
+	traces, err := providecrypto.EVMTraceTx(rpcClientKey, rpcURL, &hash)
 	if err != nil {
 		common.Log.Warningf("failed to fetch tx traces; %s", err.Error())
 		return nil, err
@@ -105,7 +106,7 @@ func evmResolveTokenContract(
 	}
 
 	contractAddr := ethcommon.HexToAddress(contractAddress)
-	client, err := provide.EVMDialJsonRpc(rpcClientKey, rpcURL)
+	client, err := providecrypto.EVMDialJsonRpc(rpcClientKey, rpcURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize eth client; %s", err.Error())
 	}
@@ -122,7 +123,7 @@ func evmResolveTokenContract(
 			Gas:      0,
 			GasPrice: big.NewInt(0),
 			Value:    nil,
-			Data:     ethcommon.FromHex(provide.EVMHashFunctionSelector("name()")),
+			Data:     ethcommon.FromHex(providecrypto.EVMHashFunctionSelector("name()")),
 		}
 
 		result, _ := client.CallContract(context.TODO(), msg, nil)
@@ -140,7 +141,7 @@ func evmResolveTokenContract(
 			Gas:      0,
 			GasPrice: big.NewInt(0),
 			Value:    nil,
-			Data:     ethcommon.FromHex(provide.EVMHashFunctionSelector("decimals()")),
+			Data:     ethcommon.FromHex(providecrypto.EVMHashFunctionSelector("decimals()")),
 		}
 		result, _ = client.CallContract(context.TODO(), msg, nil)
 		var decimals *big.Int
@@ -157,7 +158,7 @@ func evmResolveTokenContract(
 			Gas:      0,
 			GasPrice: big.NewInt(0),
 			Value:    nil,
-			Data:     ethcommon.FromHex(provide.EVMHashFunctionSelector("symbol()")),
+			Data:     ethcommon.FromHex(providecrypto.EVMHashFunctionSelector("symbol()")),
 		}
 		result, _ = client.CallContract(context.TODO(), msg, nil)
 		var symbol string

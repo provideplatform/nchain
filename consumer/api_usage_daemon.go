@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/kthomas/go-natsutil"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/common"
 )
 
 const apiUsageDaemonBufferSize = 256

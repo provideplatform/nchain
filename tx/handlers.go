@@ -14,7 +14,7 @@ import (
 	"github.com/provideapp/nchain/filter"
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/wallet"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/common"
 )
 
 // InstallTransactionsAPI installs the handlers using the given gin Engine

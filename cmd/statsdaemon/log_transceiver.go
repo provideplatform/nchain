@@ -20,7 +20,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
-	"github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"

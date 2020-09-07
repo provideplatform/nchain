@@ -3,7 +3,7 @@ package provider
 import (
 	"time"
 
-	"github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
 )
 
 const BaselineConnectorProvider = "baseline"

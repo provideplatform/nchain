@@ -16,7 +16,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
+	api "github.com/provideservices/provide-go/api/nchain"
 )
 
 const resolveTokenTickerInterval = time.Millisecond * 5000
@@ -49,9 +50,9 @@ func (c *Contract) enrich() {
 	c.PubsubPrefix = c.pubsubSubjectPrefix()
 }
 
-// CompiledArtifact - parse the original JSON params used for contract creation and attempt to unmarshal to a provide.CompiledArtifact
-func (c *Contract) CompiledArtifact() *provide.CompiledArtifact {
-	artifact := &provide.CompiledArtifact{}
+// CompiledArtifact - parse the original JSON params used for contract creation and attempt to unmarshal to a api.CompiledArtifact
+func (c *Contract) CompiledArtifact() *api.CompiledArtifact {
+	artifact := &api.CompiledArtifact{}
 	params := c.ParseParams()
 	if params != nil {
 		if compiledArtifact, compiledArtifactOk := params["compiled_artifact"].(map[string]interface{}); compiledArtifactOk {
@@ -190,13 +191,13 @@ func (c *Contract) ReadEthereumContractAbi() (*abi.ABI, error) {
 
 // ResolveCompiledDependencyArtifact returns the compiled artifact if matched to the given descriptor;
 // in the case of EVM-based solidity contracts, the descriptor can be a contract name or its raw bytecode
-func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *provide.CompiledArtifact {
+func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.CompiledArtifact {
 	artifact := c.CompiledArtifact()
 	if artifact == nil {
 		return nil
 	}
 
-	var dependencyArtifact *provide.CompiledArtifact
+	var dependencyArtifact *api.CompiledArtifact
 
 	for _, dep := range artifact.Deps {
 		dependency := dep.(map[string]interface{})

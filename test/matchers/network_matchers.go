@@ -10,7 +10,7 @@ import (
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/matchers"
 	"github.com/onsi/gomega/types"
-	"github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
 	// provideapp "github.com/provideapp/nchain"
 )
 

@@ -18,7 +18,9 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network/p2p"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
+	provideapi "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 const defaultWebappPort = 3000
@@ -77,7 +79,7 @@ type Network struct {
 	Config          *json.RawMessage `sql:"type:json not null" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"-" json:"-"`
 
-	// Stats         *provide.NetworkStatus `sql:"-" json:"stats,omitempty"`
+	// Stats         *provideapi.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
 
 // ListQuery returns a DB query configured to select columns suitable for a paginated API response
@@ -106,14 +108,14 @@ func StatusKey(networkID uuid.UUID) string {
 }
 
 // Stats returns the network stats for the given network id without a network instance
-func Stats(networkID uuid.UUID) (*provide.NetworkStatus, error) {
+func Stats(networkID uuid.UUID) (*provideapi.NetworkStatus, error) {
 	statsKey := StatsKey(networkID)
 	rawstats, err := redisutil.Get(statsKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve cached network stats from key: %s; %s", statsKey, err.Error())
 	}
 
-	stats := &provide.NetworkStatus{}
+	stats := &provideapi.NetworkStatus{}
 	json.Unmarshal([]byte(*rawstats), stats)
 	return stats, nil
 }
@@ -341,7 +343,7 @@ func (n *Network) setIsLoadBalanced(db *gorm.DB, val bool) {
 }
 
 // Stats returns the network stats
-func (n *Network) Stats() (*provide.NetworkStatus, error) {
+func (n *Network) Stats() (*provideapi.NetworkStatus, error) {
 	return Stats(n.ID)
 }
 
@@ -911,7 +913,7 @@ func (n *Network) InvokeJSONRPC(method string, params []interface{}) (map[string
 		rpcAPIUser := cfg[networkConfigRPCAPIUser].(string)
 		rpcAPIKey := cfg[networkConfigRPCAPIKey].(string)
 		var resp map[string]interface{}
-		err := provide.BcoinInvokeJsonRpcClient(n.ID.String(), n.RPCURL(), rpcAPIUser, rpcAPIKey, method, params, &resp)
+		err := providecrypto.BcoinInvokeJsonRpcClient(n.ID.String(), n.RPCURL(), rpcAPIUser, rpcAPIKey, method, params, &resp)
 		if err != nil {
 			common.Log.Warningf("Failed to invoke JSON-RPC method %s with params: %s; %s", method, params, err.Error())
 			return nil, err

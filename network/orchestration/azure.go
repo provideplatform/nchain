@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 
 	azurewrapper "github.com/kthomas/go-azure-wrapper"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
 
 	"github.com/provideapp/nchain/common"
 )

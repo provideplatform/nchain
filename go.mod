@@ -22,7 +22,7 @@ require (
 	github.com/jinzhu/gorm v1.9.14
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
 	github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122
-	github.com/kthomas/go-azure-wrapper v0.0.0-20200602073514-5ee6e5f6bd49
+	github.com/kthomas/go-azure-wrapper v0.0.0-20200907095139-0122b394ac33
 	github.com/kthomas/go-db-config v0.0.0-20200612131637-ec0436a9685e
 	github.com/kthomas/go-logger v0.0.0-20200602072946-d7d72dfc2531
 	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05
@@ -38,10 +38,9 @@ require (
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
-	github.com/provideservices/provide-go v0.0.0-20200813175543-ffcfaeab4fa8
+	github.com/provideservices/provide-go v0.0.0-20200906045411-986de3bb2f71
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
-	google.golang.org/protobuf v1.25.0 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 

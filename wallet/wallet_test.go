@@ -11,7 +11,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/wallet"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/crypto"
 )
 
 var defaultPurpose = 44

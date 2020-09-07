@@ -15,7 +15,8 @@ import (
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/token"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 // Account represents a single address associated with a specific network and application or user
@@ -59,7 +60,7 @@ func (a *Account) generate(db *gorm.DB) error {
 	var encodedPrivateKey *string
 
 	if network.IsEthereumNetwork() {
-		addr, privateKey, err := provide.EVMGenerateKeyPair()
+		addr, privateKey, err := providecrypto.EVMGenerateKeyPair()
 		if err != nil {
 			err := fmt.Errorf("Unable to generate private key for bitcoin account for network: %s; %s", a.NetworkID.String(), err.Error())
 			common.Log.Warning(err.Error())
@@ -86,7 +87,7 @@ func (a *Account) generate(db *gorm.DB) error {
 			}
 		}
 
-		addr, privateKey, err := provide.BcoinGenerateKeyPair(version)
+		addr, privateKey, err := providecrypto.BcoinGenerateKeyPair(version)
 		if err != nil {
 			err := fmt.Errorf("Unable to generate private key for bitcoin account for network: %s; %s", a.NetworkID.String(), err.Error())
 			common.Log.Warning(err.Error())
@@ -203,7 +204,7 @@ func (a *Account) NativeCurrencyBalance() (*big.Int, error) {
 	var network = &network.Network{}
 	db.Model(a).Related(&network)
 	if network.IsEthereumNetwork() {
-		balance, err = provide.EVMGetNativeBalance(network.ID.String(), network.RPCURL(), a.Address)
+		balance, err = providecrypto.EVMGetNativeBalance(network.ID.String(), network.RPCURL(), a.Address)
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +227,7 @@ func (a *Account) TokenBalance(tokenID string) (*big.Int, error) {
 	}
 	if network.IsEthereumNetwork() {
 		contractAbi, err := token.ReadEthereumContractAbi()
-		balance, err = provide.EVMGetTokenBalance(network.ID.String(), network.RPCURL(), *token.Address, a.Address, contractAbi)
+		balance, err = providecrypto.EVMGetTokenBalance(network.ID.String(), network.RPCURL(), *token.Address, a.Address, contractAbi)
 		if err != nil {
 			return nil, err
 		}

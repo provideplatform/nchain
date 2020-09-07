@@ -11,7 +11,8 @@ import (
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 // GethP2PProvider is a network.p2p.API implementing the parity API
@@ -123,7 +124,7 @@ func (p *GethP2PProvider) FetchTxReceipt(signerAddress, hash string) (*provide.T
 // FetchTxTraces fetch transaction traces given its hash
 func (p *GethP2PProvider) FetchTxTraces(hash string) (*provide.TxTrace, error) {
 	traces := map[string]interface{}{}
-	err := provide.EVMInvokeJsonRpcClient(p.networkID, *p.rpcURL, "debug_traceTransaction", []interface{}{hash}, &traces)
+	err := providecrypto.EVMInvokeJsonRpcClient(p.networkID, *p.rpcURL, "debug_traceTransaction", []interface{}{hash}, &traces)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +150,7 @@ func (p *GethP2PProvider) DropNonReservedPeers() error {
 // AddPeer adds a peer by its peer url
 func (p *GethP2PProvider) AddPeer(peerURL string) error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "admin_addPeer", []interface{}{peerURL}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "admin_addPeer", []interface{}{peerURL}, &resp)
 }
 
 // FormatBootnodes formats the given peer urls as a valid bootnodes param

@@ -13,7 +13,7 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
 	bip39 "github.com/tyler-smith/go-bip39"
 
 	"github.com/jinzhu/gorm"

@@ -11,7 +11,8 @@ import (
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 // QuorumP2PProvider is a network.p2p.API implementing the geth API
@@ -155,7 +156,7 @@ func (p *QuorumP2PProvider) FetchTxTraces(hash string) (*provide.TxTrace, error)
 // AddPeer adds a peer by its peer url
 func (p *QuorumP2PProvider) AddPeer(peerURL string) error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "admin_addPeer", []interface{}{peerURL}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "admin_addPeer", []interface{}{peerURL}, &resp)
 }
 
 // FormatBootnodes formats the given peer urls as a valid bootnodes param

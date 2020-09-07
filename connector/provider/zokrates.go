@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
@@ -50,7 +50,7 @@ func InitZokratesProvider(connectorID uuid.UUID, networkID, applicationID, organ
 	}
 }
 
-func (p *ZokratesProvider) apiClientFactory(basePath *string) *provide.APIClient {
+func (p *ZokratesProvider) apiClientFactory(basePath *string) *provide.Client {
 	uri := ""
 	if basePath != nil {
 		uri = *basePath
@@ -62,7 +62,7 @@ func (p *ZokratesProvider) apiClientFactory(basePath *string) *provide.APIClient
 	}
 
 	parts := strings.Split(*apiURL, "://")
-	return &provide.APIClient{
+	return &provide.Client{
 		Host:   parts[len(parts)-1],
 		Scheme: parts[0],
 	}

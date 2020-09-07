@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/provideapp/nchain/test/fixtures"
-	"github.com/provideservices/provide-go"
+	"github.com/provideservices/provide-go/api"
 )
 
 func ptrTo(s string) *string {

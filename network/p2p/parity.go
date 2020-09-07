@@ -16,7 +16,8 @@ import (
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api/nchain"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 // ParityP2PProvider is a network.p2p.API implementing the parity API
@@ -106,19 +107,19 @@ func (p *ParityP2PProvider) EnrichStartCommand(bootnodes []string) []string {
 // AcceptNonReservedPeers allows non-reserved peers to connect
 func (p *ParityP2PProvider) AcceptNonReservedPeers() error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_acceptNonReservedPeers", []interface{}{}, &resp)
 }
 
 // DropNonReservedPeers only allows reserved peers to connect; reversed by calling `AcceptNonReservedPeers`
 func (p *ParityP2PProvider) DropNonReservedPeers() error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_dropNonReservedPeers", []interface{}{}, &resp)
 }
 
 // AddPeer adds a peer by its peer url
 func (p *ParityP2PProvider) AddPeer(peerURL string) error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_addReservedPeer", []interface{}{peerURL}, &resp)
 }
 
 // FetchTxReceipt fetch a transaction receipt given its hash
@@ -176,13 +177,13 @@ func (p *ParityP2PProvider) ParsePeerURL(string) (*string, error) {
 // RemovePeer removes a peer by its peer url
 func (p *ParityP2PProvider) RemovePeer(peerURL string) error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_removeReservedPeer", []interface{}{peerURL}, &resp)
 }
 
 // ResolvePeerURL attempts to resolve one or more viable peer urls
 func (p *ParityP2PProvider) ResolvePeerURL() (*string, error) {
 	var resp interface{}
-	err := provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_enode", []interface{}{}, &resp)
+	err := providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_enode", []interface{}{}, &resp)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +228,7 @@ func (p *ParityP2PProvider) RequireBootnodes(db *gorm.DB, userID *uuid.UUID, net
 			db.Table("accounts").Select("private_key").Where("accounts.user_id = ? AND accounts.address = ?", userID.String(), addr).Pluck("private_key", &out)
 			if out == nil || len(out) == 0 || len(out[0]) == 0 {
 				common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", networkID)
-				addr, privateKey, err = provide.EVMGenerateKeyPair()
+				addr, privateKey, err = providecrypto.EVMGenerateKeyPair()
 			} else {
 				encryptedKey := common.StringOrNil(out[0])
 				privateKey, err = common.DecryptECDSAPrivateKey(*encryptedKey)
@@ -241,11 +242,11 @@ func (p *ParityP2PProvider) RequireBootnodes(db *gorm.DB, userID *uuid.UUID, net
 			}
 		} else if !masterOfCeremonyPrivateKeyOk {
 			common.Log.Debugf("Generating managed master of ceremony signing identity for network: %s", networkID)
-			addr, privateKey, err = provide.EVMGenerateKeyPair()
+			addr, privateKey, err = providecrypto.EVMGenerateKeyPair()
 		}
 
 		if addr != nil && privateKey != nil {
-			keystoreJSON, err := provide.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
+			keystoreJSON, err := providecrypto.EVMMarshalEncryptedKey(ethcommon.HexToAddress(*addr), privateKey, hex.EncodeToString(ethcrypto.FromECDSA(privateKey)))
 			if err == nil {
 				common.Log.Debugf("Master of ceremony has initiated the initial key ceremony: %s; network: %s", *addr, networkID)
 				env["ENGINE_SIGNER"] = addr
@@ -295,5 +296,5 @@ func (p *ParityP2PProvider) RequireBootnodes(db *gorm.DB, userID *uuid.UUID, net
 // Upgrade executes a pending upgrade
 func (p *ParityP2PProvider) Upgrade() error {
 	var resp interface{}
-	return provide.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_executeUpgrade", []interface{}{}, &resp)
+	return providecrypto.EVMInvokeJsonRpcClient(*p.rpcClientKey, *p.rpcURL, "parity_executeUpgrade", []interface{}{}, &resp)
 }

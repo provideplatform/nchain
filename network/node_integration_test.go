@@ -16,7 +16,7 @@ import (
 	awswrapper "github.com/kthomas/go-aws-wrapper"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/onsi/gomega/gstruct"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/crypto"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"

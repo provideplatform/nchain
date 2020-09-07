@@ -18,7 +18,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network/orchestration"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
+	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
 const loadBalancerReachabilityTimeout = time.Millisecond * 2500
@@ -313,7 +314,7 @@ func (l *LoadBalancer) orchestrationAPIClient() (orchestration.API, error) {
 }
 
 func (l *LoadBalancer) buildTargetGroupName(port int64) string {
-	return ethcommon.Bytes2Hex(provide.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), port)))[0:31]
+	return ethcommon.Bytes2Hex(providecrypto.Keccak256(fmt.Sprintf("%s-port-%v", l.ID.String(), port)))[0:31]
 }
 
 // Deprovision underlying infrastructure for the load balancer instance

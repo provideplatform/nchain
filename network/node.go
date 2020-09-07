@@ -19,7 +19,7 @@ import (
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network/orchestration"
 	"github.com/provideapp/nchain/network/p2p"
-	provide "github.com/provideservices/provide-go"
+	provide "github.com/provideservices/provide-go/api"
 )
 
 const defaultDockerhubBaseURL = "https://hub.docker.com/v2/repositories"
