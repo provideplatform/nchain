@@ -37,7 +37,7 @@ require (
 	github.com/nats-io/stan.go v0.7.0
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
-	github.com/provideapp/ident v0.0.0-20200211072350-222fb774d799
+	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
 	github.com/provideservices/provide-go v0.0.0-20200906045411-986de3bb2f71
 	github.com/tyler-smith/go-bip39 v1.0.2
 	go.mongodb.org/mongo-driver v1.3.3
