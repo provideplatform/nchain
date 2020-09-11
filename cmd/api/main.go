@@ -22,9 +22,9 @@ import (
 	"github.com/provideapp/nchain/tx"
 	"github.com/provideapp/nchain/wallet"
 
-	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 
 	identcommon "github.com/provideapp/ident/common"
 )
@@ -43,12 +43,12 @@ var (
 
 func init() {
 	if common.ConsumeNATSStreamingSubscriptions {
-		common.Log.Panicf("Dedicated API instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
+		common.Log.Panicf("dedicated API instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
 		return
 	}
 
-	identcommon.RequireJWT()
-	pgputil.RequirePGP()
+	util.RequireJWT()
+	util.RequireGin()
 	redisutil.RequireRedis()
 
 	// identcommon.RequireAPIAccounting()
@@ -104,7 +104,7 @@ func runAPI() {
 	r.Use(provide.CORSMiddleware())
 	r.Use(identcommon.AccountingMiddleware())
 	r.Use(identcommon.RateLimitingMiddleware())
-	r.Use(provide.TrackAPICalls())
+	r.Use(util.TrackAPICalls())
 
 	network.InstallNetworksAPI(r)
 	prices.InstallPricesAPI(r)
@@ -119,17 +119,17 @@ func runAPI() {
 	r.GET("/status", statusHandler)
 
 	srv = &http.Server{
-		Addr:    common.ListenAddr,
+		Addr:    util.ListenAddr,
 		Handler: r,
 	}
 
-	if common.ShouldServeTLS() {
-		go srv.ListenAndServeTLS(common.CertificatePath, common.PrivateKeyPath)
+	if util.ServeTLS {
+		go srv.ListenAndServeTLS(util.CertificatePath, util.PrivateKeyPath)
 	} else {
 		go srv.ListenAndServe()
 	}
 
-	common.Log.Debugf("Listening on %s", common.ListenAddr)
+	common.Log.Debugf("listening on %s", util.ListenAddr)
 }
 
 func statusHandler(c *gin.Context) {

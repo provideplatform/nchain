@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 )
 
 // InstallTokensAPI installs the handlers using the given gin Engine
@@ -19,7 +20,7 @@ func InstallTokensAPI(r *gin.Engine) {
 }
 
 func tokensListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -44,7 +45,7 @@ func tokenDetailsHandler(c *gin.Context) {
 }
 
 func createTokenHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -74,7 +75,7 @@ func createTokenHandler(c *gin.Context) {
 }
 
 func networkTokensListHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return

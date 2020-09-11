@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 )
 
 // InstallOraclesAPI installs the handlers using the given gin Engine
@@ -16,7 +17,7 @@ func InstallOraclesAPI(r *gin.Engine) {
 }
 
 func oraclesListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -35,7 +36,7 @@ func oracleDetailsHandler(c *gin.Context) {
 }
 
 func createOracleHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return

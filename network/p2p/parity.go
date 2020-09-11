@@ -225,6 +225,7 @@ func (p *ParityP2PProvider) RequireBootnodes(db *gorm.DB, userID *uuid.UUID, net
 		if masterOfCeremony, masterOfCeremonyOk := env["ENGINE_SIGNER"].(string); masterOfCeremonyOk && !masterOfCeremonyPrivateKeyOk {
 			addr = common.StringOrNil(masterOfCeremony)
 			out := []string{}
+			// FIXME!!!!!!
 			db.Table("accounts").Select("private_key").Where("accounts.user_id = ? AND accounts.address = ?", userID.String(), addr).Pluck("private_key", &out)
 			if out == nil || len(out) == 0 || len(out[0]) == 0 {
 				common.Log.Warningf("Failed to retrieve manage engine signing identity for network: %s; generating unmanaged identity...", networkID)

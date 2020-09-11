@@ -10,6 +10,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 
 	"github.com/provideapp/ident/token"
 )
@@ -26,8 +27,8 @@ func InstallContractsAPI(r *gin.Engine) {
 }
 
 func contractsListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -75,8 +76,8 @@ func contractsListHandler(c *gin.Context) {
 }
 
 func contractDetailsHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -113,7 +114,7 @@ func contractDetailsHandler(c *gin.Context) {
 }
 
 func createContractHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -163,8 +164,8 @@ func createContractHandler(c *gin.Context) {
 }
 
 func createContractSubscriptionTokenHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -247,7 +248,7 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 }
 
 func networkContractsListHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -279,7 +280,7 @@ func networkContractsListHandler(c *gin.Context) {
 
 // FIXME-- DRY this up
 func networkContractDetailsHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return

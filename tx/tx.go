@@ -7,14 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
@@ -26,6 +24,8 @@ import (
 	"github.com/provideapp/nchain/wallet"
 	provide "github.com/provideservices/provide-go/api"
 	provideapi "github.com/provideservices/provide-go/api/nchain"
+	vault "github.com/provideservices/provide-go/api/vault"
+	util "github.com/provideservices/provide-go/common/util"
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
@@ -36,7 +36,7 @@ const firstHardenedChildIndex = uint32(0x80000000)
 // Signer interface for signing transactions
 type Signer interface {
 	Address() string
-	Sign(tx *Transaction) (signedTx interface{}, hash *string, err error)
+	Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error)
 	String() string
 }
 
@@ -112,7 +112,7 @@ func (txs *TransactionSigner) Address() string {
 }
 
 // Sign implements the Signer interface
-func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash *string, err error) {
+func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error) {
 	if tx == nil {
 		err := errors.New("cannot sign nil transaction payload")
 		common.Log.Warning(err.Error())
@@ -145,37 +145,67 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			nonce = &nonceUint
 		}
 
-		if txs.Account != nil {
-			if txs.Account.PrivateKey != nil {
-				privateKey, _ := common.DecryptECDSAPrivateKey(*txs.Account.PrivateKey)
-				signedTx, hash, err = providecrypto.EVMSignTx(
-					txs.Network.ID.String(),
-					txs.Network.RPCURL(),
-					txs.Account.Address,
-					hex.EncodeToString(ethcrypto.FromECDSA(privateKey)),
-					tx.To,
-					tx.Data,
-					tx.Value.BigInt(),
-					nonce,
-					uint64(gas),
-					gasPrice,
-				)
+		var signer types.Signer
+		var _tx *types.Transaction
 
-				if err == nil {
-					accessedAt := time.Now()
-					go func() {
-						txs.Account.AccessedAt = &accessedAt
-						txs.DB.Save(&txs.Account)
-					}()
-				} else {
-					err = fmt.Errorf("failed to sign %d-byte transaction payload using signing account %s; %s", len(*tx.Data), txs.Account.Address, err.Error())
-				}
-			} else {
-				err = fmt.Errorf("unable to sign tx; no private key for account: %s", txs.Account.ID)
+		if txs.Account != nil && txs.Account.VaultID != nil && txs.Account.KeyID != nil {
+			signer, _tx, hash, err = providecrypto.EVMTxFactory(
+				txs.Network.ID.String(),
+				txs.Network.RPCURL(),
+				txs.Account.Address,
+				tx.To,
+				tx.Data,
+				tx.Value.BigInt(),
+				nonce,
+				uint64(gas),
+				gasPrice,
+			)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			sig, err := vault.SignMessage(
+				util.DefaultVaultAccessJWT,
+				txs.Account.VaultID.String(),
+				txs.Account.KeyID.String(),
+				fmt.Sprintf("%x", hash),
+				map[string]interface{}{},
+			)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			_sig, err := hex.DecodeString(*sig.Signature)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			signedTx, err = _tx.WithSignature(signer, _sig)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			if err == nil {
+				signedTxJSON, _ := signedTx.(*types.Transaction).MarshalJSON()
+				common.Log.Debugf("signed eth tx: %s", signedTxJSON)
+
+				accessedAt := time.Now()
+				go func() {
+					txs.Account.AccessedAt = &accessedAt
+					txs.DB.Save(&txs.Account)
+				}()
 			}
 		}
 
-		if txs.Wallet != nil {
+		if txs.Wallet != nil && txs.Wallet.VaultID != nil && txs.Wallet.KeyID != nil {
 			if txs.Wallet.Path == nil {
 				err := fmt.Errorf("failed to sign %d-byte transaction payload using HD wallet without a specified derivation path", len(*tx.Data))
 				common.Log.Warning(err.Error())
@@ -198,11 +228,10 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
-			signedTx, hash, err = providecrypto.EVMSignTx(
+			signer, _tx, hash, err = providecrypto.EVMTxFactory(
 				txs.Network.ID.String(),
 				txs.Network.RPCURL(),
 				derivedAccount.Address,
-				*derivedAccount.PrivateKey,
 				tx.To,
 				tx.Data,
 				tx.Value.BigInt(),
@@ -210,6 +239,38 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				uint64(gas),
 				gasPrice,
 			)
+			if err != nil {
+				err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			sig, err := vault.SignMessage(
+				util.DefaultVaultAccessJWT,
+				txs.Wallet.VaultID.String(),
+				txs.Wallet.KeyID.String(),
+				fmt.Sprintf("%x", hash),
+				map[string]interface{}{},
+			)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction using hardened account for HD wallet: %s; %s", txs.Wallet.ID, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			_sig, err := hex.DecodeString(*sig.Signature)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction using hardened account for HD wallet: %s; %s", txs.Wallet.ID, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			signedTx, err = _tx.WithSignature(signer, _sig)
+			if err != nil {
+				err = fmt.Errorf("failed to sign transaction payload using hardened account for HD wallet: %s; %s", txs.Wallet.ID, err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
 		}
 	} else {
 		return nil, nil, fmt.Errorf("unable to generate signed tx for unsupported network: %s", *txs.Network.Name)
@@ -346,11 +407,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 	}
 
 	signingErr := t.sign(db, signer)
-	if signingErr != nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(signingErr.Error()),
-		})
-	}
 
 	if db.NewRecord(t) {
 		// last check to make sure we don't violate fk constraints with a nil uuid;
@@ -377,7 +433,16 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
+				providePayment := true // HACK
 				if signingErr != nil {
+					common.Log.Debugf("attepting broadcast...")
+					signingErr = t.broadcast(db, nil, nil)
+					providePayment = false
+				}
+
+				if signingErr != nil {
+					common.Log.Warningf("attepted broadcast failed anyway! %s", signingErr.Error())
+
 					t.Errors = append(t.Errors, &provide.Error{
 						Message: common.StringOrNil(signingErr.Error()),
 					})
@@ -385,7 +450,10 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					desc := signingErr.Error()
 					t.updateStatus(db, "failed", &desc)
 				} else {
-					err = t.broadcast(db, signer.Network, signer)
+					if providePayment {
+						err = t.broadcast(db, nil, nil)
+					}
+
 					if err == nil {
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
@@ -549,58 +617,58 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string, description *stri
 	}
 }
 
-func (t *Transaction) attemptTxBroadcastRecovery(err error) error {
-	msg := err.Error()
-	common.Log.Debugf("Attempting to recover from failed transaction broadcast (tx id: %s); %s", t.ID.String(), msg)
+// func (t *Transaction) attemptTxBroadcastRecovery(err error) error {
+// 	msg := err.Error()
+// 	common.Log.Debugf("Attempting to recover from failed transaction broadcast (tx id: %s); %s", t.ID.String(), msg)
 
-	gasFailureStr := "not enough gas to cover minimal cost of the transaction (minimal: "
-	isGasEstimationRecovery := strings.Contains(msg, gasFailureStr) && strings.Contains(msg, "got: 0") // HACK
-	if isGasEstimationRecovery {
-		common.Log.Debugf("Attempting to recover from gas estimation failure with supplied gas of 0 for tx id: %s", t.ID)
-		offset := strings.Index(msg, gasFailureStr) + len(gasFailureStr)
-		length := strings.Index(msg[offset:], ",")
-		minimalGas, err := strconv.ParseFloat(msg[offset:offset+length], 64)
-		if err == nil {
-			common.Log.Debugf("Resolved minimal gas of %v required to execute tx: %s", minimalGas, t.ID)
-			params := t.ParseParams()
-			params["gas"] = minimalGas
-			t.setParams(params)
-			return nil
-		}
-		common.Log.Debugf("failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
-	}
+// 	gasFailureStr := "not enough gas to cover minimal cost of the transaction (minimal: "
+// 	isGasEstimationRecovery := strings.Contains(msg, gasFailureStr) && strings.Contains(msg, "got: 0") // HACK
+// 	if isGasEstimationRecovery {
+// 		common.Log.Debugf("Attempting to recover from gas estimation failure with supplied gas of 0 for tx id: %s", t.ID)
+// 		offset := strings.Index(msg, gasFailureStr) + len(gasFailureStr)
+// 		length := strings.Index(msg[offset:], ",")
+// 		minimalGas, err := strconv.ParseFloat(msg[offset:offset+length], 64)
+// 		if err == nil {
+// 			common.Log.Debugf("Resolved minimal gas of %v required to execute tx: %s", minimalGas, t.ID)
+// 			params := t.ParseParams()
+// 			params["gas"] = minimalGas
+// 			t.setParams(params)
+// 			return nil
+// 		}
+// 		common.Log.Debugf("failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
+// 	}
 
-	return err
-}
+// 	return err
+// }
 
 func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Signer) error {
 	var err error
 
-	if t.SignedTx == nil {
-		return fmt.Errorf("failed to broadcast %s tx using signer: %s; tx not yet signed", *network.Name, signer.String())
-	}
-
-	if network.IsEthereumNetwork() {
-		if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-			err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
-		} else {
-			err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
-		}
-
+	if t.SignedTx == nil || network == nil {
+		result, err := common.BroadcastTransaction(t.To, t.Data)
 		if err != nil {
-			if t.attemptTxBroadcastRecovery(err) == nil {
-				err = t.sign(db, signer)
-				if err == nil {
-					if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-						err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
-					} else {
-						err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
-					}
-				}
-			}
+			return fmt.Errorf("failed to broadcast tx; %s", err.Error())
 		}
+
+		t.Hash = result
+		db.Save(&t)
+		common.Log.Debugf("broadcast tx: %s", *t.Hash)
 	} else {
-		err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *network.Name)
+		if network.IsEthereumNetwork() {
+			// data := string(t.SignedTx.(*types.Transaction).Data())
+			// _, err := common.BroadcastTransaction(t.To, &data)
+			// if err != nil {
+			// 	return fmt.Errorf("failed to broadcast %s tx using signer: %s; tx not yet signed", *network.Name, signer.String())
+			// }
+
+			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
+				err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+			} else {
+				err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
+			}
+		} else {
+			err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *network.Name)
+		}
 	}
 
 	if err != nil {
@@ -620,7 +688,8 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 
 func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 	var err error
-	t.SignedTx, t.Hash, err = signer.Sign(t)
+	var hash []byte
+	t.SignedTx, hash, err = signer.Sign(t)
 
 	if err != nil {
 		length := 0
@@ -628,11 +697,13 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 			length = len(*t.Data)
 		}
 		common.Log.Warningf("failed to sign %d-byte tx using on behalf of signer: %s; %s", length, signer.Address(), err.Error())
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		desc := err.Error()
-		t.updateStatus(db, "failed", &desc)
+		// t.Errors = append(t.Errors, &provide.Error{
+		// 	Message: common.StringOrNil(err.Error()),
+		// })
+		// desc := err.Error()
+		// t.updateStatus(db, "failed", &desc)
+	} else {
+		t.Hash = common.StringOrNil(string(ethcommon.FromHex(string(hash))))
 	}
 
 	return err

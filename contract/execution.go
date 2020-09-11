@@ -32,12 +32,13 @@ type Execution struct {
 	HDPath   *string     `json:"hd_derivation_path"`
 
 	// Tx params
-	Gas      *float64      `json:"gas"`
-	GasPrice *float64      `json:"gas_price"`
-	Nonce    *uint64       `json:"nonce"`
-	Method   string        `json:"method"`
-	Params   []interface{} `json:"params"`
-	Value    *big.Int      `json:"value"`
+	Gas       *float64      `json:"gas"`
+	GasPrice  *float64      `json:"gas_price"`
+	Nonce     *uint64       `json:"nonce"`
+	Method    string        `json:"method"`
+	Params    []interface{} `json:"params"`
+	Subsidize bool          `json:"subsidize"`
+	Value     *big.Int      `json:"value"`
 
 	// Tx metadata/instrumentation
 	Ref         *string    `json:"ref"`

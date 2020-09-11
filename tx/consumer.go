@@ -22,7 +22,9 @@ import (
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/wallet"
 	api "github.com/provideservices/provide-go/api"
+	bookie "github.com/provideservices/provide-go/api/bookie"
 	provide "github.com/provideservices/provide-go/api/nchain"
+	util "github.com/provideservices/provide-go/common/util"
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
@@ -226,7 +228,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
-		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && networkSubsidyFaucetExists(tx.NetworkID)
+		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && tx.shouldSubsidize()
 		if faucetSubsidyEligible {
 			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
 			faucetBeneficiary, _ := tx.signerFactory(db)
@@ -260,62 +262,17 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 }
 
-func networkSubsidyFaucets(networkID uuid.UUID) map[string]interface{} {
-	// FIXME-- read from environment config
-	networkSubsidyFaucetApplicationAddressMapping := map[string]interface{}{
-		"66d44f30-9092-4182-a3c4-bc02736d6ae5": map[string]interface{}{ // Ropsten
-			"01554e22-3d7a-44a3-9c65-6bcabaa08c38": "0xdD2F8052bE76FA1456e096526db5C0F12B0af564",
-			"146ab73e-b2eb-4386-8c6f-93663792c741": "0x96f1027FEe06A15f42E48180705a2ecB2F846985",
-		},
-		"8d31bf48-df6b-4a71-9d7c-3cb291111e27": map[string]interface{}{ // Kovan
-			"a5639994-f249-4eff-92f8-dd2467b5860e": "0x4A7471c60e64BA56910e31e6c9097B15C26d8B79",
-		},
-		"1b16996e-3595-4985-816c-043345d22f8c": map[string]interface{}{ // Görli
-			"31eafcd1-b977-4873-8e5b-fbe36f607a93": "0x6e689eE04621C21B9855BBc1c679d974e6fb632b",
-		},
-	}
-	if networkSubsidyFaucets, networkSubsidyFaucetExists := networkSubsidyFaucetApplicationAddressMapping[networkID.String()].(map[string]interface{}); networkSubsidyFaucetExists {
-		return networkSubsidyFaucets
-	}
-	return nil
-}
-
-func networkSubsidyFaucetExists(networkID uuid.UUID) bool {
-	return networkSubsidyFaucets(networkID) != nil
-}
-
 // subsidize the given beneficiary with a drip equal to the given val
 func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas int64) error {
-	for networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress := range networkSubsidyFaucets(networkID) {
-		out := []string{}
-		db.Table("accounts").Select("id").Where("accounts.application_id = ? AND accounts.address = ?", networkSubsidyFaucetApplicationID, networkSubsidyFaucetAddress).Pluck("id", &out)
-		if out == nil || len(out) == 0 || len(out[0]) == 0 {
-			common.Log.Warningf("Failed to retrieve configured subsidy faucet signing identity for faucet address: %s; faucet application id: %s", networkSubsidyFaucetAddress, networkSubsidyFaucetApplicationID)
-		} else {
-			faucetApplicationID, _ := uuid.FromString(networkSubsidyFaucetApplicationID)
-			faucetAccountID, _ := uuid.FromString(out[0])
-			// faucetGas := int64(210000 * 2) // FIXME-- parameterize
-			faucetTx := &Transaction{
-				ApplicationID: &faucetApplicationID,
-				Data:          common.StringOrNil("0x"),
-				NetworkID:     networkID,
-				AccountID:     &faucetAccountID,
-				To:            common.StringOrNil(beneficiary),
-				Value:         &TxValue{value: big.NewInt(val)},
-			}
-			faucetTx.setParams(map[string]interface{}{
-				"gas": gas,
-			})
-
-			if faucetTx.Create(db) {
-				common.Log.Debugf("faucetTx execution successful: %s", *faucetTx.Hash)
-				break
-			} else {
-				common.Log.Debugf("failed to broadcast subsidy faucet tx to beneficiary: %s; %s", beneficiary, *faucetTx.Errors[0].Message)
-			}
-		}
+	payment, err := bookie.CreatePayment(util.DefaultVaultAccessJWT, map[string]interface{}{
+		"to":   beneficiary,
+		"data": common.StringOrNil("0x"),
+	})
+	if err != nil {
+		return err
 	}
 
+	common.Log.Debugf("subsidized transaction using api.providepayments.com; beneficiary: %s; tx hash: %s", beneficiary, payment.Params["result"].(string))
 	return nil
 }
 
@@ -388,15 +345,15 @@ func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Netw
 					if publicKeyOk && privateKeyOk {
 						common.Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
 						tx.SignedTx, tx.Hash, err = providecrypto.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas), gasPrice)
-						if err == nil {
-							if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
-								err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
-								return nil, err
-							} else {
-								err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
-								common.Log.Warning(err.Error())
-								return nil, err
-							}
+						if err != nil {
+							err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
+							common.Log.Warning(err.Error())
+							return nil, err
+						}
+
+						if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
+							err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+							return nil, err
 						}
 
 						if err != nil {
@@ -700,10 +657,10 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 			// 	gas = float64(210000 * 2) // FIXME-- parameterize
 			// }
 			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
-			faucetSubsidyEligible := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && networkSubsidyFaucetExists(cntract.NetworkID)
+			_subsidize := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && tx.shouldSubsidize()
 
-			if faucetSubsidyEligible {
-				common.Log.Debugf("Contract execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", cntract.NetworkID)
+			if _subsidize {
+				common.Log.Debugf("contract execution failed due to insufficient funds but tx subsidize flag is set; requesting subsidized tx funding for target network: %s", cntract.NetworkID)
 				faucetBeneficiaryAddress := *execution.AccountAddress
 				err = subsidize(
 					db,
@@ -717,7 +674,7 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 					if tx != nil && tx.ID != uuid.Nil {
 						db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
 					}
-					common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
+					common.Log.Debugf("faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
 				}
 			}
 

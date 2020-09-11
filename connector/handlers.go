@@ -10,6 +10,7 @@ import (
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 )
 
 // InstallConnectorsAPI installs the handlers using the given gin Engine
@@ -30,8 +31,8 @@ func InstallConnectorsAPI(r *gin.Engine) {
 }
 
 func connectorsListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -58,8 +59,8 @@ func connectorsListHandler(c *gin.Context) {
 }
 
 func connectorDetailsHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
@@ -90,8 +91,8 @@ func connectorDetailsHandler(c *gin.Context) {
 }
 
 func createConnectorHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -126,8 +127,8 @@ func createConnectorHandler(c *gin.Context) {
 }
 
 func deleteConnectorHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -155,8 +156,8 @@ func deleteConnectorHandler(c *gin.Context) {
 }
 
 func connectorLoadBalancersListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -199,8 +200,8 @@ func connectorLoadBalancersListHandler(c *gin.Context) {
 }
 
 func connectorNodesListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -233,8 +234,8 @@ func connectorNodesListHandler(c *gin.Context) {
 }
 
 func connectorEntitiesListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -271,8 +272,8 @@ func connectorEntitiesListHandler(c *gin.Context) {
 }
 
 func connectorEntityCreateHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -316,8 +317,8 @@ func connectorEntityCreateHandler(c *gin.Context) {
 }
 
 func connectorEntityDetailsHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -348,8 +349,8 @@ func connectorEntityDetailsHandler(c *gin.Context) {
 }
 
 func updateConnectorEntityHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -393,8 +394,8 @@ func updateConnectorEntityHandler(c *gin.Context) {
 }
 
 func deleteConnectorEntityHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	orgID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return

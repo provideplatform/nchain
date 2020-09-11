@@ -4,25 +4,42 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"os"
 	"sync"
 	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	pgputil "github.com/kthomas/go-pgputil"
-	selfsignedcert "github.com/kthomas/go-self-signed-cert"
+	bookie "github.com/provideservices/provide-go/api/bookie"
 )
 
 var natsStreamingConnectionMutex sync.Mutex
 var natsStreamingConnectionDrainTimeout = 10 * time.Second
 
-func buildListenAddr() string {
-	listenPort := os.Getenv("PORT")
-	if listenPort == "" {
-		listenPort = "8080"
+// BroadcastTransaction attempts to broadcast arbitrary calldata to the specified recipient
+// using the Provide Payments API
+func BroadcastTransaction(to, calldata *string) (*string, error) {
+	_calldata := "0x"
+	if calldata != nil {
+		_calldata = *calldata
 	}
-	return fmt.Sprintf("0.0.0.0:%s", listenPort)
+
+	payment, err := bookie.CreatePayment(defaultPaymentsAccessJWT, map[string]interface{}{
+		"to":   to,
+		"data": _calldata,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result *string
+	if rslt, rsltOk := payment.Params["result"].(string); rsltOk {
+		result = &rslt
+		Log.Debugf("broadcast %d-byte transaction using api.providepayments.com; recipient: %v; tx hash: %s", len(_calldata), to, *result)
+	} else {
+		Log.Warningf("failed to broadcast %d-byte transaction using api.providepayments.com", len(_calldata))
+	}
+
+	return result, nil
 }
 
 // DecryptECDSAPrivateKey - read the wallet-specific ECDSA private key; required for signing transactions on behalf of the wallet
@@ -38,20 +55,6 @@ func DecryptECDSAPrivateKey(encryptedKey string) (*ecdsa.PrivateKey, error) {
 		return nil, err
 	}
 	return ethcrypto.ToECDSA(privateKeyBytes)
-}
-
-// ShouldServeTLS returns true if the API should be served over TLS
-func ShouldServeTLS() bool {
-	if requireTLS {
-		privKeyPath, certPath, err := selfsignedcert.GenerateToDisk([]string{})
-		if err != nil {
-			Log.Panicf("Failed to generate self-signed certificate; %s", err.Error())
-		}
-		PrivateKeyPath = *privKeyPath
-		CertificatePath = *certPath
-		return true
-	}
-	return false
 }
 
 // PanicIfEmpty panics if the given string is empty

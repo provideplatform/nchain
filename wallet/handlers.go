@@ -12,6 +12,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 )
 
 const defaultDerivedAccountsPerPage = uint32(10)
@@ -36,9 +37,9 @@ func InstallWalletsAPI(r *gin.Engine) {
 }
 
 func createAccountHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -79,9 +80,9 @@ func createAccountHandler(c *gin.Context) {
 }
 
 func accountsListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -121,9 +122,9 @@ func accountsListHandler(c *gin.Context) {
 }
 
 func accountDetailsHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -167,9 +168,9 @@ func accountDetailsHandler(c *gin.Context) {
 }
 
 func accountBalanceHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -202,9 +203,9 @@ func accountBalanceHandler(c *gin.Context) {
 }
 
 func createWalletHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -236,7 +237,6 @@ func createWalletHandler(c *gin.Context) {
 	}
 
 	if wallet.Create() {
-		wallet.decrypt()
 		provide.Render(wallet, 201, c)
 	} else {
 		obj := map[string]interface{}{}
@@ -246,9 +246,9 @@ func createWalletHandler(c *gin.Context) {
 }
 
 func walletsListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -271,16 +271,15 @@ func walletsListHandler(c *gin.Context) {
 
 	var wallets []*Wallet
 	provide.Paginate(c, query, &Wallet{}).Find(&wallets)
-	for _, wallet := range wallets {
-		wallet.decrypt()
-	}
+	// for _, wallet := range wallets {
+	// }
 	provide.Render(wallets, 200, c)
 }
 
 func walletDetailsHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -303,14 +302,14 @@ func walletDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	wallet.decrypt()
+	// wallet.decrypt()
 	provide.Render(wallet, 200, c)
 }
 
 func walletAccountsListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
-	organizationID := provide.AuthorizedSubjectID(c, "organization")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	organizationID := util.AuthorizedSubjectID(c, "organization")
 	if appID == nil && userID == nil && organizationID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return

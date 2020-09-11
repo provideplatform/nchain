@@ -15,6 +15,7 @@ import (
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/wallet"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 )
 
 // InstallTransactionsAPI installs the handlers using the given gin Engine
@@ -29,8 +30,8 @@ func InstallTransactionsAPI(r *gin.Engine) {
 }
 
 func transactionsListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -86,8 +87,8 @@ func transactionsListHandler(c *gin.Context) {
 }
 
 func createTransactionHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -121,7 +122,7 @@ func createTransactionHandler(c *gin.Context) {
 }
 
 func transactionDetailsHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -150,7 +151,7 @@ func transactionDetailsHandler(c *gin.Context) {
 }
 
 func networkTransactionsListHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -174,7 +175,7 @@ func networkTransactionsListHandler(c *gin.Context) {
 }
 
 func networkTransactionDetailsHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -195,7 +196,7 @@ func networkTransactionDetailsHandler(c *gin.Context) {
 }
 
 func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -214,6 +215,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	gas, gasOk := params["gas"].(float64)
 	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
+	subsidize, subsidizeOk := params["subsidize"].(bool)
 
 	ref, err := uuid.NewV4()
 	if err != nil {
@@ -253,6 +255,10 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	if nonceOk {
 		nonceUint := uint64(nonce)
 		execution.Nonce = &nonceUint
+	}
+
+	if subsidizeOk {
+		execution.Subsidize = subsidize
 	}
 
 	ntwrk := &network.Network{}
@@ -335,8 +341,8 @@ func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[
 }
 
 func contractExecutionHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -453,6 +459,7 @@ func contractExecutionHandler(c *gin.Context) {
 	gas, gasOk := params["gas"].(float64)
 	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
+	subsidize, subsidizeOk := params["subsidize"].(bool)
 
 	if gasOk {
 		execution.Gas = &gas
@@ -465,6 +472,10 @@ func contractExecutionHandler(c *gin.Context) {
 	if nonceOk {
 		nonceUint := uint64(nonce)
 		execution.Nonce = &nonceUint
+	}
+
+	if subsidizeOk {
+		execution.Subsidize = subsidize
 	}
 
 	var tx Transaction

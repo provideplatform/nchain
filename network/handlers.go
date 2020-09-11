@@ -12,6 +12,7 @@ import (
 	"github.com/provideapp/nchain/common"
 	api "github.com/provideservices/provide-go/api/nchain"
 	provide "github.com/provideservices/provide-go/common"
+	util "github.com/provideservices/provide-go/common/util"
 )
 
 // InstallNetworksAPI installs the handlers using the given gin Engine
@@ -41,8 +42,8 @@ func InstallNetworksAPI(r *gin.Engine) {
 }
 
 func createNetworkHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
-	userID := provide.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -73,7 +74,7 @@ func createNetworkHandler(c *gin.Context) {
 }
 
 func updateNetworkHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
+	userID := util.AuthorizedSubjectID(c, "user")
 	if userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -126,14 +127,14 @@ func networksListHandler(c *gin.Context) {
 	if strings.ToLower(c.Query("public")) == "true" {
 		query = query.Where("networks.application_id IS NULL AND networks.user_id IS NULL")
 	} else {
-		appID := provide.AuthorizedSubjectID(c, "application")
+		appID := util.AuthorizedSubjectID(c, "application")
 		if appID != nil {
 			query = query.Where("networks.application_id = ?", appID)
 		} else {
 			query = query.Where("networks.application_id IS NULL")
 		}
 
-		userID := provide.AuthorizedSubjectID(c, "user")
+		userID := util.AuthorizedSubjectID(c, "user")
 		if userID != nil {
 			query = query.Where("networks.user_id = ?", userID)
 		} else {
@@ -179,7 +180,7 @@ func networkConnectorsListHandler(c *gin.Context) {
 }
 
 func loadBalancersListHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -212,7 +213,7 @@ func loadBalancerDetailsHandler(c *gin.Context) {
 }
 
 func updateLoadBalancerHandler(c *gin.Context) {
-	appID := provide.AuthorizedSubjectID(c, "application")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -266,8 +267,8 @@ func updateLoadBalancerHandler(c *gin.Context) {
 }
 
 func nodesListHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
-	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -291,8 +292,8 @@ func nodesListHandler(c *gin.Context) {
 }
 
 func nodeDetailsHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
-	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -315,8 +316,8 @@ func nodeDetailsHandler(c *gin.Context) {
 }
 
 func nodeLogsHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
-	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -358,8 +359,8 @@ func nodeLogsHandler(c *gin.Context) {
 }
 
 func createNodeHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
-	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -417,8 +418,8 @@ func createNodeHandler(c *gin.Context) {
 }
 
 func updateNodeHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
-	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
@@ -466,8 +467,8 @@ func updateNodeHandler(c *gin.Context) {
 }
 
 func deleteNodeHandler(c *gin.Context) {
-	userID := provide.AuthorizedSubjectID(c, "user")
-	appID := provide.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	appID := util.AuthorizedSubjectID(c, "application")
 	if userID == nil && appID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
