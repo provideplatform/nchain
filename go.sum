@@ -164,7 +164,6 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 h1:Yzb9+7DPaBjB8zlTR87/ElzFsnQfuHnVUVqpZZIcV5Y=
 github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5/go.mod h1:a2zkGnVExMxdzMo3M0Hi/3sEU+cWnZpSni0O6/Yb/P0=
 github.com/ethereum/go-ethereum v1.9.19/go.mod h1:JSSTypSMTkGZtAdAChH2wP5dZEvPGh3nUTuDpH+hNrg=
-github.com/ethereum/go-ethereum v1.9.21/go.mod h1:RXAVzbGrSGmDkDnHymruTAIEjUR3E4TX0EOpaj702sI=
 github.com/ethereum/go-ethereum v1.9.22 h1:/Fea9n2EWJuNJ9oahMq9luqjRBcbW7QWdThbcJl13ek=
 github.com/ethereum/go-ethereum v1.9.22/go.mod h1:FQjK3ZwD8C5DYn7ukTmFee36rq1dOMESiUfXr5RUc1w=
 github.com/fatih/color v1.3.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
@@ -600,8 +599,8 @@ github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38i
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
 github.com/provideservices/provide-go v0.0.0-20200906045411-986de3bb2f71/go.mod h1:Pn7/Q7Q9AcvFlv9jP/2ABVfll6Ls/HlmqjRF8KM2dAM=
 github.com/provideservices/provide-go v0.0.0-20200929141258-9a03d0e3ee26/go.mod h1:yzwBDvZH0GKjbDeFFzAZ5EJlysxaSsWSM5AednUXHG8=
-github.com/provideservices/provide-go v0.0.0-20201011035222-b2c8c1cad53c h1:1jfnnJPGF4GQhKUACL63QTrurUK3szHZkBxfwPocLhQ=
-github.com/provideservices/provide-go v0.0.0-20201011035222-b2c8c1cad53c/go.mod h1:4L2s4e+arCjD3G8BIC/4hzP7ZiE4B0HtZkbgEY+JngU=
+github.com/provideservices/provide-go v0.0.0-20201011065818-f25910aee3cc h1:TaCWqRsLYp7lRV8HLknSjmldS9VHW2tPPyldtb/Ka8U=
+github.com/provideservices/provide-go v0.0.0-20201011065818-f25910aee3cc/go.mod h1:yzwBDvZH0GKjbDeFFzAZ5EJlysxaSsWSM5AednUXHG8=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rjeczalik/notify v0.9.1/go.mod h1:rKwnCoCGeuQnwBtTSPL9Dad03Vh2n40ePRrjvIXnJho=
 github.com/rjeczalik/notify v0.9.2 h1:MiTWrPj55mNDHEiIX5YUSKefw/+lCQVoAFmD6oQm5w8=
