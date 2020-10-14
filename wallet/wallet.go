@@ -129,7 +129,7 @@ func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, err
 	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
 		"type":               "asymmetric",
 		"usage":              "sign/verify",
-		"spec":               "BIP39", // FIXME... does this feel weird?
+		"spec":               "BIP39",
 		"name":               "nchain hd wallet",
 		"hd_derivation_path": pathstr,
 	})
@@ -214,7 +214,7 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
 		"type":               "asymmetric",
 		"usage":              "sign/verify",
-		"spec":               "BIP39", // FIXME... does this feel weird?
+		"spec":               "BIP39",
 		"name":               "nchain hd wallet",
 		"hd_derivation_path": pathstr,
 	})
@@ -313,7 +313,7 @@ func (w *Wallet) generate(db *gorm.DB) error {
 	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
 		"type":  "asymmetric",
 		"usage": "sign/verify",
-		"spec":  "BIP39", // FIXME... does this feel weird?
+		"spec":  "BIP39",
 		"name":  "nchain hd wallet",
 	})
 
@@ -330,7 +330,7 @@ func (w *Wallet) generate(db *gorm.DB) error {
 
 	// FIXME!!!! w.populate(masterKey)
 
-	common.Log.Debugf("generated HD wallet using vault: %s; key id: %s", w.VaultID.String(), key.ID.String())
+	common.Log.Debugf("generated HD wallet using vault: %s; key id: %s; public key: %s", w.VaultID.String(), key.ID.String(), *w.PublicKey)
 	// common.Log.Debugf("generated HD wallet using vault; key id: %s%d-byte master seed with mnemonic; xpub: %s", len(seed), *w.PublicKey)
 	return nil
 }
