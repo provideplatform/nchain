@@ -157,12 +157,12 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 
 		contract, contractABI := cachedContractArtifacts(networkUUID, *evtmsg.Address, *evtmsg.TransactionHash)
 		if contract == nil {
-			common.Log.Debugf("No contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
+			common.Log.Tracef("No contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
 			natsutil.Nack(msg)
 			return
 		}
 		if contractABI == nil {
-			common.Log.Debugf("No contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
+			common.Log.Tracef("No contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
 			natsutil.Nack(msg)
 			return
 		}
@@ -197,7 +197,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 		evtmsg.Params["network_id"] = networkUUID.String()
 
 		payload, _ := json.Marshal(evtmsg.Params)
-		common.Log.Debugf("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
+		common.Log.Tracef("Unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
 
 		qualifiedSubject := contract.qualifiedSubject(subject)
 		if qualifiedSubject != nil {
@@ -213,11 +213,11 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 				msg.Ack()
 			}
 		} else {
-			common.Log.Debugf("Dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
+			common.Log.Tracef("Dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
 			natsutil.Nack(msg)
 		}
 	} else {
-		common.Log.Debugf("Dropping anonymous %d-byte log emission event on the floor", len(msg.Data))
+		common.Log.Tracef("Dropping anonymous %d-byte log emission event on the floor", len(msg.Data))
 		natsutil.Nack(msg)
 	}
 }
@@ -251,7 +251,7 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 }
 
 func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS log transceiver event emission message: %s", msg)
+	common.Log.Tracef("Consuming NATS log transceiver event emission message: %s", msg)
 
 	evtmsg := &natsLogEventMessage{}
 	err := json.Unmarshal(msg.Data, &evtmsg)
@@ -278,7 +278,7 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 		return
 	}
 
-	common.Log.Debugf("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
+	common.Log.Tracef("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
 
 	network := cachedNetwork(networkUUID)
 	if network == nil || network.ID == uuid.Nil {
