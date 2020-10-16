@@ -696,13 +696,13 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 
 // TODO: consider batching this using a buffered channel for high-volume networks
 func consumeTxFinalizeMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS tx finalize message: %s", msg)
+	common.Log.Tracef("Consuming NATS tx finalize message: %s", msg)
 
 	var params map[string]interface{}
 
 	nack := func(msg *stan.Msg, errmsg string, dropPacket bool) {
 		if dropPacket {
-			common.Log.Debugf("Dropping tx packet (seq: %d) on the floor; %s", msg.Sequence, errmsg)
+			common.Log.Tracef("Dropping tx packet (seq: %d) on the floor; %s", msg.Sequence, errmsg)
 			msg.Ack()
 			return
 		}
