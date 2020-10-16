@@ -80,7 +80,7 @@ type API interface {
 func evmFetchTxReceipt(rpcClientKey, rpcURL, signerAddress, hash string) (*types.Receipt, error) {
 	receipt, err := providecrypto.EVMGetTxReceipt(rpcClientKey, rpcURL, hash, signerAddress)
 	if err != nil {
-		common.Log.Warningf("failed to fetch tx receipt; %s", err.Error())
+		common.Log.Tracef("failed to fetch tx receipt; %s", err.Error())
 		return nil, err
 	}
 	return receipt, nil

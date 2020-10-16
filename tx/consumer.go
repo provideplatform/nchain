@@ -798,25 +798,25 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 func consumeTxReceiptMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			common.Log.Warningf("Recovered from failed tx receipt message; %s", r)
+			common.Log.Warningf("recovered from failed tx receipt message; %s", r)
 			natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS tx receipt message: %s", msg)
+	common.Log.Debugf("consuming NATS tx receipt message: %s", msg)
 
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal load balancer provisioning message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal load balancer provisioning message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
 
 	transactionID, transactionIDOk := params["transaction_id"].(string)
 	if !transactionIDOk {
-		common.Log.Warningf("Failed to consume NATS tx receipt message; no transaction id provided")
+		common.Log.Warningf("failed to consume NATS tx receipt message; no transaction id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -826,7 +826,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	tx := &Transaction{}
 	db.Where("id = ?", transactionID).Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
-		common.Log.Warningf("Failed to fetch tx receipt; no tx resolved for id: %s", transactionID)
+		common.Log.Tracef("failed to fetch tx receipt; no tx resolved for id: %s", transactionID)
 		natsutil.Nack(msg)
 		return
 	}
@@ -842,7 +842,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
-		common.Log.Warningf(fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error()))
+		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error()))
 		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
 		common.Log.Debugf("fetched tx receipt for hash: %s", *tx.Hash)
