@@ -89,23 +89,23 @@ func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contrac
 	if cachedContract, cachedContractOk := cachedContracts[addr]; cachedContractOk {
 		contract = cachedContract
 	} else {
-		common.Log.Debugf("Contract cache miss; attempting to load contract from persistent storage for network: %s; address: %s", networkID, addr)
+		common.Log.Tracef("Contract cache miss; attempting to load contract from persistent storage for network: %s; address: %s", networkID, addr)
 
 		out := []string{}
 		db.Table("transactions").Select("id").Where("transactions.hash = ?", txHash).Pluck("id", &out)
 		if len(out) == 0 {
-			common.Log.Debugf("Contract lookup failed for address: %s; no tx resolved for hash: %s", addr, txHash)
+			common.Log.Tracef("Contract lookup failed for address: %s; no tx resolved for hash: %s", addr, txHash)
 			return nil, nil
 		}
 		txID, err := uuid.FromString(out[0])
 		if err != nil {
-			common.Log.Debugf("Contract lookup failed for address: %s; no tx resolved for hash: %s; %s", addr, txHash, err.Error())
+			common.Log.Tracef("Contract lookup failed for address: %s; no tx resolved for hash: %s; %s", addr, txHash, err.Error())
 			return nil, nil
 		}
 
 		contract = FindByTxID(db, txID)
 		if contract == nil || contract.ID == uuid.Nil {
-			common.Log.Debugf("Contract lookup failed for address: %s; no contract resolved for tx hash: %s", addr, txHash)
+			common.Log.Tracef("Contract lookup failed for address: %s; no contract resolved for tx hash: %s", addr, txHash)
 			return nil, nil
 		}
 
@@ -115,7 +115,7 @@ func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contrac
 	if cachedABI, cachedABIOk := cachedContractABIs[addr]; cachedABIOk {
 		contractABI = cachedABI
 	} else {
-		common.Log.Debugf("Contract ABI cache miss; attempting to cache contract ABI for network: %s; address: %s", networkID, addr)
+		common.Log.Tracef("Contract ABI cache miss; attempting to cache contract ABI for network: %s; address: %s", networkID, addr)
 		contractABI, err = contract.ReadEthereumContractAbi()
 		if err != nil {
 			common.Log.Warningf("Failed to read ethereum contract ABI on contract: %s; %s", contract.ID, err.Error())
@@ -153,7 +153,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 
 		eventID := ethcommon.HexToHash(*evtmsg.Topics[0])
 		eventIDHex := eventID.Hex()
-		common.Log.Debugf("Attempting to publish parsed log emission event with id: %s", eventIDHex)
+		common.Log.Tracef("Attempting to publish parsed log emission event with id: %s", eventIDHex)
 
 		contract, contractABI := cachedContractArtifacts(networkUUID, *evtmsg.Address, *evtmsg.TransactionHash)
 		if contract == nil {
