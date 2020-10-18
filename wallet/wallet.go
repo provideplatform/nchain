@@ -145,44 +145,7 @@ func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, err
 	w.VaultID = key.VaultID
 	w.KeyID = &key.ID
 
-	return nil, fmt.Errorf("failed to derive hardened child with path: %s", pathstr)
-
-	// masterKey := w.ExtendedKey
-	// if masterKey == nil {
-	// 	masterKey, _ = bip32.NewMasterKey([]byte(*w.Seed))
-	// }
-	// if masterKey == nil {
-	// 	return nil, fmt.Errorf("failed to reinitialize master key to attempt account derivation at path: %s", pathstr)
-	// }
-	// common.Log.Debugf("reinitialized master key to attempt account derivation at path: %s", pathstr)
-
-	// childKey, err := masterKey.NewChildKey(0x80000000 + coin)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to initialize child key at derivation path: m/%d'/%d'; %s", *w.Purpose, coin, err.Error())
-	// }
-	// common.Log.Debugf("derived child key at derivation path: m/%d'/%d'", *w.Purpose, coin)
-
-	// w0 := &Wallet{
-	// 	Path:    &pathstr,
-	// 	Purpose: w.Purpose,
-	// 	Wallet:  w,
-	// }
-	// w0.populate(childKey)
-
-	// childKey, err = childKey.NewChildKey(0x80000000 + account)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to initialize child key at derivation path: m/%d'/%d'/%d'; %s", *w.Purpose, coin, account, err.Error())
-	// }
-	// common.Log.Debugf("derived child key at derivation path: m/%d'/%d'/%d'", *w.Purpose, coin, account)
-
-	// w1 := &Wallet{
-	// 	Path:    &pathstr,
-	// 	Purpose: w.Purpose,
-	// 	Wallet:  w0,
-	// }
-	// w1.populate(childKey)
-
-	// return w1, nil
+	return w, nil
 }
 
 // DeriveAddress derives a child address from the parent wallet which should be a hardened
@@ -191,6 +154,9 @@ func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, err
 // exists at `m/purpose'/coin_type'/account'/<index>` (or `m/purpose'/coin_type'/account'/<chain>/<index>`
 // if a chain index is provided). Returns an `Account` instance.
 func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Account, error) {
+	if w.Path == nil {
+		w.Path = common.StringOrNil("m/44'/60'/0'")
+	}
 	pathstr := fmt.Sprintf("%s/%d", *w.Path, index)
 	if chain != nil {
 		pathstr = fmt.Sprintf("%s/%d/%d", *w.Path, *chain, index)
@@ -211,11 +177,15 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 		return nil, errors.New("failed to derive signing address without hardened HD path")
 	}
 
-	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
-		"type":               "asymmetric",
-		"usage":              "sign/verify",
-		"spec":               "BIP39",
-		"name":               "nchain hd wallet",
+	// key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
+	// 	"type":               "asymmetric",
+	// 	"usage":              "sign/verify",
+	// 	"spec":               "BIP39",
+	// 	"name":               "nchain hd wallet",
+	// 	"hd_derivation_path": pathstr,
+	// })
+
+	key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), w.KeyID.String(), map[string]interface{}{
 		"hd_derivation_path": pathstr,
 	})
 
@@ -230,83 +200,16 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 	w.VaultID = key.VaultID
 	w.KeyID = &key.ID
 
-	return nil, fmt.Errorf("failed to derive address with path: %s", pathstr)
-
-	// var mnemonic *string
-	// parent := w
-	// for {
-	// 	parent = parent.Wallet
-	// 	if parent != nil {
-	// 		mnemonic = parent.Mnemonic
-	// 	} else {
-	// 		break
-	// 	}
-	// }
-
-	// pathstr := fmt.Sprintf("%s/%d", *w.Path, index)
-	// if chain != nil {
-	// 	pathstr = fmt.Sprintf("%s/%d/%d", *w.Path, *chain, index)
-	// }
-
-	// components := strings.Split(*w.Path, "/")
-	// coin, err := strconv.Atoi(strings.Trim(components[len(components)-2], "'"))
-	// if err != nil {
-	// 	common.Log.Warningf("failed to derive signing account at derivation path: %s; %s", pathstr, err.Error())
-	// 	return nil, err
-	// }
-
-	// var account *Account
-	// purpose := 0x80000000 + uint32(*w.Purpose)
-
-	// switch purpose {
-	// case bip44.Purpose:
-	// 	switch 0x80000000 + uint32(coin) {
-	// 	case bip44.TypeEther:
-	// 		hdw, err := hdwallet.NewFromMnemonic(*mnemonic)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("failed to derive signing account at derivation path: %s; %s", pathstr, err.Error())
-	// 		}
-
-	// 		path, err := hdwallet.ParseDerivationPath(pathstr)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("failed to derive signing account at derivation path: %s; %s", pathstr, err.Error())
-	// 		}
-
-	// 		derived, err := hdw.Derive(path, false)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("failed to derive signing account at derivation path: %s; %s", pathstr, err.Error())
-	// 		}
-
-	// 		privateKey, err := hdw.PrivateKeyBytes(derived)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("failed to derive private key for signing account at derivation path: %s; %s", pathstr, err.Error())
-	// 		}
-
-	// 		publicKey, err := hdw.PublicKeyBytes(derived)
-	// 		if err != nil {
-	// 			return nil, fmt.Errorf("failed to derive private key for signing account at derivation path: %s; %s", pathstr, err.Error())
-	// 		}
-
-	// 		account = &Account{
-	// 			ApplicationID:    w.ApplicationID,
-	// 			UserID:           w.UserID,
-	// 			WalletID:         &w.ID,
-	// 			Wallet:           w,
-	// 			HDDerivationPath: &pathstr,
-	// 			Address:          derived.Address.Hex(),
-	// 			PublicKey:        common.StringOrNil(hexutil.Encode(publicKey)[4:]),
-	// 			PrivateKey:       common.StringOrNil(hexutil.Encode(privateKey)[2:]),
-	// 		}
-
-	// 		common.Log.Debugf("derived address for signing account at derivation path: %s; address: %s", pathstr, account.Address)
-	// 	default:
-	// 		return nil, fmt.Errorf("failed to derive signing account at derivation path: %s; unsupported coin: %d", pathstr, coin)
-	// 	}
-	// default:
-	// 	return nil, fmt.Errorf("failed to derive signing account at derivation path: %s; unsupported purpose: %d", pathstr, *w.Purpose)
-	// }
-
-	// return account, nil
+	return &Account{
+		VaultID:          key.VaultID,
+		ApplicationID:    w.ApplicationID,
+		OrganizationID:   w.OrganizationID,
+		UserID:           w.UserID,
+		WalletID:         &w.ID,
+		Wallet:           w,
+		HDDerivationPath: &pathstr,
+		Address:          *key.Address,
+	}, nil
 }
 
 func (w *Wallet) generate(db *gorm.DB) error {
@@ -328,18 +231,7 @@ func (w *Wallet) generate(db *gorm.DB) error {
 	w.VaultID = key.VaultID
 	w.KeyID = &key.ID
 
-	// FIXME!!!! w.populate(masterKey)
-
 	common.Log.Debugf("generated HD wallet using vault: %s; key id: %s; public key: %s", w.VaultID.String(), key.ID.String(), *w.PublicKey)
 	// common.Log.Debugf("generated HD wallet using vault; key id: %s%d-byte master seed with mnemonic; xpub: %s", len(seed), *w.PublicKey)
 	return nil
 }
-
-// func (w *Wallet) populate(key *bip32.Key) {
-// 	xpub := key.PublicKey().String()
-// 	xprv := key.String()
-
-// 	w.ExtendedKey = key
-// 	w.PublicKey = &xpub
-// 	// w.PrivateKey = &xprv
-// }
