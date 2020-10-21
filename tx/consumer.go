@@ -278,7 +278,7 @@ func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas in
 
 func txResponsefunc(tx *Transaction, c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
 	var err error
-	var result []byte
+	result := make([]byte, 32)
 	var receipt map[string]interface{}
 	out := map[string]interface{}{}
 

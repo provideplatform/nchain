@@ -126,6 +126,7 @@ func (w *Wallet) Validate() bool {
 func (w *Wallet) DeriveHardened(db *gorm.DB, coin, account uint32) (*Wallet, error) {
 	pathstr := fmt.Sprintf("m/%d'/%d'/%d'", *w.Purpose, coin, account)
 
+	// FIXME-- this should be audited -- it is probably creating additional HD wallets that aren't persisted within nchain...
 	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
 		"type":               "asymmetric",
 		"usage":              "sign/verify",
@@ -176,14 +177,6 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 	if w.Path == nil {
 		return nil, errors.New("failed to derive signing address without hardened HD path")
 	}
-
-	// key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
-	// 	"type":               "asymmetric",
-	// 	"usage":              "sign/verify",
-	// 	"spec":               "BIP39",
-	// 	"name":               "nchain hd wallet",
-	// 	"hd_derivation_path": pathstr,
-	// })
 
 	key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), w.KeyID.String(), map[string]interface{}{
 		"hd_derivation_path": pathstr,

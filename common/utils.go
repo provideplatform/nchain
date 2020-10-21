@@ -34,7 +34,11 @@ func BroadcastTransaction(to, calldata *string) (*string, error) {
 	var result *string
 	if rslt, rsltOk := payment.Params["result"].(string); rsltOk {
 		result = &rslt
-		Log.Debugf("broadcast %d-byte transaction using api.providepayments.com; recipient: %v; tx hash: %s", len(_calldata), to, *result)
+		if to == nil {
+			Log.Debugf("broadcast %d-byte contract creation transaction using api.providepayments.com; tx hash: %s", len(_calldata), *result)
+		} else {
+			Log.Debugf("broadcast %d-byte transaction using api.providepayments.com; recipient: %v; tx hash: %s", len(_calldata), *to, *result)
+		}
 	} else {
 		Log.Warningf("failed to broadcast %d-byte transaction using api.providepayments.com", len(_calldata))
 	}

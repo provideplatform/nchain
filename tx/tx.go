@@ -206,11 +206,11 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 		}
 
 		if txs.Wallet != nil && txs.Wallet.VaultID != nil && txs.Wallet.KeyID != nil {
-			if txs.Wallet.Path == nil {
-				err := fmt.Errorf("failed to sign %d-byte transaction payload using HD wallet without a specified derivation path", len(*tx.Data))
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
+			// if txs.Wallet.Path == nil {
+			// 	err := fmt.Errorf("failed to sign %d-byte transaction payload using HD wallet without a specified derivation path", len(*tx.Data))
+			// 	common.Log.Warning(err.Error())
+			// 	return nil, nil, err
+			// }
 
 			hardenedChild, derivationErr := txs.Wallet.DeriveHardened(nil, defaultDerivedCoinType, uint32(0))
 			if derivationErr != nil {
@@ -244,6 +244,8 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				common.Log.Warning(err.Error())
 				return nil, nil, err
 			}
+
+			// common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
 
 			sig, err := vault.SignMessage(
 				util.DefaultVaultAccessJWT,
