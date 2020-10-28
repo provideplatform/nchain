@@ -647,7 +647,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 	var err error
 
 	if t.SignedTx == nil || network == nil {
-		result, err := common.BroadcastTransaction(t.To, t.Data)
+		result, err := common.BroadcastTransaction(t.To, t.Data, t.Params)
 		if err != nil {
 			return fmt.Errorf("failed to broadcast tx; %s", err.Error())
 		}

@@ -17,15 +17,16 @@ var natsStreamingConnectionDrainTimeout = 10 * time.Second
 
 // BroadcastTransaction attempts to broadcast arbitrary calldata to the specified recipient
 // using the Provide Payments API
-func BroadcastTransaction(to, calldata *string) (*string, error) {
+func BroadcastTransaction(to, calldata *string, params map[string]interface{}) (*string, error) {
 	_calldata := "0x"
 	if calldata != nil {
 		_calldata = *calldata
 	}
 
 	payment, err := bookie.CreatePayment(defaultPaymentsAccessJWT, map[string]interface{}{
-		"to":   to,
-		"data": _calldata,
+		"to":     to,
+		"data":   _calldata,
+		"params": params,
 	})
 	if err != nil {
 		return nil, err
