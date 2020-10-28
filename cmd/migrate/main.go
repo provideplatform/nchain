@@ -31,7 +31,7 @@ func main() {
 	)
 	if err != nil && !strings.Contains(err.Error(), "exists") { // HACK -- could be replaced with query
 		common.Log.Warningf("migrations failed; %s", err.Error())
-		panic(err)
+		// panic(err)
 	}
 
 	dsn := fmt.Sprintf(
