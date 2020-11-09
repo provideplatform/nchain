@@ -24,7 +24,7 @@ services:
     restart: always
 
   vault:
-    build: ../
+    image: provide/vault
     container_name: vault
     depends_on:
       - postgres
@@ -123,7 +123,7 @@ services:
       - ./ops/await_tcp.sh:/usr/local/bin/await_tcp.sh:cached
 
   ident:
-    build: ../
+    image: provide/ident
     container_name: ident
     depends_on:
       - nats-streaming
@@ -158,8 +158,8 @@ services:
       - 8081:8080
     restart: always
 
-  alice-nchain:
-    image: provide/nchain
+  nchain:
+    build: ../
     container_name: nchain
     depends_on:
       - nats-streaming
@@ -172,7 +172,7 @@ services:
       - DATABASE_PASSWORD=nchain
       - LOG_LEVEL=DEBUG
       - NATS_CLIENT_PREFIX=nchain
-      - NATS_URL=nats://alice-nats:4222
+      - NATS_URL=nats://nats:4222
       - NATS_STREAMING_URL=nats://nats-streaming:4222
       - PORT=8080
       - REDIS_HOSTS=redis:6379
@@ -189,7 +189,7 @@ services:
       - 8080:8080
     restart: always
 
-  alice-nchain-consumer:
+  nchain-consumer:
     image: provide/nchain
     entrypoint: ./ops/run_consumer.sh
     container_name: nchain-consumer
