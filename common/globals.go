@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,13 +10,16 @@ import (
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
 
-	// ident "github.com/provideservices/provide-go/api/ident"
+	ident "github.com/provideservices/provide-go/api/ident"
 	vault "github.com/provideservices/provide-go/api/vault"
 	util "github.com/provideservices/provide-go/common/util"
 )
 
 const defaultDockerhubOrganization = "provide"
 const reachabilityTimeout = time.Millisecond * 2500
+
+const refreshTokenTickInterval = 60000 * 45 * time.Millisecond  // 45 minutes
+const refreshTokenSleepInterval = 60000 * 10 * time.Millisecond // 10 minutes
 
 var (
 	// Log is the default package logger
@@ -138,24 +142,57 @@ func requireInfrastructureSupport() {
 }
 
 func requirePayments() {
-	defaultPaymentsRefreshJWT = os.Getenv("PAYMENTS_REFRESH_TOKEN")
-	if defaultPaymentsRefreshJWT == "" {
-		Log.Panicf("failed to parse PAYMENTS_REFRESH_TOKEN from nchain environent")
+	paymentsAccessJWT := os.Getenv("PAYMENTS_ACCESS_TOKEN")
+	if paymentsAccessJWT != "" {
+		defaultPaymentsAccessJWT = paymentsAccessJWT
 	}
 
-	defaultPaymentsAccessJWT = defaultPaymentsRefreshJWT // HACK
+	if defaultPaymentsAccessJWT == "" {
+		defaultPaymentsRefreshJWT = os.Getenv("PAYMENTS_REFRESH_TOKEN")
+		if defaultPaymentsRefreshJWT == "" {
+			Log.Panicf("failed to parse PAYMENTS_REFRESH_TOKEN from bookie environent")
+		}
 
-	// token, err := ident.CreateToken(defaultPaymentsRefreshJWT, map[string]interface{}{
-	// 	"grant_type": "refresh_token",
-	// })
-	// if err != nil {
-	// 	Log.Panicf("failed to authorize access token for given payments refresh token; %s", err.Error())
-	// }
+		err := refreshPaymentsAccessToken()
+		if err != nil {
+			Log.Panicf(err.Error())
+		}
 
-	// if token.AccessToken == nil {
-	// 	Log.Panicf("failed to authorize access token for given payments refresh token: %s", token.ID.String())
-	// }
-	// defaultPaymentsAccessJWT = *token.AccessToken
+		go func() {
+			timer := time.NewTicker(refreshTokenTickInterval)
+			for {
+				select {
+				case <-timer.C:
+					err = refreshPaymentsAccessToken()
+					if err != nil {
+						Log.Debugf("failed to refresh payments access token; %s", err.Error())
+					}
+				default:
+					time.Sleep(refreshTokenSleepInterval)
+				}
+			}
+		}()
+	}
+}
+
+func refreshPaymentsAccessToken() error {
+	if defaultPaymentsRefreshJWT == "" {
+		return errors.New("failed to refresh payments access token")
+	}
+
+	token, err := ident.CreateToken(defaultPaymentsRefreshJWT, map[string]interface{}{
+		"grant_type": "refresh_token",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to authorize access token for given payments refresh token; %s", err.Error())
+	}
+
+	if token.AccessToken == nil {
+		return fmt.Errorf("failed to authorize access token for given payments refresh token: %s", token.ID.String())
+	}
+
+	defaultPaymentsAccessJWT = *token.AccessToken
+	return nil
 }
 
 func requireVault() {

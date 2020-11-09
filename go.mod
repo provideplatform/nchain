@@ -35,7 +35,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideservices/provide-go v0.0.0-20201028125719-d0267eaa8cbf
+	github.com/provideservices/provide-go v0.0.0-20201109140457-70d750eff26f
 	go.mongodb.org/mongo-driver v1.3.3
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
