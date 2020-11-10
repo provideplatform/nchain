@@ -17,6 +17,11 @@ import (
 	provide "github.com/provideservices/provide-go/api"
 )
 
+const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
+const natsShuttleCircuitDeployedMaxInFlight = 1024
+const natsShuttleCircuitDeployedInvocationTimeout = time.Second * 30
+const natsShuttleCircuitDeployedTimeout = int64(natsShuttleCircuitDeployedInvocationTimeout * 3)
+
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleContractDeployedMaxInFlight = 1024
 const natsShuttleContractDeployedInvocationTimeout = time.Second * 30
@@ -30,7 +35,22 @@ func init() {
 
 	natsutil.EstablishSharedNatsStreamingConnection(nil)
 
+	createNatsShuttleCircuitDeployedSubject(&waitGroup)
 	createNatsShuttleContractDeployedSubject(&waitGroup)
+}
+
+func createNatsShuttleCircuitDeployedSubject(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			natsShuttleCircuitDeployedInvocationTimeout,
+			natsShuttleCircuitDeployedSubject,
+			natsShuttleCircuitDeployedSubject,
+			consumeShuttleCircuitDeployedMsg,
+			natsShuttleCircuitDeployedInvocationTimeout,
+			natsShuttleCircuitDeployedMaxInFlight,
+			nil,
+		)
+	}
 }
 
 func createNatsShuttleContractDeployedSubject(wg *sync.WaitGroup) {
@@ -45,6 +65,22 @@ func createNatsShuttleContractDeployedSubject(wg *sync.WaitGroup) {
 			nil,
 		)
 	}
+}
+
+func consumeShuttleCircuitDeployedMsg(msg *stan.Msg) {
+	common.Log.Debugf("Consuming NATS shuttle circuit deployed message: %s", msg)
+
+	var params map[string]interface{}
+
+	err := json.Unmarshal(msg.Data, &params)
+	if err != nil {
+		common.Log.Warningf("Failed to umarshal shuttle circuit deployed message; %s", err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	common.Log.Debugf("shuttle.circuit.deployed message is currently a no-op")
+	msg.Ack()
 }
 
 func consumeShuttleContractDeployedMsg(msg *stan.Msg) {

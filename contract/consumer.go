@@ -27,6 +27,7 @@ const natsNetworkContractCreateInvocationMaxInFlight = 32
 const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
+const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
 
 type natsLogEventMessage struct {
 	Address         *string                `json:"address,omitempty"`
@@ -207,7 +208,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 				natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
 			} else {
 				common.Log.Debugf("Published %d-byte log event with id: %s; subject: %s", len(payload), eventIDHex, *qualifiedSubject)
-				if subject == natsShuttleContractDeployedSubject { // HACK!!!
+				if subject == natsShuttleContractDeployedSubject || subject == natsShuttleCircuitDeployedSubject { // HACK!!!
 					natsutil.NatsStreamingPublish(subject, payload)
 				}
 				msg.Ack()

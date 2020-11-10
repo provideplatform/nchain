@@ -18,6 +18,7 @@ import (
 	"github.com/provideapp/nchain/network"
 	provide "github.com/provideservices/provide-go/api"
 	api "github.com/provideservices/provide-go/api/nchain"
+	prvdcrypto "github.com/provideservices/provide-go/crypto"
 )
 
 const resolveTokenTickerInterval = time.Millisecond * 5000
@@ -269,9 +270,33 @@ func (c *Contract) Create() bool {
 						}
 					}
 
+					// FIXME-- should not be here.
+					_abi, err := c.ReadEthereumContractAbi()
+					if err != nil {
+						c.Errors = append(c.Errors, &provide.Error{
+							Message: common.StringOrNil(fmt.Sprintf("failed to create contract; %s", err.Error())),
+						})
+						return false
+					}
+
+					data := compiledArtifact.Bytecode
+					if argv, argvOk := params["argv"].([]interface{}); argvOk {
+						if len(argv) > 0 {
+							encodedArgv, err := prvdcrypto.EVMEncodeABI(&_abi.Constructor, argv...)
+							if err != nil {
+								common.Log.Warningf("failed to encode contract constructor args; %s", err.Error())
+								c.Errors = append(c.Errors, &provide.Error{
+									Message: common.StringOrNil(fmt.Sprintf("failed to encode contract constructor args; %s", err.Error())),
+								})
+								return false
+							}
+							data = fmt.Sprintf("%s%x", data, string(encodedArgv))
+						}
+					}
+
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
 						"contract_id":        c.ID,
-						"data":               compiledArtifact.Bytecode,
+						"data":               data,
 						"account_id":         accountID,
 						"wallet_id":          walletID,
 						"hd_derivation_path": hdDerivationPath,
@@ -280,7 +305,7 @@ func (c *Contract) Create() bool {
 						"published_at":       time.Now(),
 					})
 
-					err := natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
+					err = natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
 						c.Errors = append(c.Errors, &provide.Error{

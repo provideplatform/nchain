@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -180,9 +181,7 @@ func refreshPaymentsAccessToken() error {
 		return errors.New("failed to refresh payments access token")
 	}
 
-	token, err := ident.CreateToken(defaultPaymentsRefreshJWT, map[string]interface{}{
-		"grant_type": "refresh_token",
-	})
+	token, err := refreshAccessToken(defaultPaymentsRefreshJWT)
 	if err != nil {
 		return fmt.Errorf("failed to authorize access token for given payments refresh token; %s", err.Error())
 	}
@@ -241,4 +240,28 @@ func requireVault() {
 			Log.Debugf("created default nchain mtx key instance: %s", DefaultKey.ID.String())
 		}
 	}
+}
+
+func refreshAccessToken(token string) (*ident.Token, error) {
+	status, resp, err := ident.InitDefaultIdentService(StringOrNil(token)).Post("tokens", map[string]interface{}{
+		"grant_type": "refresh_token",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if status != 201 {
+		return nil, fmt.Errorf("failed to refresh access token; status: %v; %s", status, err.Error())
+	}
+
+	// FIXME...
+	tkn := &ident.Token{}
+	tknraw, _ := json.Marshal(resp)
+	err = json.Unmarshal(tknraw, &tkn)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to authorize token; status: %v; %s", status, err.Error())
+	}
+
+	return tkn, nil
 }
