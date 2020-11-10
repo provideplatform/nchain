@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/connector"
@@ -46,6 +47,7 @@ func init() {
 		common.Log.Panicf("dedicated API instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
 		return
 	}
+	godotenv.Load()
 
 	util.RequireJWT()
 	util.RequireGin()

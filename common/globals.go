@@ -150,7 +150,7 @@ func requirePayments() {
 	if defaultPaymentsAccessJWT == "" {
 		defaultPaymentsRefreshJWT = os.Getenv("PAYMENTS_REFRESH_TOKEN")
 		if defaultPaymentsRefreshJWT == "" {
-			Log.Panicf("failed to parse PAYMENTS_REFRESH_TOKEN from bookie environent")
+			Log.Panicf("failed to parse PAYMENTS_REFRESH_TOKEN from nchain environent")
 		}
 
 		err := refreshPaymentsAccessToken()

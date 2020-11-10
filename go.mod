@@ -19,6 +19,7 @@ require (
 	github.com/ipfs/go-cid v0.0.4 // indirect
 	github.com/ipfs/go-ipfs-api v0.0.2
 	github.com/jinzhu/gorm v1.9.16
+	github.com/joho/godotenv v1.3.0
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
 	github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122
 	github.com/kthomas/go-azure-wrapper v0.0.0-20200907095139-0122b394ac33
@@ -35,7 +36,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideservices/provide-go v0.0.0-20201109140457-70d750eff26f
+	github.com/provideservices/provide-go v0.0.0-20201110145856-2a98ad12dc52
 	go.mongodb.org/mongo-driver v1.3.3
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
