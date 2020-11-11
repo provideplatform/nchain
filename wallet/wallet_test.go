@@ -1,3 +1,5 @@
+// +build integration_legacy
+
 package wallet_test
 
 import (

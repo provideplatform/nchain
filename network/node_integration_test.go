@@ -1,4 +1,4 @@
-// +build integration
+// +build integration_legacy
 
 package network_test
 
