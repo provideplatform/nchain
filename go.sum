@@ -386,6 +386,7 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
+github.com/kthomas/go-auth0 v0.0.0-20200602063018-d45ad85a2325 h1:iMO7yFYhqkKsGbaA0V5yC63GYwdZubem6d6pxAogCZQ=
 github.com/kthomas/go-auth0 v0.0.0-20200602063018-d45ad85a2325/go.mod h1:5EldCqcNHCsr438udBKWrheZWbvXbUnyF4Jo1PMeBSA=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBHOhd8DjpcK3ewKvM6YD0E5wHf6LAyTd6XX0=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
@@ -408,6 +409,7 @@ github.com/kthomas/go-self-signed-cert v0.0.0-20200602041729-f9878375d46e h1:G//
 github.com/kthomas/go-self-signed-cert v0.0.0-20200602041729-f9878375d46e/go.mod h1:2U4e9gFnjUVWhKO7bMhpRh5k3SoQIZAsahqb+gQhaFI=
 github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4 h1:xWgita+beQTA+NaWz1dSFnWMZFLFPpRNZ0NdG1VOfOQ=
 github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4/go.mod h1:HqzG4AC71EusLj6ojuBNx8UKX03eWGSSXNYuKE7sUNo=
+github.com/kthomas/trumail v0.0.0-20190925185815-ab3de2e834a3 h1:/ROUUH3uXMmWpXQDxeAeCTxE72abSIoxUrlTQKxmRtw=
 github.com/kthomas/trumail v0.0.0-20190925185815-ab3de2e834a3/go.mod h1:z63ssnwIkxYPFQeArk8cJ+IBZNCIiEcC+JnULsF/dF4=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/leodido/go-urn v1.2.0 h1:hpXL4XnriNwQ/ABnpepYM/1vCLWNDfUNts8dX3xTG6Y=

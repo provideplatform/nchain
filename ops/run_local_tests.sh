@@ -4,15 +4,15 @@ set -e
 echo "" > coverage.txt
 
 if [[ -z "${DATABASE_NAME}" ]]; then
-  DATABASE_NAME=nchain_test
+  DATABASE_NAME=nchain_dev
 fi
 
 if [[ -z "${DATABASE_USER}" ]]; then
-  DATABASE_USER=nchaintest
+  DATABASE_USER=nchain
 fi
 
 if [[ -z "${DATABASE_PASSWORD}" ]]; then
-  DATABASE_PASSWORD=
+  DATABASE_PASSWORD=nchain
 fi
 
 if [[ -z "${NATS_SERVER_PORT}" ]]; then
@@ -35,12 +35,15 @@ if [[ -z "${TAGS}" ]]; then
   TAGS=unit
 fi
 
-dropdb $DATABASE_NAME || true >/dev/null
-dropuser $DATABASE_USER || true >/dev/null
+#dropdb $DATABASE_NAME || true >/dev/null
+#dropuser $DATABASE_USER || true >/dev/null
+
+#PGPASSWORD=$DATABASE_SUPERUSER_PASSWORD dropdb -U $DATABASE_SUPERUSER -h 0.0.0.0 -p $DATABASE_PORT $DATABASE_NAME || true >/dev/null
+#PGPASSWORD=$DATABASE_SUPERUSER_PASSWORD dropuser -U $DATABASE_SUPERUSER -h 0.0.0.0 -p $DATABASE_PORT $DATABASE_USER || true >/dev/null
 
 DATABASE_USER=$DATABASE_USER DATABASE_PASSWORD=$DATABASE_PASSWORD DATABASE_NAME=$DATABASE_NAME make migrate
-PGPASSWORD=${DATABASE_PASSWORD} psql -U ${DATABASE_USER} ${DATABASE_NAME} < db/networks_test.sql || true >/dev/null
 
+echo now we are here
 PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBF1Db+IBEAC0nRf3s6rls6jhWeWWTAJY8Nn4+qPUbSu0ZOx1DAqOHHxYAek1
@@ -204,12 +207,31 @@ dWaI2DVuGDp6xMrNtmWiOvoZry3/WceLuIqfrUyGhJCaIvepCsX2eg==
 
 PGP_PASSPHRASE=password
 
-pkgs=(bridge common connector consumer contract db filter network oracle prices token tx wallet)
+PAYMENTS_REFRESH_TOKEN='eyJhbGciOiJSUzI1NiIsImtpZCI6ImU2OmY3OmQ1OjI0OmUyOjU5OjA2OjJiOmJjOmEyOjhjOjM1OjlkOmNhOjBhOjg3IiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwczovL2lkZW50LnByb3ZpZGUuc2VydmljZXMvYXBpL3YxIiwiaWF0IjoxNjAwNzA5NzU0LCJpc3MiOiJodHRwczovL2lkZW50LnByb3ZpZGUuc2VydmljZXMiLCJqdGkiOiJjN2I2YzI2ZS00OTkwLTQ4YWYtYmMwYy05YWRiY2E5ZmRmNzYiLCJuYXRzIjp7InBlcm1pc3Npb25zIjp7InN1YnNjcmliZSI6eyJhbGxvdyI6WyJhcHBsaWNhdGlvbi4wMTU1NGUyMi0zZDdhLTQ0YTMtOWM2NS02YmNhYmFhMDhjMzgiLCJuZXR3b3JrLiouY29ubmVjdG9yLioiLCJuZXR3b3JrLiouc3RhdHVzIiwicGxhdGZvcm0uXHUwMDNlIl19fX0sInBydmQiOnsiYXBwbGljYXRpb25faWQiOiIwMTU1NGUyMi0zZDdhLTQ0YTMtOWM2NS02YmNhYmFhMDhjMzgiLCJleHRlbmRlZCI6eyJwZXJtaXNzaW9ucyI6eyIqIjo1MTB9fSwicGVybWlzc2lvbnMiOjUxMH0sInN1YiI6ImFwcGxpY2F0aW9uOjAxNTU0ZTIyLTNkN2EtNDRhMy05YzY1LTZiY2FiYWEwOGMzOCJ9.iPYYSS0hHNYLUXcgpBfQbo6goMGDHF5Oxv1OvkB-WAzRgZSAm2HFroOUsmPlCQwO5eNeTfMqRaQMDdl6idTCip99y-zYTu8ys7dahyk4P1lhh4BB8vTCl3AHQuyUTGloMrY2JytpkmXMZTsxu-UhQxaaQN0IlSotSIFAYPT3jHH5nYy2MJbcfxePt8xKmXzwvpjTEVJRmUfAfEXjJF34S3hAuw9S7WncKucZfuP1WwP65h53HbLB69DR6KFZ76eiRavke5RpT40r9UKC6zPP-UZhTAuWQjOSmBhkd_IUg4T2a8r4W9CJT6aLgtwE0i1OUrPDVj_EzQV9tsjlwIOv5y9r_p-sfdxXdHFfoT8nAs5uIcWTw45J2Ycc0b4vqs-sYDr2qn7TS5DvJbPQSnRBS9YZ8CJq9mFpc5GjunCzEqO6JkvEWaN1mqPJbcvMGmLRQt5zA-2D0fFq1mvIUCUcg3EQ5J5lAZqudGf9mnYf4xRIMacCssF5VsP36xXg7pnscqh3u3JdQ-Fon3nB5vbIXn2fxaJjYl4ggNr-IgLxK7_h9KlDkiv7I7EKWGl2Np0q3-mVvuTIk7M-GqT3Dx9TtpR6MsK6EX0frUH3bZH8RHBHnxx67oxNMamviT-XUNudUU7Wan1PfnaPSsqfrn6OT5Abep-BbewKJn3ErY0Z-oU'
+NCHAIN_API_HOST='localhost:8080'
+NCHAIN_API_PATH='api/v1'
+NCHAIN_API_SCHEME='http'
+IDENT_API_HOST='localhost:8081'
+IDENT_API_PATH='api/v1'
+IDENT_API_SCHEME='http'
+VAULT_API_HOST='localhost:8082'
+VAULT_API_PATH='api/v1'
+VAULT_API_SCHEME='http'
+VAULT_SEAL_UNSEAL_KEY='traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day'
+VAULT_REFRESH_TOKEN='eyJhbGciOiJSUzI1NiIsImtpZCI6IjEwOjJlOmQ5OmUxOmI4OmEyOjM0OjM3Ojk5OjNhOjI0OmZjOmFhOmQxOmM4OjU5IiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwczovL3Byb3ZpZGUuc2VydmljZXMvYXBpL3YxIiwiZXhwIjoxNjA1NzgxNjg4LCJpYXQiOjE2MDMxODk2ODgsImlzcyI6Imh0dHBzOi8vaWRlbnQucHJvdmlkZS5zZXJ2aWNlcyIsImp0aSI6IjMwYzdkMDJlLWNmMTktNGExNC05MzVjLWVjMmVkNjlhOWIzYyIsIm5hdHMiOnsicGVybWlzc2lvbnMiOnsic3Vic2NyaWJlIjp7ImFsbG93IjpbInVzZXIuYzA5NjZjMmYtODQxNC00YTBjLTg2NDEtMTYxYjM0NzMzOWVhIiwibmV0d29yay4qLmNvbm5lY3Rvci4qIiwibmV0d29yay4qLnN0YXR1cyIsInBsYXRmb3JtLlx1MDAzZSJdfX19LCJwcnZkIjp7InBlcm1pc3Npb25zIjo3NTUzLCJ1c2VyX2lkIjoiYzA5NjZjMmYtODQxNC00YTBjLTg2NDEtMTYxYjM0NzMzOWVhIn0sInN1YiI6InRva2VuOjkyN2VjNzNmLTZiOWQtNDhiMi05ODJmLWYxMGY3ODA2NzIzNyJ9.cRcgerEouLBL-RrGcy5BvWdUPVxiXxuczAn_TIuRVoYcw6LBuLbqZrfOUE_ioixmXWiumMBiOAKe49BGILlcg7ffuLCJ9P7ROzx9QxDTPFuOR109B_RIibSnkeAY44No85NibGEB_uApYIbBHTNnAzf_PksoXJ4cAuR0g_r3birUPllFKaHHqvLtg2JLoco4-YXnVsxYy6a93vuBAzPhL_-4QoB12hunsJvAr358hr8Ycp-VRzDBM-lSFRPnmUEyPiNX8cZPRop6axQLPWmISfy50Qz3eiUqG2t3KC98r5n74B2oqmZQSdI3h85o1o6Y5m24dVSdieyyQY8XZBhaKhPFeccWrVI5lHBC4cOCOGL5MB3mAuSYcq9u20qVyZ7P4dZ-xit_UKkaM9ViKWue69zo9YSadws8URjyMdxhxR6czNcvBX0IFTo7AJ_r9OzgsoqZjtVV7f_r6DPKGhAcwregtEG5-JEp2h5F5lwnBXlysPuFGfpjh6qeMx5Ew8JoZ9cW038CFDHRrPwCHyG7SbJ6zEdA-giCx-ZX6fA6mHYuv76S1vkksH9_Y2fDLO3uY8KMXCwdXuFBSYmZ3BKUhei3LZbkJRCO35Ogyd7C94Bw9s1lAmvRerayRF_Hy6GYMXQH85t4Ghqcv3NXsCPkvr5BWj8XiOPIclUgXme3Kts'
+
+#pkgs=(bridge common connector consumer contract db filter network oracle prices token tx wallet)
+pkgs=(integration)
+
+
+
+
+
 for d in "${pkgs[@]}" ; do
   pkg=$(echo $d | sed 's/\/*$//g')
   
   if [ "$RACE" = "true" ]; then
-    PGP_PUBLIC_KEY=$PGP_PUBLIC_KEY \
+    PGP_PUBLIC_KEY=${PGP_PUBLIC_KEY} \
     PGP_PRIVATE_KEY=$PGP_PRIVATE_KEY \
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
     NATS_TOKEN=testtoken \
@@ -226,6 +248,15 @@ for d in "${pkgs[@]}" ; do
     REDIS_HOSTS=localhost:${REDIS_SERVER_PORT} \
     TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
     TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
+    PAYMENTS_REFRESH_TOKEN=${PAYMENTS_REFRESH_TOKEN} \
+    IDENT_API_HOST=${IDENT_API_HOST} \
+    IDENT_API_SCHEME=${IDENT_API_SCHEME} \
+    VAULT_API_HOST=${VAULT_API_HOST} \
+    VAULT_API_SCHEME=${VAULT_API_SCHEME} \
+    NCHAIN_API_HOST=${NCHAIN_API_HOST} \
+    NCHAIN_API_SCHEME=http \
+    VAULT_SEAL_UNSEAL_KEY=${VAULT_SEAL_UNSEAL_KEY} \
+    VAULT_REFRESH_TOKEN=${VAULT_REFRESH_TOKEN} \
     go test "./${pkg}" -v \
                        -race \
                        -timeout 1800s \
@@ -251,6 +282,15 @@ for d in "${pkgs[@]}" ; do
     REDIS_HOSTS=localhost:${REDIS_SERVER_PORT} \
     TEST_AWS_ACCESS_KEY_ID=${TEST_AWS_ACCESS_KEY_ID} \
     TEST_AWS_SECRET_ACCESS_KEY=${TEST_AWS_SECRET_ACCESS_KEY} \
+    PAYMENTS_REFRESH_TOKEN=${PAYMENTS_REFRESH_TOKEN} \
+    IDENT_API_HOST=${IDENT_API_HOST} \
+    IDENT_API_SCHEME=${IDENT_API_SCHEME} \
+    #VAULT_API_HOST=${VAULT_API_HOST} \
+    #VAULT_API_SCHEME=${VAULT_API_SCHEME} \
+    #NCHAIN_API_HOST=${NCHAIN_API_HOST} \
+    #NCHAIN_API_SCHEME=${NCHAIN_API_SCHEME} \   
+    #VAULT_REFRESH_TOKEN=${VAULT_REFRESH_TOKEN} \
+    #VAULT_SEAL_UNSEAL_KEY=${VAULT_SEAL_UNSEAL_KEY} \
     go test "./${pkg}" -v \
                        -timeout 1800s \
                        -cover \
