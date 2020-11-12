@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/joho/godotenv"
 	"github.com/provideapp/nchain/common"
 
 	"github.com/golang-migrate/migrate"
@@ -22,6 +23,13 @@ const initIfNotExistsRetryInterval = time.Second * 5
 const initIfNotExistsTimeout = time.Second * 30
 
 func main() {
+
+	enverr := godotenv.Load()
+	if enverr != nil {
+		common.Log.Debugf("xxxerror loading env vars. Error: %s", enverr)
+	}
+	common.Log.Debugf("xxxpayments refresh token (from env): %s", os.Getenv("PAYMENTS_REFRESH_TOKEN"))
+
 	cfg := dbconf.GetDBConfig()
 
 	err := initIfNotExists(
