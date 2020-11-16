@@ -707,8 +707,14 @@ func (n *Network) Validate() bool {
 	}
 
 	config := map[string]interface{}{}
+
 	if n.Config != nil {
 		err := json.Unmarshal(*n.Config, &config)
+		if err != nil {
+			n.Errors = append(n.Errors, &provide.Error{
+				Message: common.StringOrNil("error parsing config"),
+			})
+		}
 
 		if err == nil && len(config) == 0 {
 			n.Errors = append(n.Errors, &provide.Error{

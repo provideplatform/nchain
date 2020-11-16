@@ -36,7 +36,7 @@ func getUser(testID uuid.UUID) User {
 	return nchainUser
 }
 
-func userFactory(testID uuid.UUID) (*provide.User, error) {
+func userFactoryByTestId(testID uuid.UUID) (*provide.User, error) {
 
 	identUser := getUser(testID)
 
@@ -48,7 +48,25 @@ func userFactory(testID uuid.UUID) (*provide.User, error) {
 	})
 }
 
-func getUserToken(testID uuid.UUID) (*provide.Token, error) {
+func userFactory(firstName, lastName, email, password string) (*provide.User, error) {
+	return provide.CreateUser("", map[string]interface{}{
+		"first_name": firstName,
+		"last_name":  lastName,
+		"email":      email,
+		"password":   password,
+	})
+}
+
+func getUserToken(email, password string) (*provide.Token, error) {
+	authResponse, err := provide.Authenticate(email, password)
+	if err != nil {
+		return nil, fmt.Errorf("error authenticating user. Error: %s", err.Error())
+	}
+
+	return authResponse.Token, nil
+}
+
+func getUserTokenByTestId(testID uuid.UUID) (*provide.Token, error) {
 	nchainUser := getUser(testID)
 	authResponse, err := provide.Authenticate(nchainUser.email, nchainUser.password)
 	if err != nil {
@@ -65,7 +83,7 @@ func getOrgToken(testID uuid.UUID) (*string, error) {
 		"orgdesc " + testID.String(),
 	}
 
-	userToken, err := createUserAndGetToken(testID)
+	userToken, err := UserAndTokenFactory(testID)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user and getting token. Error: %s ", err.Error())
 	}
@@ -83,11 +101,11 @@ func getOrgToken(testID uuid.UUID) (*string, error) {
 	return orgToken.Token, nil
 }
 
-func createUserAndGetToken(testID uuid.UUID) (*string, error) {
+func UserAndTokenFactory(testID uuid.UUID) (*string, error) {
 	// set up the user - who cares if we get a 409 - user already exists, just error if we can't get a token
-	_, _ = userFactory(testID)
+	_, _ = userFactoryByTestId(testID)
 
-	token, err := getUserToken(testID)
+	token, err := getUserTokenByTestId(testID)
 	if err != nil {
 		return nil, fmt.Errorf("error generating token. Error: %s", err.Error())
 	}
