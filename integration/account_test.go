@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"encoding/json"
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
@@ -10,28 +11,28 @@ import (
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
-func TestCreateAccount(t *testing.T) {
+// func TestCreateAccount(t *testing.T) {
 
-	testId, err := uuid.NewV4()
-	if err != nil {
-		t.Logf("error creating new UUID")
-	}
+// 	testId, err := uuid.NewV4()
+// 	if err != nil {
+// 		t.Logf("error creating new UUID")
+// 	}
 
-	token, err := UserAndTokenFactory(testId)
-	if err != nil {
-		t.Errorf("user authentication failed. Error: %s", err.Error())
-	}
+// 	token, err := UserAndTokenFactory(testId)
+// 	if err != nil {
+// 		t.Errorf("user authentication failed. Error: %s", err.Error())
+// 	}
 
-	account, err := provide.CreateAccount(*token, map[string]interface{}{
-		"network_id": ropstenNetworkID,
-	})
+// 	account, err := provide.CreateAccount(*token, map[string]interface{}{
+// 		"network_id": ropstenNetworkID,
+// 	})
 
-	if err != nil {
-		t.Errorf("error creating account. Error: %s", err.Error())
-		return
-	}
-	t.Logf("account created: %+v", account)
-}
+// 	if err != nil {
+// 		t.Errorf("error creating account. Error: %s", err.Error())
+// 		return
+// 	}
+// 	t.Logf("account created: %+v", account)
+// }
 
 func TestListAccounts(t *testing.T) {
 	testId, err := uuid.NewV4()
@@ -58,29 +59,57 @@ func TestListAccounts(t *testing.T) {
 		{"joey10", "joe joe10", "j.j10" + testId.String() + "@email.com", "secrit_password", nil},
 	}
 
-	userToken := &ident.Token{}
+	setupUser, err := userFactoryByTestId(testId)
+	if err != nil {
+		t.Errorf("error setting up ident user. Error: %s", err.Error())
+		return
+	}
+
+	setupUserToken, err := getUserToken(setupUser.Email, "secrit_password") //HACK gen password properly!
+	if err != nil {
+		t.Errorf("error getting setup user token. Error: %s", err.Error())
+		return
+	}
+
+	testcaseApp := Application{
+		"app" + testId.String(),
+		"appdesc " + testId.String(),
+	}
+
+	app, err := appFactory(*setupUserToken.Token, testcaseApp.name, testcaseApp.description)
+	if err != nil {
+		t.Errorf("error setting up application. Error: %s", err.Error())
+		return
+	}
+
+	appToken, err := appTokenFactory(*setupUserToken.Token, app.ID)
+	if err != nil {
+		t.Errorf("error getting app token. Error: %s", err.Error())
+		return
+	}
 
 	for _, user := range users {
 
 		// create the ident user
-		_, err = userFactory(user.firstName, user.lastName, user.email, user.password)
+		identUser, err := userFactory(user.firstName, user.lastName, user.email, user.password)
 		if err != nil {
 			t.Errorf("error creating user. Error: %s", err.Error())
+			return
 		}
 
-		// get the ident user token
-		token, err := getUserToken(user.email, user.password)
+		// use the app token to add that user to the application
+		err = ident.CreateApplicationUser(*appToken.Token, app.ID.String(), map[string]interface{}{
+			"user_id": identUser.ID.String(),
+		})
 		if err != nil {
-			t.Errorf("error getting user token. Error: %s", err.Error())
-		}
-
-		if userToken.Token == nil {
-			userToken = token
+			t.Errorf("error adding user %s to app %s. Error: %s", identUser.ID, app.ID, err.Error())
+			return
 		}
 
 		// create the account for that user, for the Ropsten network
-		account, err := provide.CreateAccount(*token.Token, map[string]interface{}{
-			"network_id": ropstenNetworkID,
+		account, err := provide.CreateAccount(*appToken.Token, map[string]interface{}{
+			"network_id":     ropstenNetworkID,
+			"application_id": app.ID,
 		})
 
 		if err != nil {
@@ -89,17 +118,31 @@ func TestListAccounts(t *testing.T) {
 		t.Logf("account created: %+v", account)
 	}
 
-	t.Logf("userToken: %+v", *userToken)
-
-	// damn, need to enable ropsten before this works...
-	status, resp, err := provide.ListAccounts(*userToken.Token, map[string]interface{}{
+	status, resp, err := provide.ListAccounts(*appToken.Token, map[string]interface{}{
 		"network_id": ropstenNetworkID,
 	})
-
 	if err != nil {
 		t.Errorf("error listing accounts. Error: %s", err.Error())
 		return
 	}
-	t.Logf("status: %v", status)
-	t.Logf("response: %+v", resp)
+
+	if status != 200 {
+		t.Errorf("invalid status returned. Expected 200, got %v", status)
+		return
+	}
+	//TODO transpose this to provide-go
+	accounts := make([]*provide.Account, 0)
+	for _, item := range resp.([]interface{}) {
+		acc := &provide.Account{}
+		accraw, _ := json.Marshal(item)
+		json.Unmarshal(accraw, &acc)
+		accounts = append(accounts, acc)
+	}
+
+	t.Logf("number of accounts returned: %d", len(accounts))
+
+	if len(accounts) != len(users) {
+		t.Errorf("incorrect number of accounts returned. Expected %d, got %d", len(users), len(accounts))
+		return
+	}
 }

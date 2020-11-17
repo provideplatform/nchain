@@ -101,6 +101,32 @@ func getOrgToken(testID uuid.UUID) (*string, error) {
 	return orgToken.Token, nil
 }
 
+func AppAndTokenFactory(testID uuid.UUID, userID uuid.UUID) (*string, error) {
+	_, _ = userFactoryByTestId(testID)
+
+	token, err := getUserTokenByTestId(testID)
+	if err != nil {
+		return nil, fmt.Errorf("error generating user token. Error: %s", err.Error())
+	}
+
+	nchainApp := Application{
+		"app" + testID.String(),
+		"appdesc " + testID.String(),
+	}
+
+	app, err := appFactory(*token.Token, nchainApp.name, nchainApp.description)
+	if err != nil {
+		return nil, fmt.Errorf("error generating application. Error: %s", err.Error())
+	}
+
+	appToken, err := appTokenFactory(*token.Token, app.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error generating app token. Error: %s", err.Error())
+	}
+
+	return appToken.Token, nil
+}
+
 func UserAndTokenFactory(testID uuid.UUID) (*string, error) {
 	// set up the user - who cares if we get a 409 - user already exists, just error if we can't get a token
 	_, _ = userFactoryByTestId(testID)
@@ -135,6 +161,13 @@ func apporgFactory(token, applicationID, organizationID string) error {
 func appTokenFactory(token string, applicationID uuid.UUID) (*provide.Token, error) {
 	return provide.CreateToken(token, map[string]interface{}{
 		"application_id": applicationID,
+	})
+}
+
+func appUserTokenFactory(token string, applicationID, userID uuid.UUID) (*provide.Token, error) {
+	return provide.CreateToken(token, map[string]interface{}{
+		"application_id": applicationID,
+		"user_id":        userID,
 	})
 }
 
