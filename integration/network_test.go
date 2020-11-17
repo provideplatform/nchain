@@ -3,9 +3,11 @@
 package integration
 
 import (
+	"encoding/json"
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
@@ -79,9 +81,57 @@ func TestEnableRopsten(t *testing.T) {
 		return
 	}
 
+	// let's try marshalling the ropsten config into my objects
+	config := &chainConfig{}
+	configRaw, _ := json.Marshal(ropsten.Config)
+	err = json.Unmarshal(configRaw, &config)
+	if err != nil {
+		t.Errorf("failed to marshal ropsten config. Error: %s", err.Error())
+		return
+	}
+
+	t.Logf("chain config from db: %+v", *config)
+	// we'll add values the config is missing in order to enable ropsten
+	ropstenSpecConfig := chainSpecConfig{
+		HomesteadBlock:      0,
+		Eip150Block:         0,
+		Eip155Block:         0,
+		Eip158Block:         0,
+		ByzantiumBlock:      0,
+		ConstantinopleBlock: 0,
+		PetersburgBlock:     0,
+	}
+
+	ropstenAlloc := allocation{
+		notexportedhack: common.StringOrNil("this left blank"),
+	}
+
+	ropstenChainSpec := chainSpec{
+		Config:     &ropstenSpecConfig,
+		Alloc:      &ropstenAlloc,
+		Coinbase:   common.StringOrNil("0x0000000000000000000000000000000000000000"),
+		Difficulty: common.StringOrNil("0x20000"),
+		ExtraData:  common.StringOrNil(""),
+		GasLimit:   common.StringOrNil("0x2fefd8"),
+		Nonce:      common.StringOrNil("0x0000000000000042"),
+		Mixhash:    common.StringOrNil("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		ParentHash: common.StringOrNil("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		Timestamp:  common.StringOrNil("0x00"),
+	}
+
+	ropstenChainConfig := chainConfig{
+		NativeCurrency: common.StringOrNil("TEST"),
+		Platform:       common.StringOrNil("evm"),
+		EngineID:       common.StringOrNil("ethash"),
+		Chain:          common.StringOrNil("test"),
+		ProtocolID:     common.StringOrNil("pow"),
+		ChainSpec:      &ropstenChainSpec,
+	}
+
+	config.ChainSpec = &ropstenChainSpec
 	err = provide.UpdateNetwork(*token, ropstenNetworkID, map[string]interface{}{
 		"enabled": true,
-		"config":  ropsten.Config,
+		"config":  ropstenChainConfig,
 	})
 
 	if err != nil {
