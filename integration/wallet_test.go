@@ -130,7 +130,9 @@ func TestCreateWallet(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{})
+	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{
+		"purpose": 44,
+	})
 	if err != nil {
 		t.Errorf("error creating wallet")
 		return
@@ -150,12 +152,15 @@ func TestWalletDetails(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{})
+	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{
+		"purpose": 44,
+	})
 	if err != nil {
 		t.Errorf("error creating wallet")
 		return
 	}
 
+	t.Logf("*** wallet returned %+v", *wallet)
 	deets, err := GoGetWalletDetails(*userToken, wallet.WalletID.String(), map[string]interface{}{})
 	if err != nil {
 		t.Errorf("error getting wallet details")
@@ -213,7 +218,9 @@ func TestListWalletAccounts(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{})
+	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{
+		"purpose": 44,
+	})
 	if err != nil {
 		t.Errorf("error creating wallet")
 		return
