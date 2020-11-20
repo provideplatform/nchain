@@ -34,6 +34,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
 	github.com/provideservices/provide-go v0.0.0-20201116181012-0530db7023e6
+	github.com/tyler-smith/go-bip32 v1.0.0
 	go.mongodb.org/mongo-driver v1.3.3
 )
 

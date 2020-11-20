@@ -68,12 +68,14 @@ func init() {
 	}
 
 	ropstenChainConfig := chainConfig{
-		NativeCurrency: common.StringOrNil("TEST"),
-		Platform:       common.StringOrNil("evm"),
-		EngineID:       common.StringOrNil("ethash"),
-		Chain:          common.StringOrNil("test"),
-		ProtocolID:     common.StringOrNil("pow"),
-		ChainSpec:      &ropstenChainSpec,
+		NativeCurrency:    common.StringOrNil("TEST"),
+		Platform:          common.StringOrNil("evm"),
+		EngineID:          common.StringOrNil("ethash"),
+		IsEthereumNetwork: true,
+		JsonRpcUrl:        common.StringOrNil("https://mainnet.infura.io/v3/fde5e81d5d3141a093def423db3eeb33"),
+		Chain:             common.StringOrNil("test"),
+		ProtocolID:        common.StringOrNil("pow"),
+		ChainSpec:         &ropstenChainSpec,
 	}
 
 	config.ChainSpec = &ropstenChainSpec

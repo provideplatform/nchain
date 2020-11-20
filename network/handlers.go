@@ -65,7 +65,6 @@ func createNetworkHandler(c *gin.Context) {
 	network.UserID = userID
 
 	if network.Create() {
-		*network.NetworkID = network.ID //hack
 		provide.Render(network, 201, c)
 	} else {
 		obj := map[string]interface{}{}
