@@ -45,12 +45,14 @@ type chainSpec struct {
 }
 
 type chainConfig struct {
-	NativeCurrency *string    `json:"native_currency"`
-	Platform       *string    `json:"platform"`
-	EngineID       *string    `json:"engine_id"`
-	Chain          *string    `json:"chain"`
-	ProtocolID     *string    `json:"protocol_id"`
-	ChainSpec      *chainSpec `json:"chainspec"`
+	NativeCurrency    *string    `json:"native_currency"`
+	IsEthereumNetwork bool       `json:"is_ethereum_network"`
+	JsonRpcUrl        *string    `json:"json_rpc_url"`
+	Platform          *string    `json:"platform"`
+	EngineID          *string    `json:"engine_id"`
+	Chain             *string    `json:"chain"`
+	ProtocolID        *string    `json:"protocol_id"`
+	ChainSpec         *chainSpec `json:"chainspec"`
 }
 
 type chainDef struct {
@@ -90,12 +92,13 @@ func NetworkFactory(token string, testId uuid.UUID) (*provide.Network, error) {
 	}
 
 	chainyConfig := chainConfig{
-		NativeCurrency: common.StringOrNil("TEST"),
-		Platform:       common.StringOrNil("evm"),
-		EngineID:       common.StringOrNil("ethash"),
-		Chain:          common.StringOrNil("test"),
-		ProtocolID:     common.StringOrNil("pow"),
-		ChainSpec:      &chainySpec,
+		NativeCurrency:    common.StringOrNil("TEST"),
+		Platform:          common.StringOrNil("evm"),
+		EngineID:          common.StringOrNil("ethash"),
+		IsEthereumNetwork: true,
+		Chain:             common.StringOrNil("test"),
+		ProtocolID:        common.StringOrNil("pow"),
+		ChainSpec:         &chainySpec,
 	}
 
 	chainName := fmt.Sprintf("Ethereum Testnet %s", testId.String())

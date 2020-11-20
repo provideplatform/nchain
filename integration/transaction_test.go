@@ -185,7 +185,46 @@ func TestCreateTransaction(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	tx, err := GoCreateTransaction(*userToken, map[string]interface{}{})
+	testcaseApp := Application{
+		"app" + testId.String(),
+		"appdesc " + testId.String(),
+	}
+
+	app, err := appFactory(*userToken, testcaseApp.name, testcaseApp.description)
+	if err != nil {
+		t.Errorf("error setting up application. Error: %s", err.Error())
+		return
+	}
+
+	appToken, err := appTokenFactory(*userToken, app.ID)
+	if err != nil {
+		t.Errorf("error getting app token. Error: %s", err.Error())
+		return
+	}
+
+	// create the account for that user, for the Ropsten network
+	account, err := GoCreateAccount(*appToken.Token, map[string]interface{}{
+		"network_id":     ropstenNetworkID,
+		"application_id": app.ID,
+	})
+
+	if err != nil {
+		t.Errorf("error creating user account. Error: %s", err.Error())
+	}
+	t.Logf("account created: %+v", account)
+
+	params := map[string]interface{}{}
+	parameter := fmt.Sprintf(`{"network_id":"%s"}`, ropstenNetworkID)
+	t.Logf("parameter is %s", parameter)
+	json.Unmarshal([]byte(parameter), &params)
+
+	tx, err := GoCreateTransaction(*userToken, map[string]interface{}{
+		"network_id": ropstenNetworkID,
+		"account_id": account.ID.String(),
+		"to":         "0xe8a43eFC2CE385AbA7465101262b03B0d2489c43", //fixme
+		"value":      10,
+		"params":     params,
+	})
 	if err != nil {
 		t.Errorf("error creating transaction")
 		return
