@@ -92,7 +92,7 @@ type Node struct {
 
 // NodeListQuery returns a DB query configured to select columns suitable for a paginated API response
 func NodeListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("nodes.id, nodes.created_at, nodes.network_id, nodes.user_id, nodes.application_id, nodes.organization_id, nodes.host, nodes.ipv4, nodes.ipv6, nodes.private_ipv4, nodes.private_ipv6, nodes.description, nodes.role, nodes.status, nodes.config")
+	return dbconf.DatabaseConnection().Select("nodes.id, nodes.created_at, nodes.c2_node_id, nodes.network_id, nodes.user_id, nodes.application_id, nodes.organization_id, nodes.description, nodes.role")
 }
 
 func (n *Node) DecryptedConfig() (map[string]interface{}, error) {
