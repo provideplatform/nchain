@@ -56,7 +56,11 @@ func init() {
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 
-	identcommon.EnableAPIAccounting()
+	common.RequireInfrastructureSupport()
+	common.RequirePayments()
+	common.RequireVault()
+
+	// identcommon.RequireAPIAccounting()
 	filter.CacheTxFilters()
 }
 

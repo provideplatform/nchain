@@ -43,6 +43,8 @@ func init() {
 
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
+
+	common.RequireInfrastructureSupport()
 }
 
 func main() {
