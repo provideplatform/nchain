@@ -9,6 +9,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
+	c2 "github.com/provideservices/provide-go/api/c2"
 	provide "github.com/provideservices/provide-go/common"
 	util "github.com/provideservices/provide-go/common/util"
 )
@@ -194,7 +195,7 @@ func connectorLoadBalancersListHandler(c *gin.Context) {
 		query = query.Where("load_balancers.type = ?", c.Query("type"))
 	}
 
-	loadBalancers := make([]*network.LoadBalancer, 0)
+	loadBalancers := make([]*c2.LoadBalancer, 0)
 	db.Model(&connector).Association("LoadBalancers").Find(&loadBalancers)
 	provide.Render(loadBalancers, 200, c)
 }

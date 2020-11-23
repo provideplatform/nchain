@@ -6,18 +6,13 @@ import (
 	provide "github.com/provideservices/provide-go/api"
 )
 
-const BaselineConnectorProvider = "baseline"
 const ElasticsearchConnectorProvider = "elasticsearch"
 const IPFSConnectorProvider = "ipfs"
 const MongoDBConnectorProvider = "mongodb"
 const NATSConnectorProvider = "nats"
-const RESTConnectorProvider = "rest"
-const ProvideConnectorProvider = "provide"
 const RedisConnectorProvider = "redis"
-const SplunkConnectorProvider = "splunk"
+const RESTConnectorProvider = "rest"
 const SQLConnectorProvider = "sql"
-const TableauConnectorProvider = "tableau"
-const UnibrightConnectorProvider = "unibright"
 const ZokratesConnectorProvider = "zokrates"
 
 const natsConnectorDenormalizeConfigSubject = "nchain.connector.config.denormalize"
