@@ -1,4 +1,11 @@
+ALTER TABLE ONLY connectors_load_balancers DROP CONSTRAINT connectors_load_balancers_pkey;
+ALTER TABLE ONLY connectors_load_balancers DROP CONSTRAINT connectors_load_balancers_connector_id_connectors_id_foreign;
+ALTER TABLE ONLY connectors_load_balancers DROP CONSTRAINT connectors_load_balancers_load_balancer_id_load_balancers_id_fo;
 DROP TABLE connectors_load_balancers;
+
+ALTER TABLE ONLY load_balancers_nodes DROP CONSTRAINT load_balancers_load_balancer_id_load_balancers_id_foreign;
+DROP TABLE load_balancers_nodes;
+
 DROP TABLE load_balancers;
 
 ALTER TABLE ONLY nodes DROP COLUMN host;
