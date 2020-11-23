@@ -16,55 +16,8 @@ import (
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
-// func TestCreateAccount(t *testing.T) {
-
-// 	testId, err := uuid.NewV4()
-// 	if err != nil {
-// 		t.Logf("error creating new UUID")
-// 	}
-
-// 	token, err := UserAndTokenFactory(testId)
-// 	if err != nil {
-// 		t.Errorf("user authentication failed. Error: %s", err.Error())
-// 	}
-
-// 	account, err := provide.CreateAccount(*token, map[string]interface{}{
-// 		"network_id": ropstenNetworkID,
-// 	})
-
-// 	if err != nil {
-// 		t.Errorf("error creating account. Error: %s", err.Error())
-// 		return
-// 	}
-// 	t.Logf("account created: %+v", account)
-// }
-
-// Account contains the specific account user details
-type Account struct {
-	api.Model
-	NetworkID      *uuid.UUID `json:"network_id,omitempty"`
-	WalletID       *uuid.UUID `json:"wallet_id,omitempty"`
-	ApplicationID  *uuid.UUID `json:"application_id,omitempty"`
-	UserID         *uuid.UUID `json:"user_id,omitempty"`
-	OrganizationID *uuid.UUID `json:"organization_id,omitempty"`
-
-	VaultID *uuid.UUID `json:"vault_id,omitempty"`
-	KeyID   *uuid.UUID `json:"key_id,omitempty"`
-
-	Type *string `json:"type,omitempty"`
-
-	HDDerivationPath *string `json:"hd_derivation_path,omitempty"` // i.e. m/44'/60'/0'/0
-	PublicKey        *string `json:"public_key,omitempty"`
-	PrivateKey       *string `json:"private_key,omitempty"`
-
-	Address    string     `json:"address"`
-	Balance    *big.Int   `json:"balance,omitempty"`
-	AccessedAt *time.Time `json:"accessed_at,omitempty"`
-	Wallet     *Wallet    `json:"-"`
-}
-
 // GoCreateAccount creates a new account
-func GoCreateAccount(token string, params map[string]interface{}) (*Account, error) {
+func GoCreateAccount(token string, params map[string]interface{}) (*provide.Account, error) {
 	uri := "accounts"
 	status, resp, err := nchain.InitNChainService(token).Post(uri, params)
 

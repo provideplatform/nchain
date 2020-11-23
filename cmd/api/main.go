@@ -53,6 +53,10 @@ func init() {
 	util.RequireGin()
 	redisutil.RequireRedis()
 
+	common.RequireInfrastructureSupport()
+	common.RequirePayments()
+	common.RequireVault()
+
 	// identcommon.RequireAPIAccounting()
 	filter.CacheTxFilters()
 }
