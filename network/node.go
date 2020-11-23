@@ -5,27 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
-	natsutil "github.com/kthomas/go-natsutil"
+
+	// natsutil "github.com/kthomas/go-natsutil"
 
 	// "github.com/provideapp/nchain/gpgputil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network/orchestration"
 	"github.com/provideapp/nchain/network/p2p"
 	provide "github.com/provideservices/provide-go/api"
+	c2 "github.com/provideservices/provide-go/api/c2"
 )
 
-const defaultDockerhubBaseURL = "https://hub.docker.com/v2/repositories"
 const defualtNodeLogRPP = int64(500)
 const nodeReachabilityTimeout = time.Millisecond * 2500
-const dockerRepoReachabilityTimeout = time.Millisecond * 2500
 
 const resolveGenesisTimeout = time.Minute * 10
 const resolveHostTimeout = time.Minute * 5
@@ -69,22 +67,24 @@ const p2pProtocolPOA = "poa"
 // or even phyiscal infrastructure
 type Node struct {
 	provide.Model
-	NetworkID       uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	UserID          *uuid.UUID       `sql:"type:uuid" json:"user_id"`
-	ApplicationID   *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	OrganizationID  *uuid.UUID       `sql:"type:uuid" json:"organization_id"`
-	Bootnode        bool             `sql:"not null;default:'false'" json:"-"`
-	Host            *string          `json:"host"`
-	IPv4            *string          `json:"ipv4"`
-	IPv6            *string          `json:"ipv6"`
-	PrivateIPv4     *string          `json:"private_ipv4"`
-	PrivateIPv6     *string          `json:"private_ipv6"`
-	Description     *string          `json:"description"`
-	Role            *string          `sql:"not null;default:'peer'" json:"role"`
-	Status          *string          `sql:"not null;default:'init'" json:"status"`
-	LoadBalancers   []LoadBalancer   `gorm:"many2many:load_balancers_nodes" json:"-"`
-	Config          *json.RawMessage `sql:"type:json" json:"config,omitempty"`
-	EncryptedConfig *string          `sql:"type:bytea" json:"-"`
+	C2NodeID       uuid.UUID  `sql:"not null;type:uuid" json:"c2_node_id"`
+	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
+	UserID         *uuid.UUID `sql:"type:uuid" json:"user_id"`
+	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"application_id"`
+	OrganizationID *uuid.UUID `sql:"type:uuid" json:"organization_id"`
+	Bootnode       bool       `sql:"not null;default:'false'" json:"-"`
+	Role           *string    `sql:"not null;default:'peer'" json:"role"`
+
+	// ephemeral fields -- enriched from C2
+	Host            *string          `sql:"-" json:"host"`
+	IPv4            *string          `sql:"-" json:"ipv4"`
+	IPv6            *string          `sql:"-" json:"ipv6"`
+	PrivateIPv4     *string          `sql:"-" json:"private_ipv4"`
+	PrivateIPv6     *string          `sql:"-" json:"private_ipv6"`
+	Description     *string          `sql:"-" json:"description"`
+	Status          *string          `sql:"-" json:"status"`
+	Config          *json.RawMessage `sql:"-" json:"config,omitempty"`
+	EncryptedConfig *string          `sql:"-" json:"-"` // FIXME!!!
 
 	privateConfig map[string]interface{} `sql:"-" json:"-"` // cache for decrypted config map in-memory
 	Network       *Network               `sql:"-" json:"-"` // in-memory reference to lazy-loaded network
@@ -93,22 +93,6 @@ type Node struct {
 // NodeListQuery returns a DB query configured to select columns suitable for a paginated API response
 func NodeListQuery() *gorm.DB {
 	return dbconf.DatabaseConnection().Select("nodes.id, nodes.created_at, nodes.network_id, nodes.user_id, nodes.application_id, nodes.organization_id, nodes.host, nodes.ipv4, nodes.ipv6, nodes.private_ipv4, nodes.private_ipv6, nodes.description, nodes.role, nodes.status, nodes.config")
-}
-
-// NodeLog represents an abstract API response containing syslog or similar messages
-type NodeLog struct {
-	Timestamp       *int64 `json:"timestamp"`
-	IngestTimestamp *int64 `json:"ingest_timestamp"`
-	Message         string `json:"message"`
-}
-
-// NodeLogsResponse represents an abstract API response containing NodeLogs
-// and pointer tokens to the next set of events in the stream; this is necessary
-// for properly paginating logs
-type NodeLogsResponse struct {
-	Logs      []*NodeLog `json:"logs"`
-	PrevToken *string    `json:"prev_token"`
-	NextToken *string    `json:"next_token"`
 }
 
 func (n *Node) DecryptedConfig() (map[string]interface{}, error) {
@@ -194,14 +178,28 @@ func (n *Node) SanitizeConfig() {
 }
 
 // Create and persist a new network node
-func (n *Node) Create() bool {
+func (n *Node) Create(token string) bool {
 	if !n.Validate() {
 		return false
 	}
 
+	db := dbconf.DatabaseConnection()
 	n.SanitizeConfig()
 
-	db := dbconf.DatabaseConnection()
+	err := n.deploy(db, token)
+	if err != nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
+		})
+		return false
+	}
+
+	if n.C2NodeID == uuid.Nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil("invalid C2 node id"),
+		})
+		return false
+	}
 
 	if db.NewRecord(n) {
 		result := db.Create(&n)
@@ -215,40 +213,10 @@ func (n *Node) Create() bool {
 			}
 		}
 		if !db.NewRecord(n) {
-			success := rowsAffected > 0
-			if success {
-				msg, _ := json.Marshal(map[string]interface{}{
-					"node_id": n.ID.String(),
-				})
-				natsutil.NatsStreamingPublish(natsDeployNodeSubject, msg)
-			}
-			return success
+			return rowsAffected > 0
 		}
 	}
 	return false
-}
-
-// Update an existing network node
-func (n *Node) Update() bool {
-	if !n.Validate() {
-		return false
-	}
-
-	n.SanitizeConfig()
-
-	db := dbconf.DatabaseConnection()
-
-	result := db.Save(&n)
-	errors := result.GetErrors()
-	if len(errors) > 0 {
-		for _, err := range errors {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil(err.Error()),
-			})
-		}
-	}
-
-	return len(n.Errors) == 0
 }
 
 // SetConfig sets the network config in-memory
@@ -352,15 +320,15 @@ func (n *Node) relatedNetwork(db *gorm.DB) *Network {
 func (n *Node) updateStatus(db *gorm.DB, status string, description *string) {
 	n.Status = common.StringOrNil(status)
 	n.Description = description
-	result := db.Save(&n)
-	errors := result.GetErrors()
-	if len(errors) > 0 {
-		for _, err := range errors {
-			n.Errors = append(n.Errors, &provide.Error{
-				Message: common.StringOrNil(err.Error()),
-			})
-		}
-	}
+	// result := db.Save(&n)
+	// errors := result.GetErrors()
+	// if len(errors) > 0 {
+	// 	for _, err := range errors {
+	// 		n.Errors = append(n.Errors, &provide.Error{
+	// 			Message: common.StringOrNil(err.Error()),
+	// 		})
+	// 	}
+	// }
 }
 
 // Validate a network node for persistence
@@ -389,12 +357,17 @@ func (n *Node) ParseConfig() map[string]interface{} {
 }
 
 // Delete a network node
-func (n *Node) Delete() bool {
-	n.undeploy()
-	msg, _ := json.Marshal(map[string]interface{}{
-		"node_id": n.ID.String(),
-	})
-	natsutil.NatsStreamingPublish(natsDeleteTerminatedNodeSubject, msg)
+func (n *Node) Delete(token string) bool {
+	err := c2.DeleteNode(token, n.ID.String())
+	if err != nil {
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil(fmt.Sprintf("Failed to delete network node; %s", err.Error())),
+		})
+	}
+	// msg, _ := json.Marshal(map[string]interface{}{
+	// 	"node_id": n.ID.String(),
+	// })
+	// natsutil.NatsStreamingPublish(natsDeleteTerminatedNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
@@ -402,75 +375,6 @@ func (n *Node) Delete() bool {
 func (n *Node) Reload() {
 	db := dbconf.DatabaseConnection()
 	db.Model(&n).Find(n)
-}
-
-// Logs exposes the paginated logstream for the underlying node
-func (n *Node) Logs(startFromHead bool, limit *int64, nextToken *string) (*NodeLogsResponse, error) {
-	var response *NodeLogsResponse
-	var network = &Network{}
-	dbconf.DatabaseConnection().Model(n).Related(&network)
-	if network == nil || network.ID == uuid.Nil {
-		return nil, fmt.Errorf("Failed to retrieve network for network node: %s", n.ID)
-	}
-
-	cfg := n.ParseConfig()
-
-	targetID, targetOk := cfg[nodeConfigTargetID].(string)
-	_, regionOk := cfg[nodeConfigRegion].(string)
-
-	if !targetOk {
-		return nil, fmt.Errorf("Cannot retrieve logs for network node without a target and provider configuration; target id: %s", targetID)
-	}
-
-	orchestrationAPI, err := n.orchestrationAPIClient()
-	if err != nil {
-		err := fmt.Errorf("Failed to retrieve logs for network node %s; %s", n.ID, err.Error())
-		common.Log.Warningf(err.Error())
-		return nil, err
-	}
-
-	if strings.ToLower(targetID) == "aws" && regionOk {
-		response = &NodeLogsResponse{
-			Logs: make([]*NodeLog, 0),
-		}
-
-		if ids, idsOk := cfg[nodeConfigTargetTaskIDs].([]interface{}); idsOk {
-			for i, id := range ids {
-				logEvents, err := orchestrationAPI.GetContainerLogEvents(id.(string), nil, startFromHead, nil, nil, limit, nextToken)
-				if err == nil && logEvents != nil {
-					events := logEvents.Events
-					if !startFromHead {
-						for i := len(events)/2 - 1; i >= 0; i-- {
-							opp := len(events) - 1 - i
-							events[i], events[opp] = events[opp], events[i]
-						}
-					}
-					for i := range logEvents.Events {
-						event := logEvents.Events[i]
-						response.Logs = append(response.Logs, &NodeLog{
-							Message:         string(*event.Message),
-							Timestamp:       event.Timestamp,
-							IngestTimestamp: event.IngestionTime,
-						})
-					}
-					if i == len(ids)-1 {
-						response.NextToken = logEvents.NextForwardToken
-						response.PrevToken = logEvents.NextBackwardToken
-					}
-				}
-			}
-			return response, nil
-		}
-
-		return nil, fmt.Errorf("Unable to retrieve logs for network node: %s", n.ID)
-
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping logs for azure")
-		common.Log.Warning(desc)
-		return nil, nil
-	}
-
-	return nil, fmt.Errorf("Unable to retrieve logs for network node: %s; no region provided", n.ID)
 }
 
 func (n *Node) resolveNetwork(db *gorm.DB) error {
@@ -485,7 +389,7 @@ func (n *Node) resolveNetwork(db *gorm.DB) error {
 	return nil
 }
 
-func (n *Node) deploy(db *gorm.DB) error {
+func (n *Node) deploy(db *gorm.DB, token string) error {
 	if n.Config == nil {
 		msg := fmt.Sprintf("Not attempting to deploy network node without a valid configuration; network node id: %s", n.ID)
 		common.Log.Warning(msg)
@@ -532,27 +436,27 @@ func (n *Node) deploy(db *gorm.DB) error {
 					return err
 				}
 
-				return n._deploy(network, bootnodes, db)
+				return n._deploy(network, bootnodes, db, token)
 			default:
 				msg := fmt.Sprintf("Attempt to deploy node %s did not succeed; network: %s; %s", n.ID, *network.Name, err.Error())
 				common.Log.Debugf(msg)
 				return errors.New(msg)
 			}
 		} else {
-			return n.requireGenesis(network, bootnodes, db) // default assumes p2p
+			return n.requireGenesis(network, bootnodes, db, token) // default assumes p2p
 		}
 	} else {
 		common.Log.Debugf("Attempting to deploy non-p2p node: %s", n.ID)
-		return n._deploy(network, []*Node{}, db)
+		return n._deploy(network, []*Node{}, db, token)
 	}
 }
 
-func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) error {
+func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB, token string) error {
 	common.Log.Debugf("Attempting to require peer-to-peer network genesis for node: %s", n.ID)
 
 	if len(bootnodes) > 0 {
 		common.Log.Debugf("Short-circuiting genesis block resolution for node: %s; %d bootnode(s) resolved for peering", n.ID, len(bootnodes))
-		return n._deploy(network, bootnodes, db)
+		return n._deploy(network, bootnodes, db, token)
 	}
 
 	// cfg := network.ParseConfig()
@@ -567,7 +471,7 @@ func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) 
 
 	if n.Role != nil && *n.Role == nodeRoleIPFS {
 		common.Log.Debugf("Short-circuiting genesis block resolution for IPFS node: %s", n.ID)
-		return n._deploy(network, bootnodes, db)
+		return n._deploy(network, bootnodes, db, token)
 	}
 
 	if time.Now().Sub(n.CreatedAt) >= resolveGenesisTimeout {
@@ -584,47 +488,34 @@ func (n *Node) requireGenesis(network *Network, bootnodes []*Node, db *gorm.DB) 
 		return fmt.Errorf("Node deployment awaiting network genesis; node: %s; network: %s", n.ID, network.ID)
 	}
 
-	return n._deploy(network, bootnodes, db)
-	// ticker := time.NewTicker(resolveGenesisTickerInterval)
-	// startedAt := time.Now()
-	// for {
-	// 	select {
-	// 	case <-ticker.C:
-	// 		if time.Now().Sub(startedAt) >= resolveGenesisTickerTimeout {
-	// 			desc := fmt.Sprintf("Failed to resolve genesis block for network bootnode: %s; timing out after %v", n.ID.String(), resolveGenesisTickerTimeout)
-	// 			n.updateStatus(db, "failed", &desc)
-	// 			common.Log.Warning(desc)
-	// 			ticker.Stop()
-	// 			return errors.New(desc)
-	// 		}
-
-	// 		stats, _ := network.Stats()
-	// 		if stats != nil && stats.Block > 0 {
-	// 			ticker.Stop()
-	// 			return n._deploy(network, bootnodes, db)
-	// 		}
-	// 	}
-	// }
+	return n._deploy(network, bootnodes, db, token)
 }
 
-func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
+func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB, token string) error {
 	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.DecryptedConfig()
+	// encryptedCfg, _ := n.DecryptedConfig()
 	networkCfg := network.ParseConfig()
 
-	image, imageOk := cfg[nodeConfigImage].(string)
-	resources, resourcesOk := cfg[nodeConfigResources].(map[string]interface{}) // TODO-- make Resources struct
-	entrypoint, entrypointOk := cfg[nodeConfigEntrypoint].([]string)
-	taskRole, taskRoleOk := cfg[nodeConfigTaskRole].(string)
+	isPeerToPeer := false
+
+	// image, imageOk := cfg[nodeConfigImage].(string)
+	// resources, resourcesOk := cfg[nodeConfigResources].(map[string]interface{}) // TODO-- make Resources struct
+	// entrypoint, entrypointOk := cfg[nodeConfigEntrypoint].([]string)
+	// taskRole, taskRoleOk := cfg[nodeConfigTaskRole].(string)
 	// script, scriptOk := cfg["script"].(map[string]interface{})
-	target, targetOk := cfg[nodeConfigTargetID].(string)
+	// target, targetOk := cfg[nodeConfigTargetID].(string)
 	role, _ := cfg[nodeConfigRole].(string)
-	region, regionOk := cfg[nodeConfigRegion].(string)
-	vpc, _ := cfg[nodeConfigVpcID].(string)
+	// region, regionOk := cfg[nodeConfigRegion].(string)
+	// vpc, _ := cfg[nodeConfigVpcID].(string)
 	env, envOk := cfg[nodeConfigEnv].(map[string]interface{})
-	encryptedEnv, encryptedEnvOk := encryptedCfg[nodeConfigEnv].(map[string]interface{})
-	securityCfg, securityCfgOk := cfg[nodeConfigSecurity].(map[string]interface{}) // TODO-- make Security struct
+	// encryptedEnv, encryptedEnvOk := encryptedCfg[nodeConfigEnv].(map[string]interface{})
+	// securityCfg, securityCfgOk := cfg[nodeConfigSecurity].(map[string]interface{}) // TODO-- make Security struct
 	isP2P, p2pOk := cfg[nodeConfigP2P].(bool)
+	if !p2pOk {
+		isPeerToPeer = false
+	} else {
+		isPeerToPeer = isP2P
+	}
 
 	if networkEnv, networkEnvOk := networkCfg[nodeConfigEnv].(map[string]interface{}); envOk && networkEnvOk {
 		common.Log.Debugf("Applying environment overrides to network node per network env configuration")
@@ -633,333 +524,90 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB) error {
 		}
 	}
 
-	var p2pAPI p2p.API
-	orchestrationAPI, err := n.orchestrationAPIClient()
+	if isPeerToPeer {
+		common.Log.Debugf("applying peer-to-peer environment sanity rules to deploy network node: %s; role: %s", n.ID, role)
+		// p2pAPI, err := n.P2PAPIClient()
+		// if err != nil {
+		// 	err := fmt.Errorf("failed to deploy network node %s; %s", n.ID, err.Error())
+		// 	return err
+		// }
+
+		// FIXME?
+		// if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
+		// 	envOverrides[networkConfigEnvBootnodes] = bnodes
+		// } else {
+		// 	bootnodesTxt, err := network.BootnodesTxt()
+		// 	if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
+		// 		envOverrides[networkConfigEnvBootnodes] = bootnodesTxt
+		// 	}
+		// }
+
+		// FIXME?
+		// networkChain, networkChainOk := networkCfg[networkConfigChain].(string)
+		// if _, chainOk := envOverrides[networkConfigChain].(string); !chainOk {
+		// 	if networkChainOk {
+		// 		envOverrides[networkConfigChain] = networkChain
+		// 	}
+		// } else if networkChainOk {
+		// 	chain := envOverrides[networkConfigChain].(string)
+		// 	if chain != networkChain {
+		// 		common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
+		// 	}
+		// }
+	}
+
+	// FIXME?
+	// overrides := map[string]interface{}{
+	// 	"environment": envOverrides,
+	// }
+	// cfg[nodeConfigEnv] = envOverrides
+
+	// FIXME?
+	// _entrypoint := make([]*string, 0)
+	// if entrypointOk {
+	// 	for i := range entrypoint {
+	// 		_entrypoint = append(_entrypoint, &entrypoint[i])
+	// 	}
+	// } else if p2pAPI != nil {
+	// 	defaultEntrypoint := p2pAPI.DefaultEntrypoint()
+	// 	for i := range defaultEntrypoint {
+	// 		_entrypoint = append(_entrypoint, &defaultEntrypoint[i])
+	// 	}
+	// }
+
+	// FIXME?
+	// if p2pAPI != nil {
+	// 	_bootnodes := make([]string, 0)
+	// 	for i := range bootnodes {
+	// 		peerURL := bootnodes[i].peerURL()
+	// 		if peerURL != nil {
+	// 			_bootnodes = append(_bootnodes, *peerURL)
+	// 		}
+	// 	}
+	// 	cmdEnrichment := p2pAPI.EnrichStartCommand(_bootnodes)
+	// 	for i := range cmdEnrichment {
+	// 		_entrypoint = append(_entrypoint, &cmdEnrichment[i])
+	// 	}
+	// }
+
+	resp, err := c2.CreateNode(token, n.ParseConfig()) // FIXME-- this should be nested under `config`
 	if err != nil {
-		err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
-		common.Log.Warningf(err.Error())
-		return err
-	}
-
-	if !imageOk {
-		desc := fmt.Sprintf("Failed to deploy node in region %s; network node id: %s; image must be specified", region, n.ID.String())
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warning(desc)
-		return errors.New(desc)
-	}
-
-	if !securityCfgOk {
-		desc := fmt.Sprintf("Failed to deploy node in region %s; network node id: %s; security config must be provided", region, n.ID.String())
-		n.updateStatus(db, "failed", &desc)
-		common.Log.Warning(desc)
-		return errors.New(desc)
-	}
-
-	if targetOk && regionOk {
-		isPeerToPeer := p2pOk && isP2P
-
-		var securityGroupIds []string
-		securityGroupDesc := fmt.Sprintf("security group for network node: %s", n.ID.String())
-
-		if strings.ToLower(target) == "aws" {
-			securityGroupIds, err = orchestrationAPI.CreateSecurityGroup(securityGroupDesc, securityGroupDesc, nil, securityCfg)
-			if err != nil {
-				desc := fmt.Sprintf("Failed to create security group '%s' with security config %+v, error: %s", securityGroupDesc, securityCfg, err.Error())
-				common.Log.Warning(desc)
-				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
-				return err
-			}
-		} else if strings.ToLower(target) == "azure" {
-			securityGroupIds = []string{}
-		}
-
-		cfg[nodeConfigSecurity] = securityCfg
-		cfg[nodeConfigRegion] = region
-		cfg[nodeConfigSecurityGroupIDs] = securityGroupIds
-		n.SetConfig(cfg)
-		db.Save(&n)
-
-		common.Log.Debugf("Attempting to deploy network node in region: %s, with config: %+v", region, cfg)
-		var imageRef *string
-
-		if imageOk {
-			imageRef = common.StringOrNil(image)
-
-			// prefer provide dockerhub repo, if it exists for the requested image...
-			imageRef, err = dockerhubRepoExists(*imageRef)
-			if err != nil {
-				n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
-				return err
-			}
-
-			common.Log.Debugf("Resolved container image to deploy in region %s; image: %s", region, *imageRef)
-		} else {
-			err := fmt.Errorf("Failed to resolve deployable image or container(s) to deploy in region: %s; network node: %s", region, n.ID)
-			n.updateStatus(db, "failed", common.StringOrNil(err.Error()))
-			return err
-		}
-
-		ref := imageRef
-		common.Log.Debugf("Attempting to deploy container %s in region: %s", *ref, region)
-
-		envOverrides := map[string]interface{}{}
-		if envOk {
-			for k := range env {
-				envOverrides[k] = env[k]
-			}
-		}
-		if encryptedEnvOk {
-			for k := range encryptedEnv {
-				envOverrides[k] = encryptedEnv[k]
-			}
-		}
-
-		if isPeerToPeer {
-			common.Log.Debugf("Applying peer-to-peer environment sanity rules to deploy network node: %s; role: %s", n.ID, role)
-			p2pAPI, err = n.P2PAPIClient()
-			if err != nil {
-				err := fmt.Errorf("Failed to deploy network node %s; %s", n.ID, err.Error())
-				return err
-			}
-
-			// if bnodes, bootnodesOk := envOverrides[networkConfigEnvBootnodes].(string); bootnodesOk {
-			// 	envOverrides[networkConfigEnvBootnodes] = bnodes
-			// } else {
-			// 	bootnodesTxt, err := network.BootnodesTxt()
-			// 	if err == nil && bootnodesTxt != nil && *bootnodesTxt != "" {
-			// 		envOverrides[networkConfigEnvBootnodes] = bootnodesTxt
-			// 	}
-			// }
-
-			networkChain, networkChainOk := networkCfg[networkConfigChain].(string)
-			if _, chainOk := envOverrides[networkConfigChain].(string); !chainOk {
-				if networkChainOk {
-					envOverrides[networkConfigChain] = networkChain
-				}
-			} else if networkChainOk {
-				chain := envOverrides[networkConfigChain].(string)
-				if chain != networkChain {
-					common.Log.Warningf("Overridden chain %s did not match network chain %s; network id: %s", chain, networkChain, network.ID)
-				}
-			}
-		}
-
-		overrides := map[string]interface{}{
-			"environment": envOverrides,
-		}
-		cfg[nodeConfigEnv] = envOverrides
-
-		n.SetConfig(cfg)
-		n.SanitizeConfig()
-		db.Save(&n)
-
-		containerSecurity := map[string]interface{}{} // for now, this should only be populated when imageRef != nil (awswrapper does not yet support providing security cfg when a task def is provided...)
-		if imageRef != nil {
-			containerSecurity = securityCfg
-		}
-
-		var cpu *int64
-		var memory *int64
-		if resourcesOk {
-			if _cpu, cpuOk := resources["cpu"].(float64); cpuOk {
-				cpuInt := int64(_cpu)
-				cpu = &cpuInt
-			}
-			if _memory, memoryOk := resources["memory"].(float64); memoryOk {
-				memoryInt := int64(_memory)
-				memory = &memoryInt
-			}
-		}
-
-		_entrypoint := make([]*string, 0)
-		if entrypointOk {
-			for i := range entrypoint {
-				_entrypoint = append(_entrypoint, &entrypoint[i])
-			}
-		} else if p2pAPI != nil {
-			defaultEntrypoint := p2pAPI.DefaultEntrypoint()
-			for i := range defaultEntrypoint {
-				_entrypoint = append(_entrypoint, &defaultEntrypoint[i])
-			}
-		}
-
-		if p2pAPI != nil {
-			_bootnodes := make([]string, 0)
-			for i := range bootnodes {
-				peerURL := bootnodes[i].peerURL()
-				if peerURL != nil {
-					_bootnodes = append(_bootnodes, *peerURL)
-				}
-			}
-			cmdEnrichment := p2pAPI.EnrichStartCommand(_bootnodes)
-			for i := range cmdEnrichment {
-				_entrypoint = append(_entrypoint, &cmdEnrichment[i])
-			}
-		}
-
-		var containerRole *string
-		if taskRoleOk {
-			containerRole = &taskRole
-		}
-
-		taskIds, networkInterfaces, err := orchestrationAPI.StartContainer(
-			imageRef,
-			nil,
-			containerRole,
-			nil,
-			nil,
-			common.StringOrNil(vpc),
-			cpu,
-			memory,
-			_entrypoint,
-			securityGroupIds,
-			[]string{},
-			overrides,
-			containerSecurity,
-		)
-
-		if err != nil || len(taskIds) == 0 {
-			desc := fmt.Sprintf("Attempt to deploy container %s in %s region failed; %s", *ref, region, err.Error())
-			n.updateStatus(db, "failed", &desc)
-			n.unregisterSecurityGroups()
-			common.Log.Warning(desc)
-			return errors.New(desc)
-		}
-
-		if len(networkInterfaces) > 0 { // azure returns at once
-			networkInterface := networkInterfaces[0]
-			if networkInterface.Host == nil {
-				n.Host = networkInterface.IPv4
-			} else {
-				n.Host = networkInterface.Host
-			}
-			n.IPv4 = networkInterface.IPv4
-			n.IPv6 = networkInterface.IPv6
-			// n.PrivateIPv4 = networkInterface.PrivateIPv4
-			// n.PrivateIPv6 = networkInterface.PrivateIPv6
-		}
-
-		if imageRef != nil {
-			common.Log.Warningf("FIXME-- leaking the task definition that was used to start this container... %s", taskIds[0])
-		}
-
-		common.Log.Debugf("Attempt to deploy container %s in %s region successful; task ids: %s", *ref, region, taskIds)
-		cfg[nodeConfigTargetTaskIDs] = taskIds
-		n.SetConfig(cfg)
-		n.SanitizeConfig()
-		db.Save(&n)
-
-		msg, _ := json.Marshal(map[string]interface{}{
-			"node_id": n.ID.String(),
+		n.Errors = append(n.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
 		})
-		natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
-	} else {
-		desc := fmt.Sprintf("Failed to deploy node in region %s, target %s; node config: %+v; encrypted config: %+v; network config: %+v; node: %+v", region, target, cfg, encryptedCfg, networkCfg, n)
-		common.Log.Warning(desc)
-	}
-
-	return nil
-}
-
-func (n *Node) resolveHost(db *gorm.DB) error {
-	network := n.relatedNetwork(db)
-	if network == nil {
-		return fmt.Errorf("resolveHost: Failed to resolve host for network node %s; no network resolved", n.ID)
-	}
-
-	cfg := n.ParseConfig()
-	_, targetOk := cfg["target_id"].(string)
-	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
-	isP2P, isP2POk := cfg[nodeConfigP2P].(bool)
-	if !isP2POk {
-		isP2P = false
-	}
-
-	if !taskIdsOk {
-		return fmt.Errorf("resolveHost: Failed to resolve host for network node %s; no target_task_ids provided", n.ID)
-	}
-
-	identifiers := make([]string, 0)
-	for _, id := range taskIds {
-		identifiers = append(identifiers, id.(string))
-	}
-
-	if len(identifiers) == 0 {
-		return fmt.Errorf("resolveHost: Unable to resolve network node host without any node identifiers")
-	}
-
-	taskID := identifiers[len(identifiers)-1]
-	_, regionOk := cfg[nodeConfigRegion].(string)
-
-	orchestrationAPI, err := n.orchestrationAPIClient()
-	if err != nil {
-		err := fmt.Errorf("resolveHost: Failed to resolve host for network node %s; %s", n.ID, err.Error())
-		common.Log.Warningf(err.Error())
 		return err
 	}
+	n.C2NodeID = resp.ID
 
-	if targetOk {
-		if regionOk {
-			interfaces, err := orchestrationAPI.GetContainerInterfaces(taskID, nil)
-			if err != nil {
-				err := fmt.Errorf("resolveHost: Failed to resolve host for network node %s; %s", n.ID, err.Error())
-				common.Log.Warningf(err.Error())
-				return err
-			}
+	n.SetConfig(cfg)
+	n.SanitizeConfig()
+	db.Save(&n)
 
-			if len(interfaces) > 0 {
-				networkInterface := interfaces[0]
-				common.Log.Debugf("resolveHost: Receiving network interface with values; %+v", networkInterface)
-				if networkInterface.Host == nil {
-					n.Host = networkInterface.IPv4
-				} else {
-					n.Host = networkInterface.Host
-				}
-				n.IPv4 = networkInterface.IPv4
-				n.IPv6 = networkInterface.IPv6
-				n.PrivateIPv4 = networkInterface.PrivateIPv4
-				n.PrivateIPv6 = networkInterface.PrivateIPv6
-			}
-		}
-
-		if n.Host == nil {
-			if time.Now().Sub(n.CreatedAt) >= resolveHostTimeout {
-				desc := fmt.Sprintf("resolveHost: Failed to resolve hostname for network node %s after %v", n.ID.String(), resolveHostTimeout)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return fmt.Errorf(desc)
-			}
-
-			return fmt.Errorf("resolveHost: Failed to resolve host for network node with id: %s", n.ID)
-		}
-
-		err = n.dropNonReservedPeers()
-		if err != nil {
-			common.Log.Debugf("resolveHost: Failed to set node to only accept connections from reserved peers; %s", err.Error())
-		}
-
-		cfgJSON, _ := json.Marshal(cfg)
-		*n.Config = json.RawMessage(cfgJSON)
-		if isP2P {
-			n.Status = common.StringOrNil(nodeStatusPeering)
-		} else {
-			n.Status = common.StringOrNil(nodeStatusRunning)
-		}
-		db.Save(&n)
-
-		role, roleOk := cfg[nodeConfigRole].(string)
-		if roleOk {
-			if role == nodeRoleBlockExplorer {
-				go network.resolveAndBalanceExplorerUrls(db, n)
-			} else if role == nodeRoleIPFS {
-				go network.resolveAndBalanceIPFSUrls(db, n)
-			}
-		}
-		// } else if strings.ToLower(targetID) == "azure" {
-		// 	desc := fmt.Sprintf("Skipping host resolving for azure")
-		// 	common.Log.Warning(desc)
-		// 	return nil
-	}
+	// FIXME
+	// msg, _ := json.Marshal(map[string]interface{}{
+	// 	"node_id": n.ID.String(),
+	// })
+	// natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
 
 	return nil
 }
@@ -971,7 +619,7 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 	}
 
 	cfg := n.ParseConfig()
-	targetID, targetOk := cfg["target_id"].(string)
+	// targetID, targetOk := cfg["target_id"].(string)
 	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
 
 	if !taskIdsOk {
@@ -994,224 +642,74 @@ func (n *Node) resolvePeerURL(db *gorm.DB) error {
 
 	common.Log.Debugf("Attempting to resolve peer url for network node: %s", n.ID.String())
 
-	var orchestrationAPI orchestration.API
 	var p2pAPI p2p.API
 
 	var peerURL *string
 	var err error
 
 	id := identifiers[len(identifiers)-1]
-	_, regionOk := cfg[nodeConfigRegion].(string)
 
-	if strings.ToLower(targetID) == "aws" && targetOk {
-		if regionOk {
-			p2pAPI, err = n.P2PAPIClient()
-			if err != nil {
-				common.Log.Warningf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
-				return err
-			}
-
-			orchestrationAPI, err = n.orchestrationAPIClient()
-			if err != nil {
-				err := fmt.Errorf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
-				common.Log.Warningf(err.Error())
-				return err
-			}
-
-			peerURL, err = p2pAPI.ResolvePeerURL()
-			if err != nil {
-				common.Log.Debugf("No peer url or equivalent resolved for network node %s; %s", n.ID, err.Error())
-			}
-
-			if peerURL == nil {
-				logs, err := orchestrationAPI.GetContainerLogEvents(id, nil, true, nil, nil, nil, nil)
-				if err == nil && logs != nil {
-					for i := range logs.Events {
-						event := logs.Events[i]
-						if event.Message != nil {
-							msg := string(*event.Message)
-							peerURL, err = p2pAPI.ParsePeerURL(msg)
-							if err == nil && peerURL != nil {
-								if n.IPv4 != nil && n.PrivateIPv4 != nil {
-									url := strings.Replace(*peerURL, *n.PrivateIPv4, *n.IPv4, 1)
-									url = strings.Replace(url, "127.0.0.1", *n.IPv4, 1)
-									peerURL = &url
-								}
-								cfg[nodeConfigPeerURL] = peerURL
-								break
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if peerURL == nil {
-			if time.Now().Sub(n.CreatedAt) >= resolvePeerTimeout {
-				desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTimeout)
-				n.updateStatus(db, "failed", &desc)
-				common.Log.Warning(desc)
-				return fmt.Errorf(desc)
-			}
-
-			return fmt.Errorf("Failed to resolve peer url for network node with id: %s", n.ID)
-		}
-
-		common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
-		if n.Bootnode {
-			err := network.AddBootnode(db, *peerURL)
-			if err != nil {
-				common.Log.Warningf("Failed to add peer url as bootnode; peer url: %s; network: %s; %s", *peerURL, network.ID, err.Error())
-			}
-		}
-
-		cfgJSON, _ := json.Marshal(cfg)
-		*n.Config = json.RawMessage(cfgJSON)
-		n.Status = common.StringOrNil(nodeStatusRunning)
-		n.Description = nil
-		db.Save(&n)
-
-		if role == nodeRolePeer || role == nodeRoleFull || role == nodeRoleValidator {
-			go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
-			// TODO: determine if the node is running IPFS; if so: go network.resolveAndBalanceIPFSUrls(db, n)
-		}
-	} else if strings.ToLower(targetID) == "azure" {
-		desc := fmt.Sprintf("Skipping peer url resolving for azure")
-		common.Log.Warning(desc)
-		return nil
-	}
-
-	return nil
-}
-
-func (n *Node) undeploy() error {
-	common.Log.Debugf("Attempting to undeploy network node with id: %s", n.ID)
-
-	db := dbconf.DatabaseConnection()
-	n.updateStatus(db, "deprovisioning", nil)
-
-	cfg := n.ParseConfig()
-	_, regionOk := cfg[nodeConfigRegion].(string)
-	taskIds, taskIdsOk := cfg[nodeConfigTargetTaskIDs].([]interface{})
-
-	orchestrationAPI, err := n.orchestrationAPIClient()
+	p2pAPI, err = n.P2PAPIClient()
 	if err != nil {
-		err := fmt.Errorf("Failed to undeploy network node %s; %s", n.ID, err.Error())
-		common.Log.Warningf(err.Error())
+		common.Log.Warningf("Failed to resolve peer url for network node %s; %s", n.ID, err.Error())
 		return err
 	}
 
-	if regionOk && taskIdsOk {
-		for i := range taskIds {
-			taskID := taskIds[i].(string)
+	peerURL, err = p2pAPI.ResolvePeerURL()
+	if err != nil {
+		common.Log.Debugf("No peer url or equivalent resolved for network node %s; %s", n.ID, err.Error())
+	}
 
-			_, err := orchestrationAPI.StopContainer(taskID, nil)
-			if err == nil {
-				common.Log.Debugf("Terminated container with id: %s", taskID)
-				n.Status = common.StringOrNil("terminated")
-				db.Save(n)
-				n.unbalance(db)
-			} else {
-				err = fmt.Errorf("Failed to terminate docker container with id: %s; %s", taskID, err.Error())
-				common.Log.Warning(err.Error())
-				return err
-			}
-		}
-
-		// FIXME-- move the following security group removal to an async NATS operation
-		ticker := time.NewTicker(securityGroupTerminationTickerInterval)
-		go func() {
-			startedAt := time.Now()
-			for {
-				select {
-				case <-ticker.C:
-					err := n.unregisterSecurityGroups()
-					if err == nil {
-						ticker.Stop()
-						return
+	if peerURL == nil {
+		resp, err := c2.GetNodeLogs("", id, map[string]interface{}{}) // FIXME-- resolve proper c2 token
+		if err == nil && resp != nil {
+			for i := range resp.Logs {
+				peerURL, err = p2pAPI.ParsePeerURL(resp.Logs[i].Message)
+				if err == nil && peerURL != nil {
+					if n.IPv4 != nil && n.PrivateIPv4 != nil {
+						url := strings.Replace(*peerURL, *n.PrivateIPv4, *n.IPv4, 1)
+						url = strings.Replace(url, "127.0.0.1", *n.IPv4, 1)
+						peerURL = &url
 					}
-
-					if time.Now().Sub(startedAt) >= securityGroupTerminationTimeout {
-						common.Log.Warningf("Failed to unregister security groups for network node with id: %s; timing out after %v...", n.ID, securityGroupTerminationTimeout)
-						ticker.Stop()
-						return
-					}
+					cfg[nodeConfigPeerURL] = peerURL
+					break
 				}
 			}
-		}()
-	}
-
-	return nil
-}
-
-func (n *Node) unbalance(db *gorm.DB) error {
-	loadBalancers := make([]*LoadBalancer, 0)
-	db.Model(&n).Association("LoadBalancers").Find(&loadBalancers)
-	for _, balancer := range loadBalancers {
-		common.Log.Debugf("Attempting to unbalance network node %s on load balancer: %s", n.ID, balancer.ID)
-		msg, _ := json.Marshal(map[string]interface{}{
-			"load_balancer_id": balancer.ID.String(),
-			"node_id":          n.ID.String(),
-		})
-		return natsutil.NatsStreamingPublish(natsLoadBalancerUnbalanceNodeSubject, msg)
-	}
-	return nil
-}
-
-func (n *Node) unregisterSecurityGroups() error {
-	common.Log.Debugf("Attempting to unregister security groups for network node with id: %s", n.ID)
-
-	cfg := n.ParseConfig()
-	_, regionOk := cfg[nodeConfigRegion].(string)
-	securityGroupIds, securityGroupIdsOk := cfg["target_security_group_ids"].([]interface{})
-
-	if regionOk && securityGroupIdsOk {
-		for i := range securityGroupIds {
-			securityGroupID := securityGroupIds[i].(string)
-			payload, _ := json.Marshal(map[string]interface{}{
-				"node_id":           n.ID.String(),
-				"security_group_id": securityGroupID,
-			})
-			natsutil.NatsStreamingPublish(natsUnregisterNodeSecurityGroupSubject, payload)
 		}
 	}
 
+	if peerURL == nil {
+		if time.Now().Sub(n.CreatedAt) >= resolvePeerTimeout {
+			desc := fmt.Sprintf("Failed to resolve peer url for network node %s after %v", n.ID.String(), resolvePeerTimeout)
+			n.updateStatus(db, "failed", &desc)
+			common.Log.Warning(desc)
+			return fmt.Errorf(desc)
+		}
+
+		return fmt.Errorf("Failed to resolve peer url for network node with id: %s", n.ID)
+	}
+
+	common.Log.Debugf("Resolved peer url for network node with id: %s; peer url: %s", n.ID, *peerURL)
+	if n.Bootnode {
+		err := network.AddBootnode(db, *peerURL)
+		if err != nil {
+			common.Log.Warningf("Failed to add peer url as bootnode; peer url: %s; network: %s; %s", *peerURL, network.ID, err.Error())
+		}
+	}
+
+	cfgJSON, _ := json.Marshal(cfg)
+	*n.Config = json.RawMessage(cfgJSON)
+	n.Status = common.StringOrNil(nodeStatusRunning)
+	n.Description = nil
+	db.Save(&n)
+
+	// FIXME!
+	// if role == nodeRolePeer || role == nodeRoleFull || role == nodeRoleValidator {
+	// 	go network.resolveAndBalanceJSONRPCAndWebsocketURLs(db, n)
+	// 	// TODO: determine if the node is running IPFS; if so: go network.resolveAndBalanceIPFSUrls(db, n)
+	// }
+
 	return nil
-}
-
-// orchestrationAPIClient returns an instance of the node's underlying orchestration.API
-func (n *Node) orchestrationAPIClient() (orchestration.API, error) {
-	cfg := n.ParseConfig()
-	encryptedCfg, _ := n.DecryptedConfig()
-
-	targetID, targetIDOk := cfg[nodeConfigTargetID].(string)
-	region, regionOk := cfg[nodeConfigRegion].(string)
-	credentials, credsOk := encryptedCfg[nodeConfigCredentials].(map[string]interface{})
-	if !targetIDOk {
-		return nil, fmt.Errorf("Failed to resolve orchestration provider for network node: %s", n.ID)
-	}
-	if !regionOk {
-		return nil, fmt.Errorf("Failed to resolve orchestration provider region for network node: %s", n.ID)
-	}
-	if !credsOk {
-		return nil, fmt.Errorf("Failed to resolve orchestration provider credentials for network node: %s", n.ID)
-	}
-
-	var apiClient orchestration.API
-
-	switch targetID {
-	case orchestration.ProviderAWS:
-		apiClient = orchestration.InitAWSOrchestrationProvider(credentials, region)
-	case orchestration.ProviderAzure:
-		apiClient = orchestration.InitAzureOrchestrationProvider(credentials, region)
-	case orchestration.ProviderGoogle:
-		// apiClient = InitGoogleOrchestrationProvider(credentials, region)
-		return nil, fmt.Errorf("Google Cloud orchestration provider not yet implemented")
-	default:
-		return nil, fmt.Errorf("Failed to resolve orchestration provider for network node %s", n.ID)
-	}
-
-	return apiClient, nil
 }
 
 // P2PAPIClient returns an instance of the node's underlying p2p.API
@@ -1300,65 +798,4 @@ func (n *Node) upgrade() error {
 		return err
 	}
 	return apiClient.Upgrade()
-}
-
-// TODO: move this elsewhere
-func dockerhubRepoExists(name string) (*string, error) {
-	if name == "" {
-		err := errors.New("invalid dockerhub repo name (empty string)")
-		common.Log.Warning(err.Error())
-		return nil, err
-	}
-
-	_name := name
-	idx := strings.Index(name, ":")
-	if idx != -1 {
-		_name = _name[0:idx]
-	}
-
-	if common.DefaultDockerhubOrganization != nil && _name != *common.DefaultDockerhubOrganization && !strings.HasPrefix(_name, *common.DefaultDockerhubOrganization) { // reentrancy check
-		repo := fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(_name, "/", "-"))
-		preferredRepo, err := dockerhubRepoExists(repo)
-		if err == nil {
-			common.Log.Debugf("short-circuiting dockerhub repo resolution; preferred organization hosts repo: %s", repo)
-			return preferredRepo, nil
-		}
-		common.Log.Debugf("preferred dockerhub organization does not currently host repo: %s", repo)
-	}
-
-	idx = strings.Index(_name, "/")
-	if idx != -1 {
-		addr := fmt.Sprintf("%s:443", _name[0:idx])
-		conn, err := net.DialTimeout("tcp", addr, dockerRepoReachabilityTimeout)
-		if err == nil {
-			defer conn.Close()
-			common.Log.Debugf("short-circuiting dockerhub repo resolution; third-party hosted repo is reachable: %s", _name)
-			return &name, nil
-		}
-		common.Log.Debugf("docker repo was not resolved to a third-party host: %s", _name)
-	}
-
-	dockerhubClient := &http.Client{
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			Proxy:             http.ProxyFromEnvironment,
-		},
-	}
-
-	resp, err := dockerhubClient.Get(fmt.Sprintf("%s/%s", defaultDockerhubBaseURL, _name))
-	if err != nil {
-		common.Log.Warningf("failed to query dockerhub for existance of repo: %s; %s", _name, err.Error())
-		return nil, err
-	} else if resp.StatusCode >= 400 {
-		var err error
-		if resp.StatusCode == 404 {
-			err = fmt.Errorf("docker repository was not resolved: %s", _name)
-		} else {
-			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", _name, resp.StatusCode)
-		}
-		common.Log.Warning(err.Error())
-		return nil, err
-	}
-
-	return &name, nil
 }

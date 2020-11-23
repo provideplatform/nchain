@@ -16,6 +16,7 @@ import (
 	"github.com/provideapp/nchain/connector/provider"
 	"github.com/provideapp/nchain/network"
 	provide "github.com/provideservices/provide-go/api"
+	c2 "github.com/provideservices/provide-go/api/c2"
 )
 
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;
@@ -36,8 +37,8 @@ type Connector struct {
 
 	Details *Details `sql:"-" json:"details,omitempty"`
 
-	LoadBalancers []network.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
-	Nodes         []network.Node         `gorm:"many2many:connectors_nodes" json:"-"`
+	// LoadBalancers []c2.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
+	Nodes []network.Node `gorm:"many2many:connectors_nodes" json:"-"`
 }
 
 // Details is a generic representation for a type-specific enrichment of a described connector;
@@ -284,8 +285,6 @@ func (c *Connector) provision() error {
 		_, gatewayURLOk := cfg["gateway_url"].(string)
 		_, rpcURLOk := cfg["rpc_url"].(string)
 		runDefaultProvisioner = !gatewayURLOk && !rpcURLOk
-	case provider.TableauConnectorProvider:
-		common.Log.Warningf("tableau connector does not yet support provider-specific provision() impl")
 	default:
 		runDefaultProvisioner = true
 	}
@@ -404,13 +403,13 @@ func (c *Connector) UpdateStatus(db *gorm.DB, status string, description *string
 // Host resolves and returns the hostname for the connector instance
 func (c *Connector) Host(db *gorm.DB) *string {
 	var host *string
-	loadBalancers := make([]*network.LoadBalancer, 0)
+	loadBalancers := make([]*c2.LoadBalancer, 0)
 	db.Model(c).Association("LoadBalancers").Find(&loadBalancers)
 	if len(loadBalancers) == 1 {
-		host = loadBalancers[0].DNSName()
+		host = loadBalancers[0].Host
 	} else if len(loadBalancers) > 1 {
 		common.Log.Warningf("Ambiguous loadbalancing configuration for connector: %s; api url resolved using first configured load balancer", c.ID)
-		host = loadBalancers[0].DNSName()
+		host = loadBalancers[0].Host
 	}
 	return host
 }
@@ -500,15 +499,6 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 	var apiClient provider.API
 
 	switch *c.Type {
-	case provider.BaselineConnectorProvider:
-		apiClient = provider.InitBaselineProvider(
-			c.ID,
-			&c.NetworkID,
-			c.ApplicationID,
-			c.OrganizationID,
-			db.Model(c),
-			c.mergedConfig(),
-		)
 	case provider.ElasticsearchConnectorProvider:
 		apiClient = provider.InitElasticsearchProvider(
 			c.ID,
@@ -545,8 +535,8 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 			db.Model(c),
 			c.mergedConfig(),
 		)
-	case provider.ProvideConnectorProvider:
-		apiClient = provider.InitProvideProvider(
+	case provider.RedisConnectorProvider:
+		apiClient = provider.InitRedisProvider(
 			c.ID,
 			&c.NetworkID,
 			c.ApplicationID,
@@ -563,44 +553,8 @@ func (c *Connector) connectorAPI() (provider.API, error) {
 			db.Model(c),
 			c.mergedConfig(),
 		)
-	case provider.RedisConnectorProvider:
-		apiClient = provider.InitRedisProvider(
-			c.ID,
-			&c.NetworkID,
-			c.ApplicationID,
-			c.OrganizationID,
-			db.Model(c),
-			c.mergedConfig(),
-		)
-	case provider.SplunkConnectorProvider:
-		apiClient = provider.InitSplunkProvider(
-			c.ID,
-			&c.NetworkID,
-			c.ApplicationID,
-			c.OrganizationID,
-			db.Model(c),
-			c.mergedConfig(),
-		)
 	case provider.SQLConnectorProvider:
 		apiClient = provider.InitSQLProvider(
-			c.ID,
-			&c.NetworkID,
-			c.ApplicationID,
-			c.OrganizationID,
-			db.Model(c),
-			c.mergedConfig(),
-		)
-	case provider.TableauConnectorProvider:
-		apiClient = provider.InitTableauProvider(
-			c.ID,
-			&c.NetworkID,
-			c.ApplicationID,
-			c.OrganizationID,
-			db.Model(c),
-			c.mergedConfig(),
-		)
-	case provider.UnibrightConnectorProvider:
-		apiClient = provider.InitUnibrightProvider(
 			c.ID,
 			&c.NetworkID,
 			c.ApplicationID,
