@@ -43,7 +43,6 @@ fi
 
 DATABASE_USER=$DATABASE_USER DATABASE_PASSWORD=$DATABASE_PASSWORD DATABASE_NAME=$DATABASE_NAME make migrate
 
-echo now we are here
 PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBF1Db+IBEAC0nRf3s6rls6jhWeWWTAJY8Nn4+qPUbSu0ZOx1DAqOHHxYAek1
@@ -222,10 +221,6 @@ VAULT_REFRESH_TOKEN='eyJhbGciOiJSUzI1NiIsImtpZCI6IjEwOjJlOmQ5OmUxOmI4OmEyOjM0OjM
 
 #pkgs=(bridge common connector consumer contract db filter network oracle prices token tx wallet)
 pkgs=(integration)
-
-
-
-
 
 for d in "${pkgs[@]}" ; do
   pkg=$(echo $d | sed 's/\/*$//g')
