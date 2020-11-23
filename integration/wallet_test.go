@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -161,7 +160,7 @@ func TestWalletDetails(t *testing.T) {
 	}
 
 	t.Logf("*** wallet returned %+v", *wallet)
-	deets, err := GoGetWalletDetails(*userToken, wallet.WalletID.String(), map[string]interface{}{})
+	deets, err := GoGetWalletDetails(*userToken, wallet.ID.String(), map[string]interface{}{})
 	if err != nil {
 		t.Errorf("error getting wallet details")
 		return
@@ -171,9 +170,11 @@ func TestWalletDetails(t *testing.T) {
 		t.Errorf("UserID details do not match. Expected: %s. Got %s", *wallet.UserID, *deets.UserID)
 		return
 	}
-	if *wallet.ApplicationID != *deets.ApplicationID {
-		t.Errorf("ApplicationID details do not match. Expected: %s. Got %s", *wallet.ApplicationID, *deets.ApplicationID)
-		return
+	if wallet.ApplicationID != nil {
+		if *wallet.ApplicationID != *deets.ApplicationID {
+			t.Errorf("ApplicationID details do not match. Expected: %s. Got %s", *wallet.ApplicationID, *deets.ApplicationID)
+			return
+		}
 	}
 	if *wallet.UserID != *deets.UserID {
 		t.Errorf("user id details do not match. Expected: %s. Got %s", *wallet.UserID, *deets.UserID)
@@ -183,26 +184,24 @@ func TestWalletDetails(t *testing.T) {
 		t.Errorf("KeyID details do not match. Expected: %s. Got %s", *wallet.KeyID, *deets.KeyID)
 		return
 	}
-	if *wallet.Path != *deets.Path {
-		t.Errorf("Path details do not match. Expected: %s. Got %s", *wallet.Path, *deets.Path)
-		return
+	if wallet.Path != nil {
+		if *wallet.Path != *deets.Path {
+			t.Errorf("Path details do not match. Expected: %s. Got %s", *wallet.Path, *deets.Path)
+			return
+		}
 	}
 	if *wallet.Purpose != *deets.Purpose {
 		t.Errorf("Purpose details do not match. Expected: %d. Got %d", *wallet.Purpose, *deets.Purpose)
 		return
 	}
-	if *wallet.Mnemonic != *deets.Mnemonic {
-		t.Errorf("Mnemonic details do not match. Expected: %s. Got %s", *wallet.Mnemonic, *deets.Mnemonic)
-		return
-	}
 
-	walletExtendedKeyJSON, _ := json.Marshal(*wallet.ExtendedKey)
-	deetsExtendedKeyJson, _ := json.Marshal(*deets.ExtendedKey)
+	// walletExtendedKeyJSON, _ := json.Marshal(*wallet.ExtendedKey)
+	// deetsExtendedKeyJson, _ := json.Marshal(*deets.ExtendedKey)
 
-	if bytes.Compare(walletExtendedKeyJSON, deetsExtendedKeyJson) != 0 {
-		t.Errorf("ExtendedKey details do not match. Expected: %+v. Got %+v", *wallet.ExtendedKey, *deets.ExtendedKey)
-		return
-	}
+	// if bytes.Compare(walletExtendedKeyJSON, deetsExtendedKeyJson) != 0 {
+	// 	t.Errorf("ExtendedKey details do not match. Expected: %+v. Got %+v", *wallet.ExtendedKey, *deets.ExtendedKey)
+	// 	return
+	// }
 
 	t.Logf("wallet details %+v", wallet)
 }
@@ -225,7 +224,7 @@ func TestListWalletAccounts(t *testing.T) {
 		t.Errorf("error creating wallet")
 		return
 	}
-	accounts, err := GoListWalletAccounts(*userToken, wallet.WalletID.String(), map[string]interface{}{})
+	accounts, err := GoListWalletAccounts(*userToken, wallet.ID.String(), map[string]interface{}{})
 	if err != nil {
 		t.Errorf("error listing wallet accounts. Error: %s", err.Error())
 		return
