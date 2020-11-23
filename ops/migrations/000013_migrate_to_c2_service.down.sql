@@ -15,6 +15,9 @@ CREATE TABLE load_balancers (
     application_id uuid
 );
 
+ALTER TABLE ONLY load_balancers
+    ADD CONSTRAINT load_balancers_pkey PRIMARY KEY (id);
+
 CREATE INDEX idx_load_balancers_application_id ON load_balancers USING btree (application_id);
 CREATE INDEX idx_load_balancers_network_id ON load_balancers USING btree (network_id);
 CREATE INDEX idx_load_balancers_region ON load_balancers USING btree (region);
@@ -36,11 +39,16 @@ ALTER TABLE ONLY connectors_load_balancers
 ALTER TABLE ONLY connectors_load_balancers
     ADD CONSTRAINT connectors_load_balancers_load_balancer_id_load_balancers_id_fo FOREIGN KEY (load_balancer_id) REFERENCES load_balancers(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
+CREATE TABLE public.load_balancers_nodes (
+    load_balancer_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    node_id uuid DEFAULT public.uuid_generate_v4() NOT NULL
+);
+
 ALTER TABLE ONLY load_balancers_nodes
     ADD CONSTRAINT load_balancers_nodes_pkey PRIMARY KEY (load_balancer_id, node_id);
 
-ALTER TABLE ONLY load_balancers
-    ADD CONSTRAINT load_balancers_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.load_balancers_nodes
+    ADD CONSTRAINT load_balancers_nodes_pkey PRIMARY KEY (load_balancer_id, node_id);
 
 ALTER TABLE ONLY nodes ADD COLUMN host text;
 ALTER TABLE ONLY nodes ADD COLUMN ipv4 text;

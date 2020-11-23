@@ -129,7 +129,7 @@ services:
       - ./ops/await_tcp.sh:/usr/local/bin/await_tcp.sh:cached
  
   ident:
-    image: provide/ident:dev
+    image: provide/ident:integration
     container_name: ident
     depends_on:
       - nats-streaming
