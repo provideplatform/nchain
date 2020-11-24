@@ -8,28 +8,29 @@ import (
 
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/db"
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
 func init() {
 	// let's enable ropsten and use it as the network id for the moment
 	// todo: test enabling all the chains - but need correct chain specs for them all
-	db.SeedNetworks()
 
 	testId, err := uuid.NewV4()
 	if err != nil {
-		common.Log.Debugf("error creating new UUID")
+		common.Log.Warningf("error creating new UUID")
+		return
 	}
 
 	token, err := UserAndTokenFactory(testId)
 	if err != nil {
-		common.Log.Debugf("user authentication failed. Error: %s", err.Error())
+		common.Log.Warningf("user authentication failed. Error: %s", err.Error())
+		return
 	}
 
 	ropsten, err := provide.GetNetworkDetails(*token, ropstenNetworkID, map[string]interface{}{})
 	if err != nil {
-		common.Log.Debugf("error getting network details for network %s. Error: %s", ropstenNetworkID, err.Error())
+		common.Log.Warningf("error getting network details for network %s. Error: %s", ropstenNetworkID, err.Error())
+		return
 	}
 
 	// let's try marshalling the ropsten config into my objects
@@ -37,7 +38,8 @@ func init() {
 	configRaw, _ := json.Marshal(ropsten.Config)
 	err = json.Unmarshal(configRaw, &config)
 	if err != nil {
-		common.Log.Debugf("failed to marshal ropsten config. Error: %s", err.Error())
+		common.Log.Warningf("failed to marshal ropsten config. Error: %s", err.Error())
+		return
 	}
 
 	common.Log.Debugf("chain config from db: %+v", *config)
