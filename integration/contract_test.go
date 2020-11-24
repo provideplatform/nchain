@@ -39,8 +39,8 @@ func GoCreateContract(token string, params map[string]interface{}) (*Contract, e
 		return nil, err
 	}
 
-	if status != 201 {
-		return nil, fmt.Errorf("failed to create contract. status: %v", status)
+	if status != 201 && status != 202 {
+		return nil, fmt.Errorf("failed to create contract. status: %v. resp: %v", status, resp)
 	}
 
 	contract := &Contract{}
