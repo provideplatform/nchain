@@ -8,12 +8,14 @@ import (
 
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/nchain/db"
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
 func init() {
 	// let's enable ropsten and use it as the network id for the moment
 	// todo: test enabling all the chains - but need correct chain specs for them all
+	db.SeedNetworks()
 
 	testId, err := uuid.NewV4()
 	if err != nil {
