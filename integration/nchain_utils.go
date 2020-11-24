@@ -47,11 +47,13 @@ type chainSpec struct {
 type chainConfig struct {
 	NativeCurrency    *string    `json:"native_currency"`
 	IsEthereumNetwork bool       `json:"is_ethereum_network"`
+	Client            *string    `json:"client"`
 	JsonRpcUrl        *string    `json:"json_rpc_url"`
 	Platform          *string    `json:"platform"`
 	EngineID          *string    `json:"engine_id"`
 	Chain             *string    `json:"chain"`
 	ProtocolID        *string    `json:"protocol_id"`
+	NetworkID         int        `"json:network_id"`
 	ChainSpec         *chainSpec `json:"chainspec"`
 }
 
@@ -95,6 +97,8 @@ func NetworkFactory(token string, testId uuid.UUID) (*provide.Network, error) {
 		NativeCurrency:    common.StringOrNil("TEST"),
 		Platform:          common.StringOrNil("evm"),
 		EngineID:          common.StringOrNil("ethash"),
+		Client:            common.StringOrNil("geth"),
+		NetworkID:         3,
 		IsEthereumNetwork: true,
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),

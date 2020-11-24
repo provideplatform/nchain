@@ -116,7 +116,7 @@ services:
     depends_on:
       - nats
     healthcheck:
-      test: ["CMD", "/usr/local/bin/await_tcp.sh", "localhost:4222"]
+      test: ["CMD", "/usr/local/bin/await_tcp.sh", "localhost:4224"]
       interval: 1m
       timeout: 1s
       retries: 2
@@ -124,6 +124,8 @@ services:
     hostname: nats-streaming
     networks:
       - provide
+    ports:
+      - 4224:4224
     restart: always
     volumes:
       - ./ops/await_tcp.sh:/usr/local/bin/await_tcp.sh:cached
@@ -144,6 +146,8 @@ services:
       - DATABASE_SUPERUSER_PASSWORD=prvdp455
       - DATABASE_PORT=5432
       - NATS_CLIENT_PREFIX=ident
+      - NATS_CLUSTER_ID=provide
+      - NATS_TOKEN=testtoken
       - NATS_URL=nats://nats:4222
       - NATS_STREAMING_URL=nats://nats-streaming:4222
       - REDIS_HOSTS=redis:6379
@@ -179,6 +183,8 @@ services:
       - DATABASE_PASSWORD=nchain
       - LOG_LEVEL=DEBUG
       - NATS_CLIENT_PREFIX=nchain
+      - NATS_CLUSTER_ID=provide
+      - NATS_TOKEN=testtoken
       - NATS_URL=nats://nats:4222
       - NATS_STREAMING_URL=nats://nats-streaming:4222
       - PORT=8080
@@ -220,6 +226,7 @@ services:
       - DATABASE_USER=nchain
       - DATABASE_PASSWORD=nchain
       - LOG_LEVEL=DEBUG
+      - NATS_CLUSTER_ID=provide   
       - NATS_CLIENT_PREFIX=nchain-consumer
       - NATS_URL=nats://nats:4222
       - NATS_STREAMING_URL=nats://nats-streaming:4222
@@ -261,6 +268,7 @@ services:
       - LOG_LEVEL=DEBUG
       - NATS_CLIENT_PREFIX=statsdaemon
       - NATS_URL=nats://nats:4222
+      - NATS_CLUSTER_ID=provide   
       - NATS_STREAMING_URL=nats://nats-streaming:4222
       - REDIS_HOSTS=redis:6379
       - IDENT_API_HOST=ident:8080
