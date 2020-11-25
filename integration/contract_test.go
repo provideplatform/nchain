@@ -114,22 +114,34 @@ func TestDeployContract(t *testing.T) {
 	t.Logf("account created: %+v", account)
 
 	params := map[string]interface{}{}
-	contractName := fmt.Sprintf("ekho(%s)", testId.String())
+	//contractName := fmt.Sprintf("ekho(%s)", testId.String())
+
+	// parameter := fmt.Sprintf(`{
+	// "account_id": "%s",
+	// "lang":"solidity",
+	// "name":"%s",
+	// "raw_source": "pragma solidity >=0.4.22 <0.7.5;contract ekhoprotocol {event ekho(bytes message);function broadcast(bytes memory message) public {emit ekho(message);}}"
+	// }`, account.ID.String(), contractName)
+
+	//unmarshal the unstructured json into mapstringinterface
+
+	var contractArtifact map[string]interface{}
+
+	json.Unmarshal([]byte(getEkhoArtifact()), contractArtifact)
 
 	parameter := fmt.Sprintf(`{
-	"account_id": "%s",
-	"lang":"solidity",
-	"name":"%s",
-	"raw_source": "pragma solidity >=0.4.22 <0.7.5;contract ekhoprotocol {event ekho(bytes message);function broadcast(bytes memory message) public {emit ekho(message);}}"
-	}`, account.ID.String(), contractName)
-	t.Logf("contract parameter is %s", parameter)
-	json.Unmarshal([]byte(parameter), &params)
+		"account_id": "%s",
+		"compiled_artifact": %s
+		}`, account.ID, getEkhoArtifact())
 
-	t.Logf("params object: %+v", params)
+	json.Unmarshal([]byte(parameter), &params)
 
 	contract, err := GoCreateContract(*appToken.Token, map[string]interface{}{
 		"network_id":     ropstenNetworkID,
-		"application_id": app.ID,
+		"application_id": app.ID.String(),
+		"account_id":     account.ID.String(),
+		"name":           "Ekho",
+		"address":        "0x",
 		"params":         params,
 	})
 	if err != nil {

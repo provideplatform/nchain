@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"testing"
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/ident/common"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
@@ -174,68 +172,68 @@ func GoListNetworkTransactions(token, networkID string, params map[string]interf
 	return transactions, nil
 }
 
-func TestCreateTransaction(t *testing.T) {
-	testId, err := uuid.NewV4()
-	if err != nil {
-		t.Logf("error creating new UUID")
-	}
+// func TestCreateTransaction(t *testing.T) {
+// 	testId, err := uuid.NewV4()
+// 	if err != nil {
+// 		t.Logf("error creating new UUID")
+// 	}
 
-	userToken, err := UserAndTokenFactory(testId)
-	if err != nil {
-		t.Errorf("user authentication failed. Error: %s", err.Error())
-	}
+// 	userToken, err := UserAndTokenFactory(testId)
+// 	if err != nil {
+// 		t.Errorf("user authentication failed. Error: %s", err.Error())
+// 	}
 
-	testcaseApp := Application{
-		"app" + testId.String(),
-		"appdesc " + testId.String(),
-	}
+// 	testcaseApp := Application{
+// 		"app" + testId.String(),
+// 		"appdesc " + testId.String(),
+// 	}
 
-	app, err := appFactory(*userToken, testcaseApp.name, testcaseApp.description)
-	if err != nil {
-		t.Errorf("error setting up application. Error: %s", err.Error())
-		return
-	}
+// 	app, err := appFactory(*userToken, testcaseApp.name, testcaseApp.description)
+// 	if err != nil {
+// 		t.Errorf("error setting up application. Error: %s", err.Error())
+// 		return
+// 	}
 
-	appToken, err := appTokenFactory(*userToken, app.ID)
-	if err != nil {
-		t.Errorf("error getting app token. Error: %s", err.Error())
-		return
-	}
+// 	appToken, err := appTokenFactory(*userToken, app.ID)
+// 	if err != nil {
+// 		t.Errorf("error getting app token. Error: %s", err.Error())
+// 		return
+// 	}
 
-	// create the account for that user, for the Ropsten network
-	account, err := GoCreateAccount(*appToken.Token, map[string]interface{}{
-		"network_id":     ropstenNetworkID,
-		"application_id": app.ID,
-	})
+// 	// create the account for that user, for the Ropsten network
+// 	account, err := GoCreateAccount(*appToken.Token, map[string]interface{}{
+// 		"network_id":     ropstenNetworkID,
+// 		"application_id": app.ID,
+// 	})
 
-	if err != nil {
-		t.Errorf("error creating user account. Error: %s", err.Error())
-	}
-	t.Logf("account created: %+v", account)
+// 	if err != nil {
+// 		t.Errorf("error creating user account. Error: %s", err.Error())
+// 	}
+// 	t.Logf("account created: %+v", account)
 
-	params := map[string]interface{}{}
-	parameter := fmt.Sprintf(`{"network_id":"%s", "gas_price":%d, "gas":30000}`, ropstenNetworkID, 30)
-	t.Logf("parameter is %s", parameter)
-	json.Unmarshal([]byte(parameter), &params)
+// 	params := map[string]interface{}{}
+// 	parameter := fmt.Sprintf(`{"network_id":"%s", "gas_price":%d, "gas":30000}`, ropstenNetworkID, 30)
+// 	t.Logf("parameter is %s", parameter)
+// 	json.Unmarshal([]byte(parameter), &params)
 
-	msg := common.RandomString(118)
+// 	msg := common.RandomString(118)
 
-	tx, err := GoCreateTransaction(*userToken, map[string]interface{}{
-		"network_id": ropstenNetworkID,
-		"account_id": account.ID.String(),
-		"to":         "0x31138a6a53141d9b5aa7f313ae0e2ca2fabac602", //ekho contract on ropsten
-		"data":       []byte(msg),
-		"value":      big.NewInt(0),
-		"params":     params,
-		"gas":        30000,
-	})
-	if err != nil {
-		t.Errorf("error creating transaction: %s", err.Error())
-		return
-	}
-	t.Logf("transaction: %+v", tx)
+// 	tx, err := GoCreateTransaction(*userToken, map[string]interface{}{
+// 		"network_id": ropstenNetworkID,
+// 		"account_id": account.ID.String(),
+// 		"to":         "0x31138a6a53141d9b5aa7f313ae0e2ca2fabac602", //ekho contract on ropsten
+// 		"data":       []byte(msg),
+// 		"value":      big.NewInt(0),
+// 		"params":     params,
+// 		"gas":        30000,
+// 	})
+// 	if err != nil {
+// 		t.Errorf("error creating transaction: %s", err.Error())
+// 		return
+// 	}
+// 	t.Logf("transaction: %+v", tx)
 
-}
+// }
 
 // func TestGetTransactionDetails(t *testing.T) {
 // 	testId, err := uuid.NewV4()
