@@ -127,12 +127,12 @@ func TestDeployContract(t *testing.T) {
 
 	var contractArtifact map[string]interface{}
 
-	json.Unmarshal([]byte(getEkhoArtifact()), contractArtifact)
+	json.Unmarshal([]byte(ekhoArtifact), contractArtifact)
 
 	parameter := fmt.Sprintf(`{
 		"account_id": "%s",
 		"compiled_artifact": %s
-		}`, account.ID, getEkhoArtifact())
+		}`, account.ID, ekhoArtifact)
 
 	json.Unmarshal([]byte(parameter), &params)
 
