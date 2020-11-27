@@ -9,70 +9,8 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideservices/provide-go/api"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
-
-// Contract instances must be associated with an application identifier.
-type Contract struct {
-	api.Model
-	ApplicationID *uuid.UUID       `json:"application_id"`
-	NetworkID     uuid.UUID        `json:"network_id"`
-	ContractID    *uuid.UUID       `json:"contract_id"`    // id of the contract which created the contract (or null)
-	TransactionID *uuid.UUID       `json:"transaction_id"` // id of the transaction which deployed the contract (or null)
-	Name          *string          `json:"name"`
-	Address       *string          `json:"address"`
-	Type          *string          `json:"type"`
-	Params        *json.RawMessage `json:"params,omitempty"`
-	AccessedAt    *time.Time       `json:"accessed_at"`
-	PubsubPrefix  *string          `json:"pubsub_prefix,omitempty"`
-}
-
-// TODO move this to provide-go when it's working
-// GoCreateContract
-func GoCreateContract(token string, params map[string]interface{}) (*Contract, error) {
-	// return InitNChainService(token).Post("contracts", params)
-	uri := "contracts"
-	status, resp, err := nchain.InitNChainService(token).Post(uri, params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if status != 201 && status != 202 {
-		return nil, fmt.Errorf("failed to create contract. status: %v. resp: %v", status, resp)
-	}
-
-	contract := &Contract{}
-	contractRaw, _ := json.Marshal(resp)
-	err = json.Unmarshal(contractRaw, &contract)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create contract. status: %v; %s", status, err.Error())
-	}
-
-	return contract, nil
-
-}
-
-// TODO move this to provide-go when it's working
-// GoExecuteContract
-func GoExecuteContract(token, contractID string, params map[string]interface{}) (int, interface{}, error) {
-	uri := fmt.Sprintf("contracts/%s/execute", contractID)
-	return nchain.InitNChainService(token).Post(uri, params)
-}
-
-// TODO move this to provide-go when it's working
-// GoListContracts
-func GoListContracts(token string, params map[string]interface{}) (int, interface{}, error) {
-	return nchain.InitNChainService(token).Get("contracts", params)
-}
-
-// TODO move this to provide-go when it's working
-// GoGetContractDetails
-func GoGetContractDetails(token, contractID string, params map[string]interface{}) (int, interface{}, error) {
-	uri := fmt.Sprintf("contracts/%s", contractID)
-	return nchain.InitNChainService(token).Get(uri, params)
-}
 
 func TestDeployContract(t *testing.T) {
 	testId, err := uuid.NewV4()
@@ -136,7 +74,7 @@ func TestDeployContract(t *testing.T) {
 
 	json.Unmarshal([]byte(parameter), &params)
 
-	contract, err := GoCreateContract(*appToken.Token, map[string]interface{}{
+	contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
 		"network_id":     ropstenNetworkID,
 		"application_id": app.ID.String(),
 		"account_id":     account.ID.String(),
@@ -147,6 +85,22 @@ func TestDeployContract(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating contract. Error: %s", err.Error())
 		return
+	}
+
+	for {
+		cntrct, err := nchain.GetContractDetails(*appToken.Token, contract.ID.String(), map[string]interface{}{})
+		if err != nil {
+			t.Errorf("error fetching contract details; %s", err.Error())
+			return
+		}
+
+		if cntrct.Address != nil {
+			t.Logf("contract address resolved; contract id: %s; address: %s", cntrct.ID.String(), *cntrct.Address)
+			break
+		}
+
+		t.Logf("contract address has not yet been resolved; contract id: %s", cntrct.ID.String())
+		time.Sleep(5)
 	}
 
 	t.Logf("contract is: %+v", contract)
