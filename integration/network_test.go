@@ -166,7 +166,7 @@ func TestListNetworks(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	networks, err := provide.ListNetworks(*token, &True, &False, map[string]interface{}{
+	networks, err := provide.ListNetworks(*token, map[string]interface{}{
 		"public": true,
 	})
 	if err != nil {

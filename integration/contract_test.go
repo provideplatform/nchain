@@ -87,7 +87,14 @@ func TestDeployContract(t *testing.T) {
 		return
 	}
 
+	started := time.Now().Unix()
+
 	for {
+		if time.Now().Unix()-started >= 60 {
+			t.Error("timed out awaiting contract address")
+			return
+		}
+
 		cntrct, err := nchain.GetContractDetails(*appToken.Token, contract.ID.String(), map[string]interface{}{})
 		if err != nil {
 			t.Errorf("error fetching contract details; %s", err.Error())

@@ -13,7 +13,6 @@ import (
 	"github.com/provideservices/provide-go/api"
 	ident "github.com/provideservices/provide-go/api/ident"
 	nchain "github.com/provideservices/provide-go/api/nchain"
-	provide "github.com/provideservices/provide-go/api/nchain"
 )
 
 // Account contains the specific account user details
@@ -147,7 +146,7 @@ func TestListAccounts(t *testing.T) {
 		t.Logf("account created: %+v", account)
 	}
 
-	status, resp, err := nchain.ListAccounts(*appToken.Token, map[string]interface{}{
+	accounts, err := nchain.ListAccounts(*appToken.Token, map[string]interface{}{
 		"network_id": ropstenNetworkID,
 	})
 	if err != nil {
@@ -158,14 +157,6 @@ func TestListAccounts(t *testing.T) {
 	if status != 200 {
 		t.Errorf("invalid status returned. Expected 200, got %v", status)
 		return
-	}
-	//TODO transpose this to provide-go
-	accounts := make([]*provide.Account, 0)
-	for _, item := range resp.([]interface{}) {
-		acc := &provide.Account{}
-		accraw, _ := json.Marshal(item)
-		json.Unmarshal(accraw, &acc)
-		accounts = append(accounts, acc)
 	}
 
 	t.Logf("number of accounts returned: %d", len(accounts))
