@@ -102,11 +102,6 @@ func TestListAccounts(t *testing.T) {
 		return
 	}
 
-	if status != 200 {
-		t.Errorf("invalid status returned. Expected 200, got %v", status)
-		return
-	}
-
 	t.Logf("number of accounts returned: %d", len(accounts))
 
 	if len(accounts) != len(users) {

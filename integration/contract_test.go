@@ -41,7 +41,7 @@ func TestDeployContract(t *testing.T) {
 	}
 
 	// create the account for that user, for the Ropsten network
-	account, err := GoCreateAccount(*appToken.Token, map[string]interface{}{
+	account, err := nchain.CreateAccount(*appToken.Token, map[string]interface{}{
 		"network_id":     ropstenNetworkID,
 		"application_id": app.ID,
 	})
