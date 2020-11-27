@@ -14,9 +14,6 @@ import (
 var ropstenNetworkID string = "66d44f30-9092-4182-a3c4-bc02736d6ae5"
 var ropstenNetworkName string = "Ethereum Ropsten testnet"
 
-var True bool = true
-var False bool = false
-
 type chainSpecConfig struct {
 	HomesteadBlock      int `json:"homesteadBlock"`
 	Eip150Block         int `json:"eip150Block"`

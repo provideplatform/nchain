@@ -3,101 +3,11 @@
 package integration
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
-
-func GoGetWalletDetails(token string, walletID string, params map[string]interface{}) (*nchain.Wallet, error) {
-	uri := fmt.Sprintf("wallets/%s", walletID)
-	status, resp, err := nchain.InitNChainService(token).Get(uri, params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if status != 200 {
-		return nil, fmt.Errorf("failed to get wallet details. status: %v", status)
-	}
-
-	wallet := &nchain.Wallet{}
-	walletRaw, _ := json.Marshal(resp)
-	err = json.Unmarshal(walletRaw, &wallet)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get wallet details. status: %v; %s", status, err.Error())
-	}
-
-	return wallet, nil
-}
-
-func GoCreateWallet(token string, params map[string]interface{}) (*nchain.Wallet, error) {
-	uri := "wallets"
-	status, resp, err := nchain.InitNChainService(token).Post(uri, params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if status != 201 {
-		return nil, fmt.Errorf("failed to create wallet. status: %v", status)
-	}
-
-	wallet := &nchain.Wallet{}
-	walletRaw, _ := json.Marshal(resp)
-	err = json.Unmarshal(walletRaw, &wallet)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create wallet. status: %v; %s", status, err.Error())
-	}
-
-	return wallet, nil
-}
-
-func GoListWallets(token string, params map[string]interface{}) ([]*nchain.Wallet, error) {
-	uri := "wallets"
-
-	status, resp, err := nchain.InitNChainService(token).Get(uri, params)
-	if err != nil {
-		return nil, err
-	}
-
-	if status != 200 {
-		return nil, fmt.Errorf("failed to list wallets. status: %v", status)
-	}
-
-	wallets := make([]*nchain.Wallet, 0)
-	for _, item := range resp.([]interface{}) {
-		wallet := &nchain.Wallet{}
-		walletRaw, _ := json.Marshal(item)
-		json.Unmarshal(walletRaw, &wallet)
-		wallets = append(wallets, wallet)
-	}
-	return wallets, nil
-}
-
-func GoListWalletAccounts(token string, walletID string, params map[string]interface{}) ([]*nchain.Account, error) {
-	uri := fmt.Sprintf("wallets/%s/accounts", walletID)
-
-	status, resp, err := nchain.InitNChainService(token).Get(uri, params)
-	if err != nil {
-		return nil, err
-	}
-
-	if status != 200 {
-		return nil, fmt.Errorf("failed to list wallet accounts. status: %v", status)
-	}
-
-	accounts := make([]*nchain.Account, 0)
-	for _, item := range resp.([]interface{}) {
-		account := &nchain.Account{}
-		accountRaw, _ := json.Marshal(item)
-		json.Unmarshal(accountRaw, &account)
-		accounts = append(accounts, account)
-	}
-	return accounts, nil
-}
 
 func TestListWallets(t *testing.T) {
 	testId, err := uuid.NewV4()
@@ -110,7 +20,7 @@ func TestListWallets(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallets, err := GoListWallets(*userToken, map[string]interface{}{})
+	wallets, err := nchain.ListWallets(*userToken, map[string]interface{}{})
 	if err != nil {
 		t.Errorf("error listing wallets")
 		return
@@ -129,7 +39,7 @@ func TestCreateWallet(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{
+	wallet, err := nchain.CreateWallet(*userToken, map[string]interface{}{
 		"purpose": 44,
 	})
 	if err != nil {
@@ -151,7 +61,7 @@ func TestWalletDetails(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{
+	wallet, err := nchain.CreateWallet(*userToken, map[string]interface{}{
 		"purpose": 44,
 	})
 	if err != nil {
@@ -160,7 +70,7 @@ func TestWalletDetails(t *testing.T) {
 	}
 
 	t.Logf("*** wallet returned %+v", *wallet)
-	deets, err := GoGetWalletDetails(*userToken, wallet.ID.String(), map[string]interface{}{})
+	deets, err := nchain.GetWalletDetails(*userToken, wallet.ID.String(), map[string]interface{}{})
 	if err != nil {
 		t.Errorf("error getting wallet details")
 		return
@@ -217,14 +127,14 @@ func TestListWalletAccounts(t *testing.T) {
 		t.Errorf("user authentication failed. Error: %s", err.Error())
 	}
 
-	wallet, err := GoCreateWallet(*userToken, map[string]interface{}{
+	wallet, err := nchain.CreateWallet(*userToken, map[string]interface{}{
 		"purpose": 44,
 	})
 	if err != nil {
 		t.Errorf("error creating wallet")
 		return
 	}
-	accounts, err := GoListWalletAccounts(*userToken, wallet.ID.String(), map[string]interface{}{})
+	accounts, err := nchain.ListWalletAccounts(*userToken, wallet.ID.String(), map[string]interface{}{})
 	if err != nil {
 		t.Errorf("error listing wallet accounts. Error: %s", err.Error())
 		return
