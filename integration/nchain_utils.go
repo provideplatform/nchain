@@ -53,7 +53,7 @@ type chainConfig struct {
 	EngineID          *string    `json:"engine_id"`
 	Chain             *string    `json:"chain"`
 	ProtocolID        *string    `json:"protocol_id"`
-	NetworkID         int        `"json:network_id"`
+	NetworkID         int        `json:"network_id"`
 	ChainSpec         *chainSpec `json:"chainspec"`
 }
 
