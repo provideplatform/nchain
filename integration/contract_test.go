@@ -101,7 +101,7 @@ func TestDeployContract(t *testing.T) {
 			return
 		}
 
-		if cntrct.Address != nil {
+		if cntrct.Address != nil && *cntrct.Address != "0x" {
 			t.Logf("contract address resolved; contract id: %s; address: %s", cntrct.ID.String(), *cntrct.Address)
 			break
 		}
