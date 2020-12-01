@@ -79,6 +79,7 @@ func init() {
 		Client:            common.StringOrNil("geth"),
 		NetworkID:         3,
 		JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/fde5e81d5d3141a093def423db3eeb33"),
+		WebsocketUrl:      common.StringOrNil("wss://ropsten.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33"),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),
 		ChainSpec:         &ropstenChainSpec,
