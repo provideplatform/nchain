@@ -46,6 +46,7 @@ type chainConfig struct {
 	IsEthereumNetwork bool       `json:"is_ethereum_network"`
 	Client            *string    `json:"client"`
 	JsonRpcUrl        *string    `json:"json_rpc_url"`
+	WebsocketUrl      *string    `json:"websocket_url"`
 	Platform          *string    `json:"platform"`
 	EngineID          *string    `json:"engine_id"`
 	Chain             *string    `json:"chain"`
