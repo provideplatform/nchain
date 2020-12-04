@@ -22,6 +22,7 @@ import (
 	"github.com/provideapp/nchain/tx"
 	"github.com/provideapp/nchain/wallet"
 
+	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	provide "github.com/provideservices/provide-go/common"
 	util "github.com/provideservices/provide-go/common/util"
