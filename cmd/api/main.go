@@ -49,6 +49,7 @@ func init() {
 
 	util.RequireJWT()
 	util.RequireGin()
+	pgputil.RequirePGP()
 	redisutil.RequireRedis()
 
 	// identcommon.RequireAPIAccounting()
