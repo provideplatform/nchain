@@ -1310,8 +1310,14 @@ func dockerhubRepoExists(name string) (*string, error) {
 		return nil, err
 	}
 
-	if common.DefaultDockerhubOrganization != nil && name != *common.DefaultDockerhubOrganization && !strings.HasPrefix(name, *common.DefaultDockerhubOrganization) { // reentrancy check
-		repo := fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(name, "/", "-"))
+	_name := name
+	idx := strings.Index(name, ":")
+	if idx != -1 {
+		_name = _name[0:idx]
+	}
+
+	if common.DefaultDockerhubOrganization != nil && _name != *common.DefaultDockerhubOrganization && !strings.HasPrefix(_name, *common.DefaultDockerhubOrganization) { // reentrancy check
+		repo := fmt.Sprintf("%s/%s", *common.DefaultDockerhubOrganization, strings.ReplaceAll(_name, "/", "-"))
 		preferredRepo, err := dockerhubRepoExists(repo)
 		if err == nil {
 			common.Log.Debugf("short-circuiting dockerhub repo resolution; preferred organization hosts repo: %s", repo)
@@ -1320,16 +1326,16 @@ func dockerhubRepoExists(name string) (*string, error) {
 		common.Log.Debugf("preferred dockerhub organization does not currently host repo: %s", repo)
 	}
 
-	idx := strings.Index(name, "/")
+	idx = strings.Index(_name, "/")
 	if idx != -1 {
-		addr := fmt.Sprintf("%s:443", name[0:idx])
+		addr := fmt.Sprintf("%s:443", _name[0:idx])
 		conn, err := net.DialTimeout("tcp", addr, dockerRepoReachabilityTimeout)
 		if err == nil {
 			defer conn.Close()
-			common.Log.Debugf("short-circuiting dockerhub repo resolution; third-party hosted repo is reachable: %s", name)
+			common.Log.Debugf("short-circuiting dockerhub repo resolution; third-party hosted repo is reachable: %s", _name)
 			return &name, nil
 		}
-		common.Log.Debugf("docker repo was not resolved to a third-party host: %s", name)
+		common.Log.Debugf("docker repo was not resolved to a third-party host: %s", _name)
 	}
 
 	dockerhubClient := &http.Client{
@@ -1339,16 +1345,16 @@ func dockerhubRepoExists(name string) (*string, error) {
 		},
 	}
 
-	resp, err := dockerhubClient.Get(fmt.Sprintf("%s/%s", defaultDockerhubBaseURL, name))
+	resp, err := dockerhubClient.Get(fmt.Sprintf("%s/%s", defaultDockerhubBaseURL, _name))
 	if err != nil {
-		common.Log.Warningf("failed to query dockerhub for existance of repo: %s; %s", name, err.Error())
+		common.Log.Warningf("failed to query dockerhub for existance of repo: %s; %s", _name, err.Error())
 		return nil, err
 	} else if resp.StatusCode >= 400 {
 		var err error
 		if resp.StatusCode == 404 {
-			err = fmt.Errorf("docker repository was not resolved: %s", name)
+			err = fmt.Errorf("docker repository was not resolved: %s", _name)
 		} else {
-			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", name, resp.StatusCode)
+			err = fmt.Errorf("failed to query dockerhub for existance of repo: %s; status code: %d", _name, resp.StatusCode)
 		}
 		common.Log.Warning(err.Error())
 		return nil, err
