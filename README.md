@@ -1,7 +1,7 @@
 # nchain
 
-Microservice for authn, authz and identity.
+Microservice providing a low-code, chain-agnostic web3 API for building enterprise applications.
 
 ## Documentation
 
-See the nchain documentation [here](https://docs.provide.services/microservices/nchain).
+See the nchain documentation [here](https://docs.provide.services/api/nchain/overview).
