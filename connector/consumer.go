@@ -24,7 +24,7 @@ const natsConnectorProvisioningInvocationTimeout = time.Second * 15
 
 const natsConnectorResolveReachabilitySubject = "nchain.connector.reachability.resolve"
 const natsConnectorResolveReachabilityMaxInFlight = 64
-const natsConnectorResolveReachabilityTimeout = int64(time.Minute * 10)
+const natsConnectorResolveReachabilityTimeout = int64(time.Minute * 20)
 const natsConnectorResolveReachabilityInvocationTimeout = time.Second * 10
 
 const natsConnectorDenormalizeConfigSubject = "nchain.connector.config.denormalize"
