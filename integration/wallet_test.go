@@ -1,4 +1,4 @@
-// +build integration
+// +build integration nchain
 
 package integration
 
@@ -10,6 +10,7 @@ import (
 )
 
 func TestListWallets(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -29,6 +30,7 @@ func TestListWallets(t *testing.T) {
 }
 
 func TestCreateWallet(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -51,6 +53,7 @@ func TestCreateWallet(t *testing.T) {
 }
 
 func TestWalletDetails(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -117,6 +120,7 @@ func TestWalletDetails(t *testing.T) {
 }
 
 func TestListWalletAccounts(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")

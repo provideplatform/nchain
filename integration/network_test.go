@@ -1,106 +1,18 @@
-// +build integration
+// +build integration nchain ropsten rinkeby kovan gorli
 
 package integration
 
 import (
-	"encoding/json"
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
-
-func init() {
-	// let's enable ropsten and use it as the network id for the moment
-	// todo: test enabling all the chains - but need correct chain specs for them all
-
-	testId, err := uuid.NewV4()
-	if err != nil {
-		common.Log.Warningf("error creating new UUID")
-		return
-	}
-
-	token, err := UserAndTokenFactory(testId)
-	if err != nil {
-		common.Log.Warningf("user authentication failed. Error: %s", err.Error())
-		return
-	}
-
-	ropsten, err := provide.GetNetworkDetails(*token, ropstenNetworkID, map[string]interface{}{})
-	if err != nil {
-		common.Log.Warningf("error getting network details for network %s. Error: %s", ropstenNetworkID, err.Error())
-		return
-	}
-
-	// let's try marshalling the ropsten config into my objects
-	config := &chainConfig{}
-	configRaw, _ := json.Marshal(ropsten.Config)
-	err = json.Unmarshal(configRaw, &config)
-	if err != nil {
-		common.Log.Warningf("failed to marshal ropsten config. Error: %s", err.Error())
-		return
-	}
-
-	common.Log.Debugf("chain config from db: %+v", *config)
-	// we'll add values the config is missing in order to enable ropsten
-	ropstenSpecConfig := chainSpecConfig{
-		HomesteadBlock:      0,
-		Eip150Block:         0,
-		Eip155Block:         0,
-		Eip158Block:         0,
-		ByzantiumBlock:      0,
-		ConstantinopleBlock: 0,
-		PetersburgBlock:     0,
-	}
-
-	ropstenAlloc := allocation{
-		notexportedhack: common.StringOrNil("this left blank"),
-	}
-
-	ropstenChainSpec := chainSpec{
-		Config:     &ropstenSpecConfig,
-		Alloc:      &ropstenAlloc,
-		Coinbase:   common.StringOrNil("0x0000000000000000000000000000000000000000"),
-		Difficulty: common.StringOrNil("0x20000"),
-		ExtraData:  common.StringOrNil(""),
-		GasLimit:   common.StringOrNil("0x2fefd8"),
-		Nonce:      common.StringOrNil("0x0000000000000042"),
-		Mixhash:    common.StringOrNil("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		ParentHash: common.StringOrNil("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		Timestamp:  common.StringOrNil("0x00"),
-	}
-
-	ropstenChainConfig := chainConfig{
-		NativeCurrency:    common.StringOrNil("TEST"),
-		Platform:          common.StringOrNil("evm"),
-		EngineID:          common.StringOrNil("ethash"),
-		IsEthereumNetwork: true,
-		Client:            common.StringOrNil("geth"),
-		NetworkID:         3,
-		JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/fde5e81d5d3141a093def423db3eeb33"),
-		WebsocketUrl:      common.StringOrNil("wss://ropsten.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33"),
-		Chain:             common.StringOrNil("test"),
-		ProtocolID:        common.StringOrNil("pow"),
-		ChainSpec:         &ropstenChainSpec,
-	}
-
-	config.ChainSpec = &ropstenChainSpec
-	err = provide.UpdateNetwork(*token, ropstenNetworkID, map[string]interface{}{
-		"enabled": true,
-		"config":  ropstenChainConfig,
-	})
-
-	if err != nil {
-		common.Log.Debugf("error enabling ropsten network. Error: %s", err.Error())
-	}
-
-	common.Log.Debugf("ropsten enabled")
-}
 
 // Note: this will fail if the db volume isn't removed, as this uses an existing chain_id
 // which has a unique index
 func TestCreateNetwork(t *testing.T) {
+	t.Parallel()
 	// let's try it from the docs!
 
 	testId, err := uuid.NewV4()
@@ -122,6 +34,7 @@ func TestCreateNetwork(t *testing.T) {
 }
 
 func TestGetNetworkDetails(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -152,44 +65,6 @@ func TestGetNetworkDetails(t *testing.T) {
 	}
 }
 
-// Note: this fails because none of the default networks are enabled
-// and when attempting to enable ropsten, I hit an issue in the config where
-// it was missing a chainspec, which is where I stopped on that rabbit hole
-func TestListNetworks(t *testing.T) {
-
-	testId, err := uuid.NewV4()
-	if err != nil {
-		t.Logf("error creating new UUID")
-	}
-
-	token, err := UserAndTokenFactory(testId)
-	if err != nil {
-		t.Errorf("user authentication failed. Error: %s", err.Error())
-	}
-
-	networks, err := provide.ListNetworks(*token, map[string]interface{}{
-		"public": true,
-	})
-	if err != nil {
-		t.Errorf("error listing networks %s", err.Error())
-		return
-	}
-
-	// we have only enabled Ropsten, so let's fix to that for the moment
-	ropstenFound := false
-	for counter, network := range networks {
-		t.Logf("network %v returned: %s", counter, *network.Name)
-		if *network.Name == ropstenNetworkName {
-			ropstenFound = true
-		}
-	}
-
-	if ropstenFound != true {
-		t.Errorf("ropsten network not found in network listing")
-		return
-	}
-}
-
 func TestListNetworkAddresses(t *testing.T) {
 	t.Logf("not implemented")
 }
@@ -207,6 +82,7 @@ func TestListNetworkConnectors(t *testing.T) {
 }
 
 func TestNetworkStatus(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")

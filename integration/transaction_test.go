@@ -1,4 +1,4 @@
-// +build integration
+// +build integration- nchain-
 
 package integration
 
@@ -84,6 +84,7 @@ type ExecutionResponse struct {
 // }
 
 func TestGetTransactionDetails(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -181,6 +182,7 @@ func TestGetTransactionDetails(t *testing.T) {
 }
 
 func TestListTransactions(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -212,6 +214,7 @@ func TestListTransactions(t *testing.T) {
 }
 
 func TestListNetworkTransactions(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -312,6 +315,7 @@ func TestListNetworkTransactions(t *testing.T) {
 }
 
 func TestGetNetworkTransactionDetails(t *testing.T) {
+	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")

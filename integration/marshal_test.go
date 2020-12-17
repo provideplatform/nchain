@@ -1,4 +1,4 @@
-// +build integration_m
+// +build integration-
 
 package integration
 

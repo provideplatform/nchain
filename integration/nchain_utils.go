@@ -1,4 +1,4 @@
-// +build integration
+// +build integration nchain failing rinkeby ropsten kovan gorli
 
 package integration
 
@@ -7,59 +7,9 @@ import (
 	"fmt"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideapp/ident/common"
 	provide "github.com/provideservices/provide-go/api/nchain"
 )
-
-var ropstenNetworkID string = "66d44f30-9092-4182-a3c4-bc02736d6ae5"
-var ropstenNetworkName string = "Ethereum Ropsten testnet"
-
-type chainSpecConfig struct {
-	HomesteadBlock      int `json:"homesteadBlock"`
-	Eip150Block         int `json:"eip150Block"`
-	Eip155Block         int `json:"eip155Block"`
-	Eip158Block         int `json:"eip158Block"`
-	ByzantiumBlock      int `json:"byzantiumBlock"`
-	ConstantinopleBlock int `json:"constantinopleBlock"`
-	PetersburgBlock     int `json:"petersburgBlock"`
-}
-
-type allocation struct {
-	notexportedhack *string `json:"hackyhack,omitempty"`
-}
-
-type chainSpec struct {
-	Config     *chainSpecConfig `json:"config"`
-	Alloc      *allocation      `json:"alloc"`
-	Coinbase   *string          `json:"coinbase"`
-	Difficulty *string          `json:"difficulty"`
-	ExtraData  *string          `json:"extraData"`
-	GasLimit   *string          `json:"gasLimit"`
-	Nonce      *string          `json:"nonce"`
-	Mixhash    *string          `json:"mixhash"`
-	ParentHash *string          `json:"parentHash"`
-	Timestamp  *string          `json:"timestamp"`
-}
-
-type chainConfig struct {
-	NativeCurrency    *string    `json:"native_currency"`
-	IsEthereumNetwork bool       `json:"is_ethereum_network"`
-	Client            *string    `json:"client"`
-	JsonRpcUrl        *string    `json:"json_rpc_url"`
-	WebsocketUrl      *string    `json:"websocket_url"`
-	Platform          *string    `json:"platform"`
-	EngineID          *string    `json:"engine_id"`
-	Chain             *string    `json:"chain"`
-	ProtocolID        *string    `json:"protocol_id"`
-	NetworkID         int        `json:"network_id"`
-	ChainSpec         *chainSpec `json:"chainspec"`
-}
-
-type chainDef struct {
-	Name      *string      `json:"name"`
-	Cloneable bool         `json:"cloneable"`
-	Config    *chainConfig `json:"config"`
-}
 
 func NetworkFactory(token string, testId uuid.UUID) (*provide.Network, error) {
 

@@ -1,4 +1,4 @@
-// +build integration
+// +build integration nchain ropsten rinkeby
 
 package integration
 
@@ -11,6 +11,8 @@ import (
 )
 
 func TestListAccounts(t *testing.T) {
+	t.Parallel()
+
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -58,6 +60,10 @@ func TestListAccounts(t *testing.T) {
 		return
 	}
 
+	if app == nil {
+		t.Errorf("error creating application")
+		return
+	}
 	appToken, err := appTokenFactory(*setupUserToken.Token, app.ID)
 	if err != nil {
 		t.Errorf("error getting app token. Error: %s", err.Error())
