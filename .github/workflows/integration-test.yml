@@ -17,7 +17,11 @@ jobs:
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
-          path: 'nchain'                      
+          path: 'nchain'  
+      - name: Checkout ident
+        uses: actions/checkout@v2
+        with:
+          path: 'ident'                              
       - run: make integration_ropsten_short
         working-directory: nchain
       - name: slack channel update
@@ -39,7 +43,11 @@ jobs:
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
-          path: 'nchain'                      
+          path: 'nchain'  
+      - name: Checkout ident
+        uses: actions/checkout@v2
+        with:
+          path: 'ident'                                
       - run: make integration_rinkeby_short
         working-directory: nchain
       - name: slack channel update
