@@ -1,0 +1,50 @@
+name: nchain-integration-test-short
+on:
+  push:
+    branches:
+      - integration   
+jobs:
+  nchain-integration-test-ropsten-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10    
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.INTEGRATION_SLACK_WEBHOOK }}
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.15.1'
+      - name: Checkout nchain
+        uses: actions/checkout@v2
+        with:
+          path: 'nchain'                      
+      - run: make integration_ropsten_short
+        working-directory: nchain
+      - name: slack channel update
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+        if: failure()   
+  nchain-integration-test-rinkeby-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10    
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.INTEGRATION_SLACK_WEBHOOK }}
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.15.1'
+      - name: Checkout nchain
+        uses: actions/checkout@v2
+        with:
+          path: 'nchain'                      
+      - run: make integration_rinkeby_short
+        working-directory: nchain
+      - name: slack channel update
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+        if: failure()             

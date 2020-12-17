@@ -61,10 +61,33 @@ test: build
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_unit_tests.sh
 
-integration: build
-	#NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+# integration_ropsten:
+# 	LOCAL_TAGS=ropsten NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
 
-integration_debug:
-	#NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+# integration_rinkeby:
+# 	LOCAL_TAGS=rinkeby NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+# integration_kovan:
+# 	LOCAL_TAGS=kovan NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+# integration_gorli:
+# 	LOCAL_TAGS=gorli NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+integration_nchain_short:
+	LOCAL_TAGS=nchain NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_ropsten_short:
+	LOCAL_TAGS=ropsten NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_rinkeby_short:
+	LOCAL_TAGS=rinkeby NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_kovan_short:
+	LOCAL_TAGS=kovan NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_gorli_short:
+	LOCAL_TAGS=gorli NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+
+debug:
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh

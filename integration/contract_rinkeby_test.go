@@ -1,4 +1,4 @@
-// +build integration
+// +build integration nchain rinkeby
 
 package integration
 
@@ -13,7 +13,9 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func TestExecuteContract_Application(t *testing.T) {
+func TestExecuteContractRinkeby(t *testing.T) {
+	t.Parallel()
+
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -41,9 +43,9 @@ func TestExecuteContract_Application(t *testing.T) {
 		return
 	}
 
-	// create the account for that user, for the Ropsten network
+	// create the account for that user, for the Rinkeby network
 	account, err := nchain.CreateAccount(*appToken.Token, map[string]interface{}{
-		"network_id":     ropstenNetworkID,
+		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID,
 	})
 
@@ -67,7 +69,7 @@ func TestExecuteContract_Application(t *testing.T) {
 	json.Unmarshal([]byte(parameter), &params)
 
 	contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
-		"network_id":     ropstenNetworkID,
+		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID.String(),
 		"account_id":     account.ID.String(),
 		"name":           "Ekho",
@@ -82,7 +84,7 @@ func TestExecuteContract_Application(t *testing.T) {
 	started := time.Now().Unix()
 
 	for {
-		if time.Now().Unix()-started >= 60 {
+		if time.Now().Unix()-started >= contractTimeout {
 			t.Error("timed out awaiting contract address")
 			return
 		}
@@ -99,11 +101,12 @@ func TestExecuteContract_Application(t *testing.T) {
 		}
 
 		t.Logf("contract address has not yet been resolved; contract id: %s", cntrct.ID.String())
-		time.Sleep(5 * time.Second)
+		time.Sleep(contractSleepTime * time.Second)
 	}
 
 	t.Logf("contract is: %+v", contract)
 
+	// generate a random string from bytes
 	msg := common.RandomString(118)
 
 	params = map[string]interface{}{}
@@ -123,7 +126,7 @@ func TestExecuteContract_Application(t *testing.T) {
 	started = time.Now().Unix()
 
 	for {
-		if time.Now().Unix()-started >= 60 {
+		if time.Now().Unix()-started >= transactionTimeout {
 			t.Error("timed out awaiting transaction hash")
 			return
 		}
@@ -142,143 +145,19 @@ func TestExecuteContract_Application(t *testing.T) {
 
 			t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(transactionSleepTime * time.Second)
 	}
 
 	t.Logf("contract execution successful")
 }
 
-func TestExecuteContract_Organization(t *testing.T) {
-	testId, err := uuid.NewV4()
-	if err != nil {
-		t.Logf("error creating new UUID")
+func TestBulkExecuteContractRinkeby(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
 	}
 
-	userToken, err := UserAndTokenFactory(testId)
-	if err != nil {
-		t.Errorf("user authentication failed. Error: %s", err.Error())
-	}
-
-	testcaseOrg := Organization{
-		"org" + testId.String(),
-		"orgdesc " + testId.String(),
-	}
-
-	org, err := orgFactory(*userToken, testcaseOrg.name, testcaseOrg.description)
-	if err != nil {
-		t.Errorf("error setting up organization. Error: %s", err.Error())
-		return
-	}
-
-	orgToken, err := orgTokenFactory(*userToken, org.ID)
-	if err != nil {
-		t.Errorf("error getting org token. Error: %s", err.Error())
-		return
-	}
-
-	// create the account for that user, for the Ropsten network
-	account, err := nchain.CreateAccount(*orgToken.Token, map[string]interface{}{
-		"network_id":      ropstenNetworkID,
-		"organization_id": org.ID,
-	})
-
-	if err != nil {
-		t.Errorf("error creating user account. Error: %s", err.Error())
-	}
-
-	// deploy the contract
-	params := map[string]interface{}{}
-
-	var contractArtifact map[string]interface{}
-
-	json.Unmarshal([]byte(ekhoArtifact), contractArtifact)
-
-	parameter := fmt.Sprintf(`{
-		"account_id": "%s",
-		"compiled_artifact": %s
-		}`, account.ID, ekhoArtifact)
-
-	json.Unmarshal([]byte(parameter), &params)
-
-	contract, err := nchain.CreateContract(*orgToken.Token, map[string]interface{}{
-		"network_id":      ropstenNetworkID,
-		"organization_id": org.ID.String(),
-		"account_id":      account.ID.String(),
-		"name":            "Ekho",
-		"address":         "0x",
-		"params":          params,
-	})
-	if err != nil {
-		t.Errorf("error creating contract. Error: %s", err.Error())
-		return
-	}
-
-	started := time.Now().Unix()
-
-	for {
-		if time.Now().Unix()-started >= 60 {
-			t.Error("timed out awaiting contract address")
-			return
-		}
-
-		deployedContract, err := nchain.GetContractDetails(*orgToken.Token, contract.ID.String(), map[string]interface{}{})
-		if err != nil {
-			t.Errorf("error fetching contract details; %s", err.Error())
-			return
-		}
-
-		if deployedContract.Address != nil && *deployedContract.Address != "0x" {
-			t.Logf("contract address resolved; contract id: %s; address: %s", deployedContract.ID.String(), *deployedContract.Address)
-			break
-		}
-
-		t.Logf("contract address has not yet been resolved; contract id: %s", deployedContract.ID.String())
-		time.Sleep(5 * time.Second)
-	}
-
-	msg := common.RandomString(118)
-
-	params = map[string]interface{}{}
-	parameter = fmt.Sprintf(`{"method":"broadcast", "params": ["%s"], "value":0, "account_id":"%s"}`, msg, account.ID.String())
-
-	json.Unmarshal([]byte(parameter), &params)
-
-	execResponse, err := nchain.ExecuteContract(*orgToken.Token, contract.ID.String(), params)
-
-	if err != nil {
-		t.Errorf("error executing contract: %s", err.Error())
-		return
-	}
-
-	started = time.Now().Unix()
-
-	for {
-		if time.Now().Unix()-started >= 60 {
-			t.Error("timed out awaiting transaction hash")
-			return
-		}
-
-		tx, err := nchain.GetTransactionDetails(*orgToken.Token, *execResponse.Reference, map[string]interface{}{})
-		//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
-		if err != nil {
-			t.Logf("error fetching transaction; %s", err.Error())
-		}
-
-		if err == nil {
-			if tx.Hash != nil && *tx.Hash != "0x" {
-				t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
-				break
-			}
-
-			t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
-		}
-		time.Sleep(5 * time.Second)
-	}
-
-	t.Logf("contract execution successful")
-}
-
-func TestBulkExecuteContract(t *testing.T) {
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -309,9 +188,9 @@ func TestBulkExecuteContract(t *testing.T) {
 		return
 	}
 
-	// create the account for that user, for the Ropsten network
+	// create the account for that user, for the Rinkeby network
 	account, err := nchain.CreateAccount(*appToken.Token, map[string]interface{}{
-		"network_id":     ropstenNetworkID,
+		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID,
 	})
 
@@ -334,7 +213,7 @@ func TestBulkExecuteContract(t *testing.T) {
 	json.Unmarshal([]byte(parameter), &params)
 
 	contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
-		"network_id":     ropstenNetworkID,
+		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID.String(),
 		"account_id":     account.ID.String(),
 		"name":           "Ekho",
@@ -349,7 +228,7 @@ func TestBulkExecuteContract(t *testing.T) {
 	started := time.Now().Unix()
 
 	for {
-		if time.Now().Unix()-started >= 60 {
+		if time.Now().Unix()-started >= contractTimeout {
 			t.Error("timed out awaiting contract address")
 			return
 		}
@@ -366,13 +245,14 @@ func TestBulkExecuteContract(t *testing.T) {
 		}
 
 		t.Logf("contract address has not yet been resolved; contract id: %s", deployedContract.ID.String())
-		time.Sleep(5 * time.Second)
+		time.Sleep(contractSleepTime * time.Second)
 	}
 
 	var references [numberofTransactions]string //we'll store the returned references in here
 
 	// send a bunch of transactions at the contract
 	for execloop := 0; execloop < numberofTransactions; execloop++ {
+
 		msg := common.RandomString(118)
 
 		params = map[string]interface{}{}
@@ -398,7 +278,7 @@ func TestBulkExecuteContract(t *testing.T) {
 
 	for txloop := 0; txloop < numberofTransactions; txloop++ {
 		for {
-			if time.Now().Unix()-started >= 120 {
+			if time.Now().Unix()-started >= transactionTimeout {
 				t.Error("timed out awaiting transaction hash")
 				return
 			}
@@ -418,7 +298,7 @@ func TestBulkExecuteContract(t *testing.T) {
 
 				t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(transactionSleepTime * time.Second)
 		}
 	}
 
