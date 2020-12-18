@@ -9,7 +9,7 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/ident/common"
+	"github.com/provideapp/vault/common"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
