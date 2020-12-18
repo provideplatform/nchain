@@ -15,7 +15,6 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/golang-migrate/migrate v3.5.4+incompatible
-	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/websocket v1.4.1
 	github.com/ipfs/go-cid v0.0.4 // indirect
 	github.com/ipfs/go-ipfs-api v0.0.2
@@ -44,7 +43,6 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideapp/vault v0.0.0-00010101000000-000000000000
 	github.com/provideservices/provide-go v0.0.0-20201207152725-cbbcf3a37eb9
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
@@ -53,5 +51,3 @@ require (
 )
 
 replace github.com/provideapp/ident => ../ident
-
-replace github.com/provideapp/vault => ../vault
