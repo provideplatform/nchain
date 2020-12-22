@@ -60,7 +60,7 @@ func init() {
 	common.RequirePayments()
 	common.RequireVault()
 
-	// identcommon.RequireAPIAccounting()
+	identcommon.EnableAPIAccounting()
 	filter.CacheTxFilters()
 }
 
