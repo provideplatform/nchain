@@ -28,6 +28,7 @@ import (
 	util "github.com/provideservices/provide-go/common/util"
 
 	identcommon "github.com/provideapp/ident/common"
+	identtoken "github.com/provideapp/ident/token"
 )
 
 const runloopSleepInterval = 250 * time.Millisecond
@@ -104,6 +105,7 @@ func runAPI() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
+	r.Use(identtoken.AuthMiddleware())
 	r.Use(identcommon.AccountingMiddleware())
 	r.Use(identcommon.RateLimitingMiddleware())
 
