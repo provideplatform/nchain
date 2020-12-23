@@ -22,6 +22,8 @@ import (
 
 const runloopTickerInterval = 5 * time.Second
 const runloopSleepInterval = 250 * time.Millisecond
+const enableDaemonsTickerInterval = 10 * time.Second
+const enableDaemonsSleepInterval = 5 * time.Second
 
 var (
 	cancelF     context.CancelFunc
@@ -49,7 +51,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	shutdownCtx, cancelF = context.WithCancel(context.Background())
 
-	requireNetworkDaemonInstances()
+	monitorNetworkDaemonInstances()
 
 	common.Log.Debugf("Running statsdaemon main()")
 	timer := time.NewTicker(runloopTickerInterval)
@@ -74,7 +76,39 @@ func main() {
 	cancelF()
 }
 
-func requireNetworkDaemonInstances() {
+func monitorNetworkDaemonInstances() {
+	go func() {
+		timer := time.NewTicker(enableDaemonsTickerInterval)
+		defer timer.Stop()
+
+		for !shuttingDown() {
+			select {
+			case <-timer.C:
+				networks := requireNetworkDaemonInstances()
+
+				for networkID := range currentNetworkStats {
+					evict := true
+					for _, netwrk := range networks {
+						if netwrk.ID.String() == networkID {
+							evict = false
+							break
+						}
+					}
+
+					if evict {
+						common.Log.Debugf("evicting network statsdaemon and log transceiver: %s", networkID)
+						EvictNetworkLogTransceiver(currentLogTransceivers[networkID].Network)
+						EvictNetworkStatsDaemon(currentNetworkStats[networkID].dataSource.Network)
+					}
+				}
+			default:
+				time.Sleep(enableDaemonsSleepInterval)
+			}
+		}
+	}()
+}
+
+func requireNetworkDaemonInstances() []*network.Network {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -85,6 +119,8 @@ func requireNetworkDaemonInstances() {
 		RequireNetworkLogTransceiver(ntwrk)
 		RequireNetworkStatsDaemon(ntwrk)
 	}
+
+	return networks
 }
 
 func shutdown() {
