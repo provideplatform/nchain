@@ -106,7 +106,6 @@ func runAPI() {
 	r.Use(provide.CORSMiddleware())
 	r.Use(identcommon.AccountingMiddleware())
 	r.Use(identcommon.RateLimitingMiddleware())
-	r.Use(util.TrackAPICalls())
 
 	network.InstallNetworksAPI(r)
 	prices.InstallPricesAPI(r)
