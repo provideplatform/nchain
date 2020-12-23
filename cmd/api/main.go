@@ -111,9 +111,6 @@ func runAPI() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(provide.CORSMiddleware())
-
-	r.GET("/status", statusHandler)
-
 	r.Use(identtoken.AuthMiddleware())
 	r.Use(identcommon.AccountingMiddleware())
 	r.Use(identcommon.RateLimitingMiddleware())
