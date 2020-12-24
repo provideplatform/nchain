@@ -646,20 +646,14 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string, description *stri
 func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Signer) error {
 	var err error
 
-	if t.SignedTx == nil || ntwrk == nil {
+	if t.SignedTx == nil || network == nil {
 		params := t.ParseParams()
 
-		var _ntwrk *network.Network
-		if t.NetworkID != uuid.Nil {
-			_ntwrk = &network.Network{}
-			db.Model(t).Related(&_ntwrk)
-		}
-
 		if _, networkOk := params["network"].(string); !networkOk {
-			params["network"] = _ntwrk.PaymentsNetworkName()
+			params["network"] = network.PaymentsNetworkName()
 		}
 
-		result, err := common.BroadcastTransaction(t.To, t.Data, params)
+		result, err := common.BroadcastTransaction(t.To, t.Data, t.ParseParams())
 		if err != nil {
 			return fmt.Errorf("failed to broadcast tx; %s", err.Error())
 		}
