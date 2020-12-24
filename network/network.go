@@ -203,6 +203,27 @@ func (n *Network) encryptConfig() bool {
 	return true
 }
 
+func (n *Network) PaymentsNetworkName() *string {
+	if n.IsEthereumNetwork() {
+		switch n.ID.String() {
+		case "deca2436-21ba-4ff5-b225-ad1b0b2f5c59":
+			return common.StringOrNil("mainnet")
+		case "07102258-5e49-480e-86af-6d0c3260827d":
+			return common.StringOrNil("rinkeby")
+		case "66d44f30-9092-4182-a3c4-bc02736d6ae5":
+			return common.StringOrNil("ropsten")
+		case "8d31bf48-df6b-4a71-9d7c-3cb291111e27":
+			return common.StringOrNil("kovan")
+		case "1b16996e-3595-4985-816c-043345d22f8c":
+			return common.StringOrNil("gorli")
+		default:
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func (n *Network) SetEncryptedConfig(params map[string]interface{}) {
 	paramsJSON, _ := json.Marshal(params)
 	_paramsJSON := string(json.RawMessage(paramsJSON))
