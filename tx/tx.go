@@ -653,7 +653,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 			params["network"] = network.PaymentsNetworkName()
 		}
 
-		result, err := common.BroadcastTransaction(t.To, t.Data, t.ParseParams())
+		result, err := common.BroadcastTransaction(t.To, t.Data, params)
 		if err != nil {
 			return fmt.Errorf("failed to broadcast tx; %s", err.Error())
 		}
