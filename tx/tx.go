@@ -453,11 +453,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					t.updateStatus(db, "failed", &desc)
 				} else {
 					if providePayment {
-						var ntwrk *network.Network
-						if t.NetworkID != uuid.Nil {
-							ntwrk = &network.Network{}
-							db.Model(t).Related(&ntwrk)
-						}
 						err = t.broadcast(db, ntwrk, nil)
 					}
 
@@ -648,14 +643,20 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string, description *stri
 // 	return err
 // }
 
-func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Signer) error {
+func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Signer) error {
 	var err error
 
-	if t.SignedTx == nil || network == nil {
+	if t.SignedTx == nil || ntwrk == nil {
 		params := t.ParseParams()
 
+		var _ntwrk *network.Network
+		if t.NetworkID != uuid.Nil {
+			_ntwrk = &network.Network{}
+			db.Model(t).Related(&_ntwrk)
+		}
+
 		if _, networkOk := params["network"].(string); !networkOk {
-			params["network"] = network.PaymentsNetworkName()
+			params["network"] = _ntwrk.PaymentsNetworkName()
 		}
 
 		result, err := common.BroadcastTransaction(t.To, t.Data, params)
@@ -667,7 +668,7 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 		db.Save(&t)
 		common.Log.Debugf("broadcast tx: %s", *t.Hash)
 	} else {
-		if network.IsEthereumNetwork() {
+		if ntwrk.IsEthereumNetwork() {
 			// data := string(t.SignedTx.(*types.Transaction).Data())
 			// _, err := common.BroadcastTransaction(t.To, &data)
 			// if err != nil {
@@ -675,17 +676,17 @@ func (t *Transaction) broadcast(db *gorm.DB, network *network.Network, signer Si
 			// }
 
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-				err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+				err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 			} else {
 				err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 			}
 		} else {
-			err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *network.Name)
+			err = fmt.Errorf("unable to generate signed tx for unsupported network: %s", *ntwrk.Name)
 		}
 	}
 
 	if err != nil {
-		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *network.Name, signer.String(), err.Error())
+		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *ntwrk.Name, signer.String(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
