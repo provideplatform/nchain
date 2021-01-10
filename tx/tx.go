@@ -453,11 +453,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					t.updateStatus(db, "failed", &desc)
 				} else {
 					if providePayment {
-						var ntwrk *network.Network
-						if t.NetworkID != uuid.Nil {
-							ntwrk = &network.Network{}
-							db.Model(t).Related(&ntwrk)
-						}
 						err = t.broadcast(db, ntwrk, nil)
 					}
 
@@ -651,11 +646,17 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string, description *stri
 func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Signer) error {
 	var err error
 
-	if t.SignedTx == nil || network == nil {
+	if t.SignedTx == nil || ntwrk == nil {
 		params := t.ParseParams()
 
+		var _ntwrk *network.Network
+		if t.NetworkID != uuid.Nil {
+			_ntwrk = &network.Network{}
+			db.Model(t).Related(&_ntwrk)
+		}
+
 		if _, networkOk := params["network"].(string); !networkOk {
-			params["network"] = network.PaymentsNetworkName()
+			params["network"] = _ntwrk.PaymentsNetworkName()
 		}
 
 		result, err := common.BroadcastTransaction(t.To, t.Data, params)
