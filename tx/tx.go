@@ -453,7 +453,12 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					t.updateStatus(db, "failed", &desc)
 				} else {
 					if providePayment {
-						err = t.broadcast(db, nil, nil)
+						var ntwrk *network.Network
+						if t.NetworkID != uuid.Nil {
+							ntwrk = &network.Network{}
+							db.Model(t).Related(&ntwrk)
+						}
+						err = t.broadcast(db, ntwrk, nil)
 					}
 
 					if err == nil {
