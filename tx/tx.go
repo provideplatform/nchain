@@ -453,7 +453,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					t.updateStatus(db, "failed", &desc)
 				} else {
 					if providePayment {
-						err = t.broadcast(db, ntwrk, nil)
+						err = t.broadcast(db, nil, nil)
 					}
 
 					if err == nil {
