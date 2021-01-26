@@ -1,7 +1,7 @@
 name: nchain-integration-test-rinkeby-short
 on:
   schedule:
-    - cron: '0,30 * * * *'  # every half hour     
+    - cron: '0 * * * *'  # every hour on the hour     
 jobs:
   nchain-integration-test-rinkeby-short:
     runs-on: ubuntu-latest
