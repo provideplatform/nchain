@@ -1,7 +1,7 @@
 name: nchain-integration-test-ropsten-short
 on:
   schedule:
-    - cron: '0,30 * * * *'  # every half hour     
+    - cron: '0 * * * *'  # every hour on the hour   
 jobs:
   nchain-integration-test-ropsten-short:
     runs-on: ubuntu-latest
