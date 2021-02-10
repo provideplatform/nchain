@@ -105,11 +105,11 @@ func (w *Wallet) Validate() bool {
 			Message: common.StringOrNil("vault key id required"),
 		})
 	}
-	if w.Purpose == nil {
-		w.Errors = append(w.Errors, &provide.Error{
-			Message: common.StringOrNil("purpose required; see https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki"),
-		})
-	}
+	// if w.Purpose == nil {
+	// 	w.Errors = append(w.Errors, &provide.Error{
+	// 		Message: common.StringOrNil("purpose required; see https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki"),
+	// 	})
+	// }
 	if w.PublicKey == nil {
 		w.Errors = append(w.Errors, &provide.Error{
 			Message: common.StringOrNil("public key required"),
