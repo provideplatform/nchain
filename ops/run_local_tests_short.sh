@@ -239,6 +239,7 @@ export LOG_LEVEL=DEBUG
 go test "./integration" -v \
                     -timeout 1800s \
                     -race \
+                    -count=1\
                     -parallel 1 \
                     -short \
                     -tags="$TAGS"

@@ -44,6 +44,7 @@ services:
       - VAULT_API_HOST=vault:8080
       - VAULT_API_PATH=api/v1
       - VAULT_API_SCHEME=http
+      - VAULT_SEAL_UNSEAL_KEY=traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day      
     healthcheck:
       test: ["CMD", "curl", "-f", "http://vault:8080/status"]
       interval: 1m
@@ -126,6 +127,7 @@ services:
       - provide
     ports:
       - 4224:4224
+      - 9222:4222
     restart: always
     volumes:
       - ./ops/await_tcp.sh:/usr/local/bin/await_tcp.sh:cached
