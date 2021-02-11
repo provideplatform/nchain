@@ -206,11 +206,19 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 }
 
 func (w *Wallet) generate(db *gorm.DB) error {
+	var mnemonic string
+
+	// handle an optional mnemonic when creating a wallet
+	if w.Mnemonic != nil {
+		mnemonic = *w.Mnemonic
+	}
+
 	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
-		"type":  "asymmetric",
-		"usage": "sign/verify",
-		"spec":  "BIP39",
-		"name":  "nchain hd wallet",
+		"type":     "asymmetric",
+		"usage":    "sign/verify",
+		"spec":     "BIP39",
+		"name":     "nchain hd wallet",
+		"mnemonic": common.StringOrNil(mnemonic),
 	})
 
 	if err != nil {

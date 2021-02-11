@@ -42,12 +42,15 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 		return
 	}
 
-	wallet, err := nchain.CreateWallet(*appToken.Token, map[string]interface{}{})
+	wallet, err := nchain.CreateWallet(*appToken.Token, map[string]interface{}{
+		"mnemonic": "traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day",
+	})
 	if err != nil {
 		t.Errorf("error creating wallet: %s", err.Error())
 		return
 	}
 	t.Logf("wallet created: %+v", wallet)
+	t.Logf("wallet public key: %s", *wallet.PublicKey)
 
 	// change this to create an eth address for vault deterministically, using the seed phrase
 	// then use this keyid for the account.
