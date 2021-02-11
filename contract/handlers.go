@@ -153,13 +153,16 @@ func createContractHandler(c *gin.Context) {
 
 		if rawSourceOk {
 			provide.Render(contract, 202, c)
+			return
 		} else {
 			provide.Render(contract, 201, c)
+			return
 		}
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = contract.Errors
 		provide.Render(obj, 422, c)
+		return
 	}
 }
 
