@@ -34,6 +34,7 @@ require (
 	github.com/libp2p/go-libp2p-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-peer v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
+	github.com/miguelmota/go-ethereum-hdwallet v0.0.0-20200123000308-a60dcd172b4c
 	github.com/minio/sha256-simd v0.1.2-0.20190917233721-f675151bb5e1 // indirect
 	github.com/multiformats/go-multiaddr-net v0.1.1 // indirect
 	github.com/multiformats/go-varint v0.0.2 // indirect
