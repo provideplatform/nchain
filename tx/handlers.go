@@ -9,11 +9,13 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
+	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/contract"
 	"github.com/provideapp/nchain/filter"
 	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/wallet"
+	vault "github.com/provideservices/provide-go/api/vault"
 	provide "github.com/provideservices/provide-go/common"
 	util "github.com/provideservices/provide-go/common/util"
 )
@@ -453,9 +455,48 @@ func contractExecutionHandler(c *gin.Context) {
 			chain := uint32(0)
 			derivedAccount, _ := hardenedChild.DeriveAddress(nil, uint32(0), &chain)
 			execution.AccountAddress = &derivedAccount.Address
-		}
-	}
 
+			// hmmm, wllt is from the db, and wallet is from...
+			if wallet.Path != nil {
+				// we have a path, so ignore the code above, and generate the address deterministically
+				_, err := hdwallet.ParseDerivationPath(*wallet.Path)
+				if err != nil {
+					err := fmt.Errorf("failed to parse derivation path provided (%s). Error: %s", *wallet.Path, err.Error())
+					common.Log.Warning(err.Error())
+					provide.RenderError(err.Error(), 500, c)
+					return
+				}
+				pathstr := *wallet.Path
+				common.Log.Debugf("vault id: %s", wllt.VaultID.String())
+				common.Log.Debugf("key id: %s", wllt.KeyID.String())
+				key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, wllt.VaultID.String(), wllt.KeyID.String(), map[string]interface{}{
+					"hd_derivation_path": pathstr,
+				})
+				if err != nil {
+					err := fmt.Errorf("unable to generate key material for HD wallet; %s", err.Error())
+					common.Log.Warning(err.Error())
+					provide.RenderError(err.Error(), 500, c)
+					return
+				}
+
+				//TODO this is not right, because it should be the same address that created the contract, but it's not
+				// check through everything to make sure we're getting the right hd wallet, and not just making up
+				// a fresh one every time...
+				// then get fresh integration branch and get this code in for a path using:
+				// - a bip39 wallet with partstr
+				// - a bip39 wallet with no pathstr (generating a new address each time and incrementing in DB)
+				// - an account id, using a single secp256k1 key (which should be, um, the same every time)
+				// then tackle the w(a(func))a(func(w)) cray
+
+				execution.AccountAddress = key.Address
+			}
+
+			//***"0x6Af845bae76F5cc16bC93F86b83E8928c3dfDa19"
+
+		}
+
+	}
+	common.Log.Debugf("*** execution address: %s", *execution.AccountAddress)
 	gas, gasOk := params["gas"].(float64)
 	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
