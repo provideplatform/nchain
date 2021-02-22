@@ -378,6 +378,8 @@ func (c *Contract) ExecuteFromTx(
 		txParams["to"] = *c.Address
 	}
 
+	// TODO get the hd-derivation-path (if present) into the txparams
+
 	accountID := accountFn(account, txParams)
 	walletID := walletFn(wallet, txParams)
 
