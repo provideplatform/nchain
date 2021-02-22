@@ -48,3 +48,8 @@ profile.out
 # Items generated for CI
 src/
 vendor/
+
+#dev artifacts
+.vscode
+.env
+__debug_bin
