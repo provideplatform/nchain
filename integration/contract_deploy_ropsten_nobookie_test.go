@@ -9,7 +9,6 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/ident/common"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
@@ -319,7 +318,7 @@ func TestEkhoContractWithSeededHDWallet(t *testing.T) {
 	// set up the path we'll use for all of these nchain interactions
 
 	path := `m/44'/60'/2'/0/0`
-
+	t.Logf("test path for hd wallet: %s", path)
 	// this describes the test cases, at the moment, we will just deploy a single contract
 	// but this can be extended to many contracts when needed, and network ids can be included
 	// to hit all the test networks
@@ -329,6 +328,7 @@ func TestEkhoContractWithSeededHDWallet(t *testing.T) {
 		name      string
 		parameter string
 	}{
+		//{"ekho", fmt.Sprintf(`{"wallet_id": "%s","compiled_artifact": %s}`, wallet.ID, ekhoArtifact)},
 		{"ekho", fmt.Sprintf(`{"wallet_id": "%s","hd_derivation_path": "%s","compiled_artifact": %s}`, wallet.ID, path, ekhoArtifact)},
 	}
 
@@ -374,59 +374,59 @@ func TestEkhoContractWithSeededHDWallet(t *testing.T) {
 			time.Sleep(contractSleepTime * time.Second)
 		}
 
-		// create a message for ekho
-		msg := common.RandomString(118)
-
 		// hd path opts from vault tests
 		// opts := map[string]interface{}{}
 		//path := `m/44'/60'/2'/0/0`
 		// options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, path)
 		// json.Unmarshal([]byte(options), &opts)
 
-		t.Logf("executing contract using wallet id: %s", wallet.ID.String())
-		params := map[string]interface{}{}
-		parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, path, msg, wallet.ID.String())
+		// comment this out for the moment to focus on the contract deployment code
+		// // create a message for ekho
+		// msg := common.RandomString(118)
+		// t.Logf("executing contract using wallet id: %s", wallet.ID.String())
+		// params := map[string]interface{}{}
+		// parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, path, msg, wallet.ID.String())
 
-		json.Unmarshal([]byte(parameter), &params)
+		// json.Unmarshal([]byte(parameter), &params)
 
-		// execute the ekho broadcast message
-		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
-		if err != nil {
-			t.Errorf("error executing contract. Error: %s", err.Error())
-			return
-		}
-		t.Logf("contractTx: %+v", execResponse)
-		t.Logf("reference: %s", *execResponse.Reference)
-		if err != nil {
-			t.Errorf("error executing contract: %s", err.Error())
-			return
-		}
+		// // execute the ekho broadcast message
+		// execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+		// if err != nil {
+		// 	t.Errorf("error executing contract. Error: %s", err.Error())
+		// 	return
+		// }
+		// t.Logf("contractTx: %+v", execResponse)
+		// t.Logf("reference: %s", *execResponse.Reference)
+		// if err != nil {
+		// 	t.Errorf("error executing contract: %s", err.Error())
+		// 	return
+		// }
 
-		// wait for the transaction to be mined (get a tx hash)
-		started = time.Now().Unix()
-		for {
-			if time.Now().Unix()-started >= transactionTimeout {
-				t.Error("timed out awaiting transaction hash")
-				return
-			}
+		// // wait for the transaction to be mined (get a tx hash)
+		// started = time.Now().Unix()
+		// for {
+		// 	if time.Now().Unix()-started >= transactionTimeout {
+		// 		t.Error("timed out awaiting transaction hash")
+		// 		return
+		// 	}
 
-			tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
-			//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
-			if err != nil {
-				t.Logf("error fetching transaction; %s", err.Error())
-			}
+		// 	tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
+		// 	//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
+		// 	if err != nil {
+		// 		t.Logf("error fetching transaction; %s", err.Error())
+		// 	}
 
-			if err == nil {
-				if tx.Hash != nil && *tx.Hash != "0x" {
-					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
-					break
-				}
+		// 	if err == nil {
+		// 		if tx.Hash != nil && *tx.Hash != "0x" {
+		// 			t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
+		// 			break
+		// 		}
 
-				t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
-			}
-			time.Sleep(transactionSleepTime * time.Second)
-		}
+		// 		t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
+		// 	}
+		// 	time.Sleep(transactionSleepTime * time.Second)
+		// }
 
-		t.Logf("contract execution successful")
+		// t.Logf("contract execution successful")
 	}
 }
