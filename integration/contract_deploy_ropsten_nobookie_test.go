@@ -236,7 +236,23 @@ import (
 
 // }
 
-func TestDeployEkhoContractRopsten(t *testing.T) {
+func TestEkhoContractWithSeededHDWallet(t *testing.T) {
+	// currently deploys to ropsten
+	// simple extensions:
+	// - deploy to every chain
+	// - deploy multiple contracts to every chain
+	// execute a function on each contract
+	// execute a read only function on every contract (if available)
+
+	// What this does
+	// create application account in ident
+	// create hd wallet on nchain with hd seed provided for determinism
+	// deploy the ekho contract using a specific derivation path
+	// execute a function on the contract using the same derivation path
+	// intention is to ensure the code obeys the derivation path and uses a specific eth address to perform all the actions
+	// then that eth address can be prefunded for tests on each chain
+	// and we can run tests independent of bookie (which funds accounts and relays transactions)
+
 	t.Parallel()
 
 	testId, err := uuid.NewV4()
@@ -266,6 +282,14 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 		return
 	}
 
+	// create the deterministic wallet via nchain
+	// note there's a question here about the token used to access the wallet
+	// everything works, but there's a security cutoff with the vault interaction
+	// medium term, this activity shoudl be run on vault and the results passed to nchain
+	// i.e. rather than nchain creating the wallet
+	// vault is used to create the wallet and nchain builds the transaction and returns the hash to be signed by vault key
+	// then the signed transaction is played to the consumer for delivery on chain
+
 	wallet, err := nchain.CreateWallet(*appToken.Token, map[string]interface{}{
 		"mnemonic": "traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day",
 	})
@@ -292,7 +316,14 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 
 	// t.Logf("account id: %s", account.ID)
 
+	// set up the path we'll use for all of these nchain interactions
+
 	path := `m/44'/60'/2'/0/0`
+
+	// this describes the test cases, at the moment, we will just deploy a single contract
+	// but this can be extended to many contracts when needed, and network ids can be included
+	// to hit all the test networks
+
 	t.Logf("ekho artifact: %s", ekhoArtifact)
 	tt := []struct {
 		name      string
@@ -320,8 +351,8 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 			return
 		}
 
+		// wait for the contract to be deployed
 		started := time.Now().Unix()
-
 		for {
 			if time.Now().Unix()-started >= contractTimeout {
 				t.Errorf("timed out awaiting contract address for %s contract", tc.name)
@@ -343,6 +374,7 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 			time.Sleep(contractSleepTime * time.Second)
 		}
 
+		// create a message for ekho
 		msg := common.RandomString(118)
 
 		// hd path opts from vault tests
@@ -357,6 +389,7 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 
 		json.Unmarshal([]byte(parameter), &params)
 
+		// execute the ekho broadcast message
 		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
 		if err != nil {
 			t.Errorf("error executing contract. Error: %s", err.Error())
@@ -369,8 +402,8 @@ func TestDeployEkhoContractRopsten(t *testing.T) {
 			return
 		}
 
+		// wait for the transaction to be mined (get a tx hash)
 		started = time.Now().Unix()
-
 		for {
 			if time.Now().Unix()-started >= transactionTimeout {
 				t.Error("timed out awaiting transaction hash")
