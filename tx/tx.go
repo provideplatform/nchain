@@ -290,14 +290,25 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
+			// opts := map[string]interface{}{}
+			// path := `m/44'/60'/2'/0/0`
+			// options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, path)
+			// json.Unmarshal([]byte(options), &opts)
+
 			// if we were provided, or have generated, a hd derivation path, pass it to the signer
 			opts := map[string]interface{}{}
 			if txDerivationPath != nil {
-				options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, *txDerivationPath)
-				json.Unmarshal([]byte(options), &opts)
+				//options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, *txDerivationPath)
+				opts = map[string]interface{}{
+					"hdwallet": map[string]interface{}{
+						"hd_derivation_path": txDerivationPath,
+					},
+				}
+				//json.Unmarshal([]byte(options), &opts)
 			}
 
-			// common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
+			common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
+			//check if the hash is actually hex. not sure if it is, it looks like bytes returned from the signer function
 
 			sig, err := vault.SignMessage(
 				util.DefaultVaultAccessJWT,
@@ -460,6 +471,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		return false
 	}
 
+	// xxx check what triggers a signingErr here...
 	signingErr := t.sign(db, signer)
 
 	if db.NewRecord(t) {
@@ -505,7 +517,13 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					t.updateStatus(db, "failed", &desc)
 				} else {
 					if providePayment {
+						//xxx let's try broadcasting it to the right network initially
+						// TEST HACK
+						//err = t.broadcast(db, signer.Network, signer)
 						err = t.broadcast(db, nil, nil)
+					} else {
+						//err = t.broadcast(db, signer.Network, signer)
+						err = t.broadcast(db, nil, nil) // going back for org registry test
 					}
 
 					if err == nil {
@@ -769,7 +787,19 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 		// desc := err.Error()
 		// t.updateStatus(db, "failed", &desc)
 	} else {
-		t.Hash = common.StringOrNil(string(ethcommon.FromHex(string(hash))))
+		// hash1 := common.StringOrNil(string(hash))
+		// hash2 := common.StringOrNil(string(ethcommon.FromHex(string(hash))))
+		// common.Log.Debugf("hash1: %s", *hash1)
+		// common.Log.Debugf("hash2: %s", *hash2)
+
+		hashAsString := hex.EncodeToString(hash)
+		//HashFromHex := ethcommon.FromHex(hashAsString)
+		//actualHash := string(HashFromHex)
+		//pointer := common.StringOrNil(actualHash)
+		t.Hash = common.StringOrNil(hashAsString)
+
+		// ok, this looks wrong, for whatever reason as it's returning just Fe
+		//t.Hash = common.StringOrNil(string(ethcommon.FromHex(string(hash))))
 	}
 
 	return err
