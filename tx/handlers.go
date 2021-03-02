@@ -218,6 +218,7 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
 	subsidize, subsidizeOk := params["subsidize"].(bool)
+	// xxx hd derivation path for contract execution
 
 	ref, err := uuid.NewV4()
 	if err != nil {
@@ -450,13 +451,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 		db.Where("id = ?", wallet.ID).Find(&wllt)
 		if wllt != nil && wllt.ID != uuid.Nil {
-			// FIXME-- parse HD path (fuck fix this mess....)
-			hardenedChild, _ := wllt.DeriveHardened(nil, uint32(60), uint32(0))
-			chain := uint32(0)
-			derivedAccount, _ := hardenedChild.DeriveAddress(nil, uint32(0), &chain)
-			execution.AccountAddress = &derivedAccount.Address
 
-			// hmmm, wllt is from the db, and wallet is from...
 			if wallet.Path != nil {
 				// we have a path, so ignore the code above, and generate the address deterministically
 				_, err := hdwallet.ParseDerivationPath(*wallet.Path)
@@ -489,6 +484,22 @@ func contractExecutionHandler(c *gin.Context) {
 				// then tackle the w(a(func))a(func(w)) cray
 
 				execution.AccountAddress = key.Address
+				common.Log.Debugf("xxx using address: %s, derived from wallet using path %s", *key.Address, pathstr)
+			}
+
+			if wallet.Path == nil {
+				// we have no path, so derive a key from vault using the default path
+				common.Log.Debugf("vault id: %s", wllt.VaultID.String())
+				common.Log.Debugf("key id: %s", wllt.KeyID.String())
+				key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, wllt.VaultID.String(), wllt.KeyID.String(), map[string]interface{}{})
+				if err != nil {
+					err := fmt.Errorf("unable to generate key material for HD wallet; %s", err.Error())
+					common.Log.Warning(err.Error())
+					provide.RenderError(err.Error(), 500, c)
+					return
+				}
+				execution.AccountAddress = key.Address
+				common.Log.Debugf("xxx using address: %s, derived from wallet using DEFAULT path", *key.Address)
 			}
 
 			//***"0x6Af845bae76F5cc16bC93F86b83E8928c3dfDa19"
@@ -496,7 +507,7 @@ func contractExecutionHandler(c *gin.Context) {
 		}
 
 	}
-	common.Log.Debugf("*** execution address: %s", *execution.AccountAddress)
+	//common.Log.Debugf("*** execution address: %s", *execution.AccountAddress)
 	gas, gasOk := params["gas"].(float64)
 	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
@@ -538,6 +549,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 	executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
 	if err != nil {
+		common.Log.Debugf("error here is: %s", err.Error())
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}

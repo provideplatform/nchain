@@ -371,6 +371,10 @@ func (c *Contract) ExecuteFromTx(
 	gas := execution.Gas
 	gasPrice := execution.GasPrice
 	nonce := execution.Nonce
+
+	//xxx add path to params
+	path := execution.HDPath
+
 	// publishedAt := execution.PublishedAt
 
 	txParams := map[string]interface{}{}
@@ -395,6 +399,11 @@ func (c *Contract) ExecuteFromTx(
 
 	if nonce != nil {
 		txParams["nonce"] = *nonce
+	}
+
+	// xxx add path to params
+	if path != nil {
+		txParams["hd_derivation_path"] = *path
 	}
 
 	txParamsJSON, _ := json.Marshal(txParams)
