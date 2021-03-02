@@ -93,3 +93,12 @@ integration_nobookie:
 
 debug:
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
+
+nobookie_up:
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill nchain
+	docker kill nchain-consumer
+
+nobookie_down:
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db

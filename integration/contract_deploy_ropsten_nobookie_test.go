@@ -5,10 +5,12 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"testing"
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
+	"github.com/provideapp/ident/common"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
@@ -323,31 +325,75 @@ func TestEkhoContractWithSeededHDWallet(t *testing.T) {
 	// but this can be extended to many contracts when needed, and network ids can be included
 	// to hit all the test networks
 
-	t.Logf("ekho artifact: %s", ekhoArtifact)
-	tt := []struct {
-		name      string
-		parameter string
-	}{
-		//{"ekho", fmt.Sprintf(`{"wallet_id": "%s","compiled_artifact": %s}`, wallet.ID, ekhoArtifact)},
-		{"ekho", fmt.Sprintf(`{"wallet_id": "%s","hd_derivation_path": "%s","compiled_artifact": %s}`, wallet.ID, path, ekhoArtifact)},
+	// // Shuttle manifest loading and compiledArtifact creation
+	// manifest, err := ioutil.ReadFile("provide-capabilities-manifest.json")
+	// if err != nil {
+	// 	t.Errorf("error loading shuttle manifest. Error: %s", err.Error())
+	// 	return
+	// }
+
+	// manifestString := fmt.Sprintf("%+v", string(manifest))
+
+	// // convert the json to map[string]interface
+	// manifestMap := map[string]interface{}{}
+	// err = json.Unmarshal([]byte(manifestString), &manifestMap)
+	// if err != nil {
+	// 	t.Errorf("error converting json string to map. Error: %s", err.Error())
+	// 	return
+	// }
+
+	// shuttleCompiledArtifact := nchain.CompiledArtifact{}
+	// baseline := manifestMap["baseline"].(map[string]interface{})
+
+	// contractArray := baseline["contracts"].([]interface{})
+
+	// contractRaw, _ := json.Marshal(contractArray[2])
+	// _ = json.Unmarshal(contractRaw, &shuttleCompiledArtifact)
+	// // end of Shuttle manifest loading
+
+	// load the ekho compiled artifact
+	ekhoArtifact, err := ioutil.ReadFile("artifacts/ekho.json")
+	if err != nil {
+		t.Errorf("error loading ekho artifact. Error: %s", err.Error())
 	}
 
-	params := map[string]interface{}{}
+	ekhoCompiledArtifact := nchain.CompiledArtifact{}
+	err = json.Unmarshal(ekhoArtifact, &ekhoCompiledArtifact)
+	if err != nil {
+		t.Errorf("error converting ekho compiled artifact. Error: %s", err.Error())
+	}
+
+	t.Logf("deploying ekho artifact: %s", ekhoArtifact)
+
+	tt := []struct {
+		name           string
+		derivationPath string
+		walletID       string
+		artifact       nchain.CompiledArtifact
+	}{
+		{"ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		//{"orgRegistry", fmt.Sprintf(`{"wallet_id": "%s","hd_derivation_path": "%s","compiled_artifact": %s}`, wallet.ID, path, greeterArtifact)},
+		//{"shuttle", fmt.Sprintf(`{"wallet_id": "%s","hd_derivation_path": "%s","compiled_artifact": %v}`, wallet.ID, path, compiledArtifact)},
+	}
 
 	for _, tc := range tt {
-		json.Unmarshal([]byte(tc.parameter), &params)
 
+		t.Logf("creating contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
 			"network_id":     ropstenNetworkID,
 			"application_id": app.ID.String(),
-			"wallet_id":      wallet.ID,
+			"wallet_id":      tc.walletID,
 			//"account_id": account.ID.String(),
-			"name":    "Ekho",
+			"name":    tc.name,
 			"address": "0x",
-			"params":  params,
+			"params": map[string]interface{}{
+				"wallet_id":          tc.walletID,
+				"hd_derivation_path": tc.derivationPath,
+				"compiled_artifact":  tc.artifact,
+			},
 		})
 		if err != nil {
-			t.Errorf("error creating contract %s. Error: %s", tc.name, err.Error())
+			t.Errorf("error creating %s contract. Error: %s", tc.name, err.Error())
 			return
 		}
 
@@ -370,63 +416,64 @@ func TestEkhoContractWithSeededHDWallet(t *testing.T) {
 				break
 			}
 
-			t.Logf("%s contract address has not yet been resolved; contract id: %s", tc.name, cntrct.ID.String())
+			//t.Logf("%s contract address has not yet been resolved; contract id: %s", tc.name, cntrct.ID.String())
+			t.Logf("resolving contract...")
 			time.Sleep(contractSleepTime * time.Second)
 		}
 
-		// hd path opts from vault tests
-		// opts := map[string]interface{}{}
-		//path := `m/44'/60'/2'/0/0`
-		// options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, path)
-		// json.Unmarshal([]byte(options), &opts)
-
 		// comment this out for the moment to focus on the contract deployment code
-		// // create a message for ekho
-		// msg := common.RandomString(118)
-		// t.Logf("executing contract using wallet id: %s", wallet.ID.String())
-		// params := map[string]interface{}{}
-		// parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, path, msg, wallet.ID.String())
+		// create a message for ekho
+		msg := common.RandomString(118)
+		t.Logf("executing contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 
-		// json.Unmarshal([]byte(parameter), &params)
+		params := map[string]interface{}{}
 
-		// // execute the ekho broadcast message
-		// execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
-		// if err != nil {
-		// 	t.Errorf("error executing contract. Error: %s", err.Error())
-		// 	return
-		// }
+		parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
+		//parameter := fmt.Sprintf(`{"method":"getOrgCount", "hd_derivation_path": "%s", params": [], "value":0, "wallet_id":"%s"}`, path, wallet.ID.String())
+		json.Unmarshal([]byte(parameter), &params)
+
+		//t.Logf("params for contract execution: %+v", params)
+		// execute the contract method
+		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+		if err != nil {
+			t.Errorf("error executing contract. Error: %s", err.Error())
+			return
+		}
 		// t.Logf("contractTx: %+v", execResponse)
 		// t.Logf("reference: %s", *execResponse.Reference)
-		// if err != nil {
-		// 	t.Errorf("error executing contract: %s", err.Error())
-		// 	return
-		// }
+		if err != nil {
+			t.Errorf("error executing contract: %s", err.Error())
+			return
+		}
 
-		// // wait for the transaction to be mined (get a tx hash)
-		// started = time.Now().Unix()
-		// for {
-		// 	if time.Now().Unix()-started >= transactionTimeout {
-		// 		t.Error("timed out awaiting transaction hash")
-		// 		return
-		// 	}
+		// wait for the transaction to be mined (get a tx hash)
+		started = time.Now().Unix()
+		for {
+			if time.Now().Unix()-started >= transactionTimeout {
+				t.Error("timed out awaiting transaction hash")
+				return
+			}
 
-		// 	tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
-		// 	//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
-		// 	if err != nil {
-		// 		t.Logf("error fetching transaction; %s", err.Error())
-		// 	}
+			tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
+			//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
+			if err != nil {
+				t.Logf("tx not yet mined...")
+				//t.Logf("error fetching transaction; %s", err.Error())
+			}
 
-		// 	if err == nil {
-		// 		if tx.Hash != nil && *tx.Hash != "0x" {
-		// 			t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
-		// 			break
-		// 		}
+			if err == nil {
+				if tx.Hash != nil && *tx.Hash != "0x" {
+					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
+					//t.Logf("tx returned: %+v", tx)
+					break
+				}
 
-		// 		t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
-		// 	}
-		// 	time.Sleep(transactionSleepTime * time.Second)
-		// }
+				//t.Logf("transaction has not yet been resolved; tx id: %s", tx.ID.String())
+				t.Logf("resolving transaction...")
+			}
+			time.Sleep(transactionSleepTime * time.Second)
+		}
 
-		// t.Logf("contract execution successful")
+		t.Logf("contract execution successful")
 	}
 }
