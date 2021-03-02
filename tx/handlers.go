@@ -451,10 +451,10 @@ func contractExecutionHandler(c *gin.Context) {
 		db.Where("id = ?", wallet.ID).Find(&wllt)
 		if wllt != nil && wllt.ID != uuid.Nil {
 			// FIXME-- parse HD path (fuck fix this mess....)
-			hardenedChild, _ := wllt.DeriveHardened(nil, uint32(60), uint32(0))
-			chain := uint32(0)
-			derivedAccount, _ := hardenedChild.DeriveAddress(nil, uint32(0), &chain)
-			execution.AccountAddress = &derivedAccount.Address
+			// hardenedChild, _ := wllt.DeriveHardened(nil, uint32(60), uint32(0))
+			// chain := uint32(0)
+			// derivedAccount, _ := hardenedChild.DeriveAddress(nil, uint32(0), &chain)
+			// execution.AccountAddress = &derivedAccount.Address
 
 			// hmmm, wllt is from the db, and wallet is from...
 			if wallet.Path != nil {
@@ -488,6 +488,20 @@ func contractExecutionHandler(c *gin.Context) {
 				// - an account id, using a single secp256k1 key (which should be, um, the same every time)
 				// then tackle the w(a(func))a(func(w)) cray
 
+				execution.AccountAddress = key.Address
+			}
+
+			if wallet.Path == nil {
+				// we don't have a path, but we do have a wallet, so let's derive the key based on the vault logic using the current (next?) derivation path
+				common.Log.Debugf("vault id: %s", wllt.VaultID.String())
+				common.Log.Debugf("key id: %s", wllt.KeyID.String())
+				key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, wllt.VaultID.String(), wllt.KeyID.String(), map[string]interface{}{})
+				if err != nil {
+					err := fmt.Errorf("unable to generate key material for HD wallet; %s", err.Error())
+					common.Log.Warning(err.Error())
+					provide.RenderError(err.Error(), 500, c)
+					return
+				}
 				execution.AccountAddress = key.Address
 			}
 
