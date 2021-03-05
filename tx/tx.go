@@ -284,6 +284,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				uint64(gas),
 				gasPrice,
 			)
+
 			if err != nil {
 				err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
 				common.Log.Warning(err.Error())
@@ -499,34 +500,48 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
-				providePayment := true // HACK FIXME
+
+				// if we have a signing error, which might be insufficient funds, try bookie
 				if signingErr != nil {
-					common.Log.Debugf("attepting broadcast...")
-					signingErr = t.broadcast(db, nil, nil)
-					providePayment = false
+					common.Log.Debugf("attepting broadcast to bookie...")
+					bookieBroadcastErr := t.broadcast(db, nil, nil)
+					// if bookie fails, we're out
+					if bookieBroadcastErr != nil {
+						common.Log.Warningf("attepted broadcast failed anyway! %s", signingErr.Error())
+
+						t.Errors = append(t.Errors, &provide.Error{
+							Message: common.StringOrNil(bookieBroadcastErr.Error()),
+						})
+
+						desc := bookieBroadcastErr.Error()
+						t.updateStatus(db, "failed", &desc)
+						return false
+					}
+					// if bookie succeeds, pop it onto nats
+					if bookieBroadcastErr == nil {
+						payload, _ := json.Marshal(map[string]interface{}{
+							"transaction_id": t.ID.String(),
+						})
+						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+
+						return true
+					}
 				}
 
-				if signingErr != nil {
-					common.Log.Warningf("attepted broadcast failed anyway! %s", signingErr.Error())
+				if signingErr == nil {
+					// if no signing error, try regular broadcast
+					networkBroadcastErr := t.broadcast(db, signer.Network, signer)
+					// if regular fails, we're out
+					if networkBroadcastErr != nil {
+						payload, _ := json.Marshal(map[string]interface{}{
+							"transaction_id": t.ID.String(),
+						})
+						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 
-					t.Errors = append(t.Errors, &provide.Error{
-						Message: common.StringOrNil(signingErr.Error()),
-					})
-
-					desc := signingErr.Error()
-					t.updateStatus(db, "failed", &desc)
-				} else {
-					if providePayment {
-						//xxx let's try broadcasting it to the right network initially
-						// TEST HACK
-						//err = t.broadcast(db, signer.Network, signer)
-						err = t.broadcast(db, nil, nil)
-					} else {
-						//err = t.broadcast(db, signer.Network, signer)
-						err = t.broadcast(db, nil, nil) // going back for org registry test
+						return true
 					}
-
-					if err == nil {
+					// if regular succeeds, pop it onto nats
+					if networkBroadcastErr == nil {
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
 						})
@@ -739,14 +754,16 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 		common.Log.Debugf("broadcast tx: %s", *t.Hash)
 	} else {
 		if ntwrk.IsEthereumNetwork() {
-			// data := string(t.SignedTx.(*types.Transaction).Data())
-			// _, err := common.BroadcastTransaction(t.To, &data)
-			// if err != nil {
-			// 	return fmt.Errorf("failed to broadcast %s tx using signer: %s; tx not yet signed", *network.Name, signer.String())
-			// }
-
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 				err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
+				if err == nil {
+					// we have successfully broadcast the transaction
+					// so update the db with the received transaction hash
+					common.Log.Debugf("signed tx returned hash: %s", signedTx.Hash().String())
+					t.Hash = common.StringOrNil(signedTx.Hash().String())
+					db.Save(&t)
+					common.Log.Debugf("broadcast tx: %s", *t.Hash)
+				}
 			} else {
 				err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
 			}
@@ -787,15 +804,7 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 		// desc := err.Error()
 		// t.updateStatus(db, "failed", &desc)
 	} else {
-		// hash1 := common.StringOrNil(string(hash))
-		// hash2 := common.StringOrNil(string(ethcommon.FromHex(string(hash))))
-		// common.Log.Debugf("hash1: %s", *hash1)
-		// common.Log.Debugf("hash2: %s", *hash2)
-
 		hashAsString := hex.EncodeToString(hash)
-		//HashFromHex := ethcommon.FromHex(hashAsString)
-		//actualHash := string(HashFromHex)
-		//pointer := common.StringOrNil(actualHash)
 		t.Hash = common.StringOrNil(hashAsString)
 
 		// ok, this looks wrong, for whatever reason as it's returning just Fe
