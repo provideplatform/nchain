@@ -502,6 +502,20 @@ func contractExecutionHandler(c *gin.Context) {
 				common.Log.Debugf("xxx using address: %s, derived from wallet using DEFAULT path", *key.Address)
 			}
 
+			if wallet.Path == nil {
+				// we don't have a path, but we do have a wallet, so let's derive the key based on the vault logic using the current (next?) derivation path
+				common.Log.Debugf("vault id: %s", wllt.VaultID.String())
+				common.Log.Debugf("key id: %s", wllt.KeyID.String())
+				key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, wllt.VaultID.String(), wllt.KeyID.String(), map[string]interface{}{})
+				if err != nil {
+					err := fmt.Errorf("unable to generate key material for HD wallet; %s", err.Error())
+					common.Log.Warning(err.Error())
+					provide.RenderError(err.Error(), 500, c)
+					return
+				}
+				execution.AccountAddress = key.Address
+			}
+
 			//***"0x6Af845bae76F5cc16bC93F86b83E8928c3dfDa19"
 
 		}
