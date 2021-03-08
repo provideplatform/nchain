@@ -102,3 +102,10 @@ nobookie_up:
 nobookie_down:
 	docker-compose -f ./ops/docker-compose-integration.yml down
 	docker volume rm ops_provide-db
+
+nobookie_bounce:
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill nchain
+	docker kill nchain-consumer	
