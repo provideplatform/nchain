@@ -134,7 +134,7 @@ func enableNetwork(networkName, networkID string) (bool, error) {
 			return false, fmt.Errorf("error generating ropsten config. Error: %s", err.Error())
 		}
 	case rinkebyNetworkID:
-		networkConfig, err = generateRopstenConfig()
+		networkConfig, err = generateRinkebyConfig()
 		if err != nil {
 			return false, fmt.Errorf("error generating rinkeby config. Error: %s", err.Error())
 		}
@@ -191,6 +191,21 @@ func generateRopstenConfig() (json.RawMessage, error) {
 		Timestamp:  common.StringOrNil("0x00"),
 	}
 
+	// networkChainConfig := chainConfig{
+	// 	NativeCurrency:    common.StringOrNil("TEST"),
+	// 	Platform:          common.StringOrNil("evm"),
+	// 	EngineID:          common.StringOrNil("ethash"),
+	// 	IsEthereumNetwork: true,
+	// 	Client:            common.StringOrNil("geth"),
+	// 	NetworkID:         3,
+	// 	BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
+	// 	JsonRpcUrl:        common.StringOrNil("http://nethermind-ropsten.provide.services:8888"),
+	// 	WebsocketUrl:      common.StringOrNil("wss://nethermind-ropsten.provide.services:8888"),
+	// 	Chain:             common.StringOrNil("test"),
+	// 	ProtocolID:        common.StringOrNil("pow"),
+	// 	ChainSpec:         &networkChainSpec,
+	// }
+
 	networkChainConfig := chainConfig{
 		NativeCurrency:    common.StringOrNil("TEST"),
 		Platform:          common.StringOrNil("evm"),
@@ -199,8 +214,8 @@ func generateRopstenConfig() (json.RawMessage, error) {
 		Client:            common.StringOrNil("geth"),
 		NetworkID:         3,
 		BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("http://nethermind-ropsten.provide.services:8888"),
-		WebsocketUrl:      common.StringOrNil("wss://nethermind-ropsten.provide.services:8888"),
+		JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+		WebsocketUrl:      common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),
 		ChainSpec:         &networkChainSpec,
