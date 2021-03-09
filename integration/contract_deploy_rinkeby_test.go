@@ -1,4 +1,4 @@
-// +build integration nchain rinkeby
+// +build integration nchain
 
 package integration
 

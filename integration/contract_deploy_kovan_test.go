@@ -1,4 +1,4 @@
-// +build integration nchain kovan
+// +build integration nchain
 
 package integration
 

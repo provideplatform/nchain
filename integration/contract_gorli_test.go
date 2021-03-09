@@ -1,4 +1,4 @@
-// +build integration nchain gorli
+// +build integration nchain
 
 package integration
 

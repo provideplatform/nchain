@@ -1,4 +1,4 @@
-// +build integration nchain failing rinkeby ropsten kovan gorli nobookie
+// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie
 
 package integration
 
@@ -376,9 +376,9 @@ func generateGorliConfig() (json.RawMessage, error) {
 		IsEthereumNetwork: true,
 		Client:            common.StringOrNil("parity"),
 		NetworkID:         5,
-		BlockExplorerUrl:  common.StringOrNil("https://gorli.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("https://gorli.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("wss://gorli.infura.io/ws/v3/561dda3e54c54188934d2ab95b1910e8"),
+		BlockExplorerUrl:  common.StringOrNil("https://goerli.etherscan.io"),
+		JsonRpcUrl:        common.StringOrNil("https://goerli.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+		WebsocketUrl:      common.StringOrNil("wss://goerli.infura.io/ws/v3/561dda3e54c54188934d2ab95b1910e8"),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("poa"),
 		ChainSpec:         &networkChainSpec,

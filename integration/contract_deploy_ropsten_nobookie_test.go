@@ -148,7 +148,7 @@ func TestEkhoContractWithSeededHDWallet_Ropsten(t *testing.T) {
 
 		t.Logf("creating contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
-			"network_id":     kovanNetworkID,
+			"network_id":     gorliNetworkID,
 			"application_id": app.ID.String(),
 			"wallet_id":      tc.walletID,
 			//"account_id": account.ID.String(),
