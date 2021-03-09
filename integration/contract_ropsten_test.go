@@ -1,4 +1,4 @@
-// +build integration nchain ropsten
+// +build integration nchain
 
 package integration
 

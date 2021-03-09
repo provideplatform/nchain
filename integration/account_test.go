@@ -1,4 +1,4 @@
-// +build integration nchain ropsten rinkeby
+// +build integration nchain ropsten rinkeby kovan goerli nobookie basic
 
 package integration
 
