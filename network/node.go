@@ -10,6 +10,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+
 	// natsutil "github.com/kthomas/go-natsutil"
 
 	// "github.com/provideapp/nchain/gpgputil"
