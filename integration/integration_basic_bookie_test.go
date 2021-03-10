@@ -73,7 +73,7 @@ func TestContractWalletNoDerivationPath(t *testing.T) {
 	}{
 		{rinkebyNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
 		//{ropstenNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
-		//{kovanNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
 		//{gorliNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},  // note: goerli network has provide-go bug, likely present in bookie as well
 	}
 
@@ -231,7 +231,7 @@ func TestContractWallet(t *testing.T) {
 	}{
 		{rinkebyNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		// {ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
-		// {kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		//{gorliNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},  // note: goerli network has provide-go bug, likely present in bookie as well
 	}
 
@@ -377,7 +377,7 @@ func TestContractAccount(t *testing.T) {
 	}{
 		{rinkebyNetworkID, "ekho", ekhoCompiledArtifact},
 		//{ropstenNetworkID, "ekho", ekhoCompiledArtifact},
-		// {kovanNetworkID, "ekho", ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", ekhoCompiledArtifact},
 		//{gorliNetworkID, "ekho", ekhoCompiledArtifact},  // note: goerli network has provide-go bug, likely present in bookie as well
 	}
 
