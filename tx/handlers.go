@@ -462,8 +462,6 @@ func contractExecutionHandler(c *gin.Context) {
 					return
 				}
 				pathstr := *wallet.Path
-				common.Log.Debugf("vault id: %s", wllt.VaultID.String())
-				common.Log.Debugf("key id: %s", wllt.KeyID.String())
 				key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, wllt.VaultID.String(), wllt.KeyID.String(), map[string]interface{}{
 					"hd_derivation_path": pathstr,
 				})
@@ -480,7 +478,7 @@ func contractExecutionHandler(c *gin.Context) {
 				// then get fresh integration branch and get this code in for a path using:
 				// - a bip39 wallet with partstr
 				// - a bip39 wallet with no pathstr (generating a new address each time and incrementing in DB)
-				// - an account id, using a single secp256k1 key (which should be, um, the same every time)
+				// - an account id, using a single secp256k1 key
 				// then tackle the w(a(func))a(func(w)) cray
 
 				execution.AccountAddress = key.Address
@@ -501,27 +499,9 @@ func contractExecutionHandler(c *gin.Context) {
 				execution.AccountAddress = key.Address
 				common.Log.Debugf("xxx using address: %s, derived from wallet using DEFAULT path", *key.Address)
 			}
-
-			if wallet.Path == nil {
-				// we don't have a path, but we do have a wallet, so let's derive the key based on the vault logic using the current (next?) derivation path
-				common.Log.Debugf("vault id: %s", wllt.VaultID.String())
-				common.Log.Debugf("key id: %s", wllt.KeyID.String())
-				key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, wllt.VaultID.String(), wllt.KeyID.String(), map[string]interface{}{})
-				if err != nil {
-					err := fmt.Errorf("unable to generate key material for HD wallet; %s", err.Error())
-					common.Log.Warning(err.Error())
-					provide.RenderError(err.Error(), 500, c)
-					return
-				}
-				execution.AccountAddress = key.Address
-			}
-
-			//***"0x6Af845bae76F5cc16bC93F86b83E8928c3dfDa19"
-
 		}
 
 	}
-	//common.Log.Debugf("*** execution address: %s", *execution.AccountAddress)
 	gas, gasOk := params["gas"].(float64)
 	gasPrice, gasPriceOk := params["gas_price"].(float64)
 	nonce, nonceOk := params["nonce"].(float64)
