@@ -136,6 +136,7 @@ func TestContractHDWallet(t *testing.T) {
 
 		// create a message for contract
 		msg := common.RandomString(118)
+		t.Logf("msg: %s", msg)
 		t.Logf("executing contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 
 		params := map[string]interface{}{}
@@ -197,7 +198,17 @@ func TestContractHDWallet(t *testing.T) {
 				t.Errorf("error executing contract. Error: %s", err.Error())
 				return
 			}
-			t.Logf("execution response: %+v", execResponse)
+			t.Logf("execution response: %+v", *execResponse.Response)
+			if execResponse.Response != nil {
+				if *execResponse.Response != msg {
+					t.Errorf("expected msg %s returned. got %s", msg, *execResponse.Response)
+					return
+				}
+			}
+			if execResponse.Response == nil {
+				t.Errorf("expected msg returned, got nil response")
+				return
+			}
 			// todo check for return param being the same as msg passed in
 
 			if err != nil {

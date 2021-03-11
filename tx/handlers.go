@@ -552,6 +552,7 @@ func contractExecutionHandler(c *gin.Context) {
 	case *contract.ExecutionResponse:
 		executionResponse = executionResponse.(*contract.ExecutionResponse).Response.(map[string]interface{})
 		provide.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
+		return
 	default:
 		confidence := invokeTxFilters(appID, buf, db)
 		executionResponse = map[string]interface{}{
