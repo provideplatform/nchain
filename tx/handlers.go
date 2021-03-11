@@ -125,7 +125,8 @@ func createTransactionHandler(c *gin.Context) {
 
 func transactionDetailsHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	userID := util.AuthorizedSubjectID(c, "user")
+	if appID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -140,10 +141,18 @@ func transactionDetailsHandler(c *gin.Context) {
 			provide.RenderError("transaction not found", 404, c)
 			return
 		}
-	} else if appID != nil && tx.ApplicationID != nil && *tx.ApplicationID != *appID {
+	}
+
+	if appID != nil && (tx.ApplicationID == nil || *tx.ApplicationID != *appID) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
+
+	if userID != nil && (tx.UserID == nil || *tx.UserID != *userID) {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
 	err := tx.RefreshDetails()
 	if err != nil {
 		provide.RenderError("internal server error", 500, c)
