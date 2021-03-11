@@ -387,6 +387,7 @@ github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/kthomas/go-auth0 v0.0.0-20200602063018-d45ad85a2325/go.mod h1:5EldCqcNHCsr438udBKWrheZWbvXbUnyF4Jo1PMeBSA=
+github.com/kthomas/go-auth0 v0.0.0-20210204094624-37a0486ae0f1/go.mod h1:zcXTKCmZWAw/2npgNsWNG+GR2RPtWcGe1KPArz/ZCvY=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423 h1:09rLqiMBHOhd8DjpcK3ewKvM6YD0E5wHf6LAyTd6XX0=
 github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423/go.mod h1:CjDyKJx7z3e1XSInFxiXJstdR16+t8UVQN0pCRFaweg=
 github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122 h1:89GDRUljOhTqKuq/AdR2KZ3Qp4Rg2weJpTLfjuTU8lk=
