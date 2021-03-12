@@ -191,21 +191,6 @@ func generateRopstenConfig() (json.RawMessage, error) {
 		Timestamp:  common.StringOrNil("0x00"),
 	}
 
-	// networkChainConfig := chainConfig{
-	// 	NativeCurrency:    common.StringOrNil("TEST"),
-	// 	Platform:          common.StringOrNil("evm"),
-	// 	EngineID:          common.StringOrNil("ethash"),
-	// 	IsEthereumNetwork: true,
-	// 	Client:            common.StringOrNil("geth"),
-	// 	NetworkID:         3,
-	// 	BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
-	// 	JsonRpcUrl:        common.StringOrNil("http://nethermind-ropsten.provide.services:8888"),
-	// 	WebsocketUrl:      common.StringOrNil("wss://nethermind-ropsten.provide.services:8888"),
-	// 	Chain:             common.StringOrNil("test"),
-	// 	ProtocolID:        common.StringOrNil("pow"),
-	// 	ChainSpec:         &networkChainSpec,
-	// }
-
 	networkChainConfig := chainConfig{
 		NativeCurrency:    common.StringOrNil("TEST"),
 		Platform:          common.StringOrNil("evm"),
@@ -214,12 +199,27 @@ func generateRopstenConfig() (json.RawMessage, error) {
 		Client:            common.StringOrNil("geth"),
 		NetworkID:         3,
 		BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+		JsonRpcUrl:        common.StringOrNil("http://nethermind-ropsten.provide.services:8888"),
+		WebsocketUrl:      common.StringOrNil("wss://nethermind-ropsten.provide.services:8888"),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),
 		ChainSpec:         &networkChainSpec,
 	}
+
+	// networkChainConfig := chainConfig{
+	// 	NativeCurrency:    common.StringOrNil("TEST"),
+	// 	Platform:          common.StringOrNil("evm"),
+	// 	EngineID:          common.StringOrNil("ethash"),
+	// 	IsEthereumNetwork: true,
+	// 	Client:            common.StringOrNil("geth"),
+	// 	NetworkID:         3,
+	// 	BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
+	// 	JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+	// 	WebsocketUrl:      common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+	// 	Chain:             common.StringOrNil("test"),
+	// 	ProtocolID:        common.StringOrNil("pow"),
+	// 	ChainSpec:         &networkChainSpec,
+	// }
 
 	// convert networkChainConfig to a json.RawMessage
 	config, err := json.Marshal(networkChainConfig)
