@@ -504,13 +504,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// if we have a signing error, which might be insufficient funds, try bookie
 				if signingErr != nil {
 					common.Log.Debugf("attepting broadcast to bookie...")
-					// adding network to bookie call as per commit: 786bd75e2b0eed795c32fe893960a97cc07eefa6
-					var ntwrk *network.Network
-					if t.NetworkID != uuid.Nil {
-						ntwrk = &network.Network{}
-						db.Model(t).Related(&ntwrk)
-					}
-					bookieBroadcastErr := t.broadcast(db, ntwrk, nil)
+					// network specified in t, so not required to be specifically passed to broadcast method
+					bookieBroadcastErr := t.broadcast(db, nil, nil)
 					// if bookie fails, we're out
 					if bookieBroadcastErr != nil {
 						common.Log.Warningf("attepted broadcast failed anyway! %s", signingErr.Error())
