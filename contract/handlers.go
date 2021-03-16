@@ -29,7 +29,8 @@ func InstallContractsAPI(r *gin.Engine) {
 func contractsListHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -49,6 +50,8 @@ func contractsListHandler(c *gin.Context) {
 
 	if appID != nil {
 		query = query.Where("contracts.application_id = ?", appID)
+	} else if orgID != nil {
+		query = query.Where("contracts.organization_id = ?", orgID)
 	}
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
@@ -78,7 +81,8 @@ func contractsListHandler(c *gin.Context) {
 func contractDetailsHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -89,6 +93,9 @@ func contractDetailsHandler(c *gin.Context) {
 	query := db.Where("id = ?", c.Param("id"))
 	if appID != nil {
 		query = query.Where("contracts.application_id = ?", appID)
+	}
+	if orgID != nil {
+		query = query.Where("contracts.organization_id = ?", orgID)
 	}
 	if userID != nil {
 		query = query.Where("contracts.application_id IS NULL", userID)
@@ -106,6 +113,9 @@ func contractDetailsHandler(c *gin.Context) {
 	} else if appID != nil && *contract.ApplicationID != *appID {
 		provide.RenderError("forbidden", 403, c)
 		return
+	} else if orgID != nil && *contract.OrganizationID != *orgID {
+		provide.RenderError("forbidden", 403, c)
+		return
 	}
 
 	contract.enrich()
@@ -115,7 +125,8 @@ func contractDetailsHandler(c *gin.Context) {
 
 func createContractHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
-	if appID == nil {
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -133,6 +144,7 @@ func createContractHandler(c *gin.Context) {
 		return
 	}
 	contract.ApplicationID = appID
+	contract.OrganizationID = orgID
 
 	params := contract.ParseParams()
 	if contract.Name == nil {
@@ -169,7 +181,8 @@ func createContractHandler(c *gin.Context) {
 func createContractSubscriptionTokenHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -195,8 +208,11 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 	if appID != nil {
 		query = query.Where("contracts.application_id = ?", appID)
 	}
+	if orgID != nil {
+		query = query.Where("contracts.organization_id = ?", orgID)
+	}
 	if userID != nil {
-		query = query.Where("contracts.application_id IS NULL", userID)
+		query = query.Where("contracts.application_id IS NULL AND contracts.organization_id IS NULL", userID)
 	}
 
 	query.Find(&contract)
@@ -211,6 +227,9 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 	} else if appID != nil && *contract.ApplicationID != *appID {
 		provide.RenderError("forbidden", 403, c)
 		return
+	} else if orgID != nil && *contract.OrganizationID != *orgID {
+		provide.RenderError("forbidden", 403, c)
+		return
 	}
 
 	contract.enrich()
@@ -222,6 +241,8 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 	var subject string
 	if appID != nil {
 		subject = fmt.Sprintf("application:%s", appID.String())
+	} else if appID != nil {
+		subject = fmt.Sprintf("organization:%s", appID.String())
 	} else if userID != nil {
 		subject = fmt.Sprintf("user:%s", userID.String())
 	}
