@@ -352,7 +352,8 @@ func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[
 func contractExecutionHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && orgID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -407,6 +408,9 @@ func contractExecutionHandler(c *gin.Context) {
 		contractArbitraryExecutionHandler(c, db, buf)
 		return
 	} else if appID != nil && *contractObj.ApplicationID != *appID {
+		provide.RenderError("forbidden", 403, c)
+		return
+	} else if orgID != nil && *contractObj.OrganizationID != *orgID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}

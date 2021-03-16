@@ -29,16 +29,17 @@ const natsTxCreateSubject = "nchain.tx.create"
 // Contract instances must be associated with an application identifier.
 type Contract struct {
 	provide.Model
-	ApplicationID *uuid.UUID       `sql:"type:uuid" json:"application_id"`
-	NetworkID     uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
-	ContractID    *uuid.UUID       `sql:"type:uuid" json:"contract_id"`    // id of the contract which created the contract (or null)
-	TransactionID *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which deployed the contract (or null)
-	Name          *string          `sql:"not null" json:"name"`
-	Address       *string          `sql:"not null" json:"address"`
-	Type          *string          `json:"type"`
-	Params        *json.RawMessage `sql:"type:json" json:"params,omitempty"`
-	AccessedAt    *time.Time       `json:"accessed_at"`
-	PubsubPrefix  *string          `sql:"-" json:"pubsub_prefix,omitempty"`
+	ApplicationID  *uuid.UUID       `sql:"type:uuid" json:"application_id"`
+	OrganizationID *uuid.UUID       `sql:"type:uuid" json:"organization_id"`
+	NetworkID      uuid.UUID        `sql:"not null;type:uuid" json:"network_id"`
+	ContractID     *uuid.UUID       `sql:"type:uuid" json:"contract_id"`    // id of the contract which created the contract (or null)
+	TransactionID  *uuid.UUID       `sql:"type:uuid" json:"transaction_id"` // id of the transaction which deployed the contract (or null)
+	Name           *string          `sql:"not null" json:"name"`
+	Address        *string          `sql:"not null" json:"address"`
+	Type           *string          `json:"type"`
+	Params         *json.RawMessage `sql:"type:json" json:"params,omitempty"`
+	AccessedAt     *time.Time       `json:"accessed_at"`
+	PubsubPrefix   *string          `sql:"-" json:"pubsub_prefix,omitempty"`
 }
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
@@ -332,6 +333,10 @@ func (c *Contract) pubsubSubjectPrefix() *string {
 	if c.ApplicationID != nil {
 		digest := sha256.New()
 		digest.Write([]byte(fmt.Sprintf("%s.%s", c.ApplicationID.String(), *c.Address)))
+		return common.StringOrNil(hex.EncodeToString(digest.Sum(nil)))
+	} else if c.OrganizationID != nil {
+		digest := sha256.New()
+		digest.Write([]byte(fmt.Sprintf("%s.%s", c.OrganizationID.String(), *c.Address)))
 		return common.StringOrNil(hex.EncodeToString(digest.Sum(nil)))
 	}
 
