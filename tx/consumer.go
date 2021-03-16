@@ -672,13 +672,15 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 	// 	// }
 	// }()
 
-	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
-		return txCreatefunc(tx, c, network, accountID, walletID, execution, _txParamsJSON)
-	}
+	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
+	// 	return txCreatefunc(tx, c, network, accountID, walletID, execution, _txParamsJSON)
+	// }
 
-	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
+	//executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
 	// xxx
-	//funclessResponse, err := createTransaction(tx, cntract, execution.AccountID, execution.WalletID, execution)
+	executionResponse, err := createTransaction(tx, cntract, execution.AccountID, execution.WalletID, execution)
+	//common.Log.Debugf("executionResponse: %+v", *executionResponse)
+	common.Log.Debugf("funclessResponse: %+v", *executionResponse)
 	if err != nil {
 		common.Log.Debugf("contract execution failed; %s", err.Error())
 
