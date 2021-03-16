@@ -638,12 +638,47 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 	}
 
 	tx := &Transaction{}
+
+	//entry point for code change
+	// we're looking to create the transaction
+	// if successful, ack
+	// if unsuccessful, nack
+
+	// txcreatefn takes in the following local state
+	// contract, network, accountid, walletid, execution, params
+	// kinda returns execution response
+
+	// so best thing might be to run these side by side and check that I'm getting the same execution response
+	// might be challenges with the nonce, but let's see where it goes
+	// BRINGTHEFUNC
+	// go func() {
+	// 	//txcreatefunc
+	// 	//executefromtx
+
+	// 	// ExecuteFromTx does stuff and then calls txCreateFn
+
+	// 	// executionResponse, err := createTransaction(tx, c, network, execution.AccountID, execution.WalletID, execution, _txParamsJSON)
+	// 	// if err != nil {
+	// 	// 	common.Log.Debugf("* contract execution failed. Error: %s", err.Error())
+	// 	// 	natsutil.AttemptNack(msg, txMsgTimeout)
+	// 	// }
+	// 	// if err == nil {
+	// 	// 	logmsg := fmt.Sprintf("Executed contract: %s", *cntract.Address)
+	// 	// 	if executionResponse != nil && executionResponse.Response != nil {
+	// 	// 		logmsg = fmt.Sprintf("%s; response: %s", logmsg, executionResponse.Response)
+	// 	// 	}
+	// 	// 	common.Log.Debug(logmsg)
+	// 	// 	msg.Ack()
+	// 	// }
+	// }()
+
 	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
 		return txCreatefunc(tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	}
 
 	executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
-
+	// xxx
+	//funclessResponse, err := createTransaction(tx, cntract, execution.AccountID, execution.WalletID, execution)
 	if err != nil {
 		common.Log.Debugf("contract execution failed; %s", err.Error())
 
