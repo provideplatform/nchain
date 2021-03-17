@@ -18,7 +18,7 @@ import (
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
-func createTransaction(tx *Transaction, c *contract.Contract, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution) (*contract.ExecutionResponse, error) {
+func createTransaction(tx *Transaction, c *contract.Contract, execution *contract.Execution) (*contract.ExecutionResponse, error) {
 	db := dbconf.DatabaseConnection()
 	hdDerivationPath := execution.HDPath
 	publishedAt := execution.PublishedAt
@@ -26,31 +26,33 @@ func createTransaction(tx *Transaction, c *contract.Contract, accountID *uuid.UU
 	params := execution.Params
 	ref := execution.Ref
 	value := execution.Value
+	walletID := execution.WalletID
+	accountID := execution.AccountID
+	gas := execution.Gas
+	gasPrice := execution.GasPrice
+	nonce := execution.Nonce
+	path := execution.HDPath
 
-	// hack get the params
+	// create the tx params
 	txParams := map[string]interface{}{}
 	if c.Address != nil {
 		txParams["to"] = *c.Address
 	}
 
-	gas := execution.Gas
 	if gas == nil {
 		gas64 := float64(0)
 		gas = &gas64
 	}
 	txParams["gas"] = gas
 
-	gasPrice := execution.GasPrice
 	if gasPrice != nil {
 		txParams["gas_price"] = gasPrice
 	}
 
-	nonce := execution.Nonce
 	if nonce != nil {
 		txParams["nonce"] = *nonce
 	}
 
-	path := execution.HDPath
 	if path != nil {
 		txParams["hd_derivation_path"] = *path
 	}
@@ -77,14 +79,6 @@ func createTransaction(tx *Transaction, c *contract.Contract, accountID *uuid.UU
 
 	var response map[string]interface{}
 
-	// let's not execute this funcyfunc
-	// txResponseCallback := func(c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
-	// 	return txResponsefunc(tx, c, network, methodDescriptor, method, abiMethod, params)
-	// }
-
-	// let's get these from the other locations
-	// methodDescriptor
-	// abiMethod
 	var err error
 	_abi, err := c.ReadEthereumContractAbi()
 	if err != nil {
@@ -98,15 +92,6 @@ func createTransaction(tx *Transaction, c *contract.Contract, accountID *uuid.UU
 		abiMethod = &_abi.Constructor
 		methodDescriptor = "constructor"
 	}
-	// end of temp copied code to populate the callback below
-
-	//txResponse, err := getTransactionResponse(tx, c, n, methodDescriptor, method, abiMethod, params)
-	// looks like we're doing this thing twice...
-	// txResponse, err := getTransactionResponse(tx, c, n, methodDescriptor, method, abiMethod, params)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error getting transaction response. Error: %s", err.Error())
-	// }
-	// common.Log.Debugf("got tx response: %+v", txResponse)
 
 	// let's take in a network id, and use it to get a network:
 	var n *network.Network
@@ -115,12 +100,7 @@ func createTransaction(tx *Transaction, c *contract.Contract, accountID *uuid.UU
 		db.Model(tx).Related(&n)
 	}
 
-	//var err error
 	if n.IsEthereumNetwork() {
-		// txResponseCallBack is the callback function from the execute ethereum contract
-		// which calls txResponseFunc, which is now called getTransactionResponse
-		//response, err = c.ExecuteEthereumContract(n, txResponseCallback, method, params)
-
 		response, err = getTransactionResponse(tx, c, n, methodDescriptor, method, abiMethod, params)
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *n.Name)
@@ -197,7 +177,6 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 				} else {
 					common.Log.Debugf("Failed tx errors: %s", *tx.Errors[0].Message)
 					txParams := tx.ParseParams()
-					// TODO: support signed transactions
 
 					publicKey, publicKeyOk := txParams["public_key"].(interface{})
 					privateKey, privateKeyOk := txParams["private_key"].(interface{})

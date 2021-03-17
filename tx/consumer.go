@@ -639,60 +639,16 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 
 	tx := &Transaction{}
 
-	//entry point for code change
-	// we're looking to create the transaction
-	// if successful, ack
-	// if unsuccessful, nack
-
-	// txcreatefn takes in the following local state
-	// contract, network, accountid, walletid, execution, params
-	// kinda returns execution response
-
-	// so best thing might be to run these side by side and check that I'm getting the same execution response
-	// might be challenges with the nonce, but let's see where it goes
-	// BRINGTHEFUNC
-	// go func() {
-	// 	//txcreatefunc
-	// 	//executefromtx
-
-	// 	// ExecuteFromTx does stuff and then calls txCreateFn
-
-	// 	// executionResponse, err := createTransaction(tx, c, network, execution.AccountID, execution.WalletID, execution, _txParamsJSON)
-	// 	// if err != nil {
-	// 	// 	common.Log.Debugf("* contract execution failed. Error: %s", err.Error())
-	// 	// 	natsutil.AttemptNack(msg, txMsgTimeout)
-	// 	// }
-	// 	// if err == nil {
-	// 	// 	logmsg := fmt.Sprintf("Executed contract: %s", *cntract.Address)
-	// 	// 	if executionResponse != nil && executionResponse.Response != nil {
-	// 	// 		logmsg = fmt.Sprintf("%s; response: %s", logmsg, executionResponse.Response)
-	// 	// 	}
-	// 	// 	common.Log.Debug(logmsg)
-	// 	// 	msg.Ack()
-	// 	// }
-	// }()
-
 	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
 	// 	return txCreatefunc(tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	// }
 
 	//executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
-	// xxx
-	executionResponse, err := createTransaction(tx, cntract, execution.AccountID, execution.WalletID, execution)
-	//common.Log.Debugf("executionResponse: %+v", *executionResponse)
-	common.Log.Debugf("funclessResponse: %+v", *executionResponse)
+	executionResponse, err := createTransaction(tx, cntract, execution)
 	if err != nil {
 		common.Log.Debugf("contract execution failed; %s", err.Error())
 
 		if execution.AccountAddress != nil {
-			// var gas float64
-			// if execution.Gas == nil {
-			// 	gas = float64(100000000000000000) // FIXME-- use proper oracle
-			// }
-			// gas, gasOk := params["gas"].(float64)
-			// if !gasOk {
-			// 	gas = float64(210000 * 2) // FIXME-- parameterize
-			// }
 			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
 			_subsidize := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && tx.shouldSubsidize()
 
