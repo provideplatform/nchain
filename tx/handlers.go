@@ -299,18 +299,19 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		Params:    &paramsMsg,
 	}
 
-	var tx Transaction
-	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
-	}
-	accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
-		return afunc(a.(wallet.Account), txParams)
-	}
-	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-		return wfunc(w.(wallet.Wallet), txParams)
-	}
+	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
+	// 	return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
+	// }
+	// accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+	// 	return afunc(a.(wallet.Account), txParams)
+	// }
+	// walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
+	// 	return wfunc(w.(wallet.Wallet), txParams)
+	// }
 
-	resp, err := ephemeralContract.ExecuteFromTx(execution, accountFn, walletFn, txCreateFn)
+	//resp, err := ephemeralContract.ExecuteFromTx(execution, accountFn, walletFn, txCreateFn)
+	tx := &Transaction{}
+	resp, err := createTransaction(tx, ephemeralContract, execution)
 	if err == nil {
 		provide.Render(resp, 202, c)
 	} else {
@@ -537,43 +538,74 @@ func contractExecutionHandler(c *gin.Context) {
 		execution.Subsidize = subsidize
 	}
 
-	var tx Transaction
-	txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
-		return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
-	}
-	accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
-		if a == nil {
-			return nil
-		}
-		return afunc(a.(*wallet.Account), txParams)
-	}
-	walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-		if w == nil {
-			return nil
-		}
-		return wfunc(w.(*wallet.Wallet), txParams)
-	}
+	// var tx Transaction
+	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
+	// 	return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
+	// }
+	// accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
+	// 	if a == nil {
+	// 		return nil
+	// 	}
+	// 	return afunc(a.(*wallet.Account), txParams)
+	// }
+	// walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
+	// 	if w == nil {
+	// 		return nil
+	// 	}
+	// 	return wfunc(w.(*wallet.Wallet), txParams)
+	// }
 
-	executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
+	//executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
+	tx := &Transaction{}
+	executionResponse, err := createTransaction(tx, contractObj, execution)
 	if err != nil {
 		common.Log.Debugf("error here is: %s", err.Error())
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
+	// check this, as we're not returning an interface depending on the return from create tx
+	// if it's a read-only method
 
-	switch executionResponse.(type) {
-	case *contract.ExecutionResponse:
-		executionResponse = executionResponse.(*contract.ExecutionResponse).Response.(map[string]interface{})
-		provide.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
-		return
-	default:
-		confidence := invokeTxFilters(appID, buf, db)
-		executionResponse = map[string]interface{}{
+	// test - let's see what we get back from a read-only?
+	// ok, let's just return whatever the hell we get - and worry about the 200/202 later
+	// check where we have the response if it's read-only contract execution and change to 200
+	// also check what confidence is actually doing :)
+
+	confidence := invokeTxFilters(appID, buf, db)
+
+	// use this to return 200 or 202
+	common.Log.Debugf("view property of execution: %t", execution.View)
+
+	if execution.View {
+
+		resp := map[string]interface{}{
 			"confidence": confidence,
-			"ref":        executionResponse.(*contract.Execution).Ref,
+			"ref":        executionResponse.Ref,
+			"response":   executionResponse.Response.(map[string]interface{})["response"],
 		}
-		provide.Render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+		provide.Render(resp, 200, c)
+		return
 	}
+
+	resp := map[string]interface{}{
+		"confidence": confidence,
+		"ref":        executionResponse.Ref,
+	}
+	provide.Render(resp, 202, c)
+
+	// switch executionResponse.(type) {
+	// case *contract.ExecutionResponse:
+	// 	executionResponse = executionResponse.(*contract.ExecutionResponse).Response.(map[string]interface{})
+	// 	provide.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
+	// 	return
+	// default:
+	// 	confidence := invokeTxFilters(appID, buf, db)
+	// 	executionResponse = map[string]interface{}{
+	// 		"confidence": confidence,
+	// 		"ref":        executionResponse.(*contract.Execution).Ref,
+	// 	}
+	// 	provide.Render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
+	// }
 }
 
 func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *float64 {

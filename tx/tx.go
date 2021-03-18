@@ -73,6 +73,9 @@ type Transaction struct {
 	SignedTx interface{}                 `sql:"-" json:"-"`
 	Traces   interface{}                 `sql:"-" json:"traces,omitempty"`
 
+	// set this is the abi method is constant/view
+	View bool `sql:"-" json:"-"`
+
 	// Transaction metadata/instrumentation
 	Block          *uint64    `json:"block"`
 	BlockTimestamp *time.Time `json:"block_timestamp,omitempty"`                       // timestamp when the tx was finalized on-chain, according to its tx receipt

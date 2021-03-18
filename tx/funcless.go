@@ -106,6 +106,11 @@ func createTransaction(tx *Transaction, c *contract.Contract, execution *contrac
 		err = fmt.Errorf("unsupported network: %s", *n.Name)
 	}
 
+	// HACK
+	if tx.View {
+		execution.View = true
+	}
+
 	if err != nil {
 		desc := err.Error()
 		tx.updateStatus(db, "failed", &desc)
@@ -159,6 +164,8 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 			tx.Data = &data
 
 			if abiMethod.IsConstant() {
+				// set the view property on the tx
+				tx.View = true
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				client, err := providecrypto.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)
@@ -168,6 +175,7 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 					return nil, err
 				}
 			} else {
+				tx.View = false
 				var txResponse *contract.ExecutionResponse
 				if tx.Create(db) {
 					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)

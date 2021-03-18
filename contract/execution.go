@@ -40,6 +40,8 @@ type Execution struct {
 	Subsidize bool          `json:"subsidize"`
 	Value     *big.Int      `json:"value"`
 
+	View bool `json:"-"`
+
 	// Tx metadata/instrumentation
 	Ref         *string    `json:"ref"`
 	PublishedAt *time.Time `json:"published_at"`
