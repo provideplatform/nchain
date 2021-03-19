@@ -68,6 +68,18 @@ func TestContractHDWallet(t *testing.T) {
 		t.Errorf("error converting ekho compiled artifact. Error: %s", err.Error())
 	}
 
+	// load the readwrite compiled artifact
+	rwArtifact, err := ioutil.ReadFile("artifacts/readwritetester.json")
+	if err != nil {
+		t.Errorf("error loading readwritetester artifact. Error: %s", err.Error())
+	}
+
+	rwCompiledArtifact := nchain.CompiledArtifact{}
+	err = json.Unmarshal(rwArtifact, &rwCompiledArtifact)
+	if err != nil {
+		t.Errorf("error converting readwritetester compiled artifact. Error: %s", err.Error())
+	}
+
 	tt := []struct {
 		network        string
 		name           string
@@ -76,6 +88,7 @@ func TestContractHDWallet(t *testing.T) {
 		artifact       nchain.CompiledArtifact
 	}{
 		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
 	}
 
 	for _, tc := range tt {
@@ -121,14 +134,21 @@ func TestContractHDWallet(t *testing.T) {
 			time.Sleep(contractSleepTime * time.Second)
 		}
 
-		// create a message for ekho
+		// create a message for contract
 		msg := common.RandomString(118)
+		t.Logf("msg: %s", msg)
 		t.Logf("executing contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 
 		params := map[string]interface{}{}
 
-		parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
-		json.Unmarshal([]byte(parameter), &params)
+		switch tc.name {
+		case "ekho":
+			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
+			json.Unmarshal([]byte(parameter), &params)
+		case "readwrite":
+			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
+			json.Unmarshal([]byte(parameter), &params)
+		}
 
 		// execute the contract method
 		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
@@ -157,13 +177,43 @@ func TestContractHDWallet(t *testing.T) {
 			}
 
 			if err == nil {
-				if tx.Hash != nil && *tx.Hash != "0x" {
-					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
+				if tx.Block != nil && *tx.Hash != "0x" {
+					t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
 					break
 				}
 				t.Logf("resolving transaction...")
 			}
 			time.Sleep(transactionSleepTime * time.Second)
+		}
+
+		// now we also run a readonly transaction for some of the contracts
+		if tc.name == "readwrite" {
+			params := map[string]interface{}{}
+			parameter := fmt.Sprintf(`{"method":"getString", "hd_derivation_path": "%s", "params": [""], "value":0, "wallet_id":"%s"}`, tc.derivationPath, tc.walletID)
+			json.Unmarshal([]byte(parameter), &params)
+
+			// execute the contract method
+			execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+			if err != nil {
+				t.Errorf("error executing contract. Error: %s", err.Error())
+				return
+			}
+			if execResponse.Response != nil {
+				t.Logf("execution response: %s", *execResponse.Response)
+				if *execResponse.Response != msg {
+					t.Errorf("expected msg %s returned. got %s", msg, *execResponse.Response)
+					return
+				}
+			}
+			if execResponse.Response == nil {
+				t.Errorf("expected msg returned, got nil response")
+				return
+			}
+
+			if err != nil {
+				t.Errorf("error executing contract: %s", err.Error())
+				return
+			}
 		}
 
 		t.Logf("contract execution successful")

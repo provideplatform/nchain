@@ -87,7 +87,7 @@ func TestContractHDWallet(t *testing.T) {
 		walletID       string
 		artifact       nchain.CompiledArtifact
 	}{
-		//{rinkebyNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{rinkebyNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		{rinkebyNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
 	}
 
