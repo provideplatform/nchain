@@ -18,7 +18,7 @@ import (
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )
 
-func createTransaction(tx *Transaction, c *contract.Contract, execution *contract.Execution) (*contract.ExecutionResponse, error) {
+func executeTransaction(c *contract.Contract, execution *contract.Execution) (*contract.ExecutionResponse, error) {
 	db := dbconf.DatabaseConnection()
 	hdDerivationPath := execution.HDPath
 	publishedAt := execution.PublishedAt
@@ -60,7 +60,7 @@ func createTransaction(tx *Transaction, c *contract.Contract, execution *contrac
 	txParamsJSON, _ := json.Marshal(txParams)
 	_txParamsJSON := json.RawMessage(txParamsJSON)
 
-	tx = &Transaction{
+	tx := &Transaction{
 		ApplicationID: c.ApplicationID,
 		UserID:        nil,
 		NetworkID:     c.NetworkID,
@@ -76,8 +76,6 @@ func createTransaction(tx *Transaction, c *contract.Contract, execution *contrac
 	if publishedAt != nil {
 		tx.PublishedAt = publishedAt
 	}
-
-	var response map[string]interface{}
 
 	var err error
 	_abi, err := c.ReadEthereumContractAbi()
@@ -100,17 +98,13 @@ func createTransaction(tx *Transaction, c *contract.Contract, execution *contrac
 		db.Model(tx).Related(&n)
 	}
 
+	var response map[string]interface{}
+
 	if n.IsEthereumNetwork() {
 		response, err = getTransactionResponse(tx, c, n, methodDescriptor, method, abiMethod, params)
 	} else {
 		err = fmt.Errorf("unsupported network: %s", *n.Name)
 	}
-
-	// HACK
-	if tx.View {
-		execution.View = true
-	}
-
 	if err != nil {
 		desc := err.Error()
 		tx.updateStatus(db, "failed", &desc)
@@ -123,19 +117,32 @@ func createTransaction(tx *Transaction, c *contract.Contract, execution *contrac
 		db.Save(c)
 	}()
 
+	readonlyMethod := false
+	if abiMethod.IsConstant() {
+		readonlyMethod = true
+	}
+
+	resp := contract.ExecutionResponse{}
 	if tx.Response == nil {
-		tx.Response = &contract.ExecutionResponse{
-			Response:    response,
+
+		common.Log.Debugf("response is: %+v", response)
+		//tx.Response = &contract.ExecutionResponse{
+		resp = contract.ExecutionResponse{
+			Response:    response["response"],
 			Receipt:     response,
 			Traces:      tx.Traces,
 			Transaction: tx,
 			Ref:         ref,
+			View:        readonlyMethod,
 		}
+		common.Log.Debugf("resp is: %+v", resp)
 	} else if tx.Response.Transaction == nil {
-		tx.Response.Transaction = tx
+		//?? when does this get tripped?
+		//tx.Response.Transaction = tx
+		resp.Transaction = tx
 	}
 
-	return tx.Response, nil
+	return &resp, nil
 }
 
 func getTransactionResponse(tx *Transaction, c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
@@ -164,8 +171,6 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 			tx.Data = &data
 
 			if abiMethod.IsConstant() {
-				// set the view property on the tx
-				tx.View = true
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				client, err := providecrypto.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
 				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)
@@ -175,7 +180,6 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 					return nil, err
 				}
 			} else {
-				tx.View = false
 				var txResponse *contract.ExecutionResponse
 				if tx.Create(db) {
 					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)

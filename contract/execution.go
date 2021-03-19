@@ -40,8 +40,6 @@ type Execution struct {
 	Subsidize bool          `json:"subsidize"`
 	Value     *big.Int      `json:"value"`
 
-	View bool `json:"-"`
-
 	// Tx metadata/instrumentation
 	Ref         *string    `json:"ref"`
 	PublishedAt *time.Time `json:"published_at"`
@@ -54,6 +52,7 @@ type ExecutionResponse struct {
 	Traces      interface{} `json:"traces"`
 	Transaction interface{} `json:"transaction"`
 	Ref         *string     `json:"ref"`
+	View        bool        `json:"-"` // used where execution response is read-only and therefore synchronous
 }
 
 const natsTxSubject = "nchain.tx"

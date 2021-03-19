@@ -637,43 +637,44 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 		return
 	}
 
-	tx := &Transaction{}
+	//tx := &Transaction{}
 
 	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
 	// 	return txCreatefunc(tx, c, network, accountID, walletID, execution, _txParamsJSON)
 	// }
 
 	//executionResponse, err := cntract.ExecuteFromTx(execution, afunc, wfunc, txCreateFn)
-	executionResponse, err := createTransaction(tx, cntract, execution)
+	executionResponse, err := executeTransaction(cntract, execution)
 	if err != nil {
 		common.Log.Debugf("contract execution failed; %s", err.Error())
 
-		if execution.AccountAddress != nil {
-			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
-			_subsidize := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && tx.shouldSubsidize()
+		// CHECKME - this functionality is now in bookie, and shouldn't be replicated here
+		// if execution.AccountAddress != nil {
+		// 	networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
+		// 	_subsidize := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && tx.shouldSubsidize()
 
-			if _subsidize {
-				common.Log.Debugf("contract execution failed due to insufficient funds but tx subsidize flag is set; requesting subsidized tx funding for target network: %s", cntract.NetworkID)
-				faucetBeneficiaryAddress := *execution.AccountAddress
-				err = subsidize(
-					db,
-					cntract.NetworkID,
-					faucetBeneficiaryAddress,
-					networkSubsidyFaucetDripValue,
-					int64(210000*2),
-				)
-				if err == nil {
-					db.Where("ref = ?", execution.Ref).Find(&tx)
-					if tx != nil && tx.ID != uuid.Nil {
-						db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-					}
-					common.Log.Debugf("faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
-				}
-			}
+		// 	if _subsidize {
+		// 		common.Log.Debugf("contract execution failed due to insufficient funds but tx subsidize flag is set; requesting subsidized tx funding for target network: %s", cntract.NetworkID)
+		// 		faucetBeneficiaryAddress := *execution.AccountAddress
+		// 		err = subsidize(
+		// 			db,
+		// 			cntract.NetworkID,
+		// 			faucetBeneficiaryAddress,
+		// 			networkSubsidyFaucetDripValue,
+		// 			int64(210000*2),
+		// 		)
+		// 		if err == nil {
+		// 			db.Where("ref = ?", execution.Ref).Find(&tx)
+		// 			if tx != nil && tx.ID != uuid.Nil {
+		// 				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
+		// 			}
+		// 			common.Log.Debugf("faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
+		// 		}
+		// 	}
 
-		} else {
-			common.Log.Warningf("Failed to execute contract; %s", err.Error())
-		}
+		// } else {
+		// 	common.Log.Warningf("Failed to execute contract; %s", err.Error())
+		// }
 
 		natsutil.AttemptNack(msg, txMsgTimeout)
 	} else {

@@ -177,8 +177,8 @@ func TestContractHDWallet(t *testing.T) {
 			}
 
 			if err == nil {
-				if tx.Hash != nil && *tx.Hash != "0x" {
-					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
+				if tx.Block != nil && *tx.Hash != "0x" {
+					t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
 					break
 				}
 				t.Logf("resolving transaction...")
@@ -198,8 +198,8 @@ func TestContractHDWallet(t *testing.T) {
 				t.Errorf("error executing contract. Error: %s", err.Error())
 				return
 			}
-			//t.Logf("execution response: %+v", *execResponse.Response)
 			if execResponse.Response != nil {
+				t.Logf("execution response: %s", *execResponse.Response)
 				if *execResponse.Response != msg {
 					t.Errorf("expected msg %s returned. got %s", msg, *execResponse.Response)
 					return
@@ -209,7 +209,6 @@ func TestContractHDWallet(t *testing.T) {
 				t.Errorf("expected msg returned, got nil response")
 				return
 			}
-			// todo check for return param being the same as msg passed in
 
 			if err != nil {
 				t.Errorf("error executing contract: %s", err.Error())

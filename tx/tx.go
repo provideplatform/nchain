@@ -73,9 +73,6 @@ type Transaction struct {
 	SignedTx interface{}                 `sql:"-" json:"-"`
 	Traces   interface{}                 `sql:"-" json:"traces,omitempty"`
 
-	// set this is the abi method is constant/view
-	View bool `sql:"-" json:"-"`
-
 	// Transaction metadata/instrumentation
 	Block          *uint64    `json:"block"`
 	BlockTimestamp *time.Time `json:"block_timestamp,omitempty"`                       // timestamp when the tx was finalized on-chain, according to its tx receipt
@@ -294,25 +291,19 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
-			// opts := map[string]interface{}{}
-			// path := `m/44'/60'/2'/0/0`
-			// options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, path)
-			// json.Unmarshal([]byte(options), &opts)
-
 			// if we were provided, or have generated, a hd derivation path, pass it to the signer
 			opts := map[string]interface{}{}
 			if txDerivationPath != nil {
-				//options := fmt.Sprintf(`{"hdwallet":{"hd_derivation_path":"%s"}}`, *txDerivationPath)
 				opts = map[string]interface{}{
 					"hdwallet": map[string]interface{}{
 						"hd_derivation_path": txDerivationPath,
 					},
 				}
-				//json.Unmarshal([]byte(options), &opts)
 			}
 
 			common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
 			//check if the hash is actually hex. not sure if it is, it looks like bytes returned from the signer function
+			// TODO sometimes the db stores the raw hash (no 0x prefix), not the tx hash (0x prefix) - investigate why this occurs
 
 			sig, err := vault.SignMessage(
 				util.DefaultVaultAccessJWT,

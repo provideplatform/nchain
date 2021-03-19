@@ -310,8 +310,8 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 	// }
 
 	//resp, err := ephemeralContract.ExecuteFromTx(execution, accountFn, walletFn, txCreateFn)
-	tx := &Transaction{}
-	resp, err := createTransaction(tx, ephemeralContract, execution)
+	//tx := &Transaction{}
+	resp, err := executeTransaction(ephemeralContract, execution)
 	if err == nil {
 		provide.Render(resp, 202, c)
 	} else {
@@ -556,33 +556,24 @@ func contractExecutionHandler(c *gin.Context) {
 	// }
 
 	//executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
-	tx := &Transaction{}
-	executionResponse, err := createTransaction(tx, contractObj, execution)
+	//tx := &Transaction{}
+	executionResponse, err := executeTransaction(contractObj, execution)
 	if err != nil {
 		common.Log.Debugf("error here is: %s", err.Error())
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
-	// check this, as we're not returning an interface depending on the return from create tx
-	// if it's a read-only method
-
-	// test - let's see what we get back from a read-only?
-	// ok, let's just return whatever the hell we get - and worry about the 200/202 later
-	// check where we have the response if it's read-only contract execution and change to 200
-	// also check what confidence is actually doing :)
 
 	confidence := invokeTxFilters(appID, buf, db)
 
-	// use this to return 200 or 202
-	common.Log.Debugf("view property of execution: %t", execution.View)
-
-	if execution.View {
-
+	// if we have a synchronous readonly method, return the response provided
+	if executionResponse.View {
 		resp := map[string]interface{}{
 			"confidence": confidence,
 			"ref":        executionResponse.Ref,
-			"response":   executionResponse.Response.(map[string]interface{})["response"],
+			"response":   executionResponse.Response,
 		}
+
 		provide.Render(resp, 200, c)
 		return
 	}
