@@ -12,8 +12,8 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func GoSaveContract(token string, params map[string]interface{}) (*nchain.Contract, error) {
-	uri := "public"
+func GoLoadPublicContract(token string, params map[string]interface{}) (*nchain.Contract, error) {
+	uri := "public/contracts"
 	status, resp, err := nchain.InitNChainService(token).Post(uri, params)
 
 	if err != nil {
@@ -90,7 +90,7 @@ func TestContractHDWallet(t *testing.T) {
 	contractName := "MONEH - erc20 contract"
 	contractAddress := "0x45a67Fd75765721D0275d3925a768E86E7a2599c"
 	// MONEH contract deployed to Rinekby - 0x45a67Fd75765721D0275d3925a768E86E7a2599c
-	contract, err := GoSaveContract(*appToken.Token, map[string]interface{}{
+	contract, err := GoLoadPublicContract(*appToken.Token, map[string]interface{}{
 		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID.String(),
 		"name":           contractName,
@@ -144,8 +144,9 @@ func TestContractHDWallet(t *testing.T) {
 	}{
 		//{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact, "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7"},
 		//{rinkebyNetworkID, "readwrite", "getString", "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7", "NfGshn0Uc52U2IDqkfKnhf8yQaRT60lPpkm2xxVRASKWdaXwjx5BBtd3oMUXvJiDRpW4Kw4Xt92mdZ7BTeIQRZ3GA9HfjLPKIZD4Xw2yX1eLUpC7lM1KiI"},
-		{rinkebyNetworkID, "erc20", "symbol", contractAddress, "MONEH"},
-		{rinkebyNetworkID, "erc20", "name", contractAddress, "MONEH test token"},
+		// {rinkebyNetworkID, "erc20", "symbol", contractAddress, "MONEH"},
+		// {rinkebyNetworkID, "erc20", "name", contractAddress, "MONEH test token"},
+		{rinkebyNetworkID, "erc20", "totalSupply", contractAddress, "MONEH test token"},
 	}
 
 	for _, tc := range tt {

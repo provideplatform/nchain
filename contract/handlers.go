@@ -24,7 +24,7 @@ func InstallContractsAPI(r *gin.Engine) {
 
 	r.GET("/api/v1/networks/:id/contracts", networkContractsListHandler)
 	r.GET("/api/v1/networks/:id/contracts/:contractId", networkContractDetailsHandler)
-	r.POST("/api/v1/public", createPublicContractHandler)
+	r.POST("/api/v1/public/contracts", createPublicContractHandler)
 }
 
 // createPublicContractHandler creates an instance of a publicly deployed contract
