@@ -135,10 +135,10 @@ func contractDetailsHandler(c *gin.Context) {
 	if contract == nil || contract.ID == uuid.Nil {
 		provide.RenderError("contract not found", 404, c)
 		return
-	} else if appID != nil && *contract.ApplicationID != *appID {
+	} else if appID != nil && (contract.ApplicationID == nil || *contract.ApplicationID != *appID) {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if orgID != nil && *contract.OrganizationID != *orgID {
+	} else if orgID != nil && (contract.OrganizationID == nil || *contract.OrganizationID != *orgID) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
