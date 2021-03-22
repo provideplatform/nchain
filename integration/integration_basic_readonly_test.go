@@ -5,11 +5,34 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
+
+func GoSaveContract(token string, params map[string]interface{}) (*nchain.Contract, error) {
+	uri := "public"
+	status, resp, err := nchain.InitNChainService(token).Post(uri, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if status != 201 {
+		return nil, fmt.Errorf("failed to save public contract. status: %v", status)
+	}
+
+	contract := &nchain.Contract{}
+	contractRaw, _ := json.Marshal(resp)
+	err = json.Unmarshal(contractRaw, &contract)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save contract. status: %v; %s", status, err.Error())
+	}
+
+	return contract, nil
+}
 
 func TestContractHDWallet(t *testing.T) {
 
@@ -50,6 +73,41 @@ func TestContractHDWallet(t *testing.T) {
 		return
 	}
 
+	// create the predeployed contract in the database, and associate it with the app
+	// load the ERC20 compiled artifact
+	erc20Artifact, err := ioutil.ReadFile("artifacts/erc20.json")
+	if err != nil {
+		t.Errorf("error loading erc20 artifact. Error: %s", err.Error())
+	}
+
+	erc20CompiledArtifact := nchain.CompiledArtifact{}
+	err = json.Unmarshal(erc20Artifact, &erc20CompiledArtifact)
+	if err != nil {
+		t.Errorf("error converting readwritetester compiled artifact. Error: %s", err.Error())
+	}
+
+	//t.Logf("compiled artifact for erc20: %+v", erc20Artifact)
+	contractName := "MONEH"
+	contractAddress := "0x45a67Fd75765721D0275d3925a768E86E7a2599c"
+	// MONEH contract deployed to Rinekby - 0x45a67Fd75765721D0275d3925a768E86E7a2599c
+	contract, err := GoSaveContract(*appToken.Token, map[string]interface{}{
+		"network_id":     rinkebyNetworkID,
+		"application_id": app.ID.String(),
+		"wallet_id":      wallet.ID,
+		"name":           contractName,
+		"address":        contractAddress,
+		"params": map[string]interface{}{
+			"wallet_id":          wallet.ID,
+			"hd_derivation_path": `m/44'/60'/2'/0/0`,
+			"compiled_artifact":  erc20CompiledArtifact,
+		},
+	})
+	if err != nil {
+		t.Errorf("error creating %s contract. Error: %s", contractName, err.Error())
+		return
+	}
+
+	t.Logf("contract returned: %+v", contract)
 	// // this path produces the ETH address 0x6af845bae76f5cc16bc93f86b83e8928c3dfda19
 	// path := `m/44'/60'/2'/0/0`
 
@@ -88,7 +146,9 @@ func TestContractHDWallet(t *testing.T) {
 		expectedResult string
 	}{
 		//{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact, "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7"},
-		{kovanNetworkID, "readwrite", "getString", "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7", "NfGshn0Uc52U2IDqkfKnhf8yQaRT60lPpkm2xxVRASKWdaXwjx5BBtd3oMUXvJiDRpW4Kw4Xt92mdZ7BTeIQRZ3GA9HfjLPKIZD4Xw2yX1eLUpC7lM1KiI"},
+		//{rinkebyNetworkID, "readwrite", "getString", "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7", "NfGshn0Uc52U2IDqkfKnhf8yQaRT60lPpkm2xxVRASKWdaXwjx5BBtd3oMUXvJiDRpW4Kw4Xt92mdZ7BTeIQRZ3GA9HfjLPKIZD4Xw2yX1eLUpC7lM1KiI"},
+		{rinkebyNetworkID, "erc20", "symbol", contractAddress, "MONEH"},
+		{rinkebyNetworkID, "erc20", "name", contractAddress, "MONEH test token"},
 	}
 
 	for _, tc := range tt {
