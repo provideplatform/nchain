@@ -1,4 +1,4 @@
-// +build integration nchain ropsten rinkeby kovan goerli basic bookie
+// +build integration nchain ropsten rinkeby kovan goerli basic bookie readonly
 
 package integration
 

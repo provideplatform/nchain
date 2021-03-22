@@ -219,3 +219,4 @@ func TestContractHDWallet(t *testing.T) {
 		t.Logf("contract execution successful")
 	}
 }
+

@@ -24,6 +24,31 @@ func InstallContractsAPI(r *gin.Engine) {
 
 	r.GET("/api/v1/networks/:id/contracts", networkContractsListHandler)
 	r.GET("/api/v1/networks/:id/contracts/:contractId", networkContractDetailsHandler)
+	r.POST("/api/v1/public", createPublicContractHandler)
+}
+
+func createPublicContractHandler(c *gin.Context) {
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && orgID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+	// TODO
+	//func AddPublicContractHandler
+	// needs the contract address
+	// and the contract compiled artifact (access to .sol) for the abi
+	// contract address
+	// network id
+	// name
+	// needs appid or orgid, same as regular
+	// checks if contract address already exists, same as existing (for that org app?)
+	// but contract doesn't get deployed
+	// and then it is available to be interacted with
+	// like any other contract on the network
+	// can be used for ERC20s
+
 }
 
 func contractsListHandler(c *gin.Context) {

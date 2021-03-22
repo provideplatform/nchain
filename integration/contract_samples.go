@@ -1,4 +1,4 @@
-// +build integration nchain ropsten rinkeby kovan gorli nobookie
+// +build integration nchain ropsten rinkeby kovan gorli nobookie readonly
 
 package integration
 
