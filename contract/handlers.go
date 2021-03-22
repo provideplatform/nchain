@@ -27,6 +27,8 @@ func InstallContractsAPI(r *gin.Engine) {
 	r.POST("/api/v1/public", createPublicContractHandler)
 }
 
+// createPublicContractHandler creates an instance of a publicly deployed contract
+// so the nchain user can interact with it without deploying it
 func createPublicContractHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	userID := util.AuthorizedSubjectID(c, "user")
@@ -48,11 +50,18 @@ func createPublicContractHandler(c *gin.Context) {
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
+
+	// we must have a contract address
+	// we'll assume it's the actual address
+	if contract.Address == nil {
+		provide.RenderError("contract address not provided", 400, c)
+		return
+	}
 	// hack - let's leave the contract available to all who want to access it by address
 	// although my preference would be that any org/app who want to access it,
 	// access their own instance of the contract - so there's some compartmentalization going on
-	// contract.ApplicationID = appID
-	// contract.OrganizationID = orgID
+	contract.ApplicationID = appID
+	contract.OrganizationID = orgID
 
 	params := contract.ParseParams()
 	if contract.Name == nil {
@@ -72,20 +81,6 @@ func createPublicContractHandler(c *gin.Context) {
 		provide.Render(obj, 422, c)
 		return
 	}
-	// TODO
-	//func AddPublicContractHandler
-	// needs the contract address
-	// and the contract compiled artifact (access to .sol) for the abi
-	// contract address
-	// network id
-	// name
-	// needs appid or orgid, same as regular
-	// checks if contract address already exists, same as existing (for that org app?)
-	// but contract doesn't get deployed
-	// and then it is available to be interacted with
-	// like any other contract on the network
-	// can be used for ERC20s
-
 }
 
 func contractsListHandler(c *gin.Context) {

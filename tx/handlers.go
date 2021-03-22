@@ -299,18 +299,6 @@ func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) 
 		Params:    &paramsMsg,
 	}
 
-	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
-	// 	return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
-	// }
-	// accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
-	// 	return afunc(a.(wallet.Account), txParams)
-	// }
-	// walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-	// 	return wfunc(w.(wallet.Wallet), txParams)
-	// }
-
-	//resp, err := ephemeralContract.ExecuteFromTx(execution, accountFn, walletFn, txCreateFn)
-	//tx := &Transaction{}
 	resp, err := executeTransaction(ephemeralContract, execution)
 	if err == nil {
 		provide.Render(resp, 202, c)
@@ -392,14 +380,25 @@ func contractExecutionHandler(c *gin.Context) {
 		arbitraryRPCExecutionHandler(db, &rpcNetworkID, params, c)
 		return
 	}
-	// HACK
 
 	var contractObj = &contract.Contract{}
 
 	db.Where("id = ?", contractID).Find(&contractObj)
 
-	if contractObj == nil || contractObj.ID == uuid.Nil { // attempt to lookup the contract by address
-		db.Where("address = ?", c.Param("id")).Find(&contractObj)
+	// if we can't find by ID, attempt to lookup the contract by address
+	// ensure that the contract returned is the valid ID for the provided token data
+	if contractObj == nil || contractObj.ID == uuid.Nil {
+		query := db.Where("address = ?", c.Param("id"))
+		if appID != nil {
+			query = query.Where("contracts.application_id = ?", appID)
+		}
+		if orgID != nil {
+			query = query.Where("contracts.organization_id = ?", orgID)
+		}
+		if userID != nil {
+			query = query.Where("contracts.application_id IS NULL", userID)
+		}
+		query.Find(&contractObj)
 	}
 
 	if contractObj == nil || contractObj.ID == uuid.Nil {
@@ -486,15 +485,6 @@ func contractExecutionHandler(c *gin.Context) {
 					return
 				}
 
-				//TODO this is not right, because it should be the same address that created the contract, but it's not
-				// check through everything to make sure we're getting the right hd wallet, and not just making up
-				// a fresh one every time...
-				// then get fresh integration branch and get this code in for a path using:
-				// - a bip39 wallet with partstr
-				// - a bip39 wallet with no pathstr (generating a new address each time and incrementing in DB)
-				// - an account id, using a single secp256k1 key
-				// then tackle the w(a(func))a(func(w)) cray
-
 				execution.AccountAddress = key.Address
 				common.Log.Debugf("xxx using address: %s, derived from wallet using path %s", *key.Address, pathstr)
 			}
@@ -538,25 +528,6 @@ func contractExecutionHandler(c *gin.Context) {
 		execution.Subsidize = subsidize
 	}
 
-	// var tx Transaction
-	// txCreateFn := func(c *contract.Contract, network *network.Network, accountID *uuid.UUID, walletID *uuid.UUID, execution *contract.Execution, _txParamsJSON *json.RawMessage) (*contract.ExecutionResponse, error) {
-	// 	return txCreatefunc(&tx, c, network, accountID, walletID, execution, _txParamsJSON)
-	// }
-	// accountFn := func(a interface{}, txParams map[string]interface{}) *uuid.UUID {
-	// 	if a == nil {
-	// 		return nil
-	// 	}
-	// 	return afunc(a.(*wallet.Account), txParams)
-	// }
-	// walletFn := func(w interface{}, txParams map[string]interface{}) *uuid.UUID {
-	// 	if w == nil {
-	// 		return nil
-	// 	}
-	// 	return wfunc(w.(*wallet.Wallet), txParams)
-	// }
-
-	//executionResponse, err := execution.ExecuteFromTx(accountFn, walletFn, txCreateFn)
-	//tx := &Transaction{}
 	executionResponse, err := executeTransaction(contractObj, execution)
 	if err != nil {
 		common.Log.Debugf("error here is: %s", err.Error())
@@ -583,20 +554,6 @@ func contractExecutionHandler(c *gin.Context) {
 		"ref":        executionResponse.Ref,
 	}
 	provide.Render(resp, 202, c)
-
-	// switch executionResponse.(type) {
-	// case *contract.ExecutionResponse:
-	// 	executionResponse = executionResponse.(*contract.ExecutionResponse).Response.(map[string]interface{})
-	// 	provide.Render(executionResponse, 200, c) // returns 200 OK status to indicate the contract invocation was able to return a syncronous response
-	// 	return
-	// default:
-	// 	confidence := invokeTxFilters(appID, buf, db)
-	// 	executionResponse = map[string]interface{}{
-	// 		"confidence": confidence,
-	// 		"ref":        executionResponse.(*contract.Execution).Ref,
-	// 	}
-	// 	provide.Render(executionResponse, 202, c) // returns 202 Accepted status to indicate the contract invocation is pending
-	// }
 }
 
 func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *float64 {

@@ -57,8 +57,6 @@ func (c *Contract) CompiledArtifact() *api.CompiledArtifact {
 	artifact := &api.CompiledArtifact{}
 	params := c.ParseParams()
 
-	// TEST
-
 	if params != nil {
 		if compiledArtifact, compiledArtifactOk := params["compiled_artifact"].(map[string]interface{}); compiledArtifactOk {
 			compiledArtifactJSON, _ := json.Marshal(compiledArtifact)
@@ -227,7 +225,7 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 	return dependencyArtifact
 }
 
-// persist a contract
+// persist a contract without deploying it to the network
 func (c *Contract) Save() bool {
 	db := dbconf.DatabaseConnection()
 
@@ -248,7 +246,6 @@ func (c *Contract) Save() bool {
 		}
 		success := rowsAffected > 0
 		return success
-		// what if it already exists?  do we update? probably not...
 	}
 	return false
 }

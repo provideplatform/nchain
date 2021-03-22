@@ -87,19 +87,16 @@ func TestContractHDWallet(t *testing.T) {
 	}
 
 	//t.Logf("compiled artifact for erc20: %+v", erc20Artifact)
-	contractName := "MONEH"
+	contractName := "MONEH - erc20 contract"
 	contractAddress := "0x45a67Fd75765721D0275d3925a768E86E7a2599c"
 	// MONEH contract deployed to Rinekby - 0x45a67Fd75765721D0275d3925a768E86E7a2599c
 	contract, err := GoSaveContract(*appToken.Token, map[string]interface{}{
 		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID.String(),
-		"wallet_id":      wallet.ID,
 		"name":           contractName,
 		"address":        contractAddress,
 		"params": map[string]interface{}{
-			"wallet_id":          wallet.ID,
-			"hd_derivation_path": `m/44'/60'/2'/0/0`,
-			"compiled_artifact":  erc20CompiledArtifact,
+			"compiled_artifact": erc20CompiledArtifact,
 		},
 	})
 	if err != nil {
