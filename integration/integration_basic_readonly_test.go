@@ -12,28 +12,6 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func GoLoadPublicContract(token string, params map[string]interface{}) (*nchain.Contract, error) {
-	uri := "public/contracts"
-	status, resp, err := nchain.InitNChainService(token).Post(uri, params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if status != 201 {
-		return nil, fmt.Errorf("failed to save public contract. status: %v", status)
-	}
-
-	contract := &nchain.Contract{}
-	contractRaw, _ := json.Marshal(resp)
-	err = json.Unmarshal(contractRaw, &contract)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save contract. status: %v; %s", status, err.Error())
-	}
-
-	return contract, nil
-}
-
 func TestContractHDWallet(t *testing.T) {
 
 	t.Parallel()
@@ -90,7 +68,7 @@ func TestContractHDWallet(t *testing.T) {
 	contractName := "MONEH - erc20 contract"
 	contractAddress := "0x45a67Fd75765721D0275d3925a768E86E7a2599c"
 	// MONEH contract deployed to Rinekby - 0x45a67Fd75765721D0275d3925a768E86E7a2599c
-	contract, err := GoLoadPublicContract(*appToken.Token, map[string]interface{}{
+	contract, err := nchain.CreatePublicContract(*appToken.Token, map[string]interface{}{
 		"network_id":     rinkebyNetworkID,
 		"application_id": app.ID.String(),
 		"name":           contractName,
@@ -140,13 +118,13 @@ func TestContractHDWallet(t *testing.T) {
 		//walletID       string
 		//artifact       nchain.CompiledArtifact
 		contract       string
-		expectedResult string
+		expectedResult interface{}
 	}{
 		//{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact, "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7"},
 		//{rinkebyNetworkID, "readwrite", "getString", "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7", "NfGshn0Uc52U2IDqkfKnhf8yQaRT60lPpkm2xxVRASKWdaXwjx5BBtd3oMUXvJiDRpW4Kw4Xt92mdZ7BTeIQRZ3GA9HfjLPKIZD4Xw2yX1eLUpC7lM1KiI"},
-		// {rinkebyNetworkID, "erc20", "symbol", contractAddress, "MONEH"},
-		// {rinkebyNetworkID, "erc20", "name", contractAddress, "MONEH test token"},
-		{rinkebyNetworkID, "erc20", "totalSupply", contractAddress, "MONEH test token"},
+		{rinkebyNetworkID, "erc20", "symbol", contractAddress, "MONEH"},
+		{rinkebyNetworkID, "erc20", "name", contractAddress, "MONEH test token"},
+		{rinkebyNetworkID, "erc20", "totalSupply", contractAddress, 1e+06},
 	}
 
 	for _, tc := range tt {
@@ -164,9 +142,9 @@ func TestContractHDWallet(t *testing.T) {
 		}
 
 		if execResponse.Response != nil {
-			t.Logf("execution response: %s", *execResponse.Response)
-			if *execResponse.Response != tc.expectedResult {
-				t.Errorf("expected msg %s returned. got %s", tc.expectedResult, *execResponse.Response)
+			t.Logf("execution response: %v", execResponse.Response)
+			if execResponse.Response != tc.expectedResult {
+				t.Errorf("expected msg %s returned. got %s", tc.expectedResult, execResponse.Response)
 				return
 			}
 		}

@@ -13,7 +13,6 @@ import (
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/contract"
 	"github.com/provideapp/nchain/filter"
-	"github.com/provideapp/nchain/network"
 	"github.com/provideapp/nchain/wallet"
 	vault "github.com/provideservices/provide-go/api/vault"
 	provide "github.com/provideservices/provide-go/common"
@@ -206,140 +205,140 @@ func networkTransactionDetailsHandler(c *gin.Context) {
 	provide.Render(tx, 200, c)
 }
 
-func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) {
-	userID := util.AuthorizedSubjectID(c, "user")
-	if userID == nil {
-		provide.RenderError("unauthorized", 401, c)
-		return
-	}
+// func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) {
+// 	userID := util.AuthorizedSubjectID(c, "user")
+// 	if userID == nil {
+// 		provide.RenderError("unauthorized", 401, c)
+// 		return
+// 	}
 
-	wal := &wallet.Account{} // signer for the tx
+// 	wal := &wallet.Account{} // signer for the tx
 
-	params := map[string]interface{}{}
-	err := json.Unmarshal(buf, &params)
-	if err != nil {
-		provide.RenderError(err.Error(), 422, c)
-		return
-	}
-	publicKey, publicKeyOk := params["public_key"].(string)
-	privateKey, privateKeyOk := params["private_key"].(string)
-	gas, gasOk := params["gas"].(float64)
-	gasPrice, gasPriceOk := params["gas_price"].(float64)
-	nonce, nonceOk := params["nonce"].(float64)
-	subsidize, subsidizeOk := params["subsidize"].(bool)
-	// xxx hd derivation path for contract execution
+// 	params := map[string]interface{}{}
+// 	err := json.Unmarshal(buf, &params)
+// 	if err != nil {
+// 		provide.RenderError(err.Error(), 422, c)
+// 		return
+// 	}
+// 	publicKey, publicKeyOk := params["public_key"].(string)
+// 	privateKey, privateKeyOk := params["private_key"].(string)
+// 	gas, gasOk := params["gas"].(float64)
+// 	gasPrice, gasPriceOk := params["gas_price"].(float64)
+// 	nonce, nonceOk := params["nonce"].(float64)
+// 	subsidize, subsidizeOk := params["subsidize"].(bool)
+// 	// xxx hd derivation path for contract execution
 
-	ref, err := uuid.NewV4()
-	if err != nil {
-		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
-	}
+// 	ref, err := uuid.NewV4()
+// 	if err != nil {
+// 		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+// 	}
 
-	execution := &contract.Execution{
-		Ref: common.StringOrNil(ref.String()),
-	}
+// 	execution := &contract.Execution{
+// 		Ref: common.StringOrNil(ref.String()),
+// 	}
 
-	err = json.Unmarshal(buf, execution)
-	if err != nil {
-		provide.RenderError(err.Error(), 422, c)
-		return
-	}
-	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
-		if execution.Wallet != nil {
-			err := fmt.Errorf("invalid request specifying a account_id and wallet")
-			provide.RenderError(err.Error(), 422, c)
-			return
-		}
-		wal.SetID(*execution.AccountID)
-	} else if publicKeyOk && privateKeyOk {
-		wal.Address = publicKey
-		wal.PrivateKey = common.StringOrNil(privateKey)
-	}
-	execution.Wallet = wal
+// 	err = json.Unmarshal(buf, execution)
+// 	if err != nil {
+// 		provide.RenderError(err.Error(), 422, c)
+// 		return
+// 	}
+// 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
+// 		if execution.Wallet != nil {
+// 			err := fmt.Errorf("invalid request specifying a account_id and wallet")
+// 			provide.RenderError(err.Error(), 422, c)
+// 			return
+// 		}
+// 		wal.SetID(*execution.AccountID)
+// 	} else if publicKeyOk && privateKeyOk {
+// 		wal.Address = publicKey
+// 		wal.PrivateKey = common.StringOrNil(privateKey)
+// 	}
+// 	execution.Wallet = wal
 
-	if gasOk {
-		execution.Gas = &gas
-	}
+// 	if gasOk {
+// 		execution.Gas = &gas
+// 	}
 
-	if gasPriceOk {
-		execution.GasPrice = &gasPrice
-	}
+// 	if gasPriceOk {
+// 		execution.GasPrice = &gasPrice
+// 	}
 
-	if nonceOk {
-		nonceUint := uint64(nonce)
-		execution.Nonce = &nonceUint
-	}
+// 	if nonceOk {
+// 		nonceUint := uint64(nonce)
+// 		execution.Nonce = &nonceUint
+// 	}
 
-	if subsidizeOk {
-		execution.Subsidize = subsidize
-	}
+// 	if subsidizeOk {
+// 		execution.Subsidize = subsidize
+// 	}
 
-	ntwrk := &network.Network{}
-	if execution.NetworkID != nil && *execution.NetworkID != uuid.Nil {
-		db.Where("id = ?", execution.NetworkID).Find(&ntwrk)
-	}
+// 	ntwrk := &network.Network{}
+// 	if execution.NetworkID != nil && *execution.NetworkID != uuid.Nil {
+// 		db.Where("id = ?", execution.NetworkID).Find(&ntwrk)
+// 	}
 
-	if ntwrk == nil || ntwrk.ID == uuid.Nil {
-		provide.RenderError("network not found for arbitrary contract execution", 404, c)
-		return
-	}
+// 	if ntwrk == nil || ntwrk.ID == uuid.Nil {
+// 		provide.RenderError("network not found for arbitrary contract execution", 404, c)
+// 		return
+// 	}
 
-	params = map[string]interface{}{
-		"abi": execution.ABI,
-	}
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		provide.RenderError("failed to marshal ephemeral contract params containing ABI", 422, c)
-		return
-	}
-	paramsMsg := json.RawMessage(paramsJSON)
+// 	params = map[string]interface{}{
+// 		"abi": execution.ABI,
+// 	}
+// 	paramsJSON, err := json.Marshal(params)
+// 	if err != nil {
+// 		provide.RenderError("failed to marshal ephemeral contract params containing ABI", 422, c)
+// 		return
+// 	}
+// 	paramsMsg := json.RawMessage(paramsJSON)
 
-	ephemeralContract := &contract.Contract{
-		NetworkID: ntwrk.ID,
-		Address:   common.StringOrNil(c.Param("id")),
-		Params:    &paramsMsg,
-	}
+// 	ephemeralContract := &contract.Contract{
+// 		NetworkID: ntwrk.ID,
+// 		Address:   common.StringOrNil(c.Param("id")),
+// 		Params:    &paramsMsg,
+// 	}
 
-	resp, err := executeTransaction(ephemeralContract, execution)
-	if err == nil {
-		provide.Render(resp, 202, c)
-	} else {
-		obj := map[string]interface{}{}
-		obj["errors"] = []string{err.Error()}
-		provide.Render(obj, 422, c)
-	}
-}
+// 	resp, err := executeTransaction(ephemeralContract, execution)
+// 	if err == nil {
+// 		provide.Render(resp, 202, c)
+// 	} else {
+// 		obj := map[string]interface{}{}
+// 		obj["errors"] = []string{err.Error()}
+// 		provide.Render(obj, 422, c)
+// 	}
+// }
 
-func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[string]interface{}, c *gin.Context) {
-	network := &network.Network{}
-	db.Where("id = ?", networkID).Find(&network)
-	if network == nil || network.ID == uuid.Nil {
-		provide.RenderError("not found", 404, c)
-		return
-	}
-	method := params["method"].(string)
-	authorizedMethod := false
-	cfg := network.ParseConfig()
-	if whitelist, whitelistOk := cfg["rpc_method_whitelist"].([]interface{}); whitelistOk {
-		for _, mthd := range whitelist {
-			mthdStr := mthd.(string)
-			authorizedMethod = mthdStr == method
-			if authorizedMethod {
-				break
-			}
-		}
-	}
-	if !authorizedMethod {
-		provide.RenderError(fmt.Sprintf("forbidden rpc method %s", method), 403, c)
-		return
-	}
-	common.Log.Debugf("%s", params)
-	resp, err := network.InvokeJSONRPC(method, params["params"].([]interface{}))
-	if err != nil {
-		provide.RenderError(err.Error(), 422, c)
-		return
-	}
-	provide.Render(resp, 200, c)
-}
+// func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[string]interface{}, c *gin.Context) {
+// 	network := &network.Network{}
+// 	db.Where("id = ?", networkID).Find(&network)
+// 	if network == nil || network.ID == uuid.Nil {
+// 		provide.RenderError("not found", 404, c)
+// 		return
+// 	}
+// 	method := params["method"].(string)
+// 	authorizedMethod := false
+// 	cfg := network.ParseConfig()
+// 	if whitelist, whitelistOk := cfg["rpc_method_whitelist"].([]interface{}); whitelistOk {
+// 		for _, mthd := range whitelist {
+// 			mthdStr := mthd.(string)
+// 			authorizedMethod = mthdStr == method
+// 			if authorizedMethod {
+// 				break
+// 			}
+// 		}
+// 	}
+// 	if !authorizedMethod {
+// 		provide.RenderError(fmt.Sprintf("forbidden rpc method %s", method), 403, c)
+// 		return
+// 	}
+// 	common.Log.Debugf("%s", params)
+// 	resp, err := network.InvokeJSONRPC(method, params["params"].([]interface{}))
+// 	if err != nil {
+// 		provide.RenderError(err.Error(), 422, c)
+// 		return
+// 	}
+// 	provide.Render(resp, 200, c)
+// }
 
 func contractExecutionHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
@@ -367,19 +366,19 @@ func contractExecutionHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 
 	contractID := c.Param("id")
-	rpcHack := strings.Index(contractID, "rpc:") == 0
-	if rpcHack {
-		rpcNetworkIDStr := contractID[4:]
-		rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
-		if err != nil {
-			err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
-			provide.RenderError(err.Error(), 400, c)
-			return
-		}
-		common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
-		arbitraryRPCExecutionHandler(db, &rpcNetworkID, params, c)
-		return
-	}
+	// rpcHack := strings.Index(contractID, "rpc:") == 0
+	// if rpcHack {
+	// 	rpcNetworkIDStr := contractID[4:]
+	// 	rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
+	// 	if err != nil {
+	// 		err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
+	// 		provide.RenderError(err.Error(), 400, c)
+	// 		return
+	// 	}
+	// 	common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
+	// 	arbitraryRPCExecutionHandler(db, &rpcNetworkID, params, c)
+	// 	return
+	// }
 
 	var contractObj = &contract.Contract{}
 
@@ -402,18 +401,22 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	if contractObj == nil || contractObj.ID == uuid.Nil {
-		if appID != nil {
-			provide.RenderError("contract not found", 404, c)
-			return
-		}
-
-		common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
-		contractArbitraryExecutionHandler(c, db, buf)
+		//if appID != nil {
+		provide.RenderError("contract not found", 404, c)
 		return
-	} else if appID != nil && *contractObj.ApplicationID != *appID {
+		//}
+
+		// common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
+		// contractArbitraryExecutionHandler(c, db, buf)
+		// return
+	}
+
+	if appID != nil && *contractObj.ApplicationID != *appID {
 		provide.RenderError("forbidden", 403, c)
 		return
-	} else if orgID != nil && *contractObj.OrganizationID != *orgID {
+	}
+
+	if orgID != nil && *contractObj.OrganizationID != *orgID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
