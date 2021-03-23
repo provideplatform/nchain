@@ -144,7 +144,7 @@ func TestContractHDWallet(t *testing.T) {
 		if execResponse.Response != nil {
 			t.Logf("execution response: %v", execResponse.Response)
 			if execResponse.Response != tc.expectedResult {
-				t.Errorf("expected msg %s returned. got %s", tc.expectedResult, execResponse.Response)
+				t.Errorf("expected msg %s returned. got %v", tc.expectedResult, execResponse.Response)
 				return
 			}
 		}

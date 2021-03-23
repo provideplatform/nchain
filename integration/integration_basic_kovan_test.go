@@ -199,9 +199,9 @@ func TestContractHDWallet(t *testing.T) {
 				return
 			}
 			if execResponse.Response != nil {
-				t.Logf("execution response: %s", *execResponse.Response)
-				if *execResponse.Response != msg {
-					t.Errorf("expected msg %s returned. got %s", msg, *execResponse.Response)
+				t.Logf("execution response: %v", execResponse.Response)
+				if execResponse.Response != msg {
+					t.Errorf("expected msg %s returned. got %v", msg, execResponse.Response)
 					return
 				}
 			}
@@ -219,4 +219,3 @@ func TestContractHDWallet(t *testing.T) {
 		t.Logf("contract execution successful")
 	}
 }
-
