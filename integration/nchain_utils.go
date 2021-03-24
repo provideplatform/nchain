@@ -1,4 +1,4 @@
-// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie
+// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly
 
 package integration
 

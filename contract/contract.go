@@ -56,6 +56,7 @@ func (c *Contract) enrich() {
 func (c *Contract) CompiledArtifact() *api.CompiledArtifact {
 	artifact := &api.CompiledArtifact{}
 	params := c.ParseParams()
+
 	if params != nil {
 		if compiledArtifact, compiledArtifactOk := params["compiled_artifact"].(map[string]interface{}); compiledArtifactOk {
 			compiledArtifactJSON, _ := json.Marshal(compiledArtifact)
@@ -222,6 +223,31 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 	}
 
 	return dependencyArtifact
+}
+
+// persist a contract without deploying it to the network
+func (c *Contract) Save() bool {
+	db := dbconf.DatabaseConnection()
+
+	if !c.Validate() {
+		return false
+	}
+
+	if db.NewRecord(c) {
+		result := db.Create(&c)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				c.Errors = append(c.Errors, &provide.Error{
+					Message: common.StringOrNil(err.Error()),
+				})
+			}
+		}
+		success := rowsAffected > 0
+		return success
+	}
+	return false
 }
 
 // Create and persist a new contract
