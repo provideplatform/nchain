@@ -159,7 +159,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
 							for _, _tx := range txs {
 								txHash := _tx.(map[string]interface{})["hash"].(string)
-								common.Log.Debugf("Setting tx block and finalized_at timestamp %s on tx: %s", finalizedAt, txHash)
+								common.Log.Debugf("Setting tx block (%v) and finalized_at timestamp %s on tx: %s", blockFinalizedMsg.Block, finalizedAt, txHash)
 
 								params := map[string]interface{}{
 									"block":           blockFinalizedMsg.Block,
