@@ -58,7 +58,7 @@ stop_local:
 	./ops/stop_local.sh
 
 test: build
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
+	#NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_unit_tests.sh
 
 # integration_ropsten:
@@ -107,5 +107,23 @@ nobookie_bounce:
 	docker-compose -f ./ops/docker-compose-integration.yml down
 	docker volume rm ops_provide-db
 	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill nchain
+	docker kill nchain-consumer	
+
+statsdaemon_up:
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill statsdaemon
+	docker kill nchain
+	docker kill nchain-consumer
+
+statsdaemon_down:	
+  docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+
+statsdaemon_bounce:
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill statsdaemon
 	docker kill nchain
 	docker kill nchain-consumer	
