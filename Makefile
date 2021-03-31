@@ -110,14 +110,12 @@ nobookie_bounce:
 	docker kill nchain
 	docker kill nchain-consumer	
 
-statsdaemon_up:
-	docker-compose -f ./ops/docker-compose-integration.yml up -d
-	docker kill statsdaemon
-	docker kill nchain
-	docker kill nchain-consumer
+# statsdaemon_up:
+# 	docker-compose -f ./ops/docker-compose-integration.yml up -d
+# 	docker kill statsdaemon
 
 statsdaemon_down:	
-  docker-compose -f ./ops/docker-compose-integration.yml down
+	docker-compose -f ./ops/docker-compose-integration.yml down
 	docker volume rm ops_provide-db
 
 statsdaemon_bounce:
@@ -125,5 +123,3 @@ statsdaemon_bounce:
 	docker volume rm ops_provide-db
 	docker-compose -f ./ops/docker-compose-integration.yml up -d
 	docker kill statsdaemon
-	docker kill nchain
-	docker kill nchain-consumer	

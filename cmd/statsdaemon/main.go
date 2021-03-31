@@ -118,8 +118,9 @@ func requireNetworkDaemonInstances() []*network.Network {
 	dbconf.DatabaseConnection().Where("user_id IS NULL AND enabled IS TRUE").Find(&networks)
 
 	for _, ntwrk := range networks {
-		RequireNetworkLogTransceiver(ntwrk)
-		RequireNetworkStatsDaemon(ntwrk)
+		//RequireNetworkLogTransceiver(ntwrk)
+		//RequireNetworkStatsDaemon(ntwrk)
+		RequireHistoricalBlockStatsDaemon(ntwrk)
 		//TODO RequireHistoricalStatsDaemon(ntwrk)
 		//TODO copy the stats_daemon into another file
 		//TODO create a simple blocknumber/tx/logs table(s)
