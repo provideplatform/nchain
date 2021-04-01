@@ -44,10 +44,11 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideservices/provide-go v0.0.0-20210323165848-e60d526cb4eb
+	github.com/provideservices/provide-go v0.0.0-20210325051827-db2dd37b401b
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	github.com/stretchr/testify v1.5.1 // indirect
+	github.com/tyler-smith/go-bip32 v1.0.0 // indirect
 	go.mongodb.org/mongo-driver v1.3.3
 )
 

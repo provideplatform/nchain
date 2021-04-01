@@ -17,15 +17,20 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/jinzhu/gorm"
+	dbconf "github.com/kthomas/go-db-config"
 	logger "github.com/kthomas/go-logger"
 	natsutil "github.com/kthomas/go-natsutil"
 	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
+	providego "github.com/provideservices/provide-go/api"
 	provide "github.com/provideservices/provide-go/api/nchain"
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )
+
+// add some historical block consts
+const defaultHistoricalBlockDaemonQueueSize = 8
 
 // HistoricalBlockDataSource provides JSON-RPC polling (http) only
 // interfaces for a network
@@ -77,7 +82,6 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 	return &HistoricalBlockDataSource{
 		Network: network,
 
-		// wait, we get run  eth_getBlockByNumber via websocket - likely easier to copy the code!
 		Poll: func(ch chan *provide.NetworkStatus) error {
 			// json rpc call to eth_getBlockByNumber
 			jsonRpcURL := network.RPCURL()
@@ -96,25 +100,38 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 
 			// let's get a new id (likely used in nats)
 			//id, _ := uuid.NewV4()
+			// here would be a good place to implement a next block getter
+			// first check the network
+			// if there's no block, then we're not worried about historical blocks,
+			// q: do we need this, if we're worried about gaps?
+			// a: yes, because we have to start there and put at least one block into the
+			// blocks table so we can start getting gaps
 
-			//let's get block 9951220
-			blockNumber := fmt.Sprintf("0x%x", 9951220)
-			// request := jsonRPCRequest{
-			// 	ID:      id,
-			// 	JSONRPC: "2.0",
-			// 	Method:  "eth_getBlockByNumber",
-			// 	Params:  []interface{}{blockNumber, true},
-			// }
-			//args := []interface{}{blockNumber, true}
+			// but we do care about gaps (if the statsdaemon was down)
+			// so query the blocks table for gaps
+			// if there's no gaps, then adios
+			// if there are gaps, then process them into a list of block numbers
+			// and iterate through grabbing all the block infos
+			// and pushing them onto nats for the block finalizer to grab
+			// and update the block finalizer5 so it populates the blocks/tx table
+			// block to begin with (must check where the txs come from!)
 
-			// body, err := json.Marshal(request)
-			// if err != nil {
-			// 	return err
-			// }
-			type response struct {
-				Result interface{}
+			type blockData struct {
+				providego.Model
+				NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
+				Block     int       `sql:"type:int8" json:"blocknumber"`
+				TxHash    string    `sql:"type:text" json:"transactionhash"`
 			}
-			//var result interface{}
+
+			//blocks := []blockData{}
+			block := blockData{}
+
+			db := dbconf.DatabaseConnection()
+			db.First(&block)
+			common.Log.Debugf("block: %+v", block)
+			//let's get block 9951220 for a test
+			blockNumber := fmt.Sprintf("0x%x", 9951220)
+
 			var resp interface{}
 			err = client.Call(&resp, "eth_getBlockByNumber", blockNumber, true)
 			if err != nil {
@@ -122,7 +139,6 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 			}
 			common.Log.Debugf("got result: %+v", resp)
 
-			//return new(jsonRpcNotSupported)
 			return err
 		},
 	}
@@ -130,13 +146,13 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 }
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
-func (sd *HistoricalBlockDaemon) consume() []error {
+func (hbd *HistoricalBlockDaemon) consume() []error {
 	errs := make([]error, 0)
-	sd.log.Debugf("Attempting to consume configured historical block daemon data source; attempt #%v", sd.attempt)
+	hbd.log.Debugf("Attempting to consume configured historical block daemon data source; attempt #%v", hbd.attempt)
 
 	var err error
-	if sd.dataSource != nil {
-		err = sd.dataSource.Poll(sd.queue)
+	if hbd.dataSource != nil {
+		err = hbd.dataSource.Poll(hbd.queue)
 	} else {
 		err = errors.New("Configured hsitorical blocks daemon does not have a configured data source")
 	}
@@ -145,35 +161,35 @@ func (sd *HistoricalBlockDaemon) consume() []error {
 		errs = append(errs, err)
 		switch err.(type) {
 		case jsonRpcNotSupported:
-			sd.log.Warningf("Configured historical block  daemon data source does not support JSON-RPC; attempting to upgrade to websocket stream for network id: %s", sd.dataSource.Network.ID)
+			hbd.log.Warningf("Configured historical block  daemon data source does not support JSON-RPC; attempting to upgrade to websocket stream for network id: %s", hbd.dataSource.Network.ID)
 			// no web socket here!
 		case websocketNotSupported:
-			sd.log.Warningf("Configured historical block  daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon for network id: %s", sd.dataSource.Network.ID)
-			err := sd.dataSource.Poll(sd.queue)
+			hbd.log.Warningf("Configured historical block  daemon data source does not support streaming via websocket; attempting to fallback to JSON-RPC long polling using stats daemon for network id: %s", hbd.dataSource.Network.ID)
+			err := hbd.dataSource.Poll(hbd.queue)
 			if err != nil {
 				errs = append(errs, err)
-				sd.log.Warningf("Configured historical block  daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
+				hbd.log.Warningf("Configured historical block  daemon data source returned error while consuming JSON-RPC endpoint: %s; restarting stream...", err.Error())
 			}
 		}
 	}
 	return errs
 }
 
-func (sd *HistoricalBlockDaemon) ingest(response interface{}) {
+func (hbd *HistoricalBlockDaemon) ingest(response interface{}) {
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("Recovered from failed historical blocks daemon message ingestion attempt; %s", r)
 		}
 	}()
 
-	if sd.dataSource.Network.IsBcoinNetwork() {
+	if hbd.dataSource.Network.IsBcoinNetwork() {
 		// nop
-	} else if sd.dataSource.Network.IsEthereumNetwork() {
-		sd.ingestEthereum(response)
+	} else if hbd.dataSource.Network.IsEthereumNetwork() {
+		hbd.ingestEthereum(response)
 	}
 }
 
-func (sd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
+func (hbd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 	switch response.(type) {
 	case *provide.NetworkStatus:
 		resp := response.(*provide.NetworkStatus)
@@ -192,7 +208,7 @@ func (sd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 					if err != nil {
 						common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received via JSON-RPC: %s; %s", response, err.Error())
 					} else if hdr != nil && hdr.Number != nil {
-						sd.ingest(hdr)
+						hbd.ingest(hdr)
 					}
 				}
 			} else {
@@ -203,39 +219,39 @@ func (sd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 		}
 	case *types.Header:
 		header := response.(*types.Header)
-		sd.stats.Block = header.Number.Uint64()
-		sd.stats.State = nil
-		sd.stats.Syncing = sd.stats.Block == 0
+		hbd.stats.Block = header.Number.Uint64()
+		hbd.stats.State = nil
+		hbd.stats.Syncing = hbd.stats.Block == 0
 
-		if sd.stats.Block == 0 {
+		if hbd.stats.Block == 0 {
 			common.Log.Debugf("Ignoring genesis header")
 			return
 		}
 
 		lastBlockAt := header.Time * 1000.0
-		sd.stats.LastBlockAt = &lastBlockAt
+		hbd.stats.LastBlockAt = &lastBlockAt
 
-		sd.stats.Meta["last_block_header"] = header
+		hbd.stats.Meta["last_block_header"] = header
 
 		blockHash := header.Hash().String()
 
-		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
-			sd.recentBlocks = append(sd.recentBlocks, header)
-			sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
+		if len(hbd.recentBlocks) == 0 || hbd.recentBlocks[len(hbd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
+			hbd.recentBlocks = append(hbd.recentBlocks, header)
+			hbd.recentBlockTimestamps = append(hbd.recentBlockTimestamps, lastBlockAt)
 		}
 
-		for len(sd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
-			i := len(sd.recentBlocks) - 1
-			sd.recentBlocks = append(sd.recentBlocks[:i], sd.recentBlocks[i+1:]...)
+		for len(hbd.recentBlocks) > networkStatsMaxRecentBlockCacheSize {
+			i := len(hbd.recentBlocks) - 1
+			hbd.recentBlocks = append(hbd.recentBlocks[:i], hbd.recentBlocks[i+1:]...)
 		}
 
-		if len(sd.recentBlocks) >= networkStatsMinimumRecentBlockCacheSize {
+		if len(hbd.recentBlocks) >= networkStatsMinimumRecentBlockCacheSize {
 			blocktimes := make([]float64, 0)
 			timedelta := float64(0)
 			i := 0
-			for i < len(sd.recentBlocks)-1 {
-				currentBlocktime := sd.recentBlockTimestamps[i]
-				nextBlocktime := sd.recentBlockTimestamps[i+1]
+			for i < len(hbd.recentBlocks)-1 {
+				currentBlocktime := hbd.recentBlockTimestamps[i]
+				nextBlocktime := hbd.recentBlockTimestamps[i+1]
 				blockDelta := float64(nextBlocktime-currentBlocktime) / 1000.0
 				blocktimes = append(blocktimes, blockDelta)
 				timedelta += blockDelta
@@ -243,17 +259,17 @@ func (sd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 			}
 
 			if len(blocktimes) > 0 {
-				sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
-				sd.stats.Meta["blocktimes"] = blocktimes
-				sd.stats.Meta["last_block_hash"] = blockHash
+				hbd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
+				hbd.stats.Meta["blocktimes"] = blocktimes
+				hbd.stats.Meta["last_block_hash"] = blockHash
 			}
 		}
 
-		common.Log.Debugf("network: %s", *sd.dataSource.Network.Name)
+		common.Log.Debugf("network: %s", *hbd.dataSource.Network.Name)
 		common.Log.Debugf("block hash processed: %s", blockHash)
 		common.Log.Debugf("block number processed: %v", header.Number.Uint64())
 		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
-			NetworkID: common.StringOrNil(sd.dataSource.Network.ID.String()),
+			NetworkID: common.StringOrNil(hbd.dataSource.Network.ID.String()),
 			Block:     header.Number.Uint64(),
 			BlockHash: common.StringOrNil(blockHash),
 			Timestamp: lastBlockAt,
@@ -262,32 +278,32 @@ func (sd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 		natsutil.NatsStreamingPublish(natsBlockFinalizedSubject, natsPayload)
 	}
 
-	sd.publish()
+	hbd.publish()
 }
 
 // loop is responsible for processing new messages received by daemon
-func (sd *HistoricalBlockDaemon) loop() error {
+func (hbd *HistoricalBlockDaemon) loop() error {
 	for {
 		select {
-		case msg := <-sd.queue:
-			sd.ingest(msg)
+		case msg := <-hbd.queue:
+			hbd.ingest(msg)
 
-		case <-sd.shutdownCtx.Done():
-			sd.log.Debugf("Closing historical block daemon on shutdown")
+		case <-hbd.shutdownCtx.Done():
+			hbd.log.Debugf("Closing historical block daemon on shutdown")
 			return nil
 		}
 	}
 }
 
 // publish stats atomically to in-memory network namespace
-func (sd *HistoricalBlockDaemon) publish() error {
-	payload, _ := json.Marshal(sd.stats)
+func (hbd *HistoricalBlockDaemon) publish() error {
+	payload, _ := json.Marshal(hbd.stats)
 	ttl := defaultStatsTTL
-	err := redisutil.Set(sd.dataSource.Network.StatsKey(), string(payload), &ttl)
+	err := redisutil.Set(hbd.dataSource.Network.StatsKey(), string(payload), &ttl)
 	if err != nil {
-		common.Log.Warningf("failed to set network stats on key: %s; %s", sd.dataSource.Network.StatsKey(), err.Error())
+		common.Log.Warningf("failed to set network stats on key: %s; %s", hbd.dataSource.Network.StatsKey(), err.Error())
 	} else {
-		natsutil.NatsPublish(sd.dataSource.Network.StatusKey(), payload)
+		natsutil.NatsPublish(hbd.dataSource.Network.StatusKey(), payload)
 	}
 	return err
 }
@@ -332,18 +348,18 @@ func RequireHistoricalBlockStatsDaemon(network *network.Network) *HistoricalBloc
 // NewNetworkStatsDaemon initializes a new network stats daemon instance using
 // NetworkStatsDataSourceFactory to construct the daemon's its data source
 func NewHistoricalBlockStatsDaemon(lg *logger.Logger, network *network.Network) *HistoricalBlockDaemon {
-	sd := new(HistoricalBlockDaemon)
-	sd.attempt = 0
-	sd.log = lg.Clone()
-	sd.shutdownCtx, sd.cancelF = context.WithCancel(context.Background())
-	sd.queue = make(chan *provide.NetworkStatus, defaultStatsDaemonQueueSize)
+	hbd := new(HistoricalBlockDaemon)
+	hbd.attempt = 0
+	hbd.log = lg.Clone()
+	hbd.shutdownCtx, hbd.cancelF = context.WithCancel(context.Background())
+	hbd.queue = make(chan *provide.NetworkStatus, defaultHistoricalBlockDaemonQueueSize)
 
 	if network.IsEthereumNetwork() {
-		sd.dataSource = EthereumHistoricalBlockDataSourceFactory(network)
+		hbd.dataSource = EthereumHistoricalBlockDataSourceFactory(network)
 	}
 	//sd.handleSignals()
 
-	if sd.dataSource == nil {
+	if hbd.dataSource == nil {
 		return nil
 	}
 
@@ -352,53 +368,53 @@ func NewHistoricalBlockStatsDaemon(lg *logger.Logger, network *network.Network) 
 		_chainID := hexutil.EncodeBig(providecrypto.EVMGetChainID(network.ID.String(), network.RPCURL()))
 		chainID = &_chainID
 	}
-	sd.stats = &provide.NetworkStatus{
+	hbd.stats = &provide.NetworkStatus{
 		ChainID: chainID,
 		Meta:    map[string]interface{}{},
 		State:   common.StringOrNil("configuring"),
 	}
 
-	return sd
+	return hbd
 }
 
 // Run the configured stats daemon instance
-func (sd *HistoricalBlockDaemon) run() error {
+func (hbd *HistoricalBlockDaemon) run() error {
 	go func() {
-		for !sd.shuttingDown() {
-			sd.attempt++
-			common.Log.Debugf("Stepping into main runloop of historical block daemon instance; attempt #%v", sd.attempt)
-			errs := sd.consume()
+		for !hbd.shuttingDown() {
+			hbd.attempt++
+			common.Log.Debugf("Stepping into main runloop of historical block daemon instance; attempt #%v", hbd.attempt)
+			errs := hbd.consume()
 			if len(errs) > 0 {
 				common.Log.Warningf("Configured historical block daemon data source returned %v error(s) while attempting to consume configured data source", len(errs))
-				if sd.backoff == 0 {
-					sd.backoff = 100
+				if hbd.backoff == 0 {
+					hbd.backoff = 100
 				} else {
-					sd.backoff *= 2
+					hbd.backoff *= 2
 				}
-				if sd.backoff > statsDaemonMaximumBackoffMillis {
-					sd.backoff = 0
+				if hbd.backoff > statsDaemonMaximumBackoffMillis {
+					hbd.backoff = 0
 				}
-				time.Sleep(time.Duration(sd.backoff) * time.Millisecond)
-				sd.dataSource.Network.Reload()
+				time.Sleep(time.Duration(hbd.backoff) * time.Millisecond)
+				hbd.dataSource.Network.Reload()
 			}
 		}
 	}()
 
-	err := sd.loop()
+	err := hbd.loop()
 
 	if err == nil {
-		sd.log.Info("Stats daemon exited cleanly")
+		hbd.log.Info("Stats daemon exited cleanly")
 	} else {
-		if !sd.shuttingDown() {
+		if !hbd.shuttingDown() {
 			common.Log.Errorf("Forcing shutdown of historical block daemon due to error; %s", err)
-			sd.shutdown()
+			hbd.shutdown()
 		}
 	}
 
 	return err
 }
 
-func (sd *HistoricalBlockDaemon) handleSignals() {
+func (hbd *HistoricalBlockDaemon) handleSignals() {
 	common.Log.Debug("Installing SIGINT and SIGTERM signal handlers")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -407,20 +423,20 @@ func (sd *HistoricalBlockDaemon) handleSignals() {
 		select {
 		case sig := <-sigs:
 			common.Log.Infof("Received signal: %s", sig)
-			sd.shutdown()
-		case <-sd.shutdownCtx.Done():
+			hbd.shutdown()
+		case <-hbd.shutdownCtx.Done():
 			close(sigs)
 		}
 	}()
 }
 
-func (sd *HistoricalBlockDaemon) shutdown() {
-	if atomic.AddUint32(&sd.closing, 1) == 1 {
-		common.Log.Debugf("Shutting down historical block daemon instance for network: %s", *sd.dataSource.Network.Name)
-		sd.cancelF()
+func (hbd *HistoricalBlockDaemon) shutdown() {
+	if atomic.AddUint32(&hbd.closing, 1) == 1 {
+		common.Log.Debugf("Shutting down historical block daemon instance for network: %s", *hbd.dataSource.Network.Name)
+		hbd.cancelF()
 	}
 }
 
-func (sd *HistoricalBlockDaemon) shuttingDown() bool {
-	return (atomic.LoadUint32(&sd.closing) > 0)
+func (hbd *HistoricalBlockDaemon) shuttingDown() bool {
+	return (atomic.LoadUint32(&hbd.closing) > 0)
 }
