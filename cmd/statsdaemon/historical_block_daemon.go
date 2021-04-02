@@ -116,29 +116,91 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 			// and update the block finalizer5 so it populates the blocks/tx table
 			// block to begin with (must check where the txs come from!)
 
-			type blockData struct {
+			// data type for blocks table
+			type Block struct {
 				providego.Model
 				NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
-				Block     int       `sql:"type:int8" json:"blocknumber"`
-				TxHash    string    `sql:"type:text" json:"transactionhash"`
+				Block     int       `sql:"type:int8" json:"block"`
+				TxHash    string    `sql:"type:text" json:"transaction_hash"`
 			}
 
-			//blocks := []blockData{}
-			block := blockData{}
+			type BlockGap struct {
+				Block         int
+				PreviousBlock int
+			}
 
+			var blockGaps []BlockGap
+
+			var missingBlocks []int
 			db := dbconf.DatabaseConnection()
-			db.First(&block)
-			common.Log.Debugf("block: %+v", block)
-			//let's get block 9951220 for a test
-			blockNumber := fmt.Sprintf("0x%x", 9951220)
-
-			var resp interface{}
-			err = client.Call(&resp, "eth_getBlockByNumber", blockNumber, true)
-			if err != nil {
-				return err
+			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", network.ID).Scan(&blockGaps)
+			common.Log.Debugf("block: %+v", blockGaps)
+			// block gaps is in the structure
+			// block - previousblock, where there is a gap
+			// so we iterate through it to get an array of blockNumbers we're missing
+			for _, blockGap := range blockGaps {
+				endBlock := blockGap.Block - 1
+				startBlock := blockGap.PreviousBlock + 1
+				gap := endBlock - startBlock
+				for looper := 0; looper <= gap; looper++ {
+					missingBlocks = append(missingBlocks, startBlock+looper)
+				}
 			}
-			common.Log.Debugf("got result: %+v", resp)
 
+			//let's get block 9951220 for a test
+			//blockNumber := fmt.Sprintf("0x%x", 9951220)
+
+			for _, missingBlock := range missingBlocks {
+				var resp interface{}
+				blockNumber := fmt.Sprintf("0x%x", missingBlock)
+				err = client.Call(&resp, "eth_getBlockByNumber", blockNumber, true)
+				if err != nil {
+					return err
+				}
+				common.Log.Debugf("got result: %+v", resp)
+				if resultJSON, err := json.Marshal(resp); err == nil {
+					header := &types.Header{}
+					err := json.Unmarshal(resultJSON, header)
+					if err != nil {
+						common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", resp, err.Error())
+					} else if header != nil && header.Number != nil {
+						ch <- &provide.NetworkStatus{
+							Meta: map[string]interface{}{
+								"last_block_header": resp,
+							},
+						}
+					}
+				}
+				// common.Log.Debugf("Received %d-byte message on network stats websocket for network: %s", len(message), *network.Name)
+				// response := &provide.EthereumWebsocketSubscriptionResponse{}
+				// err := json.Unmarshal(message, response)
+				// if err != nil {
+				// 	common.Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
+				// } else {
+				// 	if result, ok := response.Params["result"].(map[string]interface{}); ok {
+				// 		if _, mixHashOk := result["mixHash"]; !mixHashOk {
+				// 			result["mixHash"] = ethcommon.HexToHash("0x")
+				// 		}
+				// 		if _, nonceOk := result["nonce"]; !nonceOk {
+				// 			result["nonce"] = types.EncodeNonce(0)
+				// 		}
+				// 		if resultJSON, err := json.Marshal(result); err == nil {
+				// 			header := &types.Header{}
+				// 			err := json.Unmarshal(resultJSON, header)
+				// 			if err != nil {
+				// 				common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
+				// 			} else if header != nil && header.Number != nil {
+				// 				ch <- &provide.NetworkStatus{
+				// 					Meta: map[string]interface{}{
+				// 						"last_block_header": result,
+				// 					},
+				// 				}
+				// 			}
+				// 		}
+				// 	}
+				// }
+				// ship the result off to NATS
+			}
 			return err
 		},
 	}

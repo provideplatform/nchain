@@ -215,7 +215,7 @@ func generateRopstenConfig() (json.RawMessage, error) {
 		NetworkID:         3,
 		BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
 		JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+		WebsocketUrl:      common.StringOrNil("wss://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),
 		ChainSpec:         &networkChainSpec,

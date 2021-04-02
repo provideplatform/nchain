@@ -13,5 +13,7 @@ ALTER TABLE ONLY public.blocks
 
 CREATE INDEX idx_blocks_network_id ON public.blocks USING btree (network_id);
 
+CREATE INDEX idx_blocks_block ON public.blocks USING btree (block);
+
 ALTER TABLE ONLY public.blocks
     ADD CONSTRAINT blocks_network_id_networks_id_foreign FOREIGN KEY (network_id) REFERENCES public.networks(id) ON UPDATE CASCADE ON DELETE CASCADE;
