@@ -121,7 +121,7 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 				providego.Model
 				NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
 				Block     int       `sql:"type:int8" json:"block"`
-				TxHash    string    `sql:"type:text" json:"transaction_hash"`
+				TxHash    string    `sql:"type:text" json:"transaction_hash"` //FIXME should be block hash
 			}
 
 			type BlockGap struct {
@@ -157,6 +157,7 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 			for _, missingBlock := range missingBlocks {
 				var resp interface{}
 				blockNumber := fmt.Sprintf("0x%x", missingBlock)
+				//TODO use the providego method like Kyle hinted at :)
 				err = client.Call(&resp, "eth_getBlockByNumber", blockNumber, true)
 				if err != nil {
 					return err
