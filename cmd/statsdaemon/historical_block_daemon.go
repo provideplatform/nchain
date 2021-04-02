@@ -131,6 +131,13 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 
 			var blockGaps []BlockGap
 
+			// TODO: check if there's the block in the network table
+			// and if there is, check if that block exists for that network in the blocks table
+			// if it doesn't, just pull that block info from the json rpc
+			// and exit
+			// it can grab the missing blocks (between the network.block table and the other blocks)
+			// if there aren't any gaps, the statsdaemon will start making them... organically :)
+
 			var missingBlocks []int
 			db := dbconf.DatabaseConnection()
 			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", network.ID).Scan(&blockGaps)
@@ -147,9 +154,6 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 				}
 			}
 
-			//let's get block 9951220 for a test
-			//blockNumber := fmt.Sprintf("0x%x", 9951220)
-
 			for _, missingBlock := range missingBlocks {
 				var resp interface{}
 				blockNumber := fmt.Sprintf("0x%x", missingBlock)
@@ -157,7 +161,6 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 				if err != nil {
 					return err
 				}
-				common.Log.Debugf("got result: %+v", resp)
 				if resultJSON, err := json.Marshal(resp); err == nil {
 					header := &types.Header{}
 					err := json.Unmarshal(resultJSON, header)
@@ -171,35 +174,6 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 						}
 					}
 				}
-				// common.Log.Debugf("Received %d-byte message on network stats websocket for network: %s", len(message), *network.Name)
-				// response := &provide.EthereumWebsocketSubscriptionResponse{}
-				// err := json.Unmarshal(message, response)
-				// if err != nil {
-				// 	common.Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
-				// } else {
-				// 	if result, ok := response.Params["result"].(map[string]interface{}); ok {
-				// 		if _, mixHashOk := result["mixHash"]; !mixHashOk {
-				// 			result["mixHash"] = ethcommon.HexToHash("0x")
-				// 		}
-				// 		if _, nonceOk := result["nonce"]; !nonceOk {
-				// 			result["nonce"] = types.EncodeNonce(0)
-				// 		}
-				// 		if resultJSON, err := json.Marshal(result); err == nil {
-				// 			header := &types.Header{}
-				// 			err := json.Unmarshal(resultJSON, header)
-				// 			if err != nil {
-				// 				common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
-				// 			} else if header != nil && header.Number != nil {
-				// 				ch <- &provide.NetworkStatus{
-				// 					Meta: map[string]interface{}{
-				// 						"last_block_header": result,
-				// 					},
-				// 				}
-				// 			}
-				// 		}
-				// 	}
-				// }
-				// ship the result off to NATS
 			}
 			return err
 		},
