@@ -49,7 +49,7 @@ func init() {
 		return
 	}
 
-	util.RequireJWT()
+	util.RequireJWTVerifiers()
 	util.RequireGin()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
