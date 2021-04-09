@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/route53"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	provide "github.com/provideservices/provide-go/api/c2"
 )
 
 // ProviderAWS aws orchestration provider

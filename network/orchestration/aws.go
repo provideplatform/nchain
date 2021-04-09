@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	awswrapper "github.com/kthomas/go-aws-wrapper"
 	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	provide "github.com/provideservices/provide-go/api/c2"
 )
 
 const awsTaskStatusRunning = "running"
