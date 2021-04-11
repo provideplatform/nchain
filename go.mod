@@ -34,7 +34,7 @@ require (
 	github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122
 	github.com/kthomas/go-azure-wrapper v0.0.0-20210409115636-8b71edfc2fcc
 	github.com/kthomas/go-db-config v0.0.0-20200612131637-ec0436a9685e
-	github.com/kthomas/go-logger v0.0.0-20200602072946-d7d72dfc2531
+	github.com/kthomas/go-logger v0.0.0-20210411034702-66a0af9aee2c
 	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05
 	github.com/kthomas/go-pgputil v0.0.0-20200602073402-784e96083943
 	github.com/kthomas/go-redisutil v0.0.0-20200602073431-aa49de17e9ff
@@ -53,7 +53,7 @@ require (
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideservices/provide-go v0.0.0-20210409104111-70ad008e4ae8
+	github.com/provideservices/provide-go v0.0.0-20210411205407-d63ebbe06fb5
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
