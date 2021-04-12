@@ -49,7 +49,7 @@ func init() {
 		return
 	}
 
-	util.RequireJWTVerifiers()
+	util.RequireJWT() // FIXME-- currently, this is still required by contract handlers call to token.VendNatsBearerAuthorization()
 	util.RequireGin()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
