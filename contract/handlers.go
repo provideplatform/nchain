@@ -238,8 +238,8 @@ func createContractSubscriptionTokenHandler(c *gin.Context) {
 	var subject string
 	if appID != nil {
 		subject = fmt.Sprintf("application:%s", appID.String())
-	} else if appID != nil {
-		subject = fmt.Sprintf("organization:%s", appID.String())
+	} else if orgID != nil {
+		subject = fmt.Sprintf("organization:%s", orgID.String())
 	} else if userID != nil {
 		subject = fmt.Sprintf("user:%s", userID.String())
 	}
