@@ -88,8 +88,9 @@ func transactionsListHandler(c *gin.Context) {
 
 func createTransactionHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	if appID == nil && orgID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -108,6 +109,7 @@ func createTransactionHandler(c *gin.Context) {
 	}
 
 	tx.ApplicationID = appID
+	tx.OrganizationID = orgID
 	tx.UserID = userID
 
 	db := dbconf.DatabaseConnection()

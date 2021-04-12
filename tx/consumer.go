@@ -205,15 +205,16 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 
 	tx := &Transaction{
-		ApplicationID: contract.ApplicationID,
-		Data:          common.StringOrNil(data),
-		NetworkID:     contract.NetworkID,
-		AccountID:     accountID,
-		WalletID:      walletID,
-		Path:          common.StringOrNil(hdDerivationPath),
-		To:            nil,
-		Value:         &TxValue{value: big.NewInt(int64(value.(float64)))},
-		PublishedAt:   &publishedAtTime,
+		ApplicationID:  contract.ApplicationID,
+		OrganizationID: contract.OrganizationID,
+		Data:           common.StringOrNil(data),
+		NetworkID:      contract.NetworkID,
+		AccountID:      accountID,
+		WalletID:       walletID,
+		Path:           common.StringOrNil(hdDerivationPath),
+		To:             nil,
+		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
+		PublishedAt:    &publishedAtTime,
 	}
 	tx.setParams(txParams)
 
@@ -439,16 +440,17 @@ func txCreatefunc(tx *Transaction, c *contract.Contract, n *network.Network, acc
 	value := execution.Value
 
 	tx = &Transaction{
-		ApplicationID: c.ApplicationID,
-		UserID:        nil,
-		NetworkID:     c.NetworkID,
-		AccountID:     accountID,
-		WalletID:      walletID,
-		Path:          hdDerivationPath,
-		To:            c.Address,
-		Value:         &TxValue{value: value},
-		Params:        _txParamsJSON,
-		Ref:           ref,
+		ApplicationID:  c.ApplicationID,
+		OrganizationID: c.OrganizationID,
+		UserID:         nil,
+		NetworkID:      c.NetworkID,
+		AccountID:      accountID,
+		WalletID:       walletID,
+		Path:           hdDerivationPath,
+		To:             c.Address,
+		Value:          &TxValue{value: value},
+		Params:         _txParamsJSON,
+		Ref:            ref,
 	}
 
 	if publishedAt != nil {
