@@ -31,8 +31,9 @@ func InstallTransactionsAPI(r *gin.Engine) {
 
 func transactionsListHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	if appID == nil && orgID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -40,6 +41,8 @@ func transactionsListHandler(c *gin.Context) {
 	var query *gorm.DB
 	if appID != nil {
 		query = dbconf.DatabaseConnection().Where("transactions.application_id = ?", appID)
+	} else if orgID != nil {
+		query = dbconf.DatabaseConnection().Where("transactions.organization_id = ?", orgID)
 	} else if userID != nil {
 		query = dbconf.DatabaseConnection().Where("transactions.user_id = ?", userID)
 	}
@@ -125,8 +128,9 @@ func createTransactionHandler(c *gin.Context) {
 
 func transactionDetailsHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
 	userID := util.AuthorizedSubjectID(c, "user")
-	if appID == nil && userID == nil {
+	if appID == nil && orgID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -144,6 +148,11 @@ func transactionDetailsHandler(c *gin.Context) {
 	}
 
 	if appID != nil && (tx.ApplicationID == nil || *tx.ApplicationID != *appID) {
+		provide.RenderError("forbidden", 403, c)
+		return
+	}
+
+	if orgID != nil && (tx.OrganizationID == nil || *tx.OrganizationID != *orgID) {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -353,9 +362,9 @@ func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[
 
 func contractExecutionHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
-	userID := util.AuthorizedSubjectID(c, "user")
 	orgID := util.AuthorizedSubjectID(c, "organization")
-	if appID == nil && userID == nil && orgID == nil {
+	userID := util.AuthorizedSubjectID(c, "user")
+	if appID == nil && orgID == nil && userID == nil {
 		provide.RenderError("unauthorized", 401, c)
 		return
 	}
@@ -532,7 +541,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 func invokeTxFilters(applicationID *uuid.UUID, payload []byte, db *gorm.DB) *float64 {
 	if applicationID == nil {
-		common.Log.Warningf("Tx filters are not currently supported for transactions outside of the scope of an application context")
+		common.Log.Warningf("tx filters are not currently supported for transactions outside of the scope of an application context")
 		return nil
 	}
 
