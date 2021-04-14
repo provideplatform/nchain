@@ -188,5 +188,6 @@ PUl1cxrvY7BHh4obNa6Bf8ECAwEAAQ==
 -e DATABASE_NAME=nchain_dev \
 -e DATABASE_HOST=docker.for.mac.localhost \
 -e LOG_LEVEL=DEBUG \
+-e SYSLOG_ENDPOINT=${SYSLOG_ENDPOINT} \
 --entrypoint ./bin/nchain_consumer \
 provide/nchain
