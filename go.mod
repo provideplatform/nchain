@@ -48,7 +48,6 @@ require (
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
 	github.com/provideservices/provide-go v0.0.0-20210419154511-f2fbc78846fc
-	//github.com/provideservices/provide-go v0.0.0-20210417082846-8ed6b3333d26
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	go.mongodb.org/mongo-driver v1.3.3

@@ -11,6 +11,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/nchain/common"
+	providego "github.com/provideservices/provide-go/api"
 	provide "github.com/provideservices/provide-go/crypto"
 )
 
@@ -155,6 +156,25 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 					} else if result, resultOk := block.Result.(map[string]interface{}); resultOk {
 						blockTimestamp := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
 						finalizedAt := time.Now()
+
+						//XXX HACK sort this out properly...
+						type Block struct {
+							providego.Model
+							NetworkID       uuid.UUID `sql:"type:uuid" json:"network_id"`
+							Block           int       `sql:"type:int8" json:"block"`
+							TransactionHash string    `sql:"type:text" json:"transaction_hash"` // FIXME: should be blockhash
+						}
+
+						// save the finalized block to the db
+						var minedBlock Block
+						minedBlock.NetworkID = network.ID
+						minedBlock.Block = int(blockFinalizedMsg.Block)
+						minedBlock.TransactionHash = *blockFinalizedMsg.BlockHash
+						dbResult := db.Create(&minedBlock)
+						if dbResult.RowsAffected < 1 {
+							common.Log.Debugf("error saving block to db. Error: %s", dbResult.Error)
+						}
+						// XXX END OF HACK
 
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
 							for _, _tx := range txs {
