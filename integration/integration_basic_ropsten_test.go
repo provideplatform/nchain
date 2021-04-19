@@ -14,7 +14,7 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func TestContractHDWallet(t *testing.T) {
+func TestContractHDWalletRopsten(t *testing.T) {
 
 	t.Parallel()
 

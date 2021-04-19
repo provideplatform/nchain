@@ -19,8 +19,8 @@ var ropstenNetworkName string = "ropsten"
 var rinkebyNetworkID string = "07102258-5e49-480e-86af-6d0c3260827d"
 var rinkebyNetworkName string = "rinkeby"
 
-var goerliNetworkID string = "1b16996e-3595-4985-816c-043345d22f8c"
-var goerliNetworkName string = "gorli"
+var gorliNetworkID string = "1b16996e-3595-4985-816c-043345d22f8c"
+var gorliNetworkName string = "gorli"
 
 var kovanNetworkID string = "8d31bf48-df6b-4a71-9d7c-3cb291111e27"
 var kovanNetworkName string = "kovan"
@@ -103,7 +103,7 @@ func init() {
 		common.Log.Warningf("error enabling kovan: Error: %s", err.Error())
 	}
 
-	_, err = enableNetwork(goerliNetworkName, goerliNetworkID)
+	_, err = enableNetwork(gorliNetworkName, gorliNetworkID)
 	if err != nil {
 		common.Log.Warningf("error enabling gorli: Error: %s", err.Error())
 	}
@@ -143,7 +143,7 @@ func enableNetwork(networkName, networkID string) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("error generating kovan config. Error: %s", err.Error())
 		}
-	case goerliNetworkID:
+	case gorliNetworkID:
 		networkConfig, err = generateGorliConfig()
 		if err != nil {
 			return false, fmt.Errorf("error generating gorli config. Error: %s", err.Error())

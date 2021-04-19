@@ -14,7 +14,7 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func TestContractHDWallet(t *testing.T) {
+func TestContractHDWalletGorli(t *testing.T) {
 
 	t.Parallel()
 
@@ -87,8 +87,8 @@ func TestContractHDWallet(t *testing.T) {
 		walletID       string
 		artifact       nchain.CompiledArtifact
 	}{
-		{goerliNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
-		{goerliNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
+		{gorliNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{gorliNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
 	}
 
 	for _, tc := range tt {

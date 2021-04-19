@@ -3,11 +3,14 @@ module github.com/provideapp/nchain
 go 1.13
 
 require (
+	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
+	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/FactomProject/go-bip32 v0.3.5
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/cespare/cp v1.1.1 // indirect
+	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/deckarep/golang-set v1.7.2-0.20180927150649-699df6a3acf6 // indirect
 	github.com/ethereum/go-ethereum v1.9.22
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
@@ -25,7 +28,7 @@ require (
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
 	github.com/kthomas/go-db-config v0.0.0-20200612131637-ec0436a9685e
-	github.com/kthomas/go-logger v0.0.0-20200602072946-d7d72dfc2531
+	github.com/kthomas/go-logger v0.0.0-20210411034702-66a0af9aee2c
 	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05
 	github.com/kthomas/go-pgputil v0.0.0-20200602073402-784e96083943
 	github.com/kthomas/go-redisutil v0.0.0-20200602073431-aa49de17e9ff
@@ -44,11 +47,12 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideservices/provide-go v0.0.0-20210323165848-e60d526cb4eb
+	github.com/provideservices/provide-go v0.0.0-20210419154511-f2fbc78846fc
+	//github.com/provideservices/provide-go v0.0.0-20210417082846-8ed6b3333d26
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
-	github.com/stretchr/testify v1.5.1 // indirect
 	go.mongodb.org/mongo-driver v1.3.3
+	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
 replace github.com/provideapp/ident => ../ident

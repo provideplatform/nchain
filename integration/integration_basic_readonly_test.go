@@ -12,7 +12,7 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func TestContractHDWallet(t *testing.T) {
+func TestContractHDWalletReadOnly(t *testing.T) {
 
 	t.Parallel()
 
@@ -83,32 +83,6 @@ func TestContractHDWallet(t *testing.T) {
 	}
 
 	t.Logf("contract returned: %+v", contract)
-	// // this path produces the ETH address 0x6af845bae76f5cc16bc93f86b83e8928c3dfda19
-	// path := `m/44'/60'/2'/0/0`
-
-	// load the ekho compiled artifact
-	// ekhoArtifact, err := ioutil.ReadFile("artifacts/ekho.json")
-	// if err != nil {
-	// 	t.Errorf("error loading ekho artifact. Error: %s", err.Error())
-	// }
-
-	// ekhoCompiledArtifact := nchain.CompiledArtifact{}
-	// err = json.Unmarshal(ekhoArtifact, &ekhoCompiledArtifact)
-	// if err != nil {
-	// 	t.Errorf("error converting ekho compiled artifact. Error: %s", err.Error())
-	// }
-
-	// // load the readwrite compiled artifact
-	// rwArtifact, err := ioutil.ReadFile("artifacts/readwritetester.json")
-	// if err != nil {
-	// 	t.Errorf("error loading readwritetester artifact. Error: %s", err.Error())
-	// }
-
-	// rwCompiledArtifact := nchain.CompiledArtifact{}
-	// err = json.Unmarshal(rwArtifact, &rwCompiledArtifact)
-	// if err != nil {
-	// 	t.Errorf("error converting readwritetester compiled artifact. Error: %s", err.Error())
-	// }
 
 	tt := []struct {
 		network string
@@ -120,8 +94,6 @@ func TestContractHDWallet(t *testing.T) {
 		contract       string
 		expectedResult interface{}
 	}{
-		//{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact, "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7"},
-		//{rinkebyNetworkID, "readwrite", "getString", "0x5eBe7A42E3496Ed044F9f95A876C8703831598d7", "NfGshn0Uc52U2IDqkfKnhf8yQaRT60lPpkm2xxVRASKWdaXwjx5BBtd3oMUXvJiDRpW4Kw4Xt92mdZ7BTeIQRZ3GA9HfjLPKIZD4Xw2yX1eLUpC7lM1KiI"},
 		{rinkebyNetworkID, "erc20", "symbol", contractAddress, "MONEH"},
 		{rinkebyNetworkID, "erc20", "name", contractAddress, "MONEH test token"},
 		{rinkebyNetworkID, "erc20", "totalSupply", contractAddress, 1e+06},

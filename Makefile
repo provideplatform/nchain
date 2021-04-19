@@ -117,7 +117,7 @@ statsdaemon_up:
 	docker kill nchain-consumer
 
 statsdaemon_down:	
-  docker-compose -f ./ops/docker-compose-integration.yml down
+	docker-compose -f ./ops/docker-compose-integration.yml down
 	docker volume rm ops_provide-db
 
 statsdaemon_bounce:
@@ -127,3 +127,5 @@ statsdaemon_bounce:
 	docker kill statsdaemon
 	docker kill nchain
 	docker kill nchain-consumer	
+
+
