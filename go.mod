@@ -7,6 +7,7 @@ require (
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/FactomProject/go-bip32 v0.3.5
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
+	github.com/aws/aws-sdk-go v1.31.8
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/cespare/cp v1.1.1 // indirect
@@ -27,6 +28,8 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/kthomas/go-aws-config v0.0.0-20200121043457-1931a324f423
+	github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122
+	github.com/kthomas/go-azure-wrapper v0.0.0-20210409115636-8b71edfc2fcc
 	github.com/kthomas/go-db-config v0.0.0-20200612131637-ec0436a9685e
 	github.com/kthomas/go-logger v0.0.0-20210411034702-66a0af9aee2c
 	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05

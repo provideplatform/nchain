@@ -199,15 +199,16 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 
 	tx := &Transaction{
-		ApplicationID: contract.ApplicationID,
-		Data:          common.StringOrNil(data),
-		NetworkID:     contract.NetworkID,
-		AccountID:     accountID,
-		WalletID:      walletID,
-		Path:          common.StringOrNil(hdDerivationPath),
-		To:            nil,
-		Value:         &TxValue{value: big.NewInt(int64(value.(float64)))},
-		PublishedAt:   &publishedAtTime,
+		ApplicationID:  contract.ApplicationID,
+		OrganizationID: contract.OrganizationID,
+		Data:           common.StringOrNil(data),
+		NetworkID:      contract.NetworkID,
+		AccountID:      accountID,
+		WalletID:       walletID,
+		Path:           common.StringOrNil(hdDerivationPath),
+		To:             nil,
+		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
+		PublishedAt:    &publishedAtTime,
 	}
 	tx.setParams(txParams)
 

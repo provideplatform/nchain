@@ -16,6 +16,7 @@ import (
 type Token struct {
 	provide.Model
 	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"application_id"`
+	OrganizationID *uuid.UUID `sql:"type:uuid" json:"organization_id"`
 	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	ContractID     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
 	SaleContractID *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`

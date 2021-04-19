@@ -47,9 +47,10 @@ type Transaction struct {
 	provide.Model
 	NetworkID uuid.UUID `sql:"not null;type:uuid" json:"network_id,omitempty"`
 
-	// Application or user id, if populated, is the entity for which the transaction was custodially signed and broadcast
-	ApplicationID *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
-	UserID        *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
+	// Application, organization or user id, if populated, is the entity for which the transaction was custodially signed and broadcast
+	ApplicationID  *uuid.UUID `sql:"type:uuid" json:"application_id,omitempty"`
+	OrganizationID *uuid.UUID `sql:"type:uuid" json:"organization_id,omitempty"`
+	UserID         *uuid.UUID `sql:"type:uuid" json:"user_id,omitempty"`
 
 	// Account or HD wallet which custodially signed the transaction; when an HD wallet is used, if no HD derivation path is provided,
 	// the most recently derived non-zero account is used to sign
@@ -577,9 +578,21 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("only an application OR user identifier should be provided"),
 		})
+	} else if t.OrganizationID != nil && t.UserID != nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil("only an organization OR user identifier should be provided"),
+		})
+	} else if t.ApplicationID != nil && t.OrganizationID != nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil("only an application OR organization identifier should be provided"),
+		})
 	} else if t.ApplicationID != nil && wal != nil && wal.ApplicationID != nil && *t.ApplicationID != *wal.ApplicationID {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("unable to sign tx due to mismatched signing application"),
+		})
+	} else if t.OrganizationID != nil && wal != nil && wal.OrganizationID != nil && *t.OrganizationID != *wal.OrganizationID {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil("unable to sign tx due to mismatched signing organization"),
 		})
 	} else if t.UserID != nil && wal != nil && wal.UserID != nil && *t.UserID != *wal.UserID {
 		t.Errors = append(t.Errors, &provide.Error{
@@ -590,7 +603,7 @@ func (t *Transaction) Validate() bool {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("unable to broadcast tx on unspecified network"),
 		})
-	} else if wal != nil && t.ApplicationID != nil && wal.NetworkID != nil && t.NetworkID != *wal.NetworkID {
+	} else if wal != nil && (t.ApplicationID != nil || t.OrganizationID != nil) && wal.NetworkID != nil && t.NetworkID != *wal.NetworkID {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil("Transaction network did not match wallet network in application context"),
 		})
@@ -868,13 +881,14 @@ func (t *Transaction) handleTxReceipt(
 			common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 			tok = &token.Token{
-				ApplicationID: c.ApplicationID,
-				NetworkID:     c.NetworkID,
-				ContractID:    &c.ID,
-				Name:          common.StringOrNil(name),
-				Symbol:        common.StringOrNil(symbol),
-				Decimals:      decimals.Uint64(),
-				Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
+				ApplicationID:  c.ApplicationID,
+				OrganizationID: c.OrganizationID,
+				NetworkID:      c.NetworkID,
+				ContractID:     &c.ID,
+				Name:           common.StringOrNil(name),
+				Symbol:         common.StringOrNil(symbol),
+				Decimals:       decimals.Uint64(),
+				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
 			}
 
 			createdToken = tok.Create()
@@ -886,12 +900,13 @@ func (t *Transaction) handleTxReceipt(
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)
 		if kontract == nil || kontract.ID == uuid.Nil {
 			kontract = &contract.Contract{
-				ApplicationID: t.ApplicationID,
-				NetworkID:     t.NetworkID,
-				TransactionID: &t.ID,
-				Name:          common.StringOrNil(contractName),
-				Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
-				Params:        t.Params,
+				ApplicationID:  t.ApplicationID,
+				OrganizationID: t.OrganizationID,
+				NetworkID:      t.NetworkID,
+				TransactionID:  &t.ID,
+				Name:           common.StringOrNil(contractName),
+				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+				Params:         t.Params,
 			}
 			if kontract.Create() {
 				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
@@ -956,13 +971,14 @@ func (t *Transaction) handleTxTraces(
 						rawParams := json.RawMessage(params)
 
 						internalContract := &contract.Contract{
-							ApplicationID: t.ApplicationID,
-							NetworkID:     t.NetworkID,
-							ContractID:    &kontract.ID,
-							TransactionID: &t.ID,
-							Name:          common.StringOrNil(dep.Name),
-							Address:       contractAddr,
-							Params:        &rawParams,
+							ApplicationID:  t.ApplicationID,
+							OrganizationID: t.OrganizationID,
+							NetworkID:      t.NetworkID,
+							ContractID:     &kontract.ID,
+							TransactionID:  &t.ID,
+							Name:           common.StringOrNil(dep.Name),
+							Address:        contractAddr,
+							Params:         &rawParams,
 						}
 
 						if internalContract.Create() {
@@ -972,13 +988,14 @@ func (t *Transaction) handleTxTraces(
 									common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 									tok := &token.Token{
-										ApplicationID: c.ApplicationID,
-										NetworkID:     c.NetworkID,
-										ContractID:    &c.ID,
-										Name:          common.StringOrNil(name),
-										Symbol:        common.StringOrNil(symbol),
-										Decimals:      decimals.Uint64(),
-										Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
+										ApplicationID:  c.ApplicationID,
+										OrganizationID: c.OrganizationID,
+										NetworkID:      c.NetworkID,
+										ContractID:     &c.ID,
+										Name:           common.StringOrNil(name),
+										Symbol:         common.StringOrNil(symbol),
+										Decimals:       decimals.Uint64(),
+										Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
 									}
 
 									createdToken = tok.Create()
