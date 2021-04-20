@@ -19,8 +19,8 @@ var ropstenNetworkName string = "ropsten"
 var rinkebyNetworkID string = "07102258-5e49-480e-86af-6d0c3260827d"
 var rinkebyNetworkName string = "rinkeby"
 
-var gorliNetworkID string = "1b16996e-3595-4985-816c-043345d22f8c"
-var gorliNetworkName string = "gorli"
+var goerliNetworkID string = "1b16996e-3595-4985-816c-043345d22f8c"
+var goerliNetworkName string = "goerli"
 
 var kovanNetworkID string = "8d31bf48-df6b-4a71-9d7c-3cb291111e27"
 var kovanNetworkName string = "kovan"
@@ -103,9 +103,9 @@ func init() {
 		common.Log.Warningf("error enabling kovan: Error: %s", err.Error())
 	}
 
-	_, err = enableNetwork(gorliNetworkName, gorliNetworkID)
+	_, err = enableNetwork(goerliNetworkName, goerliNetworkID)
 	if err != nil {
-		common.Log.Warningf("error enabling gorli: Error: %s", err.Error())
+		common.Log.Warningf("error enabling goerli: Error: %s", err.Error())
 	}
 }
 
@@ -143,10 +143,10 @@ func enableNetwork(networkName, networkID string) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("error generating kovan config. Error: %s", err.Error())
 		}
-	case gorliNetworkID:
-		networkConfig, err = generateGorliConfig()
+	case goerliNetworkID:
+		networkConfig, err = generateGoerliConfig()
 		if err != nil {
-			return false, fmt.Errorf("error generating gorli config. Error: %s", err.Error())
+			return false, fmt.Errorf("error generating goerli config. Error: %s", err.Error())
 		}
 	}
 
@@ -338,10 +338,10 @@ func generateKovanConfig() (json.RawMessage, error) {
 	return config, nil
 }
 
-//gorli
+//goerli
 //{"block_explorer_url":"https://goerli.etherscan.io","engine_id":"clique","is_ethereum_network":true,"native_currency":"ETH","network_id":5,"platform":"evm","protocol_id":"poa","websocket_url":"wss://goerli.infura.io/ws/v3/561dda3e54c54188934d2ab95b1910e8","json_rpc_url":"https://goerli.infura.io/v3/561dda3e54c54188934d2ab95b1910e8","security":{"egress":"*","ingress":{"0.0.0.0/0":{"tcp":[8545,8546,8547,30303],"udp":[30303]}}}}
 
-func generateGorliConfig() (json.RawMessage, error) {
+func generateGoerliConfig() (json.RawMessage, error) {
 	networkSpecConfig := chainSpecConfig{
 		HomesteadBlock:      0,
 		Eip150Block:         0,

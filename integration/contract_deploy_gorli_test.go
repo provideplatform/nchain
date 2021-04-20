@@ -12,7 +12,7 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func TestDeployEkhoContractGorli(t *testing.T) {
+func TestDeployEkhoContractGoerli(t *testing.T) {
 	t.Parallel()
 
 	testId, err := uuid.NewV4()
@@ -42,9 +42,9 @@ func TestDeployEkhoContractGorli(t *testing.T) {
 		return
 	}
 
-	// create the account for that user, for the Gorli network
+	// create the account for that user, for the Goerli network
 	account, err := nchain.CreateAccount(*appToken.Token, map[string]interface{}{
-		"network_id":     gorliNetworkID,
+		"network_id":     goerliNetworkID,
 		"application_id": app.ID,
 	})
 
@@ -65,7 +65,7 @@ func TestDeployEkhoContractGorli(t *testing.T) {
 		json.Unmarshal([]byte(tc.parameter), &params)
 
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
-			"network_id":     gorliNetworkID,
+			"network_id":     goerliNetworkID,
 			"application_id": app.ID.String(),
 			"account_id":     account.ID.String(),
 			"name":           "Ekho",
@@ -102,7 +102,7 @@ func TestDeployEkhoContractGorli(t *testing.T) {
 	}
 }
 
-func TestDeployContractsGorli(t *testing.T) {
+func TestDeployContractsGoerli(t *testing.T) {
 	t.Parallel()
 	testId, err := uuid.NewV4()
 	if err != nil {
@@ -135,9 +135,9 @@ func TestDeployContractsGorli(t *testing.T) {
 		return
 	}
 
-	// create the account for that user, for the Gorli network
+	// create the account for that user, for the Goerli network
 	account, err := nchain.CreateAccount(*appToken.Token, map[string]interface{}{
-		"network_id":     gorliNetworkID,
+		"network_id":     goerliNetworkID,
 		"application_id": app.ID,
 	})
 
@@ -162,7 +162,7 @@ func TestDeployContractsGorli(t *testing.T) {
 		json.Unmarshal([]byte(tc.parameter), &params)
 
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
-			"network_id":     gorliNetworkID,
+			"network_id":     goerliNetworkID,
 			"application_id": app.ID.String(),
 			"account_id":     account.ID.String(),
 			"name":           "Ekho",

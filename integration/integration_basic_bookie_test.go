@@ -71,10 +71,10 @@ func TestContractWalletNoDerivationPath(t *testing.T) {
 		walletID string
 		artifact nchain.CompiledArtifact
 	}{
-		{rinkebyNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
-		{ropstenNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
+		//{rinkebyNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
+		//{ropstenNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
 		{kovanNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact},
-		{gorliNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact}, // note: goerli network has provide-go bug, likely present in bookie as well
+		//{goerliNetworkID, "ekho", wallet.ID.String(), ekhoCompiledArtifact}, // note: goerli network has provide-go bug, likely present in bookie as well
 	}
 
 	for _, tc := range tt {
@@ -229,10 +229,10 @@ func TestContractWallet(t *testing.T) {
 		walletID       string
 		artifact       nchain.CompiledArtifact
 	}{
-		{rinkebyNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
-		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		//{rinkebyNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		//{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
-		{gorliNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact}, // note: goerli network has provide-go bug, likely present in bookie as well
+		//{goerliNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact}, // note: goerli network has provide-go bug, likely present in bookie as well
 	}
 
 	for _, tc := range tt {
@@ -375,10 +375,10 @@ func TestContractAccount(t *testing.T) {
 		name     string
 		artifact nchain.CompiledArtifact
 	}{
-		{rinkebyNetworkID, "ekho", ekhoCompiledArtifact},
-		{ropstenNetworkID, "ekho", ekhoCompiledArtifact},
+		//{rinkebyNetworkID, "ekho", ekhoCompiledArtifact},
+		//{ropstenNetworkID, "ekho", ekhoCompiledArtifact},
 		{kovanNetworkID, "ekho", ekhoCompiledArtifact},
-		{gorliNetworkID, "ekho", ekhoCompiledArtifact}, // note: goerli network has provide-go bug, likely present in bookie as well
+		//{goerliNetworkID, "ekho", ekhoCompiledArtifact}, // note: goerli network has provide-go bug, likely present in bookie as well
 	}
 
 	for _, tc := range tt {
