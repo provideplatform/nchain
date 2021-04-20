@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/connector"
@@ -48,11 +49,16 @@ func init() {
 		common.Log.Panicf("dedicated API instance started with CONSUME_NATS_STREAMING_SUBSCRIPTIONS=true")
 		return
 	}
+	godotenv.Load()
 
 	util.RequireJWT() // FIXME-- currently, this is still required by contract handlers call to token.VendNatsBearerAuthorization()
 	util.RequireGin()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
+
+	common.RequireInfrastructureSupport()
+	common.RequirePayments()
+	common.RequireVault()
 
 	identcommon.EnableAPIAccounting()
 	filter.CacheTxFilters()

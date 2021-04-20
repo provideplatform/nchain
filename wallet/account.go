@@ -129,6 +129,10 @@ func (a *Account) generate(db *gorm.DB) error {
 
 // GetNetwork - retrieve the associated network
 func (a *Account) GetNetwork() (*network.Network, error) {
+	if a.NetworkID == nil {
+		return nil, fmt.Errorf("failed to retrieve associated network for account: %s", a.ID)
+	}
+
 	db := dbconf.DatabaseConnection()
 	var network = &network.Network{}
 	db.Model(a).Related(&network)

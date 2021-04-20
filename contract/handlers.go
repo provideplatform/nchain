@@ -24,6 +24,63 @@ func InstallContractsAPI(r *gin.Engine) {
 
 	r.GET("/api/v1/networks/:id/contracts", networkContractsListHandler)
 	r.GET("/api/v1/networks/:id/contracts/:contractId", networkContractDetailsHandler)
+	r.POST("/api/v1/public/contracts", createPublicContractHandler)
+}
+
+// createPublicContractHandler creates an instance of a publicly deployed contract
+// so the nchain user can interact with it without deploying it
+func createPublicContractHandler(c *gin.Context) {
+	appID := util.AuthorizedSubjectID(c, "application")
+	userID := util.AuthorizedSubjectID(c, "user")
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	if appID == nil && userID == nil && orgID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	contract := &Contract{}
+	err = json.Unmarshal(buf, contract)
+	if err != nil {
+		provide.RenderError(err.Error(), 422, c)
+		return
+	}
+
+	// we must have a contract address
+	// we'll assume it's the actual address
+	if contract.Address == nil {
+		provide.RenderError("contract address not provided", 400, c)
+		return
+	}
+	// hack - let's leave the contract available to all who want to access it by address
+	// although my preference would be that any org/app who want to access it,
+	// access their own instance of the contract - so there's some compartmentalization going on
+	contract.ApplicationID = appID
+	contract.OrganizationID = orgID
+
+	params := contract.ParseParams()
+	if contract.Name == nil {
+		if constructor, constructorOk := params["constructor"].(string); constructorOk {
+			contract.Name = &constructor
+		} else if name, nameOk := params["name"].(string); nameOk {
+			contract.Name = &name
+		}
+	}
+
+	if contract.Save() {
+		provide.Render(contract, 201, c)
+
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = contract.Errors
+		provide.Render(obj, 422, c)
+		return
+	}
 }
 
 func contractsListHandler(c *gin.Context) {
@@ -165,13 +222,16 @@ func createContractHandler(c *gin.Context) {
 
 		if rawSourceOk {
 			provide.Render(contract, 202, c)
+			return
 		} else {
 			provide.Render(contract, 201, c)
+			return
 		}
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = contract.Errors
 		provide.Render(obj, 422, c)
+		return
 	}
 }
 

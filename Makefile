@@ -58,9 +58,81 @@ stop_local:
 	./ops/stop_local.sh
 
 test: build
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
+	#NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_unit_tests.sh
 
-integration: build
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_local_dependencies.sh
-	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+# integration_ropsten:
+# 	LOCAL_TAGS=ropsten NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+# integration_rinkeby:
+# 	LOCAL_TAGS=rinkeby NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+# integration_kovan:
+# 	LOCAL_TAGS=kovan NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+# integration_goerli:
+# 	LOCAL_TAGS=goerli NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
+
+integration:
+	LOCAL_TAGS=integration NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh\
+
+integration_nchain_short:
+	LOCAL_TAGS=nchain NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_ropsten_short:
+	LOCAL_TAGS=ropsten NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_rinkeby_short:
+	LOCAL_TAGS=rinkeby NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_kovan_short:
+	LOCAL_TAGS=kovan NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_goerli_short:
+	LOCAL_TAGS=goerli NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_goerli_short:
+	LOCAL_TAGS=goerli NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_readonly:
+	LOCAL_TAGS=readonly NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+integration_bookie:
+	LOCAL_TAGS=bookie NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
+debug:
+	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
+
+nobookie_up:
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill nchain
+	docker kill nchain-consumer
+
+nobookie_down:
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+
+nobookie_bounce:
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill nchain
+	docker kill nchain-consumer	
+
+statsdaemon_up:
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill statsdaemon
+
+statsdaemon_down:	
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+
+statsdaemon_bounce:
+	docker-compose -f ./ops/docker-compose-integration.yml down
+	docker volume rm ops_provide-db
+	docker-compose -f ./ops/docker-compose-integration.yml up -d
+	docker kill statsdaemon
+	docker kill nchain
+	docker kill nchain-consumer	
+
+

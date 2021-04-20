@@ -16,7 +16,6 @@ import (
 
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/connector"
-	"github.com/provideapp/nchain/network"
 )
 
 const runloopTickerInterval = 5 * time.Second
@@ -29,8 +28,7 @@ var (
 
 	mutex sync.Mutex
 
-	connectors    []*connector.Connector
-	loadBalancers []*network.LoadBalancer
+	connectors []*connector.Connector
 )
 
 func init() {
@@ -50,7 +48,6 @@ func main() {
 	shutdownCtx, cancelF = context.WithCancel(context.Background())
 
 	requireConnectorReachabilityDaemonInstances()
-	requireLoadBalancerReachabilityDaemonInstances()
 
 	common.Log.Debugf("Running reachabilitydaemon main()")
 	timer := time.NewTicker(runloopTickerInterval)
@@ -132,89 +129,6 @@ func requireConnectorReachabilityDaemonInstances() {
 					reachable:   reachableFn,
 					unreachable: unreachableFn,
 				})
-			}
-		}
-	}
-}
-
-func requireLoadBalancerReachabilityDaemonInstances() {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	db := dbconf.DatabaseConnection()
-
-	loadBalancers = make([]*network.LoadBalancer, 0)
-	db.Find(&loadBalancers)
-
-	for _, lb := range loadBalancers {
-		if lb.Host != nil {
-			var tcpPorts []interface{}
-			var udpPorts []interface{}
-
-			cfg := lb.ParseConfig()
-			if security, securityOk := cfg["security"].(map[string]interface{}); securityOk {
-				if ingress, ingressOk := security["ingress"]; ingressOk {
-					switch ingress.(type) {
-					case map[string]interface{}:
-						ingressCfg := ingress.(map[string]interface{})
-						for cidr := range ingressCfg {
-							if ports, portsOk := ingressCfg[cidr].(map[string]interface{})["tcp"].([]interface{}); portsOk {
-								tcpPorts = ports
-							}
-							if ports, portsOk := ingressCfg[cidr].(map[string]interface{})["udp"].([]interface{}); portsOk {
-								udpPorts = ports
-							}
-						}
-					}
-				}
-			}
-
-			reachableFn := func() {
-				lb.UpdateStatus(db, "active", nil)
-			}
-
-			unreachableFn := func() {
-				lb.Reload(db)
-
-				if lb.Status != nil && *lb.Status == "deprovisioning" && lb.Host != nil {
-					for i := range tcpPorts {
-						EvictReachabilityDaemon(&endpoint{
-							network: "tcp",
-							addr:    fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
-						})
-					}
-
-					for i := range udpPorts {
-						EvictReachabilityDaemon(&endpoint{
-							network: "udp",
-							addr:    fmt.Sprintf("%s:%v", *lb.Host, udpPorts[i]),
-						})
-					}
-				} else {
-					lb.UpdateStatus(db, "unreachable", nil)
-				}
-			}
-
-			for i := range tcpPorts {
-				if lb.Host != nil {
-					RequireReachabilityDaemon(&endpoint{
-						network:     "tcp",
-						addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
-						reachable:   reachableFn,
-						unreachable: unreachableFn,
-					})
-				}
-			}
-
-			for i := range udpPorts {
-				if lb.Host != nil {
-					RequireReachabilityDaemon(&endpoint{
-						network:     "tcp",
-						addr:        fmt.Sprintf("%s:%v", *lb.Host, tcpPorts[i]),
-						reachable:   reachableFn,
-						unreachable: unreachableFn,
-					})
-				}
 			}
 		}
 	}

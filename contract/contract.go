@@ -56,6 +56,7 @@ func (c *Contract) enrich() {
 func (c *Contract) CompiledArtifact() *api.CompiledArtifact {
 	artifact := &api.CompiledArtifact{}
 	params := c.ParseParams()
+
 	if params != nil {
 		if compiledArtifact, compiledArtifactOk := params["compiled_artifact"].(map[string]interface{}); compiledArtifactOk {
 			compiledArtifactJSON, _ := json.Marshal(compiledArtifact)
@@ -224,6 +225,31 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 	return dependencyArtifact
 }
 
+// persist a contract without deploying it to the network
+func (c *Contract) Save() bool {
+	db := dbconf.DatabaseConnection()
+
+	if !c.Validate() {
+		return false
+	}
+
+	if db.NewRecord(c) {
+		result := db.Create(&c)
+		rowsAffected := result.RowsAffected
+		errors := result.GetErrors()
+		if len(errors) > 0 {
+			for _, err := range errors {
+				c.Errors = append(c.Errors, &provide.Error{
+					Message: common.StringOrNil(err.Error()),
+				})
+			}
+		}
+		success := rowsAffected > 0
+		return success
+	}
+	return false
+}
+
 // Create and persist a new contract
 func (c *Contract) Create() bool {
 	db := dbconf.DatabaseConnection()
@@ -376,12 +402,18 @@ func (c *Contract) ExecuteFromTx(
 	gas := execution.Gas
 	gasPrice := execution.GasPrice
 	nonce := execution.Nonce
+
+	//xxx add path to params
+	path := execution.HDPath
+
 	// publishedAt := execution.PublishedAt
 
 	txParams := map[string]interface{}{}
 	if c.Address != nil {
 		txParams["to"] = *c.Address
 	}
+
+	// TODO get the hd-derivation-path (if present) into the txparams
 
 	accountID := accountFn(account, txParams)
 	walletID := walletFn(wallet, txParams)
@@ -398,6 +430,11 @@ func (c *Contract) ExecuteFromTx(
 
 	if nonce != nil {
 		txParams["nonce"] = *nonce
+	}
+
+	// xxx add path to params
+	if path != nil {
+		txParams["hd_derivation_path"] = *path
 	}
 
 	txParamsJSON, _ := json.Marshal(txParams)

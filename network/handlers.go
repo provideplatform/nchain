@@ -10,6 +10,7 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
+	c2 "github.com/provideservices/provide-go/api/c2"
 	api "github.com/provideservices/provide-go/api/nchain"
 	provide "github.com/provideservices/provide-go/common"
 	util "github.com/provideservices/provide-go/common/util"
@@ -29,12 +30,10 @@ func InstallNetworksAPI(r *gin.Engine) {
 
 	r.GET("/api/v1/networks/:id/load_balancers", loadBalancersListHandler)
 	r.GET("/api/v1/networks/:id/load_balancers/:loadBalancerId", loadBalancerDetailsHandler)
-	r.PUT("/api/v1/networks/:id/load_balancers/:loadBalancerId", updateLoadBalancerHandler)
 
 	r.GET("/api/v1/networks/:id/nodes", nodesListHandler)
 	r.POST("/api/v1/networks/:id/nodes", createNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId", nodeDetailsHandler)
-	r.PUT("/api/v1/networks/:id/nodes/:nodeId", updateNodeHandler)
 	r.GET("/api/v1/networks/:id/nodes/:nodeId/logs", nodeLogsHandler)
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNodeHandler)
 
@@ -180,90 +179,29 @@ func networkConnectorsListHandler(c *gin.Context) {
 }
 
 func loadBalancersListHandler(c *gin.Context) {
-	appID := util.AuthorizedSubjectID(c, "application")
-	if appID == nil {
-		provide.RenderError("unauthorized", 401, c)
-		return
-	}
-
-	query := LoadBalancerListQuery()
-	query = query.Where("load_balancers.network_id = ?", c.Param("id"))
-	if appID != nil {
-		query = query.Where("load_balancers.application_id = ?", appID)
-	}
-
-	if c.Query("region") != "" {
-		query = query.Where("load_balancers.region = ?", c.Query("region"))
-	}
-	if c.Query("status") != "" {
-		query = query.Where("load_balancers.status = ?", c.Query("status"))
-	}
-	if c.Query("type") != "" {
-		query = query.Where("load_balancers.type = ?", c.Query("type"))
-	}
-
-	var loadBalancers []LoadBalancer
-	query = query.Order("load_balancers.created_at ASC")
-	provide.Paginate(c, query, &Node{}).Find(&loadBalancers)
-	provide.Render(loadBalancers, 200, c)
-}
-
-func loadBalancerDetailsHandler(c *gin.Context) {
-	provide.RenderError("not implemented", 501, c)
-}
-
-func updateLoadBalancerHandler(c *gin.Context) {
-	appID := util.AuthorizedSubjectID(c, "application")
-	if appID == nil {
-		provide.RenderError("unauthorized", 401, c)
-		return
-	}
-
 	buf, err := c.GetRawData()
 	if err != nil {
 		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
-	var loadBalancer = &LoadBalancer{}
-	query := dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("loadBalancerId"), c.Param("id"))
-	if appID != nil {
-		query = query.Where("load_balancers.application_id = ?", appID)
-	}
-	query.Find(&loadBalancer)
-
-	if loadBalancer == nil || loadBalancer.ID == uuid.Nil {
-		provide.RenderError("load balancer not found", 404, c)
-		return
-	} else if appID != nil && loadBalancer.ApplicationID != nil && *loadBalancer.ApplicationID != *appID {
-		provide.RenderError("forbidden", 403, c)
-		return
-	} else if loadBalancer.ApplicationID == nil {
-		// shouldn't be able to reach this branch, here for now to be safe
-		provide.RenderError("forbidden", 403, c)
-		return
-	}
-
-	var initialStatus string
-	if loadBalancer.Status != nil {
-		initialStatus = *loadBalancer.Status
-	}
-
-	err = json.Unmarshal(buf, loadBalancer)
+	params := map[string]interface{}{}
+	err = json.Unmarshal(buf, &params)
 	if err != nil {
-		provide.RenderError(err.Error(), 422, c)
+		provide.RenderError(err.Error(), 400, c)
 		return
 	}
 
-	loadBalancer.Status = common.StringOrNil(initialStatus)
-
-	if loadBalancer.Update() {
-		provide.Render(nil, 204, c)
-	} else {
-		obj := map[string]interface{}{}
-		obj["errors"] = loadBalancer.Errors
-		provide.Render(obj, 422, c)
+	resp, err := c2.ListLoadBalancers(c.GetString("token"), params)
+	if err != nil {
+		provide.RenderError(err.Error(), 500, c)
+		return
 	}
+	provide.Render(resp, 200, c)
+}
+
+func loadBalancerDetailsHandler(c *gin.Context) {
+	provide.RenderError("not implemented", 501, c)
 }
 
 func nodesListHandler(c *gin.Context) {
@@ -336,26 +274,17 @@ func nodeLogsHandler(c *gin.Context) {
 		return
 	}
 
-	page := c.Query("page")
-	rpp := c.Query("rpp")
-	var limit int64
-	limit, err := strconv.ParseInt(rpp, 10, 64)
-	if err != nil {
-		limit = defualtNodeLogRPP
-	}
-
-	startFromHead := false
-	if c.Query("start_from_head") == "true" {
-		startFromHead = true
-	}
-
-	logs, err := node.Logs(startFromHead, &limit, common.StringOrNil(page))
+	resp, err := c2.GetNodeLogs(c.GetString("token"), node.ID.String(), map[string]interface{}{
+		"page":            c.DefaultQuery("page", "1"),
+		"rpp":             c.DefaultQuery("rpp", strconv.Itoa(int(defualtNodeLogRPP))),
+		"start_from_head": c.DefaultQuery("start_from_head", "false"),
+	})
 	if err != nil {
 		provide.RenderError(fmt.Sprintf("log retrieval failed; %s", err.Error()), 500, c)
 		return
 	}
 
-	provide.Render(logs, 200, c)
+	provide.Render(resp, 200, c)
 }
 
 func createNodeHandler(c *gin.Context) {
@@ -377,13 +306,20 @@ func createNodeHandler(c *gin.Context) {
 		return
 	}
 
+	params := map[string]interface{}{}
+	err = json.Unmarshal(buf, &params)
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
 	node := &Node{}
 	err = json.Unmarshal(buf, node)
 	if err != nil {
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
-	node.Status = common.StringOrNil("pending")
+
 	node.NetworkID = networkID
 	node.UserID = userID
 	node.ApplicationID = appID
@@ -408,57 +344,8 @@ func createNodeHandler(c *gin.Context) {
 		return
 	}
 
-	if node.Create() {
+	if node.Create(c.GetString("token")) {
 		provide.Render(node, 201, c)
-	} else {
-		obj := map[string]interface{}{}
-		obj["errors"] = node.Errors
-		provide.Render(obj, 422, c)
-	}
-}
-
-func updateNodeHandler(c *gin.Context) {
-	userID := util.AuthorizedSubjectID(c, "user")
-	appID := util.AuthorizedSubjectID(c, "application")
-	if userID == nil && appID == nil {
-		provide.RenderError("unauthorized", 401, c)
-		return
-	}
-
-	buf, err := c.GetRawData()
-	if err != nil {
-		provide.RenderError(err.Error(), 400, c)
-		return
-	}
-
-	var node = &Node{}
-	dbconf.DatabaseConnection().Where("id = ? AND network_id = ?", c.Param("nodeId"), c.Param("id")).Find(&node)
-	if node == nil || node.ID == uuid.Nil {
-		provide.RenderError("network node not found", 404, c)
-		return
-	} else if userID != nil && *node.UserID != *userID {
-		provide.RenderError("forbidden", 403, c)
-		return
-	} else if appID != nil && *node.ApplicationID != *appID {
-		provide.RenderError("forbidden", 403, c)
-		return
-	}
-
-	var initialStatus string
-	if node.Status != nil {
-		initialStatus = *node.Status
-	}
-
-	err = json.Unmarshal(buf, node)
-	if err != nil {
-		provide.RenderError(err.Error(), 422, c)
-		return
-	}
-
-	node.Status = common.StringOrNil(initialStatus)
-
-	if node.Update() {
-		provide.Render(nil, 204, c)
 	} else {
 		obj := map[string]interface{}{}
 		obj["errors"] = node.Errors
@@ -488,7 +375,7 @@ func deleteNodeHandler(c *gin.Context) {
 		return
 	}
 
-	if !node.Delete() {
+	if !node.Delete(c.GetString("token")) {
 		provide.RenderError("network node not deleted", 500, c)
 		return
 	}

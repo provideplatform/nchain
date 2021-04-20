@@ -105,11 +105,11 @@ func (w *Wallet) Validate() bool {
 			Message: common.StringOrNil("vault key id required"),
 		})
 	}
-	if w.Purpose == nil {
-		w.Errors = append(w.Errors, &provide.Error{
-			Message: common.StringOrNil("purpose required; see https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki"),
-		})
-	}
+	// if w.Purpose == nil {
+	// 	w.Errors = append(w.Errors, &provide.Error{
+	// 		Message: common.StringOrNil("purpose required; see https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki"),
+	// 	})
+	// }
 	if w.PublicKey == nil {
 		w.Errors = append(w.Errors, &provide.Error{
 			Message: common.StringOrNil("public key required"),
@@ -206,11 +206,19 @@ func (w *Wallet) DeriveAddress(db *gorm.DB, index uint32, chain *uint32) (*Accou
 }
 
 func (w *Wallet) generate(db *gorm.DB) error {
+	var mnemonic string
+
+	// handle an optional mnemonic when creating a wallet
+	if w.Mnemonic != nil {
+		mnemonic = *w.Mnemonic
+	}
+
 	key, err := vault.CreateKey(util.DefaultVaultAccessJWT, common.DefaultVault.ID.String(), map[string]interface{}{
-		"type":  "asymmetric",
-		"usage": "sign/verify",
-		"spec":  "BIP39",
-		"name":  "nchain hd wallet",
+		"type":     "asymmetric",
+		"usage":    "sign/verify",
+		"spec":     "BIP39",
+		"name":     "nchain hd wallet",
+		"mnemonic": common.StringOrNil(mnemonic),
 	})
 
 	if err != nil {

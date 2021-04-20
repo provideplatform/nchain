@@ -31,6 +31,10 @@ var (
 func init() {
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
+
+	common.RequireInfrastructureSupport()
+	common.RequirePayments()
+	common.RequireVault()
 }
 
 func main() {

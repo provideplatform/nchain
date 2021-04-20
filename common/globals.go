@@ -89,13 +89,9 @@ func init() {
 
 	DefaultAWSConfig = awsconf.GetConfig()
 	ConsumeNATSStreamingSubscriptions = strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
-
-	requireInfrastructureSupport()
-	requirePayments()
-	requireVault()
 }
 
-func requireInfrastructureSupport() {
+func RequireInfrastructureSupport() {
 	if os.Getenv("DEFAULT_DOCKERHUB_ORGANIZATION") != "" {
 		DefaultDockerhubOrganization = StringOrNil(os.Getenv("DEFAULT_DOCKERHUB_ORGANIZATION"))
 	} else {
@@ -142,7 +138,7 @@ func requireInfrastructureSupport() {
 	DefaultInfrastructureUsesSelfSignedCertificate = !(DefaultInfrastructureDomain != "" && DefaultInfrastructureRoute53HostedZoneID != "" && DefaultInfrastructureAWSConfig != nil && DefaultInfrastructureAWSConfig.DefaultCertificateArn != nil && *DefaultInfrastructureAWSConfig.DefaultCertificateArn != "")
 }
 
-func requirePayments() {
+func RequirePayments() {
 	paymentsAccessJWT := os.Getenv("PAYMENTS_ACCESS_TOKEN")
 	if paymentsAccessJWT != "" {
 		defaultPaymentsAccessJWT = paymentsAccessJWT
@@ -151,7 +147,7 @@ func requirePayments() {
 	if defaultPaymentsAccessJWT == "" {
 		defaultPaymentsRefreshJWT = os.Getenv("PAYMENTS_REFRESH_TOKEN")
 		if defaultPaymentsRefreshJWT == "" {
-			Log.Panicf("failed to parse PAYMENTS_REFRESH_TOKEN from bookie environent")
+			Log.Panicf("failed to parse PAYMENTS_REFRESH_TOKEN from nchain environent")
 		}
 
 		err := refreshPaymentsAccessToken()
@@ -194,7 +190,7 @@ func refreshPaymentsAccessToken() error {
 	return nil
 }
 
-func requireVault() {
+func RequireVault() {
 	util.RequireVault()
 
 	vaults, err := vault.ListVaults(util.DefaultVaultAccessJWT, map[string]interface{}{})

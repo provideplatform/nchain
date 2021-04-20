@@ -15,6 +15,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
+	c2 "github.com/provideservices/provide-go/api/c2"
 )
 
 // SQLProvider is a connector.ProviderAPI implementing orchestration for SQL
@@ -125,7 +126,7 @@ func (p *SQLProvider) rawConfig() *json.RawMessage {
 
 // Deprovision undeploys all associated nodes and load balancers and removes them from the SQL connector
 func (p *SQLProvider) Deprovision() error {
-	loadBalancers := make([]*network.LoadBalancer, 0)
+	loadBalancers := make([]*c2.LoadBalancer, 0)
 	p.model.Association("LoadBalancers").Find(&loadBalancers)
 	for _, balancer := range loadBalancers {
 		p.model.Association("LoadBalancers").Delete(balancer)
@@ -136,7 +137,7 @@ func (p *SQLProvider) Deprovision() error {
 	for _, node := range nodes {
 		common.Log.Debugf("Attempting to deprovision node %s on connector: %s", node.ID, p.connectorID)
 		p.model.Association("Nodes").Delete(node)
-		node.Delete()
+		node.Delete("") // FIXME -- needs c2 API token
 	}
 
 	for _, balancer := range loadBalancers {
@@ -151,17 +152,17 @@ func (p *SQLProvider) Deprovision() error {
 
 // Provision configures a new load balancer and the initial SQL nodes and associates the resources with the SQL connector
 func (p *SQLProvider) Provision() error {
-	loadBalancer := &network.LoadBalancer{
-		NetworkID:      *p.networkID,
-		ApplicationID:  p.applicationID,
-		OrganizationID: p.organizationID,
-		Type:           common.StringOrNil(SQLConnectorProvider),
-		Description:    common.StringOrNil(fmt.Sprintf("SQL Connector Load Balancer")),
-		Region:         p.region,
-		Config:         p.rawConfig(),
-	}
+	loadBalancer, err := c2.CreateLoadBalancer("", map[string]interface{}{
+		"network_id":      *p.networkID,
+		"application_id":  p.applicationID,
+		"organization_id": p.organizationID,
+		"type":            common.StringOrNil(ElasticsearchConnectorProvider),
+		"description":     common.StringOrNil(fmt.Sprintf("SQL Connector Load Balancer")),
+		"region":          p.region,
+		"config":          p.config,
+	})
 
-	if loadBalancer.Create() {
+	if err == nil {
 		common.Log.Debugf("Created load balancer %s on connector: %s", loadBalancer.ID, p.connectorID)
 		p.model.Association("LoadBalancers").Append(loadBalancer)
 
@@ -175,7 +176,7 @@ func (p *SQLProvider) Provision() error {
 			common.Log.Warning(err.Error())
 		}
 	} else {
-		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, *loadBalancer.Errors[0].Message)
+		return fmt.Errorf("Failed to provision load balancer on connector: %s; %s", p.connectorID, err.Error())
 	}
 
 	return nil
@@ -198,11 +199,11 @@ func (p *SQLProvider) ProvisionNode() error {
 		Config:         p.rawConfig(),
 	}
 
-	if node.Create() {
+	if node.Create("") { // FIXME -- needs c2 API token
 		common.Log.Debugf("Created node %s on connector: %s", node.ID, p.connectorID)
 		p.model.Association("Nodes").Append(node)
 
-		loadBalancers := make([]*network.LoadBalancer, 0)
+		loadBalancers := make([]*c2.LoadBalancer, 0)
 		p.model.Association("LoadBalancers").Find(&loadBalancers)
 		for _, balancer := range loadBalancers {
 			msg, _ := json.Marshal(map[string]interface{}{
@@ -225,7 +226,7 @@ func (p *SQLProvider) ProvisionNode() error {
 
 // Reachable returns true if the SQL API provider is available
 func (p *SQLProvider) Reachable() bool {
-	loadBalancers := make([]*network.LoadBalancer, 0)
+	loadBalancers := make([]*c2.LoadBalancer, 0)
 	p.model.Association("LoadBalancers").Find(&loadBalancers)
 	for _, loadBalancer := range loadBalancers {
 		if loadBalancer.ReachableOnPort(uint(p.apiPort)) {
