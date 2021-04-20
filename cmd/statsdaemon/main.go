@@ -118,34 +118,9 @@ func requireNetworkDaemonInstances() []*network.Network {
 	dbconf.DatabaseConnection().Where("user_id IS NULL AND enabled IS TRUE").Find(&networks)
 
 	for _, ntwrk := range networks {
-		//RequireNetworkLogTransceiver(ntwrk)
-		//RequireNetworkStatsDaemon(ntwrk)
-		RequireHistoricalBlockStatsDaemon(ntwrk)
-		//TODO RequireHistoricalStatsDaemon(ntwrk)
-		//TODO copy the stats_daemon into another file
-		//TODO create a simple blocknumber/tx/logs table(s)
-		//TODO add an origin to this table (historical/websocket)
-		//TODO update networks with the start_block (for historical)
-		//TODO update networks with the latest_block (??)
-		// this will use JSON RPC to call blocks that are higher than the start_block
-		// if there is no start_block, it will ignore historicals and just run stats_daemon
-		// from scratch:
-		// - it gets start_block,
-		//     - if no start_block,
-		//       -  nop
-		//     - if start_block,
-		//       -  check table for lowest missing value
-		//          - higher than start block in the table
-		//          - and lower than the MAX origin:websocket block (populated every time the ws finalizes a block)
-		//       -  check if this is possible in single sql query
-		//       - pull the block details using jsonrpc
-		//       - populate the block details in the table
-		//       - run query again and rinse repeat
-		//       - query might be a pain/slow. maybe there's a naive implementation
-		//         we can do first (increment by 1, and only rerun query if there's a record there)
-		//       -
-		// TODO Blockchain table created, check the queries on it.
-
+		RequireNetworkLogTransceiver(ntwrk)
+		RequireNetworkStatsDaemon(ntwrk)
+		//RequireHistoricalBlockStatsDaemon(ntwrk)
 	}
 
 	return networks
