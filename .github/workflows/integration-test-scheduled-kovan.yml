@@ -1,4 +1,4 @@
-name: nchain-ROPSTEN-s
+name: nchain-KOVAN-s
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     
@@ -30,7 +30,7 @@ jobs:
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
-      - run: TAGS=ropsten ./ops/run_local_tests_short.sh
+      - run: TAGS=kovan ./ops/run_local_tests_short.sh
         working-directory: nchain      
       - run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain

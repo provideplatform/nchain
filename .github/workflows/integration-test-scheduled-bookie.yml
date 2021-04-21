@@ -1,4 +1,4 @@
-name: nchain-ROPSTEN-s
+name: nchain-BOOKIE-s
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     
@@ -24,13 +24,13 @@ jobs:
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
-          ref: dev        
+          ref: dev
           path: 'nchain'                    
       - run: docker-compose -f ./ops/docker-compose.yml build --no-cache nchain
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
-      - run: TAGS=ropsten ./ops/run_local_tests_short.sh
+      - run: TAGS=bookie ./ops/run_local_tests_short.sh
         working-directory: nchain      
       - run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain

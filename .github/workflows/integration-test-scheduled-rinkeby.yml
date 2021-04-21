@@ -1,9 +1,10 @@
-name: nchain-integration-test-rinkeby-short
+name: nchain-RINKEBY-s
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     
+
 jobs:
-  nchain-integration-test-rinkeby-short:
+  push_to_branch:
     runs-on: ubuntu-latest
     timeout-minutes: 10    
     env:
@@ -23,22 +24,19 @@ jobs:
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
-          path: 'nchain'                   
-      - run: docker-compose -f ./ops/docker-compose-integration.yml build --no-cache nchain
+          ref: dev        
+          path: 'nchain'                    
+      - run: docker-compose -f ./ops/docker-compose.yml build --no-cache nchain
         working-directory: nchain
-      - run: docker-compose -f ./ops/docker-compose-integration.yml up -d
+      - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
       - run: TAGS=rinkeby ./ops/run_local_tests_short.sh
+        working-directory: nchain      
+      - run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain
-      - run: docker-compose -f ./ops/docker-compose-integration.yml logs
-        working-directory: nchain
-      - run: docker-compose -f ./ops/docker-compose-integration.yml down
-        working-directory: nchain
-      - run: docker volume rm ops_provide-db     
-        working-directory: nchain  
       - name: slack channel update
+        if: failure()  
         uses: act10ns/slack@v1
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-        if: always()  
