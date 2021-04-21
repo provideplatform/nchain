@@ -120,14 +120,14 @@ func (p *NethermindP2PProvider) ResolvePeerURL() (*string, error) {
 }
 
 // ResolveTokenContract attempts to resolve the given token contract details for the contract at a given address
-func (p *NethermindP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *big.Int, *string, error) {
+func (p *NethermindP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *string, *big.Int, *string, error) {
 	switch receipt.(type) {
 	case *types.Receipt:
 		contractAddress := receipt.(*types.Receipt).ContractAddress
 		return evmResolveTokenContract(*p.rpcClientKey, *p.rpcURL, artifact, contractAddress.Hex(), signerAddress)
 	}
 
-	return nil, nil, nil, errors.New("given tx receipt was of invalid type")
+	return nil, nil, nil, nil, errors.New("given tx receipt was of invalid type")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes

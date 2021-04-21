@@ -210,13 +210,14 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 		// }
 
 		internalContract.ResolveTokenContract(db, network, *cntrct.Address, receipt,
-			func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
+			func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 				common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 				tok := &token.Token{
 					ApplicationID: c.ApplicationID,
 					NetworkID:     c.NetworkID,
 					ContractID:    &c.ID,
+					Type:          common.StringOrNil(tokenType),
 					Name:          common.StringOrNil(name),
 					Symbol:        common.StringOrNil(symbol),
 					Decimals:      decimals.Uint64(),

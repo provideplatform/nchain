@@ -877,7 +877,7 @@ func (t *Transaction) handleTxReceipt(
 		kontract := &contract.Contract{}
 		var tok *token.Token
 
-		tokenCreateFn := func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
+		tokenCreateFn := func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 			common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 			tok = &token.Token{
@@ -885,6 +885,7 @@ func (t *Transaction) handleTxReceipt(
 				OrganizationID: c.OrganizationID,
 				NetworkID:      c.NetworkID,
 				ContractID:     &c.ID,
+				Type:           common.StringOrNil(tokenType),
 				Name:           common.StringOrNil(name),
 				Symbol:         common.StringOrNil(symbol),
 				Decimals:       decimals.Uint64(),
@@ -984,7 +985,7 @@ func (t *Transaction) handleTxTraces(
 						if internalContract.Create() {
 							common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
 							internalContract.ResolveTokenContract(db, network, signerAddress, receipt,
-								func(c *contract.Contract, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
+								func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 									common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 									tok := &token.Token{
@@ -992,6 +993,7 @@ func (t *Transaction) handleTxTraces(
 										OrganizationID: c.OrganizationID,
 										NetworkID:      c.NetworkID,
 										ContractID:     &c.ID,
+										Type:           common.StringOrNil(tokenType),
 										Name:           common.StringOrNil(name),
 										Symbol:         common.StringOrNil(symbol),
 										Decimals:       decimals.Uint64(),

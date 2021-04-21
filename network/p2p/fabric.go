@@ -94,8 +94,8 @@ func (p *HyperledgerFabricP2PProvider) ResolvePeerURL() (*string, error) {
 }
 
 // ResolveTokenContract attempts to resolve the given token contract details for the contract at a given address
-func (p *HyperledgerFabricP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *big.Int, *string, error) {
-	return nil, nil, nil, errors.New("fabric p2p provider does not impl ResolveTokenContract()")
+func (p *HyperledgerFabricP2PProvider) ResolveTokenContract(signerAddress string, receipt interface{}, artifact *provide.CompiledArtifact) (*string, *string, *big.Int, *string, error) {
+	return nil, nil, nil, nil, errors.New("fabric p2p provider does not impl ResolveTokenContract()")
 }
 
 // RequireBootnodes attempts to resolve the peers to use as bootnodes

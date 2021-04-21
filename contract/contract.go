@@ -451,7 +451,7 @@ func (c *Contract) ResolveTokenContract(
 	network *network.Network,
 	signerAddress string,
 	receipt interface{},
-	tokenCreateFn func(*Contract, string, *big.Int, string) (bool, uuid.UUID, []*provide.Error),
+	tokenCreateFn func(*Contract, string, string, *big.Int, string) (bool, uuid.UUID, []*provide.Error),
 ) {
 	p2pAPI, err := network.P2PAPIClient()
 	if err != nil {
@@ -477,13 +477,13 @@ func (c *Contract) ResolveTokenContract(
 					return
 				}
 
-				name, decimals, symbol, err := p2pAPI.ResolveTokenContract(signerAddress, receipt, artifact)
+				tokenType, name, decimals, symbol, err := p2pAPI.ResolveTokenContract(signerAddress, receipt, artifact)
 				if err != nil {
 					common.Log.Debugf("contract id %s did not match a supported token contract standard; %s", c.ID, err.Error())
 					return
 				}
 
-				res, id, errs := tokenCreateFn(c, *name, decimals, *symbol)
+				res, id, errs := tokenCreateFn(c, *tokenType, *name, decimals, *symbol)
 				if res {
 					common.Log.Debugf("created token %s for associated %s contract: %s", id, *network.Name, c.ID)
 					ticker.Stop()

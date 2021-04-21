@@ -58,6 +58,9 @@ const ProviderParity = "parity"
 // ProviderQuorum quorum p2p provider
 const ProviderQuorum = "quorum"
 
+const tokenTypeERC20 = "ERC-20"
+const tokenTypeERC721 = "ERC-721"
+
 // API defines an interface for p2p network implementations
 type API interface {
 	AcceptNonReservedPeers() error
@@ -70,7 +73,7 @@ type API interface {
 	FormatBootnodes([]string) string
 	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
 	ResolvePeerURL() (*string, error)
-	ResolveTokenContract(string, interface{}, *provide.CompiledArtifact) (*string, *big.Int, *string, error) // name, decimals, symbol, error
+	ResolveTokenContract(string, interface{}, *provide.CompiledArtifact) (*string, *string, *big.Int, *string, error) // name, decimals, symbol, error
 	Upgrade() error
 
 	DefaultEntrypoint() []string
@@ -100,15 +103,15 @@ func evmResolveTokenContract(
 	artifact *provide.CompiledArtifact,
 	contractAddress,
 	signerAddress string,
-) (*string, *big.Int, *string, error) {
+) (*string, *string, *big.Int, *string, error) {
 	if artifact.ABI != nil {
-		return nil, nil, nil, errors.New("given artifact does not contain ABI")
+		return nil, nil, nil, nil, errors.New("given artifact does not contain ABI")
 	}
 
 	contractAddr := ethcommon.HexToAddress(contractAddress)
 	client, err := providecrypto.EVMDialJsonRpc(rpcClientKey, rpcURL)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to initialize eth client; %s", err.Error())
+		return nil, nil, nil, nil, fmt.Errorf("failed to initialize eth client; %s", err.Error())
 	}
 
 	abistr, err := json.Marshal(artifact.ABI)
@@ -169,10 +172,34 @@ func evmResolveTokenContract(
 			}
 		}
 
+		var tokenType *string
+
 		if name != "" && decimals != nil && symbol != "" { // isERC20Token
-			return common.StringOrNil(name), decimals, common.StringOrNil(symbol), nil
+			tokenType = common.StringOrNil(tokenTypeERC20)
+			msg = ethereum.CallMsg{
+				From:     ethcommon.HexToAddress(signerAddress),
+				To:       &contractAddr,
+				Gas:      0,
+				GasPrice: big.NewInt(0),
+				Value:    nil,
+				Data:     ethcommon.FromHex(providecrypto.EVMHashFunctionSelector("tokenURI(uint256)")),
+			}
+			result, _ = client.CallContract(context.TODO(), msg, nil)
+			var tokenURI string
+			if method, ok := _abi.Methods["tokenURI"]; ok {
+				err = method.Outputs.Unpack(&tokenURI, result)
+				if err != nil {
+					common.Log.Warningf("Failed to read contract symbol from deployed contract %s; %s", contractAddress, err.Error())
+				}
+			}
+
+			if tokenURI != "" {
+				tokenType = common.StringOrNil(tokenTypeERC721)
+			}
+
+			return tokenType, common.StringOrNil(name), decimals, common.StringOrNil(symbol), nil
 		}
 	}
 
-	return nil, nil, nil, fmt.Errorf("failed to resolve token contract at contract address: %s", contractAddress)
+	return nil, nil, nil, nil, fmt.Errorf("failed to resolve token contract at contract address: %s", contractAddress)
 }

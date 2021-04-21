@@ -20,6 +20,7 @@ type Token struct {
 	NetworkID      uuid.UUID  `sql:"not null;type:uuid" json:"network_id"`
 	ContractID     *uuid.UUID `sql:"type:uuid" json:"contract_id"`
 	SaleContractID *uuid.UUID `sql:"type:uuid" json:"sale_contract_id"`
+	Type           *string    `sql:"not null" json:"type"`
 	Name           *string    `sql:"not null" json:"name"`
 	Symbol         *string    `sql:"not null" json:"symbol"`
 	Decimals       uint64     `sql:"not null" json:"decimals"`
