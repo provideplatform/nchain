@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"os"
 	"os/signal"
@@ -76,6 +77,24 @@ type jsonRPCResponse struct {
 	Error   interface{}     `json:"error"` //check what's in here
 }
 
+var sleepTimeInSeconds int64
+
+const defaultSleepTime = 10
+
+func init() {
+	// get the configured sleep time if available
+	sleeptime := os.Getenv("LOG_LEVEL")
+	if sleeptime == "" {
+		sleepTimeInSeconds = defaultSleepTime
+	}
+	// otherwise, use the default sleep time
+	var err error
+	sleepTimeInSeconds, err = strconv.ParseInt(sleeptime, 10, 64)
+	if err != nil {
+		sleepTimeInSeconds = defaultSleepTime
+	}
+}
+
 // EthereumHistoricalBlockDataSourceFactory builds and returns a JSON-RPC
 // data source which is used by historical block daemon instances to consume historical blocks
 func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *HistoricalBlockDataSource {
@@ -141,10 +160,19 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 			var missingBlocks []int
 			db := dbconf.DatabaseConnection()
 			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", network.ID).Scan(&blockGaps)
-			common.Log.Debugf("block: %+v", blockGaps)
+			common.Log.Debugf("number of historical blocks to obtain for (%v)network: %+v", network.ID, blockGaps)
 			// block gaps is in the structure
 			// block - previousblock, where there is a gap
 			// so we iterate through it to get an array of blockNumbers we're missing
+
+			if len(blockGaps) == 0 {
+				// if we have nothing to do, sleep for a bit
+				common.Log.Debugf("nothing to do, sleeping for %v seconds", sleepTimeInSeconds)
+				time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
+			} else {
+				common.Log.Debugf("processing %v missing blocks", len(blockGaps))
+			}
+
 			for _, blockGap := range blockGaps {
 				endBlock := blockGap.Block - 1
 				startBlock := blockGap.PreviousBlock + 1
@@ -191,7 +219,7 @@ func (hbd *HistoricalBlockDaemon) consume() []error {
 	if hbd.dataSource != nil {
 		err = hbd.dataSource.Poll(hbd.queue)
 	} else {
-		err = errors.New("Configured hsitorical blocks daemon does not have a configured data source")
+		err = errors.New("Configured historical blocks daemon does not have a configured data source")
 	}
 
 	if err != nil {

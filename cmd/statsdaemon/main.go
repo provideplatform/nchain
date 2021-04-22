@@ -120,7 +120,7 @@ func requireNetworkDaemonInstances() []*network.Network {
 	for _, ntwrk := range networks {
 		RequireNetworkLogTransceiver(ntwrk)
 		RequireNetworkStatsDaemon(ntwrk)
-		//RequireHistoricalBlockStatsDaemon(ntwrk)
+		RequireHistoricalBlockStatsDaemon(ntwrk)
 	}
 
 	return networks
