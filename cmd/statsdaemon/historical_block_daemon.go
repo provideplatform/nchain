@@ -77,21 +77,69 @@ type jsonRPCResponse struct {
 	Error   interface{}     `json:"error"` //check what's in here
 }
 
+// sleepTimeInSeconds is the time the daemon will sleep if there's nothing to do
 var sleepTimeInSeconds int64
 
+// defaultSleepTime is the default sleep time if there's nothing to do
 const defaultSleepTime = 10
 
-func init() {
-	// get the configured sleep time if available
-	sleeptime := os.Getenv("LOG_LEVEL")
-	if sleeptime == "" {
-		sleepTimeInSeconds = defaultSleepTime
+func getSleepTime() int64 {
+	envSleepTime := os.Getenv("HISTORICAL_BLOCK_SLEEP_SECONDS")
+	if envSleepTime == "" {
+		common.Log.Debugf("no HBD sleep specified, using default sleep of %v seconds", defaultSleepTime)
+		return defaultSleepTime
 	}
 	// otherwise, use the default sleep time
 	var err error
-	sleepTimeInSeconds, err = strconv.ParseInt(sleeptime, 10, 64)
+	sleepTimeInSeconds, err := strconv.ParseInt(envSleepTime, 10, 64)
 	if err != nil {
-		sleepTimeInSeconds = defaultSleepTime
+		common.Log.Errorf("error parsing HBD sleep, using default sleep of %v seconds. Error: %s", defaultSleepTime, err.Error())
+		return defaultSleepTime
+	}
+	common.Log.Debugf("using specified HBD sleep time of %v seconds", sleepTimeInSeconds)
+	return sleepTimeInSeconds
+}
+
+func updateStartingBlocks() error {
+	strtBlcks := os.Getenv("HISTORICAL_BLOCK_START_JSON")
+	if strtBlcks == "" {
+		return nil
+	}
+
+	var startBlocks map[string]interface{}
+
+	err := json.Unmarshal([]byte(strtBlcks), &startBlocks)
+	if err != nil {
+		errmsg := fmt.Sprintf("error marshalling starting blocks environment variable. Error: %s", err.Error())
+		return fmt.Errorf(errmsg)
+	}
+
+	db := dbconf.DatabaseConnection()
+	var ntwrks []network.Network
+	db.Raw("select * from networks").Scan(&ntwrks)
+
+	for _, ntwrk := range ntwrks {
+		if startBlocks[ntwrk.ID.String()] != ntwrk.Block {
+			// update the db with the environment starting block
+			updatedStartingBlock, err := strconv.Atoi(startBlocks[ntwrk.ID.String()].(string))
+			if err != nil {
+				errmsg := fmt.Sprintf("error getting start block for %s network. Error: %s", ntwrk.ID.String(), err.Error())
+				return fmt.Errorf(errmsg)
+			}
+			ntwrk.Block = updatedStartingBlock
+			db.Save(&ntwrk)
+		}
+	}
+	return nil
+}
+
+func init() {
+	// get the configured sleep time if available
+	sleepTimeInSeconds = getSleepTime()
+
+	err := updateStartingBlocks()
+	if err != nil {
+		common.Log.Errorf("error updating start blocks. Error: %s", err.Error())
 	}
 }
 

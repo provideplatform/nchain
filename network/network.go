@@ -82,6 +82,7 @@ type Network struct {
 	NetworkID       *uuid.UUID       `sql:"type:uuid" json:"network_id,omitempty"`   // network id used as the parent
 	Config          *json.RawMessage `sql:"type:json not null" json:"config,omitempty"`
 	EncryptedConfig *string          `sql:"-" json:"-"`
+	Block           int              `sql:"type:int8" json:"block,omitempty"` //starting block for historical daemon retrieval
 
 	// Stats         *provideapi.NetworkStatus `sql:"-" json:"stats,omitempty"`
 }
