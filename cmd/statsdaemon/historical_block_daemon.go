@@ -83,6 +83,19 @@ var sleepTimeInSeconds int64
 // defaultSleepTime is the default sleep time if there's nothing to do
 const defaultSleepTime = 10
 
+// data type for blocks table
+type Block struct {
+	providego.Model
+	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
+	Block     int       `sql:"type:int8" json:"block"`
+	TxHash    string    `sql:"type:text" json:"transaction_hash"` //FIXME should be block hash
+}
+
+type BlockGap struct {
+	Block         int
+	PreviousBlock int
+}
+
 func getSleepTime() int64 {
 	envSleepTime := os.Getenv("HISTORICAL_BLOCK_SLEEP_SECONDS")
 	if envSleepTime == "" {
@@ -121,13 +134,18 @@ func updateStartingBlocks() error {
 	for _, ntwrk := range ntwrks {
 		if startBlocks[ntwrk.ID.String()] != ntwrk.Block {
 			// update the db with the environment starting block
-			updatedStartingBlock, err := strconv.Atoi(startBlocks[ntwrk.ID.String()].(string))
-			if err != nil {
-				errmsg := fmt.Sprintf("error getting start block for %s network. Error: %s", ntwrk.ID.String(), err.Error())
-				return fmt.Errorf(errmsg)
+			// get the new starting block
+			blockyblock := startBlocks[ntwrk.ID.String()]
+			common.Log.Debugf("blockyblock: %v", blockyblock)
+			if blockyblock != nil {
+				updatedStartingBlock, err := strconv.Atoi(startBlocks[ntwrk.ID.String()].(string))
+				if err != nil {
+					errmsg := fmt.Sprintf("error getting start block for %s network. Error: %s", ntwrk.ID.String(), err.Error())
+					return fmt.Errorf(errmsg)
+				}
+				ntwrk.Block = updatedStartingBlock
+				db.Save(&ntwrk)
 			}
-			ntwrk.Block = updatedStartingBlock
-			db.Save(&ntwrk)
 		}
 	}
 	return nil
@@ -136,22 +154,17 @@ func updateStartingBlocks() error {
 func init() {
 	// get the configured sleep time if available
 	sleepTimeInSeconds = getSleepTime()
-
-	err := updateStartingBlocks()
-	if err != nil {
-		common.Log.Errorf("error updating start blocks. Error: %s", err.Error())
-	}
 }
 
 // EthereumHistoricalBlockDataSourceFactory builds and returns a JSON-RPC
 // data source which is used by historical block daemon instances to consume historical blocks
-func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *HistoricalBlockDataSource {
+func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *HistoricalBlockDataSource {
 	return &HistoricalBlockDataSource{
-		Network: network,
+		Network: ntwrk,
 
 		Poll: func(ch chan *provide.NetworkStatus) error {
 			// json rpc call to eth_getBlockByNumber
-			jsonRpcURL := network.RPCURL()
+			jsonRpcURL := ntwrk.RPCURL()
 			if jsonRpcURL == "" {
 				err := new(jsonRpcNotSupported)
 				return *err
@@ -183,32 +196,39 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 			// and update the block finalizer5 so it populates the blocks/tx table
 			// block to begin with (must check where the txs come from!)
 
-			// data type for blocks table
-			type Block struct {
-				providego.Model
-				NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
-				Block     int       `sql:"type:int8" json:"block"`
-				TxHash    string    `sql:"type:text" json:"transaction_hash"` //FIXME should be block hash
-			}
-
-			type BlockGap struct {
-				Block         int
-				PreviousBlock int
-			}
-
 			var blockGaps []BlockGap
 
-			// TODO: check if there's the block in the network table
+			// check if there's the block in the network table
 			// and if there is, check if that block exists for that network in the blocks table
 			// if it doesn't, just pull that block info from the json rpc
+			// push it onto the channel
 			// and exit
 			// it can grab the missing blocks (between the network.block table and the other blocks)
 			// if there aren't any gaps, the statsdaemon will start making them... organically :)
 
-			var missingBlocks []int
+			// check the block in the network table
 			db := dbconf.DatabaseConnection()
-			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", network.ID).Scan(&blockGaps)
-			common.Log.Debugf("number of historical blocks to obtain for (%v)network: %+v", network.ID, blockGaps)
+			currentNetwork := network.Network{}
+
+			db.Where("id=?", ntwrk.ID.String()).Find(&currentNetwork)
+			if currentNetwork.Block != 0 {
+				// we have a current block to get
+				// if it's in the blocks table, then sleep
+				block := &Block{}
+				db.Where("block=?", currentNetwork.Block).Find(block)
+				if block.Block == 0 {
+					// we don't have this block, so request it and sleep
+					common.Log.Debugf("Getting initial block %v details for network %s and sleeping", block.Block, ntwrk.ID.String())
+					getBlockDetails(ch, client, currentNetwork.Block)
+					time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
+					return nil
+				}
+			}
+
+			var missingBlocks []int
+
+			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", ntwrk.ID).Scan(&blockGaps)
+
 			// block gaps is in the structure
 			// block - previousblock, where there is a gap
 			// so we iterate through it to get an array of blockNumbers we're missing
@@ -217,8 +237,7 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 				// if we have nothing to do, sleep for a bit
 				common.Log.Debugf("nothing to do, sleeping for %v seconds", sleepTimeInSeconds)
 				time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
-			} else {
-				common.Log.Debugf("processing %v missing blocks", len(blockGaps))
+				return nil
 			}
 
 			for _, blockGap := range blockGaps {
@@ -230,32 +249,59 @@ func EthereumHistoricalBlockDataSourceFactory(network *network.Network) *Histori
 				}
 			}
 
-			for _, missingBlock := range missingBlocks {
-				var resp interface{}
-				blockNumber := fmt.Sprintf("0x%x", missingBlock)
-				//TODO use the providego method like Kyle hinted at :)
-				err = client.Call(&resp, "eth_getBlockByNumber", blockNumber, true)
-				if err != nil {
-					return err
+			// XXX
+			// TODO
+			// stop it creating dupes
+			// step 1: if we have the block and tx hash in the db, don't get it again/put it in db
+			// step 2: think about a way to not pull blocks again (write them to blocks, but with no txhash, or with a pending flag?)
+			// e.g.
+			// hbd gets 1000 gaps
+			// hbd pops 1000 block headers onto NATS
+			// hbd has a rest
+			// faster: hbd just gets the block number, writes it to db without txhash, pops it on NATS
+			// NATS is likely the better approach. TODO research if I can query NATS for blocks in progress
+			// or some kind of catch and release to at least only replay them into nats
+			//
+
+			common.Log.Debugf("processing %v missing blocks", len(missingBlocks))
+			for idx, missingBlock := range missingBlocks {
+				//we'll just do 100 at a time //TODO configurable
+				// TODO actually, work out how not to keep spamming NATS with dupes, timing is not the answer
+				if idx > 100 {
+					break
 				}
-				if resultJSON, err := json.Marshal(resp); err == nil {
-					header := &types.Header{}
-					err := json.Unmarshal(resultJSON, header)
-					if err != nil {
-						common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", resp, err.Error())
-					} else if header != nil && header.Number != nil {
-						ch <- &provide.NetworkStatus{
-							Meta: map[string]interface{}{
-								"last_block_header": resp,
-							},
-						}
-					}
-				}
+				getBlockDetails(ch, client, missingBlock)
 			}
+			time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
 			return err
 		},
 	}
 
+}
+
+func getBlockDetails(ch chan *provide.NetworkStatus, client *rpc.Client, blockNumber int) error {
+	var resp interface{}
+	missingBlock := fmt.Sprintf("0x%x", blockNumber)
+
+	err := client.Call(&resp, "eth_getBlockByNumber", missingBlock, true)
+	if err != nil {
+		return err
+	}
+	if resultJSON, err := json.Marshal(resp); err == nil {
+		header := &types.Header{}
+		err := json.Unmarshal(resultJSON, header)
+		if err != nil {
+			common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", resp, err.Error())
+			return err
+		} else if header != nil && header.Number != nil {
+			ch <- &provide.NetworkStatus{
+				Meta: map[string]interface{}{
+					"last_block_header": resp,
+				},
+			}
+		}
+	}
+	return nil
 }
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
