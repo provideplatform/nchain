@@ -282,6 +282,7 @@ github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMyw
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.0 h1:/QaMHBdZ26BB3SSst0Iwl10Epc+xhTquomWX0oZEB6w=
 github.com/google/go-cmp v0.5.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/gofuzz v1.1.1-0.20200604201612-c04b05f3adfa/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/google/logger v1.0.1/go.mod h1:w7O8nrRr0xufejBlQMI83MXqRusvREoJdaAxV+CoAB4=
@@ -609,6 +610,7 @@ github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38i
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
 github.com/provideservices/provide-go v0.0.0-20201109202001-a527b36e6cf1/go.mod h1:yzwBDvZH0GKjbDeFFzAZ5EJlysxaSsWSM5AednUXHG8=
 github.com/provideservices/provide-go v0.0.0-20210409104111-70ad008e4ae8/go.mod h1:zMvfECorm5+hb9aewWEVpxkaFGko3r5Qk3/N/aIuLeY=
+github.com/provideservices/provide-go v0.0.0-20210417082846-8ed6b3333d26/go.mod h1:lAT70A7vk8dxX8lh6kcjgo3BKVJ8ceu+k9aSBrnLZwU=
 github.com/provideservices/provide-go v0.0.0-20210420170130-f3b2717c52f0 h1:AGUyv2CrJHI0owb+WDcDPn5CrEBznREcf0AMPDzBkCM=
 github.com/provideservices/provide-go v0.0.0-20210420170130-f3b2717c52f0/go.mod h1:lAT70A7vk8dxX8lh6kcjgo3BKVJ8ceu+k9aSBrnLZwU=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
