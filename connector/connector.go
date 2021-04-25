@@ -37,8 +37,8 @@ type Connector struct {
 
 	Details *Details `sql:"-" json:"details,omitempty"`
 
-	// LoadBalancers []c2.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
-	Nodes []network.Node `gorm:"many2many:connectors_nodes" json:"-"`
+	LoadBalancers []c2.LoadBalancer `gorm:"many2many:connectors_load_balancers" json:"-"`
+	Nodes         []network.Node    `gorm:"many2many:connectors_nodes" json:"-"`
 }
 
 // Details is a generic representation for a type-specific enrichment of a described connector;
