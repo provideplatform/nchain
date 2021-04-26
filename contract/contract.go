@@ -212,7 +212,7 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 		}
 
 		fingerprint, fingerprintOk := dependency["fingerprint"].(string)
-		if !nameOk && !fingerprintOk {
+		if name != "" && !fingerprintOk {
 			continue
 		}
 
