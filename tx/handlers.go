@@ -544,7 +544,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 	executionResponse, err := executeTransaction(contractObj, execution)
 	if err != nil {
-		common.Log.Debugf("error here is: %s", err.Error())
+		common.Log.Debugf("transaction execution failed; %s", err.Error())
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}
