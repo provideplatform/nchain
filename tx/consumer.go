@@ -443,7 +443,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 
 	tx := &Transaction{}
 	db := dbconf.DatabaseConnection()
-	common.Log.Debugf("*** checking db for status of tx %s", hash)
+	common.Log.Tracef("checking local db for tx status; tx hash: %s", hash)
 	db.Where("hash = ? AND status IN (?, ?)", hash, "pending", "failed").Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
 		// TODO: this is integration point to upsert Wallet & Transaction... need to think thru performance implications & implementation details
