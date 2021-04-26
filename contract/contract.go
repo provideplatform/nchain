@@ -210,9 +210,10 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 		} else if depname, depnameOk := dependency["contractName"].(string); depnameOk {
 			name = depname
 		}
+		nameOk := name != ""
 
 		fingerprint, fingerprintOk := dependency["fingerprint"].(string)
-		if name != "" && !fingerprintOk {
+		if !nameOk && !fingerprintOk {
 			continue
 		}
 
