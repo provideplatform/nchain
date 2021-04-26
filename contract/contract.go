@@ -204,13 +204,19 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 
 	for _, dep := range artifact.Deps {
 		dependency := dep.(map[string]interface{})
-		name, nameOk := dependency["name"].(string)
+		var name string
+		if depname, depnameOk := dependency["name"].(string); depnameOk {
+			name = depname
+		} else if depname, depnameOk := dependency["contractName"].(string); depnameOk {
+			name = depname
+		}
+
 		fingerprint, fingerprintOk := dependency["fingerprint"].(string)
 		if !nameOk && !fingerprintOk {
 			continue
 		}
 
-		common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s", name, fingerprint, *c.Address)
+		common.Log.Debugf("checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s", name, fingerprint, *c.Address)
 		if name == descriptor {
 			depJSON, _ := json.Marshal(dependency)
 			json.Unmarshal(depJSON, &dependencyArtifact)
