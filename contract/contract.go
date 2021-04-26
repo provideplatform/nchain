@@ -44,7 +44,7 @@ type Contract struct {
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
 func ContractListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address, contracts.type")
+	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.organization_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address, contracts.type")
 }
 
 // enrich enriches the contract
@@ -63,7 +63,7 @@ func (c *Contract) CompiledArtifact() *api.CompiledArtifact {
 			compiledArtifactRawJSON := json.RawMessage(compiledArtifactJSON)
 			err := json.Unmarshal(compiledArtifactRawJSON, &artifact)
 			if err != nil {
-				common.Log.Warningf("Failed to unmarshal contract params to compiled artifact; %s", err.Error())
+				common.Log.Warningf("failed to unmarshal contract params to compiled artifact; %s", err.Error())
 				return nil
 			}
 		}
