@@ -172,7 +172,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						minedBlock.Hash = *blockFinalizedMsg.BlockHash
 						dbResult := db.Create(&minedBlock)
 						if dbResult.RowsAffected == 0 {
-							common.Log.Warning("error saving block to db; error: %s", dbResult.Error)
+							common.Log.Warningf("error saving block to db; error: %s", dbResult.Error.Error())
 						}
 
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
