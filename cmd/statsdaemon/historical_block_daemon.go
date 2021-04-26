@@ -25,7 +25,6 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideapp/nchain/common"
 	"github.com/provideapp/nchain/network"
-	providego "github.com/provideservices/provide-go/api"
 	provide "github.com/provideservices/provide-go/api/nchain"
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )
@@ -83,14 +82,6 @@ var sleepTimeInSeconds int64
 // defaultSleepTime is the default sleep time if there's nothing to do
 const defaultSleepTime = 10
 
-// data type for blocks table
-type Block struct {
-	providego.Model
-	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
-	Block     int       `sql:"type:int8" json:"block"`
-	TxHash    string    `sql:"type:text" json:"transaction_hash"` //FIXME should be block hash
-}
-
 type BlockGap struct {
 	Block         int
 	PreviousBlock int
@@ -111,44 +102,6 @@ func getSleepTime() int64 {
 	}
 	common.Log.Debugf("using specified HBD sleep time of %v seconds", sleepTimeInSeconds)
 	return sleepTimeInSeconds
-}
-
-func updateStartingBlocks() error {
-	strtBlcks := os.Getenv("HISTORICAL_BLOCK_START_JSON")
-	if strtBlcks == "" {
-		return nil
-	}
-
-	var startBlocks map[string]interface{}
-
-	err := json.Unmarshal([]byte(strtBlcks), &startBlocks)
-	if err != nil {
-		errmsg := fmt.Sprintf("error marshalling starting blocks environment variable. Error: %s", err.Error())
-		return fmt.Errorf(errmsg)
-	}
-
-	db := dbconf.DatabaseConnection()
-	var ntwrks []network.Network
-	db.Raw("select * from networks").Scan(&ntwrks)
-
-	for _, ntwrk := range ntwrks {
-		if startBlocks[ntwrk.ID.String()] != ntwrk.Block {
-			// update the db with the environment starting block
-			// get the new starting block
-			blockyblock := startBlocks[ntwrk.ID.String()]
-			common.Log.Debugf("blockyblock: %v", blockyblock)
-			if blockyblock != nil {
-				updatedStartingBlock, err := strconv.Atoi(startBlocks[ntwrk.ID.String()].(string))
-				if err != nil {
-					errmsg := fmt.Sprintf("error getting start block for %s network. Error: %s", ntwrk.ID.String(), err.Error())
-					return fmt.Errorf(errmsg)
-				}
-				ntwrk.Block = updatedStartingBlock
-				db.Save(&ntwrk)
-			}
-		}
-	}
-	return nil
 }
 
 func init() {
@@ -178,33 +131,7 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 
 			defer client.Close()
 
-			// let's get a new id (likely used in nats)
-			//id, _ := uuid.NewV4()
-			// here would be a good place to implement a next block getter
-			// first check the network
-			// if there's no block, then we're not worried about historical blocks,
-			// q: do we need this, if we're worried about gaps?
-			// a: yes, because we have to start there and put at least one block into the
-			// blocks table so we can start getting gaps
-
-			// but we do care about gaps (if the statsdaemon was down)
-			// so query the blocks table for gaps
-			// if there's no gaps, then adios
-			// if there are gaps, then process them into a list of block numbers
-			// and iterate through grabbing all the block infos
-			// and pushing them onto nats for the block finalizer to grab
-			// and update the block finalizer5 so it populates the blocks/tx table
-			// block to begin with (must check where the txs come from!)
-
 			var blockGaps []BlockGap
-
-			// check if there's the block in the network table
-			// and if there is, check if that block exists for that network in the blocks table
-			// if it doesn't, just pull that block info from the json rpc
-			// push it onto the channel
-			// and exit
-			// it can grab the missing blocks (between the network.block table and the other blocks)
-			// if there aren't any gaps, the statsdaemon will start making them... organically :)
 
 			// check the block in the network table
 			db := dbconf.DatabaseConnection()
@@ -213,14 +140,15 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 			db.Where("id=?", ntwrk.ID.String()).Find(&currentNetwork)
 			if currentNetwork.Block != 0 {
 				// we have a current block to get
-				// if it's in the blocks table, then sleep
-				block := &Block{}
+				// if it's in the blocks table, then carry on and look for gaps
+				// otherwise get the block's details and add it to the table
+				block := &network.Block{}
 				db.Where("block=?", currentNetwork.Block).Find(block)
 				if block.Block == 0 {
 					// we don't have this block, so request it and sleep
 					common.Log.Debugf("Getting initial block %v details for network %s and sleeping", block.Block, ntwrk.ID.String())
-					getBlockDetails(ch, client, currentNetwork.Block)
-					time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
+					getBlockDetails(ch, client, currentNetwork.Block, &currentNetwork)
+					//time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
 					return nil
 				}
 			}
@@ -249,37 +177,19 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 				}
 			}
 
-			// XXX
-			// TODO
-			// stop it creating dupes
-			// step 1: if we have the block and tx hash in the db, don't get it again/put it in db
-			// step 2: think about a way to not pull blocks again (write them to blocks, but with no txhash, or with a pending flag?)
-			// e.g.
-			// hbd gets 1000 gaps
-			// hbd pops 1000 block headers onto NATS
-			// hbd has a rest
-			// faster: hbd just gets the block number, writes it to db without txhash, pops it on NATS
-			// NATS is likely the better approach. TODO research if I can query NATS for blocks in progress
-			// or some kind of catch and release to at least only replay them into nats
-			//
-
 			common.Log.Debugf("processing %v missing blocks", len(missingBlocks))
-			for idx, missingBlock := range missingBlocks {
-				//we'll just do 100 at a time //TODO configurable
-				// TODO actually, work out how not to keep spamming NATS with dupes, timing is not the answer
-				if idx > 100 {
-					break
-				}
-				getBlockDetails(ch, client, missingBlock)
+			for _, missingBlock := range missingBlocks {
+				getBlockDetails(ch, client, missingBlock, &currentNetwork)
 			}
+
+			// once we're done filling in the gaps, sleep before finishing up
 			time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
 			return err
 		},
 	}
-
 }
 
-func getBlockDetails(ch chan *provide.NetworkStatus, client *rpc.Client, blockNumber int) error {
+func getBlockDetails(ch chan *provide.NetworkStatus, client *rpc.Client, blockNumber int, ntwrk *network.Network) error {
 	var resp interface{}
 	missingBlock := fmt.Sprintf("0x%x", blockNumber)
 
@@ -294,6 +204,24 @@ func getBlockDetails(ch chan *provide.NetworkStatus, client *rpc.Client, blockNu
 			common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", resp, err.Error())
 			return err
 		} else if header != nil && header.Number != nil {
+			// add the block details to the db
+			db := dbconf.DatabaseConnection()
+			var minedBlock network.Block
+			minedBlock.NetworkID = ntwrk.ID
+			minedBlock.Block = blockNumber
+			minedBlock.BlockHash = header.Hash().String() //CHECKME this is different to the etherscan hash, but seems to be generated correctly
+			// TODO get the transactions from the block and add them to the db
+			// txs := resp.(map[string]interface{})
+			// common.Log.Debugf("transactions in block %+v", txs["transactions"])
+			// TODO move this db code to the point where the msg gets put on NATS
+			// then if NATS is down, it will not save it to db
+			if db.Model(&minedBlock).Where("block = ?", minedBlock.Block).Updates(&minedBlock).RowsAffected == 0 {
+				dbResult := db.Create(&minedBlock)
+				if dbResult.RowsAffected < 1 {
+					errmsg := fmt.Sprintf("error saving block to db. Error: %s", dbResult.Error)
+					return fmt.Errorf(errmsg)
+				}
+			}
 			ch <- &provide.NetworkStatus{
 				Meta: map[string]interface{}{
 					"last_block_header": resp,

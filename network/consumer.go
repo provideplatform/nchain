@@ -44,6 +44,14 @@ type natsBlockFinalizedMsg struct {
 	Timestamp uint64  `json:"timestamp"`
 }
 
+//XXX HACK sort this out properly (using the provide-go models?)
+type Block struct {
+	providego.Model
+	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
+	Block     int       `sql:"type:int8" json:"block"`
+	BlockHash string    `sql:"type:text" json:"block_hash"` // FIXME: should be blockhash
+}
+
 var waitGroup sync.WaitGroup
 
 func init() {
@@ -157,24 +165,17 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						blockTimestamp := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
 						finalizedAt := time.Now()
 
-						//XXX HACK sort this out properly...
-						type Block struct {
-							providego.Model
-							NetworkID       uuid.UUID `sql:"type:uuid" json:"network_id"`
-							Block           int       `sql:"type:int8" json:"block"`
-							TransactionHash string    `sql:"type:text" json:"transaction_hash"` // FIXME: should be blockhash
-						}
-
-						// save the finalized block to the db
+						// upsert the finalized block to the db
 						var minedBlock Block
 						minedBlock.NetworkID = network.ID
 						minedBlock.Block = int(blockFinalizedMsg.Block)
-						minedBlock.TransactionHash = *blockFinalizedMsg.BlockHash
-						dbResult := db.Create(&minedBlock)
-						if dbResult.RowsAffected < 1 {
-							common.Log.Debugf("error saving block to db. Error: %s", dbResult.Error)
+						minedBlock.BlockHash = *blockFinalizedMsg.BlockHash
+						if db.Model(&minedBlock).Where("block = ?", minedBlock.Block).Updates(&minedBlock).RowsAffected == 0 {
+							dbResult := db.Create(&minedBlock)
+							if dbResult.RowsAffected < 1 {
+								common.Log.Debugf("error saving block to db. Error: %s", dbResult.Error)
+							}
 						}
-						// XXX END OF HACK
 
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
 							for _, _tx := range txs {
