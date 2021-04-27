@@ -37,19 +37,19 @@ const natsRemoveNodePeerTimeout = int64(time.Minute * 10)
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 
-type Block struct {
-	providego.Model
-
-	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
-	Block     int       `json:"block"`
-	Hash      string    `json:"hash"` // FIXME: should be blockhash
-}
-
 type natsBlockFinalizedMsg struct {
 	NetworkID *string `json:"network_id"`
 	Block     uint64  `json:"block"`
 	BlockHash *string `json:"blockhash"`
 	Timestamp uint64  `json:"timestamp"`
+}
+
+//XXX HACK sort this out properly (using the provide-go models?)
+type Block struct {
+	providego.Model
+	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
+	Block     int       `sql:"type:int8" json:"block"`
+	BlockHash string    `sql:"type:text" json:"block_hash"` // FIXME: should be blockhash
 }
 
 var waitGroup sync.WaitGroup
@@ -165,14 +165,16 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						blockTimestamp := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
 						finalizedAt := time.Now()
 
-						// save the finalized block to the db
+						// upsert the finalized block to the db
 						var minedBlock Block
 						minedBlock.NetworkID = network.ID
 						minedBlock.Block = int(blockFinalizedMsg.Block)
-						minedBlock.Hash = *blockFinalizedMsg.BlockHash
-						dbResult := db.Create(&minedBlock)
-						if dbResult.RowsAffected == 0 {
-							common.Log.Warningf("error saving block to db; error: %s", dbResult.Error.Error())
+						minedBlock.BlockHash = *blockFinalizedMsg.BlockHash
+						if db.Model(&minedBlock).Where("block = ?", minedBlock.Block).Updates(&minedBlock).RowsAffected == 0 {
+							dbResult := db.Create(&minedBlock)
+							if dbResult.RowsAffected < 1 {
+								common.Log.Debugf("error saving block to db. Error: %s", dbResult.Error)
+							}
 						}
 
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
