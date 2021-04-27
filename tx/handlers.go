@@ -148,17 +148,11 @@ func transactionDetailsHandler(c *gin.Context) {
 		}
 	}
 
-	if appID != nil && (tx.ApplicationID == nil || *tx.ApplicationID != *appID) {
-		provide.RenderError("forbidden", 403, c)
-		return
-	}
+	validApp := appID != nil && (tx.ApplicationID == nil || *tx.ApplicationID != *appID)
+	validOrg := orgID != nil && (tx.OrganizationID == nil || *tx.OrganizationID != *orgID)
+	validUser := userID != nil && (tx.UserID == nil || *tx.UserID != *userID)
 
-	if orgID != nil && (tx.OrganizationID == nil || *tx.OrganizationID != *orgID) {
-		provide.RenderError("forbidden", 403, c)
-		return
-	}
-
-	if userID != nil && (tx.UserID == nil || *tx.UserID != *userID) {
+	if !validApp && !validOrg && !validUser {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
@@ -544,7 +538,7 @@ func contractExecutionHandler(c *gin.Context) {
 
 	executionResponse, err := executeTransaction(contractObj, execution)
 	if err != nil {
-		common.Log.Debugf("error here is: %s", err.Error())
+		common.Log.Debugf("transaction execution failed; %s", err.Error())
 		provide.RenderError(err.Error(), 422, c)
 		return
 	}

@@ -37,6 +37,14 @@ const natsRemoveNodePeerTimeout = int64(time.Minute * 10)
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 
+type Block struct {
+	providego.Model
+
+	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
+	Block     int       `json:"block"`
+	Hash      string    `json:"hash"` // FIXME: should be blockhash
+}
+
 type natsBlockFinalizedMsg struct {
 	NetworkID *string `json:"network_id"`
 	Block     uint64  `json:"block"`
@@ -152,34 +160,25 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 				if err == nil {
 					block, err := provide.EVMGetBlockByNumber(network.ID.String(), network.RPCURL(), blockFinalizedMsg.Block)
 					if err != nil {
-						err = fmt.Errorf("Failed to fetch block; %s", err.Error())
+						err = fmt.Errorf("failed to fetch block; %s", err.Error())
 					} else if result, resultOk := block.Result.(map[string]interface{}); resultOk {
 						blockTimestamp := time.Unix(int64(blockFinalizedMsg.Timestamp/1000), 0)
 						finalizedAt := time.Now()
-
-						//XXX HACK sort this out properly...
-						type Block struct {
-							providego.Model
-							NetworkID       uuid.UUID `sql:"type:uuid" json:"network_id"`
-							Block           int       `sql:"type:int8" json:"block"`
-							TransactionHash string    `sql:"type:text" json:"transaction_hash"` // FIXME: should be blockhash
-						}
 
 						// save the finalized block to the db
 						var minedBlock Block
 						minedBlock.NetworkID = network.ID
 						minedBlock.Block = int(blockFinalizedMsg.Block)
-						minedBlock.TransactionHash = *blockFinalizedMsg.BlockHash
+						minedBlock.Hash = *blockFinalizedMsg.BlockHash
 						dbResult := db.Create(&minedBlock)
-						if dbResult.RowsAffected < 1 {
-							common.Log.Debugf("error saving block to db. Error: %s", dbResult.Error)
+						if dbResult.RowsAffected == 0 {
+							common.Log.Warningf("error saving block to db; error: %s", dbResult.Error.Error())
 						}
-						// XXX END OF HACK
 
 						if txs, txsOk := result["transactions"].([]interface{}); txsOk {
 							for _, _tx := range txs {
 								txHash := _tx.(map[string]interface{})["hash"].(string)
-								common.Log.Debugf("Setting tx block (%v) and finalized_at timestamp %s on tx: %s", blockFinalizedMsg.Block, finalizedAt, txHash)
+								common.Log.Tracef("setting tx block (%v) and finalized_at timestamp %s on tx: %s", blockFinalizedMsg.Block, finalizedAt, txHash)
 
 								params := map[string]interface{}{
 									"block":           blockFinalizedMsg.Block,

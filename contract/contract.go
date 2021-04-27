@@ -44,7 +44,7 @@ type Contract struct {
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
 func ContractListQuery() *gorm.DB {
-	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address, contracts.type")
+	return dbconf.DatabaseConnection().Select("contracts.id, contracts.created_at, contracts.accessed_at, contracts.application_id, contracts.organization_id, contracts.network_id, contracts.transaction_id, contracts.contract_id, contracts.name, contracts.address, contracts.type")
 }
 
 // enrich enriches the contract
@@ -63,7 +63,7 @@ func (c *Contract) CompiledArtifact() *api.CompiledArtifact {
 			compiledArtifactRawJSON := json.RawMessage(compiledArtifactJSON)
 			err := json.Unmarshal(compiledArtifactRawJSON, &artifact)
 			if err != nil {
-				common.Log.Warningf("Failed to unmarshal contract params to compiled artifact; %s", err.Error())
+				common.Log.Warningf("failed to unmarshal contract params to compiled artifact; %s", err.Error())
 				return nil
 			}
 		}
@@ -204,13 +204,20 @@ func (c *Contract) ResolveCompiledDependencyArtifact(descriptor string) *api.Com
 
 	for _, dep := range artifact.Deps {
 		dependency := dep.(map[string]interface{})
-		name, nameOk := dependency["name"].(string)
+		var name string
+		if depname, depnameOk := dependency["name"].(string); depnameOk {
+			name = depname
+		} else if depname, depnameOk := dependency["contractName"].(string); depnameOk {
+			name = depname
+		}
+		nameOk := name != ""
+
 		fingerprint, fingerprintOk := dependency["fingerprint"].(string)
 		if !nameOk && !fingerprintOk {
 			continue
 		}
 
-		common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s", name, fingerprint, *c.Address)
+		common.Log.Debugf("checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s", name, fingerprint, *c.Address)
 		if name == descriptor {
 			depJSON, _ := json.Marshal(dependency)
 			json.Unmarshal(depJSON, &dependencyArtifact)

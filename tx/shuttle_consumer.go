@@ -192,26 +192,11 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 	}
 
 	if internalContract.Create() {
-		common.Log.Debugf("Created contract %s for %s shuttle.contract.deployed event", internalContract.ID, *network.Name)
-		// if name == "OrgRegistry" || name == "Shield" || name == "Verifier" { // FIXME-- check ABI for Ownable interface instead of name
-		// 	var response map[string]interface{}
-		// 	txResponseCallback := func(c *contract.Contract, network *network.Network, methodDescriptor, method string, abiMethod *abi.Method, params []interface{}) (map[string]interface{}, error) {
-		// 		return txResponsefunc(tx, c, network, methodDescriptor, method, abiMethod, params)
-		// 	}
-		// 	if n.IsEthereumNetwork() {
-		// 		// FIXME-- make this use p2p interface
-		// 		response, err = cntrct.ExecuteEthereumContract(n, txResponseCallback, "transferOwnership", )
-		// 		if err != nil {
-		// 			common.Log.Warningf("Failed to handle shuttle.contract.deployed message; failed to fetch tx receipt for contract with address: %s; %s", byAddr, err.Error())
-		// 			natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
-		// 			return
-		// 		}
-		// 	}
-		// }
+		common.Log.Debugf("created contract %s for %s shuttle.contract.deployed event", internalContract.ID, *network.Name)
 
 		internalContract.ResolveTokenContract(db, network, *cntrct.Address, receipt,
 			func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
-				common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+				common.Log.Debugf("resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 				tok := &token.Token{
 					ApplicationID: c.ApplicationID,
