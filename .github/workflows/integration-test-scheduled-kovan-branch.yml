@@ -1,4 +1,4 @@
-name: nchain-KOVAN-s
+name: nchain-KOVAN-s(b)
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     
