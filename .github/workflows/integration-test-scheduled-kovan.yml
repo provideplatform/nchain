@@ -34,6 +34,10 @@ jobs:
         working-directory: nchain      
       - run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain
+      - name: log on failure
+        if: failure()
+        run: docker-compose -f ./ops/docker-compose.yml logs
+        working-directory: nchain
       - name: slack channel update
         if: failure()  
         uses: act10ns/slack@v1

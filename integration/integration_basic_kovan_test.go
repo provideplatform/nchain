@@ -399,7 +399,6 @@ func TestContractHDWalletKovanOrg(t *testing.T) {
 			json.Unmarshal([]byte(parameter), &params)
 
 			// execute the contract method
-			t.Logf("org token: %s", *orgToken.Token)
 			execResponse, err := nchain.ExecuteContract(*orgToken.Token, contract.ID.String(), params)
 			if err != nil {
 				t.Errorf("error executing contract. Error: %s", err.Error())
