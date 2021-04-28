@@ -31,7 +31,9 @@ jobs:
         working-directory: nchain
       - run: TAGS=rinkeby ./ops/run_local_tests_short.sh
         working-directory: nchain      
-      - run: docker-compose -f ./ops/docker-compose.yml logs
+      - name: log on failure
+        if: failure()
+        run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain
       - name: push_to_docker_hub
         if: success()
