@@ -61,16 +61,17 @@ func executeTransaction(c *contract.Contract, execution *contract.Execution) (*c
 	_txParamsJSON := json.RawMessage(txParamsJSON)
 
 	tx := &Transaction{
-		ApplicationID: c.ApplicationID,
-		UserID:        nil,
-		NetworkID:     c.NetworkID,
-		AccountID:     accountID,
-		WalletID:      walletID,
-		Path:          hdDerivationPath,
-		To:            c.Address,
-		Value:         &TxValue{value: value},
-		Params:        &_txParamsJSON,
-		Ref:           ref,
+		ApplicationID:  c.ApplicationID,
+		OrganizationID: c.OrganizationID,
+		UserID:         nil,
+		NetworkID:      c.NetworkID,
+		AccountID:      accountID,
+		WalletID:       walletID,
+		Path:           hdDerivationPath,
+		To:             c.Address,
+		Value:          &TxValue{value: value},
+		Params:         &_txParamsJSON,
+		Ref:            ref,
 	}
 
 	if publishedAt != nil {
