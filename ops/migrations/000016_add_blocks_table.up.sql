@@ -3,7 +3,7 @@ CREATE TABLE public.blocks (
 	network_id uuid NOT NULL,
 	created_at timestamp with time zone DEFAULT now() NOT NULL,
 	block int8 NULL,
-	block_hash text NULL
+	transaction_hash text NULL
 );
 
 ALTER TABLE public.accounts OWNER TO current_user;
