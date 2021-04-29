@@ -34,6 +34,8 @@ import (
 
 const runloopSleepInterval = 250 * time.Millisecond
 const runloopTickInterval = 5000 * time.Millisecond
+const jwtVerifierRefreshInterval = 60 * time.Second
+const jwtVerifierGracePeriod = 60 * time.Second
 
 var (
 	cancelF     context.CancelFunc
@@ -70,13 +72,23 @@ func main() {
 
 	runAPI()
 
+	startAt := time.Now()
+	gracePeriodEndAt := startAt.Add(jwtVerifierGracePeriod)
+	verifiersRefreshedAt := time.Now()
+
 	timer := time.NewTicker(runloopTickInterval)
 	defer timer.Stop()
 
 	for !shuttingDown() {
 		select {
 		case <-timer.C:
-			// tick... no-op
+			now := time.Now()
+			if now.Before(gracePeriodEndAt) {
+				util.RequireJWTVerifiers()
+			} else if now.After(verifiersRefreshedAt.Add(jwtVerifierRefreshInterval)) {
+				verifiersRefreshedAt = now
+				util.RequireJWTVerifiers()
+			}
 		case sig := <-sigs:
 			common.Log.Debugf("received signal: %s", sig)
 			srv.Shutdown(shutdownCtx)

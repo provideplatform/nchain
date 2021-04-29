@@ -1,4 +1,4 @@
-// +build integration- nchain-
+// +build integration nchain
 
 package integration
 
