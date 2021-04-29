@@ -215,7 +215,7 @@ func (n *Network) PaymentsNetworkName() *string {
 		case "8d31bf48-df6b-4a71-9d7c-3cb291111e27":
 			return common.StringOrNil("kovan")
 		case "1b16996e-3595-4985-816c-043345d22f8c":
-			return common.StringOrNil("gorli")
+			return common.StringOrNil("goerli")
 		default:
 			return nil
 		}
