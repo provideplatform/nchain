@@ -163,9 +163,9 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 			}
 
 			var missingBlocks []int
-
+			start := time.Now()
 			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", ntwrk.ID).Scan(&blockGaps)
-
+			common.Log.Debugf("ran missing blocks query in %v(ms)", time.Since(start).Milliseconds())
 			// block gaps is in the structure
 			// block - previousblock, where there is a gap
 			// so we iterate through it to get an array of blockNumbers we're missing
