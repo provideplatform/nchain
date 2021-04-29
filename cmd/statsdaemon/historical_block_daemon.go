@@ -112,10 +112,10 @@ func init() {
 
 	if HistoricalBlockDaemonActive {
 		common.Log.Debugf("historical block daemon active")
-	}
-	// get the configured sleep time if available
-	sleepTimeInSeconds = getSleepTime()
 
+		// get the configured sleep time if available
+		sleepTimeInSeconds = getSleepTime()
+	}
 }
 
 // EthereumHistoricalBlockDataSourceFactory builds and returns a JSON-RPC
