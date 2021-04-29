@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"os"
 	"os/signal"
@@ -31,6 +32,8 @@ import (
 
 // add some historical block consts
 const defaultHistoricalBlockDaemonQueueSize = 8
+
+var HistoricalBlockDaemonActive bool
 
 // HistoricalBlockDataSource provides JSON-RPC polling (http) only
 // interfaces for a network
@@ -88,7 +91,7 @@ type BlockGap struct {
 }
 
 func getSleepTime() int64 {
-	envSleepTime := os.Getenv("HISTORICAL_BLOCK_SLEEP_SECONDS")
+	envSleepTime := os.Getenv("HISTORICAL_BLOCK_DAEMON_SLEEP_SECONDS")
 	if envSleepTime == "" {
 		common.Log.Debugf("no HBD sleep specified, using default sleep of %v seconds", defaultSleepTime)
 		return defaultSleepTime
@@ -105,8 +108,14 @@ func getSleepTime() int64 {
 }
 
 func init() {
+	HistoricalBlockDaemonActive = strings.ToLower(os.Getenv("HISTORICAL_BLOCK_DAEMON")) == "true"
+
+	if HistoricalBlockDaemonActive {
+		common.Log.Debugf("historical block daemon active")
+	}
 	// get the configured sleep time if available
 	sleepTimeInSeconds = getSleepTime()
+
 }
 
 // EthereumHistoricalBlockDataSourceFactory builds and returns a JSON-RPC
@@ -414,6 +423,10 @@ var currentHistoricalBlocks = map[string]*HistoricalBlockDaemon{}
 // the given network; if no stats daemon instance has been started for the network,
 // the instance is configured and started immediately, caching real-time network stats.
 func RequireHistoricalBlockStatsDaemon(network *network.Network) *HistoricalBlockDaemon {
+	if !HistoricalBlockDaemonActive {
+		return nil
+	}
+
 	var daemon *HistoricalBlockDaemon
 	if daemon, ok := currentHistoricalBlocks[network.ID.String()]; ok {
 		common.Log.Debugf("Cached historical daemon instance found for network: %s; id: %s", *network.Name, network.ID)
