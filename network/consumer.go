@@ -49,7 +49,7 @@ type Block struct {
 	providego.Model
 	NetworkID uuid.UUID `sql:"type:uuid" json:"network_id"`
 	Block     int       `sql:"type:int8" json:"block"`
-	BlockHash string    `sql:"type:text" json:"block_hash"` // FIXME: should be blockhash
+	Hash      string    `sql:"type:text" json:"hash"`
 }
 
 var waitGroup sync.WaitGroup
@@ -169,7 +169,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						var minedBlock Block
 						minedBlock.NetworkID = network.ID
 						minedBlock.Block = int(blockFinalizedMsg.Block)
-						minedBlock.BlockHash = *blockFinalizedMsg.BlockHash
+						minedBlock.Hash = *blockFinalizedMsg.BlockHash
 						if db.Model(&minedBlock).Where("block = ?", minedBlock.Block).Updates(&minedBlock).RowsAffected == 0 {
 							dbResult := db.Create(&minedBlock)
 							if dbResult.RowsAffected < 1 {

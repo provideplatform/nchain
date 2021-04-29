@@ -218,7 +218,7 @@ func getBlockDetails(ch chan *provide.NetworkStatus, client *rpc.Client, blockNu
 			var minedBlock network.Block
 			minedBlock.NetworkID = ntwrk.ID
 			minedBlock.Block = blockNumber
-			minedBlock.BlockHash = header.Hash().String() //CHECKME this is different to the etherscan hash, but seems to be generated correctly
+			minedBlock.Hash = header.Hash().String() //CHECKME this is different to the etherscan hash, but seems to be generated correctly
 			// TODO get the transactions from the block and add them to the db
 			// txs := resp.(map[string]interface{})
 			// common.Log.Debugf("transactions in block %+v", txs["transactions"])
