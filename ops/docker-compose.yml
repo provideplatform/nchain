@@ -27,6 +27,7 @@ services:
     image: provide/vault:dev
     container_name: vault
     depends_on:
+      - ident
       - postgres
     environment:
       - DATABASE_HOST=postgres
