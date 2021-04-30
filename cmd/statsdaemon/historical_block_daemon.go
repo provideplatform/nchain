@@ -186,7 +186,7 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 				}
 			}
 
-			common.Log.Debugf("HBD: Found %v missing blocks in %v(ms)", len(missingBlocks), time.Since(start).Milliseconds()) //TODO report this only once
+			common.Log.Debugf("HBD: Found %v missing blocks for %s network in %v(ms)", len(missingBlocks), currentNetwork.ID, time.Since(start).Milliseconds()) //TODO report this only once
 			for _, missingBlock := range missingBlocks {
 				getBlockDetails(ch, client, missingBlock, &currentNetwork)
 			}
