@@ -93,17 +93,17 @@ type BlockGap struct {
 func getSleepTime() int64 {
 	envSleepTime := os.Getenv("HISTORICAL_BLOCK_DAEMON_SLEEP_SECONDS")
 	if envSleepTime == "" {
-		common.Log.Debugf("no HBD sleep specified, using default sleep of %v seconds", defaultSleepTime)
+		common.Log.Debugf("No HBD sleep specified, using default sleep of %v seconds", defaultSleepTime)
 		return defaultSleepTime
 	}
 	// otherwise, use the default sleep time
 	var err error
 	sleepTimeInSeconds, err := strconv.ParseInt(envSleepTime, 10, 64)
 	if err != nil {
-		common.Log.Errorf("error parsing HBD sleep, using default sleep of %v seconds. Error: %s", defaultSleepTime, err.Error())
+		common.Log.Errorf("Error parsing HBD sleep, using default sleep of %v seconds. Error: %s", defaultSleepTime, err.Error())
 		return defaultSleepTime
 	}
-	common.Log.Debugf("using specified HBD sleep time of %v seconds", sleepTimeInSeconds)
+	common.Log.Debugf("Using specified HBD sleep time of %v seconds", sleepTimeInSeconds)
 	return sleepTimeInSeconds
 }
 
@@ -111,7 +111,7 @@ func init() {
 	HistoricalBlockDaemonActive = strings.ToLower(os.Getenv("HISTORICAL_BLOCK_DAEMON")) == "true"
 
 	if HistoricalBlockDaemonActive {
-		common.Log.Debugf("historical block daemon active")
+		common.Log.Debugf("Historical Block Daemon active")
 
 		// get the configured sleep time if available
 		sleepTimeInSeconds = getSleepTime()
@@ -165,14 +165,14 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 			var missingBlocks []int
 			start := time.Now()
 			db.Raw("select * from (select block, lag(block,1) over (order by block) as previous_block from blocks where network_id = ?) list where block - previous_block > 1", ntwrk.ID).Scan(&blockGaps)
-			common.Log.Debugf("ran missing blocks query in %v(ms)", time.Since(start).Milliseconds())
+
 			// block gaps is in the structure
 			// block - previousblock, where there is a gap
 			// so we iterate through it to get an array of blockNumbers we're missing
 
 			if len(blockGaps) == 0 {
 				// if we have nothing to do, sleep for a bit
-				common.Log.Debugf("nothing to do, sleeping for %v seconds", sleepTimeInSeconds)
+				common.Log.Debugf("HBD: Found no missing blocks in %v(ms), sleeping for %v seconds", time.Since(start).Milliseconds(), sleepTimeInSeconds)
 				time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
 				return nil
 			}
@@ -186,7 +186,7 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 				}
 			}
 
-			common.Log.Debugf("processing %v missing blocks", len(missingBlocks))
+			common.Log.Debugf("HBD: Found %v missing blocks in %v(ms)", len(missingBlocks), time.Since(start).Milliseconds()) //TODO report this only once
 			for _, missingBlock := range missingBlocks {
 				getBlockDetails(ch, client, missingBlock, &currentNetwork)
 			}
@@ -213,24 +213,6 @@ func getBlockDetails(ch chan *provide.NetworkStatus, client *rpc.Client, blockNu
 			common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", resp, err.Error())
 			return err
 		} else if header != nil && header.Number != nil {
-			// add the block details to the db
-			db := dbconf.DatabaseConnection()
-			var minedBlock network.Block
-			minedBlock.NetworkID = ntwrk.ID
-			minedBlock.Block = blockNumber
-			minedBlock.Hash = header.Hash().String() //CHECKME this is different to the etherscan hash, but seems to be generated correctly
-			// TODO get the transactions from the block and add them to the db
-			// txs := resp.(map[string]interface{})
-			// common.Log.Debugf("transactions in block %+v", txs["transactions"])
-			// TODO move this db code to the point where the msg gets put on NATS
-			// then if NATS is down, it will not save it to db
-			if db.Model(&minedBlock).Where("block = ?", minedBlock.Block).Updates(&minedBlock).RowsAffected == 0 {
-				dbResult := db.Create(&minedBlock)
-				if dbResult.RowsAffected < 1 {
-					errmsg := fmt.Sprintf("error saving block to db. Error: %s", dbResult.Error)
-					return fmt.Errorf(errmsg)
-				}
-			}
 			ch <- &provide.NetworkStatus{
 				Meta: map[string]interface{}{
 					"last_block_header": resp,
@@ -371,7 +353,28 @@ func (hbd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 			Timestamp: lastBlockAt,
 		})
 
-		natsutil.NatsStreamingPublish(natsBlockFinalizedSubject, natsPayload)
+		// add the block details to the db
+		db := dbconf.DatabaseConnection()
+		var minedBlock network.Block
+		minedBlock.NetworkID = hbd.dataSource.Network.ID
+		minedBlock.Block = int(header.Number.Int64())
+		minedBlock.Hash = header.Hash().String() //CHECKME this is different to the etherscan hash, but seems to be generated correctly
+		// TODO get the transactions from the block and add them to the db
+		// txs := resp.(map[string]interface{})
+		// common.Log.Debugf("transactions in block %+v", txs["transactions"])
+		var err error
+		if db.Model(&minedBlock).Where("block = ?", minedBlock.Block).Updates(&minedBlock).RowsAffected == 0 {
+			dbResult := db.Create(&minedBlock)
+			if dbResult.RowsAffected < 1 {
+				err = fmt.Errorf("Error saving block %v to db. Error: %s", minedBlock.Block, dbResult.Error)
+				common.Log.Debugf("%s", err)
+			}
+		}
+		// publish to NATS only if we've managed to save the block record to the DB
+		if err != nil {
+			natsutil.NatsStreamingPublish(natsBlockFinalizedSubject, natsPayload)
+		}
+
 	}
 
 	hbd.publish()
