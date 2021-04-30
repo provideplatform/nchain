@@ -172,7 +172,7 @@ func EthereumHistoricalBlockDataSourceFactory(ntwrk *network.Network) *Historica
 
 			if len(blockGaps) == 0 {
 				// if we have nothing to do, sleep for a bit
-				common.Log.Debugf("HBD: Found no missing blocks in %v(ms), sleeping for %v seconds", time.Since(start).Milliseconds(), sleepTimeInSeconds)
+				common.Log.Debugf("HBD: Found no missing blocks for %s network in %v(ms), sleeping for %v seconds", currentNetwork.ID, time.Since(start).Milliseconds(), sleepTimeInSeconds)
 				time.Sleep(time.Duration(sleepTimeInSeconds) * time.Second)
 				return nil
 			}
