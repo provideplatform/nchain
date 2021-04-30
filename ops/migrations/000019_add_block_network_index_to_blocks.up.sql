@@ -1,0 +1,1 @@
+CREATE INDEX idx_blocks_block_network ON public.blocks USING btree (block, network_id);

@@ -1,0 +1,1 @@
+DROP INDEX public.idx_blocks_block_network;
