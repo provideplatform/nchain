@@ -221,7 +221,13 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 						}
 
 						if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
-							err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+							// retry json rpc broadcast 3 times if it fails
+							err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+								err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
+								return
+							})
+
+							//err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
 							return nil, err
 						}
 

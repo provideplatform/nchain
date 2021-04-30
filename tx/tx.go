@@ -34,6 +34,8 @@ const defaultDerivedCoinType = uint32(60)
 const defaultDerivedChainPath = uint32(0) // i.e., the external or internal chain (also known as change addresses if internal chain)
 const firstHardenedChildIndex = uint32(0x80000000)
 
+const DefaultJSONRPCRetries = 3
+
 // Signer interface for signing transactions
 type Signer interface {
 	Address() string
@@ -754,7 +756,7 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 
 		result, err := common.BroadcastTransaction(t.To, t.Data, params)
 		if err != nil {
-			return fmt.Errorf("failed to broadcast tx; %s", err.Error())
+			return fmt.Errorf("failed to broadcast bookie tx; %s", err.Error())
 		}
 
 		t.Hash = result
@@ -763,7 +765,14 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	} else {
 		if ntwrk.IsEthereumNetwork() {
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-				err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
+
+				// retry broadcast 3 times if it fails
+				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+					err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
+					return
+				})
+
+				//err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 				if err == nil {
 					// we have successfully broadcast the transaction
 					// so update the db with the received transaction hash

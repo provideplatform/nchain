@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -92,4 +93,22 @@ func MarshalConfig(opts map[string]interface{}) *json.RawMessage {
 	cfgJSON, _ := json.Marshal(opts)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	return &_cfgJSON
+}
+
+// Retry attempts functions multiple times until they succceed
+func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
+	for i := 0; ; i++ {
+		err = f()
+		if err == nil {
+			return
+		}
+		if i >= (attempts - 1) {
+			break
+		}
+
+		// TODO increase sleep duration by a factor of i, so there's a backoff
+		time.Sleep(sleep)
+
+	}
+	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
