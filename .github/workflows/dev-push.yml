@@ -29,7 +29,7 @@ jobs:
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
-      - run: TAGS=kovan ./ops/run_local_tests_short.sh
+      - run: TAGS=ropsten ./ops/run_local_tests_short.sh
         working-directory: nchain      
       - name: log on failure
         if: failure()
