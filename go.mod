@@ -58,3 +58,5 @@ require (
 )
 
 replace github.com/provideapp/ident => ../ident
+
+replace github.com/provideservices/provide-go => ../provide-go

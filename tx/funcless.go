@@ -136,7 +136,8 @@ func executeTransaction(c *contract.Contract, execution *contract.Execution) (*c
 			Ref:         ref,
 			View:        readonlyMethod,
 		}
-		common.Log.Debugf("resp is: %+v", resp)
+		common.Log.Debugf("XXXresp is: %+v", resp)
+		common.Log.Debugf("XXXresponse transaction is: %v", resp.Transaction)
 	} else if tx.Response.Transaction == nil {
 		//?? when does this get tripped?
 		//tx.Response.Transaction = tx
