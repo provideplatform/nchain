@@ -426,9 +426,17 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	ref, err := uuid.NewV4()
-	if err != nil {
-		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+	// get ref from params (optional, create new if not present)
+	var ref uuid.UUID
+	txRef, txRefOk := params["ref"].(uuid.UUID)
+
+	if txRefOk {
+		ref = txRef
+	} else {
+		ref, err = uuid.NewV4()
+		if err != nil {
+			common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+		}
 	}
 
 	execution := &contract.Execution{

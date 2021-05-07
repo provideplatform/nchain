@@ -136,6 +136,20 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	value, valueOk := params["value"]
 	txParams, paramsOk := params["params"].(map[string]interface{})
 	publishedAt, publishedAtOk := params["published_at"].(string)
+	reference, referenceOk := params["ref"].(uuid.UUID)
+
+	if !referenceOk {
+		// no reference provided with the contract, so we'll make one
+		reference, err = uuid.NewV4()
+		if err != nil {
+			common.Log.Warningf("Failed to create unique tx ref. Error: %s", err.Error())
+			natsutil.Nack(msg)
+			return
+		}
+	}
+
+	// get pointer to reference for tx object (HACK, TIDY)
+	ref := reference.String()
 
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
@@ -209,7 +223,9 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		To:             nil,
 		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:    &publishedAtTime,
+		Ref:            &ref,
 	}
+
 	tx.setParams(txParams)
 
 	if tx.Create(db) {
