@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+	"github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/provideapp/nchain/common"
@@ -276,6 +278,22 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
+			// redis nonce
+			cachedNonce, err := redisutil.Get(*txAddress)
+			if err != nil {
+				common.Log.Debugf("Error getting cached nonce")
+			}
+			if cachedNonce == nil {
+				common.Log.Debugf("No nonce found on redis for address: %s", *txAddress)
+			} else {
+				int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
+				if err != nil {
+					common.Log.Debugf("error converting cached nonce to int64. Error: %s", err.Error())
+				} else {
+					nonce = &int64nonce
+				}
+			}
+
 			common.Log.Debugf("XXX: getting signer information: %v", time.Now())
 			err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
 				signer, _tx, hash, err = providecrypto.EVMTxFactory(
@@ -291,6 +309,13 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				)
 				return
 			})
+
+			common.Log.Debugf("XXX: got tx nonce of %v", _tx.Nonce())
+			// update nonce and cache in redis
+			updatedNonce := _tx.Nonce() + 1
+			redisutil.Set(*txAddress, updatedNonce, nil)
+			common.Log.Debugf("XXX updated nonce in redis to %v", updatedNonce)
+
 			common.Log.Debugf("XXX: got signer information: %v", time.Now())
 			// signer, _tx, hash, err = providecrypto.EVMTxFactory(
 			// 	txs.Network.ID.String(),

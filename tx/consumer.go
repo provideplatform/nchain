@@ -149,8 +149,15 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		}
 	}
 
+	var ref string
 	// get pointer to reference for tx object (HACK, TIDY)
-	ref := reference.(string)
+	//HACK until I find where this is getting set incorrectly
+	switch reference.(type) {
+	case string:
+		ref = reference.(string)
+	case uuid.UUID:
+		ref = reference.(uuid.UUID).String()
+	}
 
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
