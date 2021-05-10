@@ -182,29 +182,22 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 				return
 			}
 
-			// get contract details to see if we have a transaction id
-			// NONONO, this is only good for contract deployments, not tx executions!
-			resp, err := nchain.GetTransactionDetails(*appToken.Token, txRef.String(), params)
+			tx, err := nchain.GetTransactionDetails(*appToken.Token, txRef.String(), map[string]interface{}{})
+			//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
 			if err != nil {
-				t.Logf("error getting contract details to determine tx status. Err: %s", err.Error())
+				t.Logf("tx not yet mined...")
 			}
-			transactionID := resp.ID
-			t.Logf("tx id for contract: %v", transactionID)
+
 			if err == nil {
-
-				tx, err := nchain.GetTransactionDetails(*appToken.Token, txRef.String(), map[string]interface{}{})
-				//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
-				if err != nil {
-					t.Logf("tx not yet mined...")
+				if tx.Description != nil {
+					t.Errorf("tx error; tx id: %s; Error: %s", tx.ID.String(), *tx.Description)
+					return
 				}
-
-				if err == nil {
-					if tx.Block != nil && *tx.Hash != "0x" {
-						t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
-						break
-					}
-					t.Logf("resolving transaction...")
+				if tx.Block != nil && *tx.Hash != "0x" {
+					t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
+					break
 				}
+				t.Logf("resolving transaction...")
 			}
 
 			time.Sleep(transactionSleepTime * time.Second)
