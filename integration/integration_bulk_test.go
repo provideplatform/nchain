@@ -121,7 +121,7 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 		for looper := 0; looper < numberOfTransactions; looper++ {
 			started := time.Now().Unix()
 			for {
-				if time.Now().Unix()-started >= contractTimeout {
+				if time.Now().Unix()-started >= bulkContractTimeout {
 					t.Errorf("timed out awaiting contract address for %s contract for %s network", tc.name, tc.network)
 					return
 				}

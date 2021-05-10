@@ -97,6 +97,9 @@ integration_readonly:
 integration_bookie:
 	LOCAL_TAGS=bookie NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
 
+integration_bulk:
+	LOCAL_TAGS=bulk NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
 debug:
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
 
