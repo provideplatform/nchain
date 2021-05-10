@@ -16,7 +16,7 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 
 	t.Parallel()
 
-	const numberOfTransactions = 10
+	const numberOfTransactions = 100
 	deployedContracts := make([]string, numberOfTransactions)
 
 	testId, err := uuid.NewV4()
@@ -81,7 +81,20 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 	for _, tc := range tt {
 		// we will deploy the contract numberOfTransactions times
 		for looper := 0; looper < numberOfTransactions; looper++ {
-			t.Logf("creating contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
+
+			// txRef, err := uuid.NewV4()
+			// if err != nil {
+			// 	t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+			// 	return
+			// }
+
+			contractRef, err := uuid.NewV4()
+			if err != nil {
+				t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+				return
+			}
+
+			t.Logf("creating contract using wallet id: %s, derivation path: %s, ref: %s", tc.walletID, tc.derivationPath, contractRef.String())
 			contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
 				"network_id":     tc.network,
 				"application_id": app.ID.String(),
@@ -92,12 +105,14 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 					"wallet_id":          tc.walletID,
 					"hd_derivation_path": tc.derivationPath,
 					"compiled_artifact":  tc.artifact,
+					"ref":                contractRef.String(),
 				},
 			})
 			if err != nil {
 				t.Errorf("error creating %s contract. Error: %s", tc.name, err.Error())
 				return
 			}
+			t.Logf("created contract with id: %s", contract.ID)
 			deployedContracts[looper] = contract.ID.String()
 		} //looper
 
