@@ -10,7 +10,7 @@ RUN rm -rf ~/.ssh && rm -rf /go/src/github.com/provideapp/nchain/ops/keys
 WORKDIR /go/src/github.com/provideapp/nchain
 RUN make build
 
-FROM golang:1.15
+FROM alpine
 
 RUN mkdir -p /nchain
 WORKDIR /nchain
