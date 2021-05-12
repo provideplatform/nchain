@@ -572,15 +572,22 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					networkBroadcastErr := t.broadcast(db, signer.Network, signer)
 					// if regular fails, we're out
 					if networkBroadcastErr != nil {
-						payload, _ := json.Marshal(map[string]interface{}{
-							"transaction_id": t.ID.String(),
-						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 
-						return true
+						common.Log.Debugf("XXX: tx.Create. Broadcast err: %s for tx ref: %s", err.Error(), *t.Ref)
+						desc := networkBroadcastErr.Error()
+						t.updateStatus(db, "failed", &desc)
+						return false
+
+						// payload, _ := json.Marshal(map[string]interface{}{
+						// 	"transaction_id": t.ID.String(),
+						// })
+						// natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+
+						// return true
 					}
 					// if regular succeeds, pop it onto nats
 					if networkBroadcastErr == nil {
+						common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
 						})
