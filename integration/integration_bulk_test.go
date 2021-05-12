@@ -16,7 +16,7 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 
 	t.Parallel()
 
-	const numberOfTransactions = 100
+	const numberOfTransactions = 25
 	deployedContracts := make([]string, numberOfTransactions)
 
 	testId, err := uuid.NewV4()
