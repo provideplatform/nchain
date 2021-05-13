@@ -97,11 +97,14 @@ func MarshalConfig(opts map[string]interface{}) *json.RawMessage {
 
 // Retry attempts functions multiple times until they succceed
 func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
+	var errors []error
+
 	for i := 0; ; i++ {
 		err = f()
 		if err == nil {
 			return
 		}
+		errors = append(errors, err)
 		if i >= (attempts - 1) {
 			break
 		}
@@ -110,5 +113,5 @@ func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
 		time.Sleep(sleep)
 
 	}
-	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
+	return fmt.Errorf("after %d attempts, errors %+v, last error: %s", attempts, errors, err)
 }
