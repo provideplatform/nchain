@@ -310,12 +310,12 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				)
 				return
 			})
-
-			common.Log.Debugf("XXX: got tx nonce of %v for tx ref: %s", _tx.Nonce(), *tx.Ref)
 			if err != nil {
 				return nil, nil, err
 			}
+
 			// update nonce and cache in redis
+			common.Log.Debugf("XXX: got tx nonce of %v for tx ref: %s", _tx.Nonce(), *tx.Ref)
 			updatedNonce := _tx.Nonce() + 1
 			redisutil.Set(*txAddress, updatedNonce, nil)
 			common.Log.Debugf("XXX updated nonce in redis for address %s for tx %s to %v", *txAddress, *tx.Ref, updatedNonce)
