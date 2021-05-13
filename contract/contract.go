@@ -328,7 +328,7 @@ func (c *Contract) Create() bool {
 							data = fmt.Sprintf("%s%x", data, string(encodedArgv))
 						}
 					}
-
+					common.Log.Debugf("XXX: CHECK: contract is %+v", c)
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
 						"contract_id":        c.ID,
 						"data":               data,
@@ -340,7 +340,7 @@ func (c *Contract) Create() bool {
 						"published_at":       time.Now(),
 						"reference":          c.Reference.String(),
 					})
-
+					common.Log.Debugf("XXX: Publishing tx create message to NATS for tx %s", c.Reference.String())
 					err = natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
