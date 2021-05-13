@@ -183,6 +183,7 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 				}
 			} else {
 				var txResponse *contract.ExecutionResponse
+				common.Log.Debugf("XXX: getTransactionResponse. About to create tx with ref: %v", *tx.Ref)
 				if tx.Create(db) {
 					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
 					if tx.Response != nil {
