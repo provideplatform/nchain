@@ -281,15 +281,16 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			// redis nonce
 			cachedNonce, err := redisutil.Get(*txAddress)
 			if err != nil {
-				common.Log.Debugf("Error getting cached nonce")
+				common.Log.Debugf("XXX: Error getting cached nonce for tx ref %s", *tx.Ref)
 			}
 			if cachedNonce == nil {
-				common.Log.Debugf("No nonce found on redis for address: %s", *txAddress)
+				common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", *txAddress, *tx.Ref)
 			} else {
 				int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
 				if err != nil {
-					common.Log.Debugf("error converting cached nonce to int64. Error: %s", err.Error())
+					common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", *tx.Ref, err.Error())
 				} else {
+					common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, *tx.Ref)
 					nonce = &int64nonce
 				}
 			}
@@ -310,14 +311,14 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return
 			})
 
+			common.Log.Debugf("XXX: got tx nonce of %v for tx ref: %s", _tx.Nonce(), *tx.Ref)
 			if err != nil {
 				return nil, nil, err
 			}
-			common.Log.Debugf("XXX: got tx nonce of %v", _tx.Nonce())
 			// update nonce and cache in redis
 			updatedNonce := _tx.Nonce() + 1
 			redisutil.Set(*txAddress, updatedNonce, nil)
-			common.Log.Debugf("XXX updated nonce in redis to %v", updatedNonce)
+			common.Log.Debugf("XXX updated nonce in redis for address %s for tx %s to %v", *txAddress, *tx.Ref, updatedNonce)
 
 			common.Log.Debugf("XXX: got signer information: %v", time.Now())
 			// signer, _tx, hash, err = providecrypto.EVMTxFactory(
@@ -587,6 +588,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					}
 					// if regular succeeds, pop it onto nats
 					if networkBroadcastErr == nil {
+						common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
 						})
