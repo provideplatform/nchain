@@ -526,7 +526,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		if t.WalletID != nil && *t.WalletID == uuid.Nil {
 			t.WalletID = nil
 		}
-
+		common.Log.Debugf("XXX: Create: about to create tx with ref: %v", *t.Ref)
 		result := db.Create(&t)
 		rowsAffected := result.RowsAffected
 		errors := result.GetErrors()
@@ -575,12 +575,15 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					networkBroadcastErr := t.broadcast(db, signer.Network, signer)
 					// if regular fails, we're out
 					if networkBroadcastErr != nil {
-						payload, _ := json.Marshal(map[string]interface{}{
-							"transaction_id": t.ID.String(),
-						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+						common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
 
-						return true
+						t.Errors = append(t.Errors, &provide.Error{
+							Message: common.StringOrNil(networkBroadcastErr.Error()),
+						})
+
+						desc := networkBroadcastErr.Error()
+						t.updateStatus(db, "failed", &desc)
+						return false
 					}
 					// if regular succeeds, pop it onto nats
 					if networkBroadcastErr == nil {
@@ -809,13 +812,13 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	} else {
 		if ntwrk.IsEthereumNetwork() {
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-
+				common.Log.Debugf("XXX: about to broadcast tx ref: %s", *t.Ref)
 				// retry broadcast 3 times if it fails
 				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
 					err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 					return
 				})
-
+				common.Log.Debugf("XXX: broadcast tx ref: %s", *t.Ref)
 				//err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 				if err == nil {
 					// we have successfully broadcast the transaction
@@ -954,6 +957,10 @@ func (t *Transaction) handleTxReceipt(
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)
 		if kontract == nil || kontract.ID == uuid.Nil {
 			common.Log.Debugf("XXX could not find contract for tx id: %s, appID: %s, walletID: %s", t.ID, *t.ApplicationID, *t.WalletID)
+			ref, err := uuid.FromString(*t.Ref)
+			if err != nil {
+				common.Log.Debugf("XXX: error converting transaction ref to contract. Error: %s", err.Error())
+			}
 			kontract = &contract.Contract{
 				ApplicationID:  t.ApplicationID,
 				OrganizationID: t.OrganizationID,
@@ -962,6 +969,7 @@ func (t *Transaction) handleTxReceipt(
 				Name:           common.StringOrNil(contractName),
 				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
 				Params:         t.Params,
+				Reference:      &ref,
 			}
 			if kontract.Create() {
 				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
