@@ -310,6 +310,9 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return
 			})
 
+			if err != nil {
+				return nil, nil, err
+			}
 			common.Log.Debugf("XXX: got tx nonce of %v", _tx.Nonce())
 			// update nonce and cache in redis
 			updatedNonce := _tx.Nonce() + 1
@@ -950,6 +953,7 @@ func (t *Transaction) handleTxReceipt(
 
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)
 		if kontract == nil || kontract.ID == uuid.Nil {
+			common.Log.Debugf("XXX could not find contract for tx id: %s, appID: %s, walletID: %s", t.ID, *t.ApplicationID, *t.WalletID)
 			kontract = &contract.Contract{
 				ApplicationID:  t.ApplicationID,
 				OrganizationID: t.OrganizationID,
