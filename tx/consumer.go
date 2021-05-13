@@ -159,6 +159,8 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		ref = reference.(uuid.UUID).String()
 	}
 
+	// REDIS HACK??
+
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
 		natsutil.Nack(msg)
@@ -235,12 +237,18 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 
 	tx.setParams(txParams)
-
+	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 	if tx.Create(db) {
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, saved contract for tx ref: %s", *tx.Ref)
 		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
-		msg.Ack()
+		err = msg.Ack()
+		if err != nil {
+			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
+		}
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *tx.Ref)
 	} else {
 		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
 		for _, err := range tx.Errors {
@@ -564,9 +572,9 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		common.Log.Debugf("fetched tx receipt for hash: %s", *tx.Hash)
 
 		// w00t but potentially HACKYHACK...
-		// TODO go through the flow of the recept and see why some get a block
+		// TODO go through the flow of the receipt and see why some get a block
 		// and some don't
-
+		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
 		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
 		// if we have a block number in the receipt, and the tx has no block
 		// populate the block and finalized timestamp
