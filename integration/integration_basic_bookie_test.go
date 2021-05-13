@@ -78,7 +78,18 @@ func TestContractWalletNoDerivationPath(t *testing.T) {
 	}
 
 	for _, tc := range tt {
+		// create unique references
+		txRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+			return
+		}
 
+		contractRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+			return
+		}
 		t.Logf("creating contract using wallet id: %s", tc.walletID)
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
 			"network_id":     tc.network,
@@ -89,6 +100,7 @@ func TestContractWalletNoDerivationPath(t *testing.T) {
 			"params": map[string]interface{}{
 				"wallet_id":         tc.walletID,
 				"compiled_artifact": tc.artifact,
+				"ref":               contractRef.String(),
 			},
 		})
 		if err != nil {
@@ -125,14 +137,13 @@ func TestContractWalletNoDerivationPath(t *testing.T) {
 
 		params := map[string]interface{}{}
 
-		parameter := fmt.Sprintf(`{"method":"broadcast", "params": ["%s"], "value":0, "wallet_id":"%s"}`, msg, tc.walletID)
+		parameter := fmt.Sprintf(`{"method":"broadcast", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, msg, tc.walletID, txRef)
 		json.Unmarshal([]byte(parameter), &params)
 
 		// execute the contract method
-		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+		_, err = nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
 		if err != nil {
-			t.Errorf("error executing contract. Error: %s", err.Error())
-			return
+			t.Logf("error executing contract, but it might be nil response. Error: %s", err.Error())
 		}
 
 		if err != nil {
@@ -148,13 +159,17 @@ func TestContractWalletNoDerivationPath(t *testing.T) {
 				return
 			}
 
-			tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
+			tx, err := nchain.GetTransactionDetails(*appToken.Token, txRef.String(), map[string]interface{}{})
 			//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
 			if err != nil {
 				t.Logf("tx not yet mined...")
 			}
 
 			if err == nil {
+				if tx.Description != nil {
+					t.Errorf("tx error; tx id: %s; Error: %s", tx.ID.String(), *tx.Description)
+					return
+				}
 				if tx.Hash != nil && *tx.Hash != "0x" {
 					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
 					break
@@ -237,6 +252,18 @@ func TestContractWallet(t *testing.T) {
 
 	for _, tc := range tt {
 
+		txRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+			return
+		}
+
+		contractRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+			return
+		}
+
 		t.Logf("creating contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
 			"network_id":     tc.network,
@@ -248,6 +275,7 @@ func TestContractWallet(t *testing.T) {
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
 				"compiled_artifact":  tc.artifact,
+				"ref":                contractRef.String(),
 			},
 		})
 		if err != nil {
@@ -284,14 +312,13 @@ func TestContractWallet(t *testing.T) {
 
 		params := map[string]interface{}{}
 
-		parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
+		parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
 		json.Unmarshal([]byte(parameter), &params)
 
 		// execute the contract method
-		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+		_, err = nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
 		if err != nil {
-			t.Errorf("error executing contract. Error: %s", err.Error())
-			return
+			t.Logf("error executing contract, but it might be nil response. Error: %s", err.Error())
 		}
 
 		if err != nil {
@@ -307,13 +334,17 @@ func TestContractWallet(t *testing.T) {
 				return
 			}
 
-			tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
+			tx, err := nchain.GetTransactionDetails(*appToken.Token, txRef.String(), map[string]interface{}{})
 			//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
 			if err != nil {
 				t.Logf("tx not yet mined...")
 			}
 
 			if err == nil {
+				if tx.Description != nil {
+					t.Errorf("tx error; tx id: %s; Error: %s", tx.ID.String(), *tx.Description)
+					return
+				}
 				if tx.Hash != nil && *tx.Hash != "0x" {
 					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
 					break
@@ -382,6 +413,18 @@ func TestContractAccount(t *testing.T) {
 	}
 
 	for _, tc := range tt {
+		// create unique references
+		txRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+			return
+		}
+
+		contractRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+			return
+		}
 
 		// create the account for that user, for the Ropsten network
 		account, err := nchain.CreateAccount(*appToken.Token, map[string]interface{}{
@@ -402,6 +445,7 @@ func TestContractAccount(t *testing.T) {
 			"params": map[string]interface{}{
 				"compiled_artifact": tc.artifact,
 				"account_id":        account.ID,
+				"ref":               contractRef.String(),
 			},
 		})
 		if err != nil {
@@ -438,14 +482,13 @@ func TestContractAccount(t *testing.T) {
 
 		params := map[string]interface{}{}
 
-		parameter := fmt.Sprintf(`{"method":"broadcast", "params": ["%s"], "value":0, "account_id":"%s"}`, msg, account.ID)
+		parameter := fmt.Sprintf(`{"method":"broadcast", "params": ["%s"], "value":0, "account_id":"%s", "ref": "%s"}`, msg, account.ID, txRef)
 		json.Unmarshal([]byte(parameter), &params)
 
 		// execute the contract method
-		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+		_, err = nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
 		if err != nil {
-			t.Errorf("error executing contract. Error: %s", err.Error())
-			return
+			t.Logf("error executing contract, but it might be nil response. Error: %s", err.Error())
 		}
 
 		if err != nil {
@@ -461,13 +504,17 @@ func TestContractAccount(t *testing.T) {
 				return
 			}
 
-			tx, err := nchain.GetTransactionDetails(*appToken.Token, *execResponse.Reference, map[string]interface{}{})
+			tx, err := nchain.GetTransactionDetails(*appToken.Token, txRef.String(), map[string]interface{}{})
 			//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
 			if err != nil {
 				t.Logf("tx not yet mined...")
 			}
 
 			if err == nil {
+				if tx.Description != nil {
+					t.Errorf("tx error; tx id: %s; Error: %s", tx.ID.String(), *tx.Description)
+					return
+				}
 				if tx.Hash != nil && *tx.Hash != "0x" {
 					t.Logf("tx resolved; tx id: %s; hash: %s", tx.ID.String(), *tx.Hash)
 					break
