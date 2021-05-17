@@ -11,6 +11,7 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+	"github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideapp/nchain/common"
@@ -43,6 +44,8 @@ const natsTxReceiptSubject = "nchain.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 15
 const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
+
+const txInFlightStatus = "IN_FLIGHT"
 
 var waitGroup sync.WaitGroup
 
@@ -159,8 +162,6 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		ref = reference.(uuid.UUID).String()
 	}
 
-	// REDIS HACK??
-
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
 		natsutil.Nack(msg)
@@ -238,11 +239,41 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	tx.setParams(txParams)
 	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
+
+	// REDIS locking to prevent dup message processing
+	// Objective
+	// after the ackwait timeout, NATS redelivers the nchain.tx.create message
+	// as the original message might still be processing
+	// we want to prevent dupe transactions getting created
+	// so we will store 2 nchain.tx.create statuses in redis
+	// - IN_FLIGHT (tx is being processed)
+	// - COMPLETED (tx is done, either acked or nacked)
+	// if we ack or nack, we will set the status to completed
+	// based on tx ref as the key
+	// and if we haven't seen it before, we will set it to IN_FLIGHT
+	// if it's IN_FLIGHT, we will dump the msg, and wait for it to come around again
+	// (in case it fails and needs to be reprocessed)
+	// as a precursor to a replay-focussed concurrent tx mechanism
+	// if it's COMPLETED, we'll log this, as this shouldn't ever happen (should be already acked or nacked)
+
+	txStatus, err := redisutil.Get(*tx.Ref)
+	if err != nil {
+		common.Log.Debugf("XXX: Error getting tx in flight status for tx ref %s", *tx.Ref)
+	}
+	if txStatus == nil {
+		common.Log.Debugf("XXX: No tx in flight status found for tx ref: %s", *tx.Ref)
+		redisutil.Set(*tx.Ref, txInFlightStatus, nil)
+	} else {
+		common.Log.Debugf("XXX: tx ref %s is in flight, waiting for it to finish", *tx.Ref)
+		// tx is in flight, so wait for it to finish
+		return
+	}
+
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, saved contract for tx ref: %s", *tx.Ref)
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
 		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
 		err = msg.Ack()
 		if err != nil {
@@ -533,7 +564,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("failed to umarshal load balancer provisioning message; %s", err.Error())
+		common.Log.Warningf("failed to unmarshal tx receipt message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -545,6 +576,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
+	common.Log.Debugf("XXX: Consuming tx receipt for tx id: %s", transactionID)
 	db := dbconf.DatabaseConnection()
 
 	tx := &Transaction{}
@@ -566,10 +598,10 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 
 	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
-		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error()))
+		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
 		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
-		common.Log.Debugf("fetched tx receipt for hash: %s", *tx.Hash)
+		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
 
 		// w00t but potentially HACKYHACK...
 		// TODO go through the flow of the receipt and see why some get a block
