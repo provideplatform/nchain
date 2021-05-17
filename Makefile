@@ -100,6 +100,9 @@ integration_bookie:
 debug:
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
 
+bulk:
+	LOCAL_TAGS=bulk NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
+
 nobookie_up:
 	docker-compose -f ./ops/docker-compose-integration.yml up -d
 	docker kill nchain
