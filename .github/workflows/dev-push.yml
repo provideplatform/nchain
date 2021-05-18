@@ -6,7 +6,7 @@ on:
 jobs:
   push_to_branch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10    
+    timeout-minutes: 20    
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.INTEGRATION_SLACK_WEBHOOK }}
     steps:
@@ -45,7 +45,7 @@ jobs:
           tags: dev
           path: 'nchain'
       - name: slack channel update
-        if: failure()  
+        if: always()  
         uses: act10ns/slack@v1
         with:
           status: ${{ job.status }}
