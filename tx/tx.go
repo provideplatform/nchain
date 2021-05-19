@@ -279,7 +279,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			cachedNonce, err := redisutil.Get(*txAddress)
 			if err != nil {
-				common.Log.Debugf("XXX: Error getting cached nonce for tx ref %s", *tx.Ref)
+				common.Log.Debugf("XXX: Error getting cached nonce for tx ref %s. Error: %s", *tx.Ref, err.Error())
 			}
 			if cachedNonce == nil {
 				common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", *txAddress, *tx.Ref)

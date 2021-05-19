@@ -264,11 +264,14 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		common.Log.Debugf("XXX: No tx in flight status found for tx ref: %s", *tx.Ref)
 		redisutil.Set(*tx.Ref, txInFlightStatus, nil)
 	} else {
-		common.Log.Debugf("XXX: tx ref %s is in flight, waiting for it to finish", *tx.Ref)
-		// tx is in flight, so wait for it to finish
-		return
+		if *txStatus == txInFlightStatus {
+			common.Log.Debugf("XXX: tx ref %s is in flight, waiting for it to finish", *tx.Ref)
+			// tx is in flight, so wait for it to finish
+			return
+		}
+		common.Log.Debugf("XXX: tx ref %s is not in flight and has redis status of %s", *tx.Ref, *txStatus)
+		redisutil.Set(*tx.Ref, txInFlightStatus, nil)
 	}
-
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 		contract.TransactionID = &tx.ID
@@ -315,7 +318,25 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		} else {
 			common.Log.Warning(errmsg)
 		}
+		// remove the in-flight status to this can be replayed
+		common.Log.Debugf("XXX: Tx ref %s failed... Resetting in flight status", *tx.Ref)
+		err = redisutil.Set(*tx.Ref, nil, nil)
+		if err != nil {
+			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, err.Error())
+		}
+		common.Log.Debugf("XXX: getting updated status for tx ref: %s", *tx.Ref)
+		updatedTxStatus, err := redisutil.Get(*tx.Ref)
+		if err != nil {
+			common.Log.Debugf("XXX: Error getting tx in flight status for tx ref %s", *tx.Ref)
+		}
+		common.Log.Debugf("XXX: updatedTxStatus: :%s: for txref: %s", *updatedTxStatus, *tx.Ref)
 
+		if updatedTxStatus == nil {
+			common.Log.Debugf("XXX: redis status for tx ref: %s is nil", *tx.Ref)
+		} else {
+			common.Log.Debugf("XXX: redis status for tx ref %s is not nil: %s", *tx.Ref, *updatedTxStatus)
+		}
+		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
