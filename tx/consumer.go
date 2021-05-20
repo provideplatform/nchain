@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
@@ -42,10 +41,11 @@ const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 
 const natsTxReceiptSubject = "nchain.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
-const txReceiptAckWait = time.Second * 15
+const txReceiptAckWait = time.Second * 60
 const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
 
 const txInFlightStatus = "IN_FLIGHT"
+const txRetryRequiredStatus = "RETRY_REQUIRED"
 
 var waitGroup sync.WaitGroup
 
@@ -262,16 +262,28 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 	if txStatus == nil {
 		common.Log.Debugf("XXX: No tx in flight status found for tx ref: %s", *tx.Ref)
-		redisutil.Set(*tx.Ref, txInFlightStatus, nil)
+		redisutil.WithRedlock(*tx.Ref, func() error {
+			redisutil.Set(*tx.Ref, txInFlightStatus, nil)
+			return nil
+		})
 	} else {
-		if *txStatus == txInFlightStatus {
+		switch *txStatus {
+		case txInFlightStatus:
 			common.Log.Debugf("XXX: tx ref %s is in flight, waiting for it to finish", *tx.Ref)
 			// tx is in flight, so wait for it to finish
 			return
+		case txRetryRequiredStatus:
+			common.Log.Debugf("XXX: tx ref %s retry commencing", *tx.Ref)
+			err = redisutil.WithRedlock(*tx.Ref, func() error {
+				redisutil.Set(*tx.Ref, txInFlightStatus, nil)
+				return nil
+			})
+			if err != nil {
+				common.Log.Debugf("XXX: Error resetting status to retry required. Error: %s", err.Error())
+			}
 		}
-		common.Log.Debugf("XXX: tx ref %s is not in flight and has redis status of %s", *tx.Ref, *txStatus)
-		redisutil.Set(*tx.Ref, txInFlightStatus, nil)
 	}
+
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 		contract.TransactionID = &tx.ID
@@ -288,54 +300,27 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
+		// getting rid of the subsidize code that's managed by bookie now
 
-		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && tx.shouldSubsidize()
-		if faucetSubsidyEligible {
-			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
-			faucetBeneficiary, _ := tx.signerFactory(db)
-			faucetBeneficiaryAddress := faucetBeneficiary.Address()
-
-			params := tx.ParseParams()
-			gas, gasOk := params["gas"].(float64)
-			if !gasOk {
-				gas = float64(210000 * 2) // FIXME-- parameterize
-			}
-			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
-
-			err = subsidize(
-				db,
-				tx.NetworkID,
-				faucetBeneficiaryAddress,
-				networkSubsidyFaucetDripValue,
-				int64(gas),
-			)
-			if err == nil {
-				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-				common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
-				contract.TransactionID = &tx.ID
-				db.Save(&contract)
-			}
-		} else {
-			common.Log.Warning(errmsg)
-		}
 		// remove the in-flight status to this can be replayed
-		common.Log.Debugf("XXX: Tx ref %s failed... Resetting in flight status", *tx.Ref)
-		err = redisutil.Set(*tx.Ref, nil, nil)
+		common.Log.Debugf("XXX: Tx ref %s failed... Setting tx status to retry required", *tx.Ref)
+		err = redisutil.WithRedlock(*tx.Ref, func() error {
+			err := redisutil.Set(*tx.Ref, txRetryRequiredStatus, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 		if err != nil {
 			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, err.Error())
 		}
+
 		common.Log.Debugf("XXX: getting updated status for tx ref: %s", *tx.Ref)
 		updatedTxStatus, err := redisutil.Get(*tx.Ref)
 		if err != nil {
 			common.Log.Debugf("XXX: Error getting tx in flight status for tx ref %s", *tx.Ref)
 		}
 		common.Log.Debugf("XXX: updatedTxStatus: :%s: for txref: %s", *updatedTxStatus, *tx.Ref)
-
-		if updatedTxStatus == nil {
-			common.Log.Debugf("XXX: redis status for tx ref: %s is nil", *tx.Ref)
-		} else {
-			common.Log.Debugf("XXX: redis status for tx ref %s is not nil: %s", *tx.Ref, *updatedTxStatus)
-		}
 		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
@@ -571,6 +556,41 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	msg.Ack()
 }
 
+// TODO add a channel output for the acking nacking?
+func processTxReceipt(msg *stan.Msg, tx *Transaction, db *gorm.DB) {
+
+	signer, err := tx.signerFactory(db)
+	if err != nil {
+		desc := "failed to resolve tx signing account or HD wallet"
+		common.Log.Warningf(desc)
+		tx.updateStatus(db, "failed", common.StringOrNil(desc))
+		natsutil.Nack(msg)
+		return
+	}
+
+	err = tx.fetchReceipt(db, signer.Network, signer.Address())
+	if err != nil {
+		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
+		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+	} else {
+		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
+
+		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
+		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
+		// if we have a block number in the receipt, and the tx has no block
+		// populate the block and finalized timestamp
+		if blockNumber != nil && tx.Block == nil {
+			receiptBlock := blockNumber.Uint64()
+			tx.Block = &receiptBlock
+			receiptFinalized := time.Now()
+			tx.FinalizedAt = &receiptFinalized
+			common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
+		}
+		tx.updateStatus(db, "success", nil)
+		msg.Ack()
+	}
+}
+
 func consumeTxReceiptMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -608,37 +628,36 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	signer, err := tx.signerFactory(db)
-	if err != nil {
-		desc := "failed to resolve tx signing account or HD wallet"
-		common.Log.Warningf(desc)
-		tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		natsutil.Nack(msg)
-		return
-	}
+	go processTxReceipt(msg, tx, db)
 
-	err = tx.fetchReceipt(db, signer.Network, signer.Address())
-	if err != nil {
-		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
-		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
-	} else {
-		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
+	// signer, err := tx.signerFactory(db)
+	// if err != nil {
+	// 	desc := "failed to resolve tx signing account or HD wallet"
+	// 	common.Log.Warningf(desc)
+	// 	tx.updateStatus(db, "failed", common.StringOrNil(desc))
+	// 	natsutil.Nack(msg)
+	// 	return
+	// }
 
-		// w00t but potentially HACKYHACK...
-		// TODO go through the flow of the receipt and see why some get a block
-		// and some don't
-		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
-		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
-		// if we have a block number in the receipt, and the tx has no block
-		// populate the block and finalized timestamp
-		if blockNumber != nil && tx.Block == nil {
-			receiptBlock := blockNumber.Uint64()
-			tx.Block = &receiptBlock
-			receiptFinalized := time.Now()
-			tx.FinalizedAt = &receiptFinalized
-			common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
-		}
-		tx.updateStatus(db, "success", nil)
-		msg.Ack()
-	}
+	// err = tx.fetchReceipt(db, signer.Network, signer.Address())
+	// if err != nil {
+	// 	common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
+	// 	natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+	// } else {
+	// 	common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
+
+	// 	common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
+	// 	blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
+	// 	// if we have a block number in the receipt, and the tx has no block
+	// 	// populate the block and finalized timestamp
+	// 	if blockNumber != nil && tx.Block == nil {
+	// 		receiptBlock := blockNumber.Uint64()
+	// 		tx.Block = &receiptBlock
+	// 		receiptFinalized := time.Now()
+	// 		tx.FinalizedAt = &receiptFinalized
+	// 		common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
+	// 	}
+	// 	tx.updateStatus(db, "success", nil)
+	// 	msg.Ack()
+	// }
 }
