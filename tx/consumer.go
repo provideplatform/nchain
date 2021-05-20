@@ -42,7 +42,7 @@ const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 const natsTxReceiptSubject = "nchain.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 60
-const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
+const txReceiptMsgTimeout = int64(txReceiptAckWait * 5)
 
 const txInFlightStatus = "IN_FLIGHT"
 const txRetryRequiredStatus = "RETRY_REQUIRED"
