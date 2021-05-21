@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +44,8 @@ const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 15
 const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
 
-const txInFlightStatus = "IN_FLIGHT"
+const msgInFlight = "IN_FLIGHT"
+const msgRetryRequired = "RETRY_REQUIRED"
 
 var waitGroup sync.WaitGroup
 
@@ -119,6 +119,52 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
+func setWithLock(key, status string) error {
+	lockErr := redisutil.WithRedlock(key, func() error {
+		err := redisutil.Set(key, status, nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if lockErr != nil {
+		return lockErr
+	}
+	common.Log.Debugf("Set message key %s to status %s", key, status)
+	return nil
+}
+
+// processMessage checks if the message is already in flight
+// with a long running process, in which case, wait for it to finish.
+// If the message has failed, processMessage will allow it to be reprocessed
+func processMessageStatus(key string) error {
+	status, _ := redisutil.Get(key)
+
+	if status == nil {
+		common.Log.Debugf("Setting message key %s status to in flight", key)
+		lockErr := setWithLock(key, msgInFlight)
+		if lockErr != nil {
+			err := fmt.Errorf("Error setting message key %s to in flight status. Error: %s", key, lockErr.Error())
+			return err
+		}
+	}
+
+	if status != nil {
+		switch *status {
+		case msgInFlight:
+			err := fmt.Errorf("Message key %s is in flight", key)
+			return err
+		case msgRetryRequired:
+			lockErr := setWithLock(key, msgInFlight)
+			if lockErr != nil {
+				err := fmt.Errorf("Error resetting message key %s back to in flight status", key)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func consumeTxCreateMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
@@ -126,7 +172,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal tx creation message; %s", err.Error())
+		common.Log.Warningf("Failed to unmarshal tx creation message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -238,37 +284,15 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	}
 
 	tx.setParams(txParams)
-	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 
-	// REDIS locking to prevent dup message processing
-	// Objective
-	// after the ackwait timeout, NATS redelivers the nchain.tx.create message
-	// as the original message might still be processing
-	// we want to prevent dupe transactions getting created
-	// so we will store 2 nchain.tx.create statuses in redis
-	// - IN_FLIGHT (tx is being processed)
-	// - COMPLETED (tx is done, either acked or nacked)
-	// if we ack or nack, we will set the status to completed
-	// based on tx ref as the key
-	// and if we haven't seen it before, we will set it to IN_FLIGHT
-	// if it's IN_FLIGHT, we will dump the msg, and wait for it to come around again
-	// (in case it fails and needs to be reprocessed)
-	// as a precursor to a replay-focussed concurrent tx mechanism
-	// if it's COMPLETED, we'll log this, as this shouldn't ever happen (should be already acked or nacked)
-
-	txStatus, err := redisutil.Get(*tx.Ref)
+	key := fmt.Sprintf("nchain.tx.create.%s", *tx.Ref)
+	err = processMessageStatus(key)
 	if err != nil {
-		common.Log.Debugf("XXX: Error getting tx in flight status for tx ref %s", *tx.Ref)
-	}
-	if txStatus == nil {
-		common.Log.Debugf("XXX: No tx in flight status found for tx ref: %s", *tx.Ref)
-		redisutil.Set(*tx.Ref, txInFlightStatus, nil)
-	} else {
-		common.Log.Debugf("XXX: tx ref %s is in flight, waiting for it to finish", *tx.Ref)
-		// tx is in flight, so wait for it to finish
+		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
 		return
 	}
 
+	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 		contract.TransactionID = &tx.ID
@@ -285,37 +309,15 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
+		// got rid of the subsidize code that's managed by bookie now
 
-		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && tx.shouldSubsidize()
-		if faucetSubsidyEligible {
-			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
-			faucetBeneficiary, _ := tx.signerFactory(db)
-			faucetBeneficiaryAddress := faucetBeneficiary.Address()
-
-			params := tx.ParseParams()
-			gas, gasOk := params["gas"].(float64)
-			if !gasOk {
-				gas = float64(210000 * 2) // FIXME-- parameterize
-			}
-			networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
-
-			err = subsidize(
-				db,
-				tx.NetworkID,
-				faucetBeneficiaryAddress,
-				networkSubsidyFaucetDripValue,
-				int64(gas),
-			)
-			if err == nil {
-				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-				common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
-				contract.TransactionID = &tx.ID
-				db.Save(&contract)
-			}
-		} else {
-			common.Log.Warning(errmsg)
+		// remove the in-flight status to this can be replayed
+		lockErr := setWithLock(key, msgRetryRequired)
+		if lockErr != nil {
+			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
+			// TODO what to do if this fails????
 		}
-
+		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
@@ -404,38 +406,22 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 		return
 	}
 
+	key := fmt.Sprintf("nchain.tx.%s", cntract.Reference)
+	err = processMessageStatus(key)
+	if err != nil {
+		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
+		return
+	}
+
 	executionResponse, err := executeTransaction(cntract, execution)
 	if err != nil {
 		common.Log.Debugf("contract execution failed; %s", err.Error())
-
-		// CHECKME - this functionality is now in bookie, and shouldn't be replicated here
-		// if execution.AccountAddress != nil {
-		// 	networkSubsidyFaucetDripValue := int64(100000000000000000) // FIXME-- configurable
-		// 	_subsidize := strings.Contains(strings.ToLower(err.Error()), "insufficient funds") && tx.shouldSubsidize()
-
-		// 	if _subsidize {
-		// 		common.Log.Debugf("contract execution failed due to insufficient funds but tx subsidize flag is set; requesting subsidized tx funding for target network: %s", cntract.NetworkID)
-		// 		faucetBeneficiaryAddress := *execution.AccountAddress
-		// 		err = subsidize(
-		// 			db,
-		// 			cntract.NetworkID,
-		// 			faucetBeneficiaryAddress,
-		// 			networkSubsidyFaucetDripValue,
-		// 			int64(210000*2),
-		// 		)
-		// 		if err == nil {
-		// 			db.Where("ref = ?", execution.Ref).Find(&tx)
-		// 			if tx != nil && tx.ID != uuid.Nil {
-		// 				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-		// 			}
-		// 			common.Log.Debugf("faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
-		// 		}
-		// 	}
-
-		// } else {
-		// 	common.Log.Warningf("Failed to execute contract; %s", err.Error())
-		// }
-
+		// remove the in-flight status to this can be replayed
+		lockErr := setWithLock(key, msgRetryRequired)
+		if lockErr != nil {
+			common.Log.Debugf("XXX: Error resetting in flight status for key: %s. Error: %s", key, lockErr.Error())
+			// TODO what to do if this fails????
+		}
 		natsutil.AttemptNack(msg, txMsgTimeout)
 	} else {
 		logmsg := fmt.Sprintf("Executed contract: %s", *cntract.Address)
@@ -550,10 +536,59 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	msg.Ack()
 }
 
+func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) {
+
+	signer, err := tx.signerFactory(db)
+	if err != nil {
+		desc := "failed to resolve tx signing account or HD wallet"
+		common.Log.Warningf(desc)
+		tx.updateStatus(db, "failed", common.StringOrNil(desc))
+		natsutil.Nack(msg)
+		return
+	}
+
+	err = tx.fetchReceipt(db, signer.Network, signer.Address())
+	if err != nil {
+		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
+		// remove the in-flight status to this can be replayed
+		lockErr := setWithLock(*key, msgRetryRequired)
+		if lockErr != nil {
+			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, err.Error())
+			// TODO what to do if this fails????
+		}
+		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+	} else {
+		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
+
+		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
+		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
+		// if we have a block number in the receipt, and the tx has no block
+		// populate the block and finalized timestamp
+		if blockNumber != nil && tx.Block == nil {
+			receiptBlock := blockNumber.Uint64()
+			tx.Block = &receiptBlock
+			receiptFinalized := time.Now()
+			tx.FinalizedAt = &receiptFinalized
+			common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
+		}
+		tx.updateStatus(db, "success", nil)
+		msg.Ack()
+	}
+}
+
 func consumeTxReceiptMsg(msg *stan.Msg) {
+	var key *string
+
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("recovered from failed tx receipt message; %s", r)
+			if key != nil {
+				lockErr := setWithLock(*key, msgRetryRequired)
+				if lockErr != nil {
+					common.Log.Debugf("XXX: Error resetting in flight status for key: %s. Error: %s", *key, lockErr.Error())
+					// TODO what to do if this fails????
+				}
+			}
 			natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 		}
 	}()
@@ -587,37 +622,13 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	signer, err := tx.signerFactory(db)
+	key = common.StringOrNil(fmt.Sprintf("nchain.tx.receipt%s", transactionID))
+	err = processMessageStatus(*key)
 	if err != nil {
-		desc := "failed to resolve tx signing account or HD wallet"
-		common.Log.Warningf(desc)
-		tx.updateStatus(db, "failed", common.StringOrNil(desc))
-		natsutil.Nack(msg)
+		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
 		return
 	}
 
-	err = tx.fetchReceipt(db, signer.Network, signer.Address())
-	if err != nil {
-		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
-		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
-	} else {
-		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
-
-		// w00t but potentially HACKYHACK...
-		// TODO go through the flow of the receipt and see why some get a block
-		// and some don't
-		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
-		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
-		// if we have a block number in the receipt, and the tx has no block
-		// populate the block and finalized timestamp
-		if blockNumber != nil && tx.Block == nil {
-			receiptBlock := blockNumber.Uint64()
-			tx.Block = &receiptBlock
-			receiptFinalized := time.Now()
-			tx.FinalizedAt = &receiptFinalized
-			common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
-		}
-		tx.updateStatus(db, "success", nil)
-		msg.Ack()
-	}
+	// process the receipts
+	go processTxReceipt(msg, tx, key, db)
 }
