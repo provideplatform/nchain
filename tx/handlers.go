@@ -371,22 +371,7 @@ func contractExecutionHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 
 	contractID := c.Param("id")
-	// rpcHack := strings.Index(contractID, "rpc:") == 0
-	// if rpcHack {
-	// 	rpcNetworkIDStr := contractID[4:]
-	// 	rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
-	// 	if err != nil {
-	// 		err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
-	// 		provide.RenderError(err.Error(), 400, c)
-	// 		return
-	// 	}
-	// 	common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
-	// 	arbitraryRPCExecutionHandler(db, &rpcNetworkID, params, c)
-	// 	return
-	// }
-
 	var contractObj = &contract.Contract{}
-
 	db.Where("id = ?", contractID).Find(&contractObj)
 
 	// if we can't find by ID, attempt to lookup the contract by address
@@ -406,14 +391,8 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	if contractObj == nil || contractObj.ID == uuid.Nil {
-		//if appID != nil {
 		provide.RenderError("contract not found", 404, c)
 		return
-		//}
-
-		// common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
-		// contractArbitraryExecutionHandler(c, db, buf)
-		// return
 	}
 
 	if appID != nil && *contractObj.ApplicationID != *appID {
