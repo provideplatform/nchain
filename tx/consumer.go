@@ -184,8 +184,15 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	value, valueOk := params["value"]
 	txParams, paramsOk := params["params"].(map[string]interface{})
 	publishedAt, publishedAtOk := params["published_at"].(string)
+	nonce, nonceOk := params["nonce"].(uint64)
 
 	reference, referenceOk := txParams["ref"]
+
+	if !nonceOk {
+		common.Log.Warningf("Failed to unmarshal nonce during NATS %v message handling", msg.Subject)
+		natsutil.Nack(msg)
+		return
+	}
 
 	if !referenceOk {
 		// no reference provided with the contract, so we'll make one
@@ -280,6 +287,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:    &publishedAtTime,
 		Ref:            &ref,
+		Nonce:          &nonce,
 	}
 
 	tx.setParams(txParams)
@@ -297,7 +305,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
-		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
+		common.Log.Debugf("Transaction execution successful for ref %s. tx hash: %s", *tx.Ref, *tx.Hash)
 		err = msg.Ack()
 		if err != nil {
 			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
@@ -465,14 +473,14 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 	common.Log.Debugf("XXX: ConsumeTxExecMsg, about to create tx with ref: %s", *tx.Ref)
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxExecMsg, created tx with ref: %s", *tx.Ref)
-		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
+		common.Log.Debugf("Transaction execution successful for tx ref: %s, : hash: %s", *tx.Ref, *tx.Hash)
 		err = msg.Ack()
 		if err != nil {
 			common.Log.Debugf("XXX: ConsumeTxExecMsg, error acking tx ref: %s", *tx.Ref)
 		}
 		common.Log.Debugf("XXX: ConsumeTxExecMsg, msg acked tx ref: %s", *tx.Ref)
 	} else {
-		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
+		errmsg := fmt.Sprintf("Failed to execute transaction ref %s; tx failed with %d error(s)", *tx.Ref, len(tx.Errors))
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
@@ -690,7 +698,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 }
 
 func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) {
-
+	common.Log.Debugf("Processing tx receipt for tx id %s, ref %s", tx.ID, *tx.Ref)
 	signer, err := tx.signerFactory(db)
 	if err != nil {
 		desc := "failed to resolve tx signing account or HD wallet"
@@ -702,6 +710,7 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 
 	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
+		common.Log.Debugf("Failed to fetch tx receipt for tx id %s, ref %s", tx.ID, *tx.Ref)
 		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
 		// remove the in-flight status to this can be replayed
 		lockErr := setWithLock(*key, msgRetryRequired)
@@ -712,7 +721,7 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
 		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
-
+		common.Log.Debugf("Fetched tx receipt for tx id %s, ref %s", tx.ID, *tx.Ref)
 		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
 		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
 		// if we have a block number in the receipt, and the tx has no block
@@ -776,6 +785,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	}
 
 	key = common.StringOrNil(fmt.Sprintf("nchain.tx.receipt%s", transactionID))
+	common.Log.Debugf("XXX: tx id %s found. Checking process message status for key %s", tx.ID, *key)
 	err = processMessageStatus(*key)
 	if err != nil {
 		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
