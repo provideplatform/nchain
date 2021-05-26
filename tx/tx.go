@@ -263,7 +263,13 @@ func generateSignedTx(wg *sync.WaitGroup, txs *TransactionSigner, tx *Transactio
 	})
 
 	if err != nil {
-		err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
+		// change the message depending on whether we're using a wallet or an account (TODO: correc this)
+		if txs.Wallet != nil {
+			err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
+		} else {
+			err = fmt.Errorf("failed to sign %d-byte transaction payload using account ID: %s; %s", len(hash), txs.Account.ID, err.Error())
+		}
+
 		common.Log.Debugf("%s", err.Error())
 		common.Log.Warning(err.Error())
 		return nil, nil, nil, err
