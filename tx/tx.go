@@ -1,6 +1,7 @@
 package tx
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
@@ -222,7 +223,10 @@ func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, 
 	return nil, nil
 }
 
-func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, txRef string) (*uint64, error) {
+func getEVMNonce(txAddress string) {
+
+}
+func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, tx *Transaction, txs *TransactionSigner) (*uint64, error) {
 	m.Lock()
 	var nonce *uint64
 
@@ -231,24 +235,40 @@ func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, txRef string)
 		wg.Done()
 	}()
 
-	// redis nonce
 	//TODO add redlock
-	cachedNonce, err := redisutil.Get(txAddress)
-	if err != nil {
-		common.Log.Debugf("XXX: Error getting cached nonce for tx ref %s. Error: %s", txRef, err.Error())
-		return nil, err
+	var cachedNonce *string
+	readErr := redisutil.WithRedlock(txAddress, func() error {
+		var err error
+		cachedNonce, err = redisutil.Get(txAddress)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if readErr != nil {
+		common.Log.Debugf("XXX: Error, possibly nil value for tx ref %s. Error: %s", *tx.Ref, readErr.Error())
 	}
+
 	if cachedNonce == nil {
-		common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", txAddress, txRef)
-		return nil, nil
+		common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", txAddress, *tx.Ref)
+		// get the nonce from the EVM
+		client, err := providecrypto.EVMDialJsonRpc(txs.Network.ID.String(), txs.Network.RPCURL())
+		if err != nil {
+			return nil, err
+		}
+		pendingNonce, err := client.PendingNonceAt(context.TODO(), providecrypto.HexToAddress(txAddress))
+		if err != nil {
+			return nil, err
+		}
+		return &pendingNonce, nil
 		// the evmtxfactory will get the current nonce from the chain
 	} else {
 		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
 		if err != nil {
-			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", txRef, err.Error())
+			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", *tx.Ref, err.Error())
 			return nil, err
 		} else {
-			common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, txRef)
+			common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, *tx.Ref)
 			nonce = &int64nonce
 		}
 	}
@@ -371,7 +391,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				var w sync.WaitGroup
 				var m sync.Mutex
 				w.Add(1)
-				nonce, err = getNonce(&w, &m, *txAddress, *tx.Ref)
+				nonce, err = getNonce(&w, &m, *txAddress, tx)
 				if err != nil {
 					common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
 				}
