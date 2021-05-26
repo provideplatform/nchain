@@ -391,7 +391,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				var w sync.WaitGroup
 				var m sync.Mutex
 				w.Add(1)
-				nonce, err = getNonce(&w, &m, *txAddress, tx)
+				nonce, err = getNonce(&w, &m, *txAddress, tx, txs)
 				if err != nil {
 					common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
 				}
