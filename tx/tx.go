@@ -375,17 +375,42 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 		// we are using an account to sign the transaction
 		if txs.Account != nil && txs.Account.VaultID != nil && txs.Account.KeyID != nil {
-			signer, _tx, hash, err = providecrypto.EVMTxFactory(
-				txs.Network.ID.String(),
-				txs.Network.RPCURL(),
-				txs.Account.Address,
-				tx.To,
-				tx.Data,
-				tx.Value.BigInt(),
-				nonce,
-				uint64(gas),
-				gasPrice,
-			)
+			txAddress := common.StringOrNil(txs.Account.Address)
+
+			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
+			if nonce == nil {
+				w.Add(1)
+				signer, _tx, hash, err = generateSignedTx(&w, txs, tx, txAddress, gas, gasPrice)
+				w.Wait()
+			} else {
+				// create a signed transaction using the provided nonce
+				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+					signer, _tx, hash, err = providecrypto.EVMTxFactory(
+						txs.Network.ID.String(),
+						txs.Network.RPCURL(),
+						*txAddress,
+						tx.To,
+						tx.Data,
+						tx.Value.BigInt(),
+						nonce,
+						uint64(gas),
+						gasPrice,
+					)
+					return
+				})
+			}
+
+			// signer, _tx, hash, err = providecrypto.EVMTxFactory(
+			// 	txs.Network.ID.String(),
+			// 	txs.Network.RPCURL(),
+			// 	txs.Account.Address,
+			// 	tx.To,
+			// 	tx.Data,
+			// 	tx.Value.BigInt(),
+			// 	nonce,
+			// 	uint64(gas),
+			// 	gasPrice,
+			// )
 			if err != nil {
 				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
 				common.Log.Warning(err.Error())
@@ -459,37 +484,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 					)
 					return
 				})
-
 			}
-			// nonce, err = getNonce(&w, &m, *txAddress, tx, txs)
-			// if err != nil {
-			// 	common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-			// }
-
-			// common.Log.Debugf("XXX: getting signer information: %v", time.Now())
-			// err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-			// 	signer, _tx, hash, err = providecrypto.EVMTxFactory(
-			// 		txs.Network.ID.String(),
-			// 		txs.Network.RPCURL(),
-			// 		*txAddress,
-			// 		tx.To,
-			// 		tx.Data,
-			// 		tx.Value.BigInt(),
-			// 		nonce,
-			// 		uint64(gas),
-			// 		gasPrice,
-			// 	)
-			// 	return
-			// })
-
-			// if err == nil {
-			// 	common.Log.Debugf("Prepared tx ref %s for broadcast using nonce %s. Transaction hash: %s", *tx.Ref, _tx.Nonce(), _tx.Hash().String())
-			// 	w.Add(1)
-			// 	_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
-			// 	if err != nil {
-			// 		common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-			// 	}
-			// }
 
 			if err != nil {
 				err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
@@ -979,15 +974,13 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 					err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 					return
 				})
-				common.Log.Debugf("XXX: broadcast tx ref: %s", *t.Ref)
-				//err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 				if err == nil {
+					common.Log.Debugf("broadcast tx ref %s with hash %s", *t.Hash)
 					// we have successfully broadcast the transaction
 					// so update the db with the received transaction hash
-					common.Log.Debugf("signed tx returned hash: %s", signedTx.Hash().String())
 					t.Hash = common.StringOrNil(signedTx.Hash().String())
 					db.Save(&t)
-					common.Log.Debugf("broadcast tx: %s", *t.Hash)
+					common.Log.Debugf("broadcast tx ref %s with hash %s - saved to db", *t.Hash)
 				}
 			} else {
 				err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
@@ -998,7 +991,7 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	}
 
 	if err != nil {
-		common.Log.Warningf("failed to broadcast %s tx using %s; %s", *ntwrk.Name, signer.String(), err.Error())
+		common.Log.Warningf("failed to broadcast tx ref %s on network %s using %s; %s", *t.Ref, *ntwrk.Name, signer.String(), err.Error())
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
