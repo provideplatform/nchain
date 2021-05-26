@@ -275,8 +275,19 @@ func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, tx *Transacti
 			return nil, err
 		}
 		common.Log.Debugf("XXX: Nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
+		// put this in redis
+		updatedNonce := pendingNonce + 1
+		lockErr := redisutil.WithRedlock(txAddress, func() error {
+			err := redisutil.Set(txAddress, updatedNonce, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if lockErr != nil {
+			return nil, lockErr
+		}
 		return &pendingNonce, nil
-		// the evmtxfactory will get the current nonce from the chain
 	} else {
 		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
 		if err != nil {
