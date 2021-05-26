@@ -304,7 +304,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		}
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *tx.Ref)
 	} else {
-		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
+		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
@@ -316,7 +316,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
 			// TODO what to do if this fails????
 		}
-		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
+		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", errmsg, *tx.Ref)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
