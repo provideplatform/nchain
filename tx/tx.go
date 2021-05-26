@@ -217,6 +217,7 @@ func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, 
 			return nil, err
 		}
 		updatedNonce := int64nonce + 1
+		common.Log.Debugf("XXX: Incrementing redis nonce for address %s after tx ref %s to %v", txAddress, txRef, updatedNonce)
 		lockErr := redisutil.WithRedlock(txAddress, func() error {
 			err := redisutil.Set(txAddress, updatedNonce, nil)
 			if err != nil {
@@ -227,7 +228,7 @@ func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, 
 		if lockErr != nil {
 			return nil, lockErr
 		}
-
+		common.Log.Debugf("XXX: Nonce incremented for address %s after tx ref %s to %v", txAddress, txRef, updatedNonce)
 		return &updatedNonce, nil
 		// the evmtxfactory will get the current nonce from the chain
 	}
