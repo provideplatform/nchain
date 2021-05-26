@@ -540,12 +540,12 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 				// if we have a signing error, which might be insufficient funds, try bookie
 				if signingErr != nil {
-					common.Log.Debugf("attepting broadcast to bookie...")
+					common.Log.Debugf("attepting broadcast of tx ref: %s to bookie due to signing error %s.", *t.Ref, signingErr.Error())
 					// network specified in t, so not required to be specifically passed to broadcast method
 					bookieBroadcastErr := t.broadcast(db, nil, nil)
 					// if bookie fails, we're out
 					if bookieBroadcastErr != nil {
-						common.Log.Warningf("attepted broadcast failed anyway! %s", signingErr.Error())
+						common.Log.Warningf("attepted broadcast of tx ref %s to bookie failed %s", *t.Ref, bookieBroadcastErr.Error())
 
 						t.Errors = append(t.Errors, &provide.Error{
 							Message: common.StringOrNil(bookieBroadcastErr.Error()),
