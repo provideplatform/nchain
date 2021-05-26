@@ -396,15 +396,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			}
 		}
 
-		// var txAddress *string
-		// var txDerivationPath *string
-
-		// we are using a wallet to sign the transaction
-		// it can include a derivation path to generate a specific address
-		// or with no derivation path, signs using the default address from the hd wallet
-		// maybe there's something we can do here with the signer to get the next increment from the signer
-		// which returns a derivation path, which we can use for the transaction creation,
-		// but that seems a little hacky
 		if txs.Wallet != nil && txs.Wallet.VaultID != nil && txs.Wallet.KeyID != nil {
 
 			txAddress, txDerivationPath, err := txs.GetSignerDetails()
@@ -421,24 +412,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				}
 				w.Wait()
 			}
-			// // redis nonce
-			// common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
-			// cachedNonce, err := redisutil.Get(*txAddress)
-			// if err != nil {
-			// 	common.Log.Debugf("XXX: Error getting cached nonce for tx ref %s. Error: %s", *tx.Ref, err.Error())
-			// }
-			// if cachedNonce == nil {
-			// 	common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", *txAddress, *tx.Ref)
-			// 	// the evmtxfactory will get the current nonce from the chain
-			// } else {
-			// 	int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
-			// 	if err != nil {
-			// 		common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", *tx.Ref, err.Error())
-			// 	} else {
-			// 		common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, *tx.Ref)
-			// 		nonce = &int64nonce
-			// 	}
-			// }
 
 			common.Log.Debugf("XXX: getting signer information: %v", time.Now())
 			err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
@@ -463,6 +436,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			}
 
 			if err == nil {
+				common.Log.Debugf("Prepared tx ref %s for broadcast using nonce %s. Transaction hash: %s", *tx.Ref, _tx.Nonce(), _tx.Hash().String())
 				w.Add(1)
 				_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
 				if err != nil {
@@ -470,25 +444,8 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				}
 				w.Wait()
 			}
-			// no error in signer, so update nonce and cache in redis
-			// common.Log.Debugf("XXX: got tx nonce of %v for tx ref: %s", _tx.Nonce(), *tx.Ref)
-			// updatedNonce := _tx.Nonce() + 1
-			// ttl := (10 * time.Minute)
-			// redisutil.Set(*txAddress, updatedNonce, &ttl)
-			// common.Log.Debugf("XXX updated nonce in redis for address %s for tx %s to %v", *txAddress, *tx.Ref, updatedNonce)
 
 			common.Log.Debugf("XXX: got signer information: %v", time.Now())
-			// signer, _tx, hash, err = providecrypto.EVMTxFactory(
-			// 	txs.Network.ID.String(),
-			// 	txs.Network.RPCURL(),
-			// 	*txAddress,
-			// 	tx.To,
-			// 	tx.Data,
-			// 	tx.Value.BigInt(),
-			// 	nonce,
-			// 	uint64(gas),
-			// 	gasPrice,
-			// )
 
 			// if we were provided, or have generated, a hd derivation path, pass it to the signer
 			opts := map[string]interface{}{}
@@ -500,7 +457,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				}
 			}
 
-			common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
+			//common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
 			//check if the hash is actually hex. not sure if it is, it looks like bytes returned from the signer function
 			// TODO sometimes the db stores the raw hash (no 0x prefix), not the tx hash (0x prefix) - investigate why this occurs
 
