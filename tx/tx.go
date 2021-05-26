@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,6 +18,7 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
+	"github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/provideapp/nchain/common"
@@ -162,6 +165,96 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 	return address, derivationPath, nil
 }
 
+func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, txNonce uint64) (*uint64, error) {
+	m.Lock()
+
+	defer func() {
+		m.Unlock()
+		wg.Done()
+	}()
+
+	cachedNonce, err := redisutil.Get(txAddress)
+	if err != nil {
+		common.Log.Debugf("XXX: Error getting cached nonce to increment for tx ref %s. Error: %s", txRef, err.Error())
+	}
+
+	if cachedNonce == nil {
+		common.Log.Debugf("XXX: No nonce found on redis to increment for address: %s, tx ref: %s", txAddress, txRef)
+		updatedNonce := txNonce + 1
+		lockErr := redisutil.WithRedlock(txAddress, func() error {
+			err := redisutil.Set(txAddress, updatedNonce, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if lockErr != nil {
+			return nil, lockErr
+		}
+
+		return &updatedNonce, nil
+		// the evmtxfactory will get the current nonce from the chain
+	}
+	if cachedNonce != nil {
+		common.Log.Debugf("XXX: Nonce of %v found on redis for address: %s, tx ref: %s", *cachedNonce, txAddress, txRef)
+		//convert cached Nonce and increment, returning updated nonce for reference
+		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
+		if err != nil {
+			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", txRef, err.Error())
+			return nil, err
+		}
+		updatedNonce := int64nonce + 1
+		lockErr := redisutil.WithRedlock(txAddress, func() error {
+			err := redisutil.Set(txAddress, updatedNonce, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if lockErr != nil {
+			return nil, lockErr
+		}
+
+		return &updatedNonce, nil
+		// the evmtxfactory will get the current nonce from the chain
+	}
+
+	return nil, nil
+}
+
+func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, txRef string) (*uint64, error) {
+	m.Lock()
+	var nonce *uint64
+
+	defer func() {
+		m.Unlock()
+		wg.Done()
+	}()
+
+	// redis nonce
+	//TODO add redlock
+	cachedNonce, err := redisutil.Get(txAddress)
+	if err != nil {
+		common.Log.Debugf("XXX: Error getting cached nonce for tx ref %s. Error: %s", txRef, err.Error())
+		return nil, err
+	}
+	if cachedNonce == nil {
+		common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", txAddress, txRef)
+		return nil, nil
+		// the evmtxfactory will get the current nonce from the chain
+	} else {
+		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
+		if err != nil {
+			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", txRef, err.Error())
+			return nil, err
+		} else {
+			common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, txRef)
+			nonce = &int64nonce
+		}
+	}
+	return nonce, nil
+}
+
 // Sign implements the Signer interface
 func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error) {
 	if tx == nil {
@@ -273,6 +366,17 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
+			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
+			if nonce == nil {
+				var w sync.WaitGroup
+				var m sync.Mutex
+				w.Add(1)
+				nonce, err = getNonce(&w, &m, *txAddress, *tx.Ref)
+				if err != nil {
+					common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+				}
+				w.Wait()
+			}
 			// // redis nonce
 			// common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			// cachedNonce, err := redisutil.Get(*txAddress)
@@ -314,6 +418,16 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 
+			if err == nil {
+				var w sync.WaitGroup
+				var m sync.Mutex
+				w.Add(1)
+				_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
+				if err != nil {
+					common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+				}
+				w.Wait()
+			}
 			// no error in signer, so update nonce and cache in redis
 			// common.Log.Debugf("XXX: got tx nonce of %v for tx ref: %s", _tx.Nonce(), *tx.Ref)
 			// updatedNonce := _tx.Nonce() + 1
