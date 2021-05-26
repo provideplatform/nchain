@@ -101,6 +101,9 @@ type TransactionSigner struct {
 	Wallet  *wallet.Wallet
 }
 
+var w sync.WaitGroup
+var m sync.Mutex
+
 // Address returns the public network address of the underlying Signer
 func (txs *TransactionSigner) Address() string {
 	var address string
@@ -174,9 +177,18 @@ func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, 
 		wg.Done()
 	}()
 
-	cachedNonce, err := redisutil.Get(txAddress)
-	if err != nil {
-		common.Log.Debugf("XXX: Error getting cached nonce to increment for tx ref %s. Error: %s", txRef, err.Error())
+	common.Log.Debugf("XXX: Incrementing redis nonce for tx ref %s", txRef)
+	var cachedNonce *string
+	readErr := redisutil.WithRedlock(txAddress, func() error {
+		var err error
+		cachedNonce, err = redisutil.Get(txAddress)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if readErr != nil {
+		common.Log.Debugf("XXX: Error, possibly nil value for redis nonce (incrementing) for tx ref %s. Error: %s", txRef, readErr.Error())
 	}
 
 	if cachedNonce == nil {
@@ -235,7 +247,6 @@ func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, tx *Transacti
 		wg.Done()
 	}()
 
-	//TODO add redlock
 	var cachedNonce *string
 	readErr := redisutil.WithRedlock(txAddress, func() error {
 		var err error
@@ -252,14 +263,18 @@ func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, tx *Transacti
 	if cachedNonce == nil {
 		common.Log.Debugf("XXX: No nonce found on redis for address: %s, tx ref: %s", txAddress, *tx.Ref)
 		// get the nonce from the EVM
+		common.Log.Debugf("XXX: dialling evm for tx ref %s", *tx.Ref)
 		client, err := providecrypto.EVMDialJsonRpc(txs.Network.ID.String(), txs.Network.RPCURL())
 		if err != nil {
 			return nil, err
 		}
+		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *tx.Ref)
 		pendingNonce, err := client.PendingNonceAt(context.TODO(), providecrypto.HexToAddress(txAddress))
 		if err != nil {
+			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *tx.Ref, err.Error())
 			return nil, err
 		}
+		common.Log.Debugf("XXX: Nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
 		return &pendingNonce, nil
 		// the evmtxfactory will get the current nonce from the chain
 	} else {
@@ -388,8 +403,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			if nonce == nil {
-				var w sync.WaitGroup
-				var m sync.Mutex
 				w.Add(1)
 				nonce, err = getNonce(&w, &m, *txAddress, tx, txs)
 				if err != nil {
@@ -439,8 +452,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			}
 
 			if err == nil {
-				var w sync.WaitGroup
-				var m sync.Mutex
 				w.Add(1)
 				_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
 				if err != nil {
