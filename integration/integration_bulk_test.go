@@ -14,11 +14,11 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
-func _TestContractHDWalletKovanBulk(t *testing.T) {
+func TestContractHDWalletKovanBulk(t *testing.T) {
 
 	t.Parallel()
 
-	const numberOfTransactions = 50
+	const numberOfTransactions = 25
 	deployedContracts := make([]string, numberOfTransactions)
 
 	testId, err := uuid.NewV4()
@@ -205,7 +205,7 @@ func TestContractExecutionHDWalletKovanBulk(t *testing.T) {
 	t.Parallel()
 
 	const numberOfContracts = 1
-	const numberOfTransactions = 50
+	const numberOfTransactions = 25
 	deployedContracts := make([]string, numberOfContracts)
 	executedTransactionsPerContract := make([]string, numberOfTransactions)
 	testId, err := uuid.NewV4()
@@ -294,7 +294,7 @@ func TestContractExecutionHDWalletKovanBulk(t *testing.T) {
 				t.Errorf("error creating %s contract. Error: %s", tc.name, err.Error())
 				return
 			}
-			t.Logf("created contract with id: %s", contract.ID)
+			t.Logf("created contract with id: %s, ref: %s", contract.ID, contractRef)
 			deployedContracts[contractLooper] = contract.ID.String()
 
 			for txLooper := 0; txLooper < numberOfTransactions; txLooper++ {
@@ -330,7 +330,7 @@ func TestContractExecutionHDWalletKovanBulk(t *testing.T) {
 				// create a message for contract
 				msg := common.RandomString(118)
 				t.Logf("msg: %s", msg)
-				t.Logf("executing contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
+				t.Logf("executing contract using wallet id: %s, derivation path: %s, tx ref: %s", tc.walletID, tc.derivationPath, txRef)
 
 				params := map[string]interface{}{}
 				//execute transaction
@@ -339,16 +339,12 @@ func TestContractExecutionHDWalletKovanBulk(t *testing.T) {
 				json.Unmarshal([]byte(parameter), &params)
 
 				// execute the contract method
-				_, err = nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+				response, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
 				if err != nil {
 					t.Errorf("error executing contract. Error: %s", err.Error())
 					return
 				}
-
-				if err != nil {
-					t.Errorf("error executing contract: %s", err.Error())
-					return
-				}
+				t.Logf("executed contract with transaction ref: %s. response: %+v", txRef.String(), response)
 				executedTransactionsPerContract[txLooper] = txRef.String()
 				// wait for the transaction to be mined (get a tx hash)
 				// started = time.Now().Unix()
