@@ -169,13 +169,7 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 	return address, derivationPath, nil
 }
 
-func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, txNonce uint64) (*uint64, error) {
-	m.Lock()
-
-	defer func() {
-		m.Unlock()
-		wg.Done()
-	}()
+func incrementNonce(txAddress, txRef string, txNonce uint64) (*uint64, error) {
 
 	common.Log.Debugf("XXX: Incrementing redis nonce for tx ref %s", txRef)
 	var cachedNonce *string
@@ -236,17 +230,58 @@ func incrementNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress, txRef string, 
 	return nil, nil
 }
 
-func getEVMNonce(txAddress string) {
-
-}
-func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, tx *Transaction, txs *TransactionSigner) (*uint64, error) {
+func generateSignedTx(wg *sync.WaitGroup, txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice *uint64) (types.Signer, *types.Transaction, []byte, error) {
 	m.Lock()
-	var nonce *uint64
 
 	defer func() {
 		m.Unlock()
 		wg.Done()
 	}()
+
+	nonce, err := getNonce(*txAddress, tx, txs)
+	if err != nil {
+		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+	}
+
+	var signer types.Signer
+	var _tx *types.Transaction
+	var hash []byte
+
+	err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+		signer, _tx, hash, err = providecrypto.EVMTxFactory(
+			txs.Network.ID.String(),
+			txs.Network.RPCURL(),
+			*txAddress,
+			tx.To,
+			tx.Data,
+			tx.Value.BigInt(),
+			nonce,
+			uint64(gas),
+			gasPrice,
+		)
+		return
+	})
+
+	if err != nil {
+		err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
+		common.Log.Debugf("%s", err.Error())
+		common.Log.Warning(err.Error())
+		return nil, nil, nil, err
+	}
+
+	if err == nil {
+		_, err = incrementNonce(*txAddress, *tx.Ref, _tx.Nonce())
+		if err != nil {
+			common.Log.Debugf("XXX: Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+		}
+	}
+
+	return signer, _tx, hash, err
+}
+
+func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint64, error) {
+
+	var nonce *uint64
 
 	var cachedNonce *string
 	readErr := redisutil.WithRedlock(txAddress, func() error {
@@ -406,12 +441,10 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			if nonce == nil {
 				w.Add(1)
-				nonce, err = getNonce(&w, &m, *txAddress, tx, txs)
-				if err != nil {
-					common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-				}
-
-				common.Log.Debugf("XXX: getting signer information: %v", time.Now())
+				signer, _tx, hash, err = generateSignedTx(&w, txs, tx, txAddress, gas, gasPrice)
+				w.Wait()
+			} else {
+				// create a signed transaction using the provided nonce
 				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
 					signer, _tx, hash, err = providecrypto.EVMTxFactory(
 						txs.Network.ID.String(),
@@ -427,17 +460,37 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 					return
 				})
 
-				if err == nil {
-					common.Log.Debugf("Prepared tx ref %s for broadcast using nonce %s. Transaction hash: %s", *tx.Ref, _tx.Nonce(), _tx.Hash().String())
-					w.Add(1)
-					_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
-					if err != nil {
-						common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-					}
-					w.Wait()
-				}
-				w.Wait()
 			}
+			// nonce, err = getNonce(&w, &m, *txAddress, tx, txs)
+			// if err != nil {
+			// 	common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+			// }
+
+			// common.Log.Debugf("XXX: getting signer information: %v", time.Now())
+			// err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+			// 	signer, _tx, hash, err = providecrypto.EVMTxFactory(
+			// 		txs.Network.ID.String(),
+			// 		txs.Network.RPCURL(),
+			// 		*txAddress,
+			// 		tx.To,
+			// 		tx.Data,
+			// 		tx.Value.BigInt(),
+			// 		nonce,
+			// 		uint64(gas),
+			// 		gasPrice,
+			// 	)
+			// 	return
+			// })
+
+			// if err == nil {
+			// 	common.Log.Debugf("Prepared tx ref %s for broadcast using nonce %s. Transaction hash: %s", *tx.Ref, _tx.Nonce(), _tx.Hash().String())
+			// 	w.Add(1)
+			// 	_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
+			// 	if err != nil {
+			// 		common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+			// 	}
+			// }
+
 			if err != nil {
 				err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
 				common.Log.Debugf("%s", err.Error())
