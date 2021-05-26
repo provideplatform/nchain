@@ -410,42 +410,40 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				if err != nil {
 					common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
 				}
+
+				common.Log.Debugf("XXX: getting signer information: %v", time.Now())
+				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+					signer, _tx, hash, err = providecrypto.EVMTxFactory(
+						txs.Network.ID.String(),
+						txs.Network.RPCURL(),
+						*txAddress,
+						tx.To,
+						tx.Data,
+						tx.Value.BigInt(),
+						nonce,
+						uint64(gas),
+						gasPrice,
+					)
+					return
+				})
+
+				if err == nil {
+					common.Log.Debugf("Prepared tx ref %s for broadcast using nonce %s. Transaction hash: %s", *tx.Ref, _tx.Nonce(), _tx.Hash().String())
+					w.Add(1)
+					_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
+					if err != nil {
+						common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+					}
+					w.Wait()
+				}
 				w.Wait()
 			}
-
-			common.Log.Debugf("XXX: getting signer information: %v", time.Now())
-			err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-				signer, _tx, hash, err = providecrypto.EVMTxFactory(
-					txs.Network.ID.String(),
-					txs.Network.RPCURL(),
-					*txAddress,
-					tx.To,
-					tx.Data,
-					tx.Value.BigInt(),
-					nonce,
-					uint64(gas),
-					gasPrice,
-				)
-				return
-			})
 			if err != nil {
 				err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
 				common.Log.Debugf("%s", err.Error())
 				common.Log.Warning(err.Error())
 				return nil, nil, err
 			}
-
-			if err == nil {
-				common.Log.Debugf("Prepared tx ref %s for broadcast using nonce %s. Transaction hash: %s", *tx.Ref, _tx.Nonce(), _tx.Hash().String())
-				w.Add(1)
-				_, err = incrementNonce(&w, &m, *txAddress, *tx.Ref, _tx.Nonce())
-				if err != nil {
-					common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-				}
-				w.Wait()
-			}
-
-			common.Log.Debugf("XXX: got signer information: %v", time.Now())
 
 			// if we were provided, or have generated, a hd derivation path, pass it to the signer
 			opts := map[string]interface{}{}
