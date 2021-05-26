@@ -275,11 +275,10 @@ func getNonce(wg *sync.WaitGroup, m *sync.Mutex, txAddress string, tx *Transacti
 			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *tx.Ref, err.Error())
 			return nil, err
 		}
-		common.Log.Debugf("XXX: Nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
+		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
 		// put this in redis
-		updatedNonce := pendingNonce + 1
 		lockErr := redisutil.WithRedlock(txAddress, func() error {
-			err := redisutil.Set(txAddress, updatedNonce, nil)
+			err := redisutil.Set(txAddress, pendingNonce, nil)
 			if err != nil {
 				return err
 			}
