@@ -136,7 +136,7 @@ func executeTransaction(c *contract.Contract, execution *contract.Execution) (*c
 			View:        readonlyMethod,
 		}
 		common.Log.Debugf("XXXresp is: %+v", resp)
-		common.Log.Debugf("XXXresponse transaction is: %v", resp.Transaction)
+		common.Log.Debugf("XXX: Execution of tx response for tx ref %s has transaction %v", *resp.Ref, resp.Transaction)
 	} else if tx.Response.Transaction == nil {
 		//?? when does this get tripped?
 		//tx.Response.Transaction = tx
@@ -202,7 +202,6 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 						hdDerivationPath = &path
 					}
 				}
-
 				// send as a message to NATS
 				txExecutionMsg, _ := json.Marshal(map[string]interface{}{
 					"contract_id":        c.ID,
@@ -220,7 +219,7 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 				err = natsutil.NatsStreamingPublish(natsTxSubject, txExecutionMsg)
 
 				if err != nil {
-					common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
+					common.Log.Warningf("Failed to publish contract deployment tx ref %s. Error: %s", *tx.Ref, err.Error())
 					c.Errors = append(c.Errors, &provideAPI.Error{
 						Message: common.StringOrNil(err.Error()),
 					})
