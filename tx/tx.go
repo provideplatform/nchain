@@ -101,7 +101,6 @@ type TransactionSigner struct {
 	Wallet  *wallet.Wallet
 }
 
-var w sync.WaitGroup
 var m sync.Mutex
 
 // Address returns the public network address of the underlying Signer
@@ -230,12 +229,11 @@ func incrementNonce(txAddress, txRef string, txNonce uint64) (*uint64, error) {
 	return nil, nil
 }
 
-func generateTx(wg *sync.WaitGroup, txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice *uint64) (types.Signer, *types.Transaction, []byte, error) {
+func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice *uint64) (types.Signer, *types.Transaction, []byte, error) {
 	m.Lock()
 
 	defer func() {
 		m.Unlock()
-		wg.Done()
 	}()
 
 	nonce, err := getNonce(*txAddress, tx, txs)
@@ -386,9 +384,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			if nonce == nil {
-				w.Add(1)
-				signer, _tx, hash, err = generateTx(&w, txs, tx, txAddress, gas, gasPrice)
-				w.Wait()
+				signer, _tx, hash, err = generateTx(txs, tx, txAddress, gas, gasPrice)
 			} else {
 				// create a signed transaction using the provided nonce
 				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
@@ -472,9 +468,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			if nonce == nil {
-				w.Add(1)
-				signer, _tx, hash, err = generateTx(&w, txs, tx, txAddress, gas, gasPrice)
-				w.Wait()
+				signer, _tx, hash, err = generateTx(txs, tx, txAddress, gas, gasPrice)
 			} else {
 				// create a signed transaction using the provided nonce
 				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
