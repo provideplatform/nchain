@@ -334,8 +334,9 @@ func TestContractExecutionHDWalletKovanBulk(t *testing.T) {
 
 				params := map[string]interface{}{}
 				//execute transaction
-
-				parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef.String())
+				//add a counter to the ref
+				ref := fmt.Sprintf("%v:%s", txLooper, txRef)
+				parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, ref)
 				json.Unmarshal([]byte(parameter), &params)
 
 				// execute the contract method
