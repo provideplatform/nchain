@@ -102,6 +102,7 @@ type TransactionSigner struct {
 }
 
 var m sync.Mutex
+var nonceMutex sync.Mutex
 
 // Address returns the public network address of the underlying Signer
 func (txs *TransactionSigner) Address() string {
@@ -233,6 +234,58 @@ func incrementNonce(txAddress, txRef string, txNonce uint64) (*uint64, error) {
 	return nil, nil
 }
 
+func generateTxAsync(txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice, nonce *uint64) (types.Signer, *types.Transaction, []byte, error) {
+
+	common.Log.Debugf("XXX: Using nonce %v for tx ref %s", nonce, *tx.Ref)
+	// nonce, err := getNonce(*txAddress, tx, txs)
+	// if err != nil {
+	// 	common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+	// }
+
+	var signer types.Signer
+	var _tx *types.Transaction
+	var hash []byte
+
+	common.Log.Debugf("XXX: Getting signer for tx ref %s", *tx.Ref)
+
+	err := common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+		signer, _tx, hash, err = providecrypto.EVMTxFactory(
+			txs.Network.ID.String(),
+			txs.Network.RPCURL(),
+			*txAddress,
+			tx.To,
+			tx.Data,
+			tx.Value.BigInt(),
+			nonce,
+			uint64(gas),
+			gasPrice,
+		)
+		return
+	})
+
+	if err != nil {
+
+		if txs.Wallet != nil {
+			err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
+		} else {
+			err = fmt.Errorf("failed to sign %d-byte transaction payload using account ID: %s; %s", len(hash), txs.Account.ID, err.Error())
+		}
+
+		common.Log.Debugf("%s", err.Error())
+		common.Log.Warning(err.Error())
+		return nil, nil, nil, err
+	}
+
+	if err == nil {
+		_, err = incrementNonce(*txAddress, *tx.Ref, _tx.Nonce())
+		if err != nil {
+			common.Log.Debugf("XXX: Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+		}
+	}
+
+	return signer, _tx, hash, err
+}
+
 func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice *uint64) (types.Signer, *types.Transaction, []byte, error) {
 	m.Lock()
 
@@ -345,6 +398,40 @@ func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint6
 			nonce = &int64nonce
 		}
 	}
+	return nonce, nil
+}
+
+func (tx *Transaction) getNonceWithMutex(db *gorm.DB) (*uint64, error) {
+	nonceMutex.Lock()
+
+	defer func() {
+		nonceMutex.Unlock()
+	}()
+
+	// first we need a signer factory
+	txs, err := tx.signerFactory(db)
+	if err != nil {
+		tx.Errors = append(tx.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
+		})
+		return nil, err
+	}
+
+	// then use this to get the transaction address
+	txAddress, _, err := txs.GetSignerDetails()
+	if err != nil {
+		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *tx.Ref, err.Error())
+		return nil, err
+	}
+
+	// then use this address to get the nonce
+	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *tx.Ref)
+	nonce, err := getNonce(*txAddress, tx, txs)
+	if err != nil {
+		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+		return nil, err
+	}
+
 	return nonce, nil
 }
 
@@ -647,6 +734,10 @@ func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
 	}
 
 	// get the nonce, assign it to the tx
+	nonce, err := t.getNonceWithMutex(db)
+	if err != nil {
+		common.Log.Debugf("XXY: Error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
+	}
 	// async sign and broadcast
 	// if it fails, correct and rebroadcast
 	// something something if it's an error that can't be fixed, and everything else is locked up behind a failed tx
