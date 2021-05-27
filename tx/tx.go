@@ -125,9 +125,13 @@ func (txs *TransactionSigner) Address() string {
 
 // GetSignerDetails gets the address and derivation path used for wallet signing
 func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *string, err error) {
+	if txs.Account != nil {
+		address := common.StringOrNil(txs.Account.Address)
+		derivationPath := common.StringOrNil("")
+		return address, derivationPath, nil
+	}
 
 	// first check if we have a provided path
-	// we'll ignore the other branch (no hd wallet path for the moment TODO)
 	if txs.Wallet.Path != nil {
 		// ensure the path is valid
 		_, err := hdwallet.ParseDerivationPath(*txs.Wallet.Path)
@@ -236,6 +240,7 @@ func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas 
 		m.Unlock()
 	}()
 
+	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *tx.Ref)
 	nonce, err := getNonce(*txAddress, tx, txs)
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
@@ -244,6 +249,8 @@ func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas 
 	var signer types.Signer
 	var _tx *types.Transaction
 	var hash []byte
+
+	common.Log.Debugf("XXX: Getting signer for tx ref %s", *tx.Ref)
 
 	err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
 		signer, _tx, hash, err = providecrypto.EVMTxFactory(
@@ -261,7 +268,7 @@ func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas 
 	})
 
 	if err != nil {
-		// change the message depending on whether we're using a wallet or an account (TODO: correc this)
+
 		if txs.Wallet != nil {
 			err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
 		} else {
@@ -355,7 +362,14 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 		return nil, nil, err
 	}
 
+	var sig *vault.SignResponse
+
+	if !txs.Network.IsEthereumNetwork() {
+		return nil, nil, fmt.Errorf("unable to generate signed tx for tx ref %s for unsupported network: %s", *tx.Ref, *txs.Network.Name)
+	}
+
 	if txs.Network.IsEthereumNetwork() {
+
 		params := tx.ParseParams()
 		gas, gasOk := params["gas"].(float64)
 		if !gasOk {
@@ -377,124 +391,82 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 
 		var signer types.Signer
 		var _tx *types.Transaction
+		var signingWithAccount bool
+		var signingWithWallet bool
 
-		// we are using an account to sign the transaction
 		if txs.Account != nil && txs.Account.VaultID != nil && txs.Account.KeyID != nil {
-			txAddress := common.StringOrNil(txs.Account.Address)
+			common.Log.Debugf("signing with account")
+			signingWithAccount = true
+		}
 
-			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
-			if nonce == nil {
-				signer, _tx, hash, err = generateTx(txs, tx, txAddress, gas, gasPrice)
-			} else {
-				// create a signed transaction using the provided nonce
-				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-					signer, _tx, hash, err = providecrypto.EVMTxFactory(
-						txs.Network.ID.String(),
-						txs.Network.RPCURL(),
-						*txAddress,
-						tx.To,
-						tx.Data,
-						tx.Value.BigInt(),
-						nonce,
-						uint64(gas),
-						gasPrice,
-					)
-					return
-				})
-			}
+		if txs.Wallet != nil && txs.Wallet.VaultID != nil && txs.Wallet.KeyID != nil {
+			common.Log.Debugf("signing with wallet")
+			signingWithWallet = true
+		}
 
-			// signer, _tx, hash, err = providecrypto.EVMTxFactory(
-			// 	txs.Network.ID.String(),
-			// 	txs.Network.RPCURL(),
-			// 	txs.Account.Address,
-			// 	tx.To,
-			// 	tx.Data,
-			// 	tx.Value.BigInt(),
-			// 	nonce,
-			// 	uint64(gas),
-			// 	gasPrice,
-			// )
-			if err != nil {
-				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
+		txAddress, txDerivationPath, err := txs.GetSignerDetails()
+		if err != nil {
+			common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *tx.Ref, err.Error())
+		}
+		common.Log.Debugf("XXX: got address %s", *txAddress)
 
-			sig, err := vault.SignMessage(
+		common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
+		if nonce == nil {
+			signer, _tx, hash, err = generateTx(txs, tx, txAddress, gas, gasPrice)
+		} else {
+			// create a raw transaction using the provided tx data
+			err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
+				signer, _tx, hash, err = providecrypto.EVMTxFactory(
+					txs.Network.ID.String(),
+					txs.Network.RPCURL(),
+					*txAddress,
+					tx.To,
+					tx.Data,
+					tx.Value.BigInt(),
+					nonce,
+					uint64(gas),
+					gasPrice,
+				)
+				return
+			})
+		}
+
+		if err != nil && strings.Contains(err.Error(), "nonce is too low)") {
+			common.Log.Debugf("got nonce too low error for tx ref %s", *tx.Ref)
+			// this error should trigger a reset of the nonce to the last mined nonce
+		}
+
+		if err != nil && strings.Contains(err.Error(), "the same hash was already imported)") {
+			common.Log.Debugf("transaction already imported error for tx ref %s", *tx.Ref)
+			// this error should trigger an increase in the gas to overwrite the previously imported tx?
+		}
+
+		if err != nil {
+			err = fmt.Errorf("failed to create raw tx for address %s; %s", *txAddress, err.Error())
+			common.Log.Warning(err.Error())
+			return nil, nil, err
+		}
+
+		// we are signing the raw transaction with a vault account id
+		if signingWithAccount {
+			sig, err = vault.SignMessage(
 				util.DefaultVaultAccessJWT,
 				txs.Account.VaultID.String(),
 				txs.Account.KeyID.String(),
 				fmt.Sprintf("%x", hash),
 				map[string]interface{}{},
 			)
+
 			if err != nil {
-				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
+				err = fmt.Errorf("failed to sign transaction ref %s using address %s; %s", *tx.Ref, *txAddress, err.Error())
 				common.Log.Warning(err.Error())
 				return nil, nil, err
-			}
-
-			_sig, err := hex.DecodeString(*sig.Signature)
-			if err != nil {
-				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
-
-			signedTx, err = _tx.WithSignature(signer, _sig)
-			if err != nil {
-				err = fmt.Errorf("failed to sign transaction using signing account %s; %s", txs.Account.Address, err.Error())
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
-
-			if err == nil {
-				signedTxJSON, _ := signedTx.(*types.Transaction).MarshalJSON()
-				common.Log.Debugf("signed eth tx: %s", signedTxJSON)
-
-				accessedAt := time.Now()
-				go func() {
-					txs.Account.AccessedAt = &accessedAt
-					txs.DB.Save(&txs.Account)
-				}()
 			}
 		}
 
-		if txs.Wallet != nil && txs.Wallet.VaultID != nil && txs.Wallet.KeyID != nil {
-
-			txAddress, txDerivationPath, err := txs.GetSignerDetails()
-			if err != nil {
-				return nil, nil, err
-			}
-
-			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
-			if nonce == nil {
-				signer, _tx, hash, err = generateTx(txs, tx, txAddress, gas, gasPrice)
-			} else {
-				// create a signed transaction using the provided nonce
-				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-					signer, _tx, hash, err = providecrypto.EVMTxFactory(
-						txs.Network.ID.String(),
-						txs.Network.RPCURL(),
-						*txAddress,
-						tx.To,
-						tx.Data,
-						tx.Value.BigInt(),
-						nonce,
-						uint64(gas),
-						gasPrice,
-					)
-					return
-				})
-			}
-
-			if err != nil {
-				err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
-				common.Log.Debugf("%s", err.Error())
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
-
-			// if we were provided, or have generated, a hd derivation path, pass it to the signer
+		// we are signing the raw transaction with a vault wallet (+optional derivation path)
+		if signingWithWallet {
+			// if we were given a hd derivation path, pass it to the signer
 			opts := map[string]interface{}{}
 			if txDerivationPath != nil {
 				opts = map[string]interface{}{
@@ -504,41 +476,49 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				}
 			}
 
-			//common.Log.Debugf("vault to sign tx... hash: %s", fmt.Sprintf("%x", hash))
-			//check if the hash is actually hex. not sure if it is, it looks like bytes returned from the signer function
-			// TODO sometimes the db stores the raw hash (no 0x prefix), not the tx hash (0x prefix) - investigate why this occurs
-
-			sig, err := vault.SignMessage(
+			sig, err = vault.SignMessage(
 				util.DefaultVaultAccessJWT,
 				txs.Wallet.VaultID.String(),
 				txs.Wallet.KeyID.String(),
 				fmt.Sprintf("%x", hash),
 				opts,
 			)
-			if err != nil {
-				err = fmt.Errorf("failed to sign transaction using hardened account for HD wallet: %s; %s", txs.Wallet.ID, err.Error())
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
 
-			_sig, err := hex.DecodeString(*sig.Signature)
 			if err != nil {
-				err = fmt.Errorf("failed to sign transaction using hardened account for HD wallet: %s; %s", txs.Wallet.ID, err.Error())
-				common.Log.Warning(err.Error())
-				return nil, nil, err
-			}
-
-			signedTx, err = _tx.WithSignature(signer, _sig)
-			if err != nil {
-				err = fmt.Errorf("failed to sign transaction payload using hardened account for HD wallet: %s; %s", txs.Wallet.ID, err.Error())
+				err = fmt.Errorf("failed to sign transaction ref %s using address %s; %s", *tx.Ref, *txAddress, err.Error())
 				common.Log.Warning(err.Error())
 				return nil, nil, err
 			}
 		}
-	} else {
-		return nil, nil, fmt.Errorf("unable to generate signed tx for unsupported network: %s", *txs.Network.Name)
-	}
 
+		sigBytes, err := hex.DecodeString(*sig.Signature)
+		if err != nil {
+			err = fmt.Errorf("failed to sign transaction ref %s using address %s; %s", *tx.Ref, *txAddress, err.Error())
+			common.Log.Warning(err.Error())
+			return nil, nil, err
+		}
+
+		signedTx, err = _tx.WithSignature(signer, sigBytes)
+		if err != nil {
+			err = fmt.Errorf("failed to sign transaction ref %s using address %s; %s", *tx.Ref, *txAddress, err.Error())
+			common.Log.Warning(err.Error())
+			return nil, nil, err
+		}
+
+		if err == nil {
+			// signedTxJSON, _ := signedTx.(*types.Transaction).MarshalJSON()
+			// common.Log.Debugf("signed eth tx: %s for tx ref %s", signedTxJSON, *tx.Ref)
+
+			accessedAt := time.Now()
+			go func() {
+				// TODO check this, tx.account can have the wallet id and derivation path
+				if signingWithAccount {
+					txs.Account.AccessedAt = &accessedAt
+					txs.DB.Save(&txs.Account)
+				}
+			}()
+		}
+	}
 	return signedTx, hash, err
 }
 
@@ -654,23 +634,88 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 	}, nil
 }
 
+func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
+
+	// if we have a signing error, which might be insufficient funds
+	// and we have been asked to subsidize, broadcast to bookie
+	signer, err := t.signerFactory(db)
+	if err != nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
+		})
+		return err
+	}
+
+	// get the nonce, assign it to the tx
+	// async sign and broadcast
+	// if it fails, correct and rebroadcast
+	// something something if it's an error that can't be fixed, and everything else is locked up behind a failed tx
+
+	signingErr := t.sign(db, signer)
+
+	if signingErr == nil {
+		// if no signing error, let's broadcast it!
+		networkBroadcastErr := t.broadcast(db, signer.Network, signer)
+		// if regular fails, we're out
+		if networkBroadcastErr != nil {
+			common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
+
+			t.Errors = append(t.Errors, &provide.Error{
+				Message: common.StringOrNil(networkBroadcastErr.Error()),
+			})
+
+			desc := networkBroadcastErr.Error()
+			t.updateStatus(db, "failed", &desc)
+			return err
+		}
+		// if regular succeeds, pop it onto nats
+		if networkBroadcastErr == nil {
+			common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
+			payload, _ := json.Marshal(map[string]interface{}{
+				"transaction_id": t.ID.String(),
+			})
+			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+
+			return nil
+		}
+	} //signingError
+
+	if signingErr != nil && t.shouldSubsidize() {
+		common.Log.Debugf("attepting broadcast of tx ref: %s to bookie with signing error %s.", *t.Ref, signingErr.Error())
+		// network specified in t, so not required to be specifically passed to broadcast method
+		bookieBroadcastErr := t.broadcast(db, nil, nil)
+		// if bookie fails, we're out
+		if bookieBroadcastErr != nil {
+			common.Log.Warningf("attepted broadcast of tx ref %s to bookie failed %s", *t.Ref, bookieBroadcastErr.Error())
+
+			t.Errors = append(t.Errors, &provide.Error{
+				Message: common.StringOrNil(bookieBroadcastErr.Error()),
+			})
+
+			desc := bookieBroadcastErr.Error()
+			t.updateStatus(db, "failed", &desc)
+			return err
+		}
+		// if bookie succeeds, pop it onto nats
+		if bookieBroadcastErr == nil {
+			payload, _ := json.Marshal(map[string]interface{}{
+				"transaction_id": t.ID.String(),
+			})
+			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+
+			return nil
+		}
+	}
+
+	return nil
+}
+
 // Create and persist a new transaction. Side effects include persistence of contract
 // and/or token instances when the tx represents a contract and/or token creation.
 func (t *Transaction) Create(db *gorm.DB) bool {
 	if !t.Validate() {
 		return false
 	}
-
-	signer, err := t.signerFactory(db)
-	if err != nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		return false
-	}
-
-	// xxx check what triggers a signingErr here...
-	signingErr := t.sign(db, signer)
 
 	if db.NewRecord(t) {
 		// last check to make sure we don't violate fk constraints with a nil uuid;
@@ -698,60 +743,80 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
 
-				// if we have a signing error, which might be insufficient funds, try bookie
-				if signingErr != nil {
-					common.Log.Debugf("attepting broadcast of tx ref: %s to bookie due to signing error %s.", *t.Ref, signingErr.Error())
-					// network specified in t, so not required to be specifically passed to broadcast method
-					bookieBroadcastErr := t.broadcast(db, nil, nil)
-					// if bookie fails, we're out
-					if bookieBroadcastErr != nil {
-						common.Log.Warningf("attepted broadcast of tx ref %s to bookie failed %s", *t.Ref, bookieBroadcastErr.Error())
-
-						t.Errors = append(t.Errors, &provide.Error{
-							Message: common.StringOrNil(bookieBroadcastErr.Error()),
-						})
-
-						desc := bookieBroadcastErr.Error()
-						t.updateStatus(db, "failed", &desc)
-						return false
-					}
-					// if bookie succeeds, pop it onto nats
-					if bookieBroadcastErr == nil {
-						payload, _ := json.Marshal(map[string]interface{}{
-							"transaction_id": t.ID.String(),
-						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
-						return true
-					}
+				err := t.signAndBroadcast(db)
+				if err != nil {
+					common.Log.Debugf("XXX: Error signing and broadcasting tx ref %s. Error: %s", *t.Ref, err.Error())
 				}
 
-				if signingErr == nil {
-					// if no signing error, try regular broadcast
-					networkBroadcastErr := t.broadcast(db, signer.Network, signer)
-					// if regular fails, we're out
-					if networkBroadcastErr != nil {
-						common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
+				// if there's no error, this tx is done
+				return true
 
-						t.Errors = append(t.Errors, &provide.Error{
-							Message: common.StringOrNil(networkBroadcastErr.Error()),
-						})
+				// if we have a signing error, which might be insufficient funds
+				// and we have been asked to subsidize, broadcast to bookie
+				// signer, err := t.signerFactory(db)
+				// if err != nil {
+				// 	t.Errors = append(t.Errors, &provide.Error{
+				// 		Message: common.StringOrNil(err.Error()),
+				// 	})
+				// 	return false
+				// }
 
-						desc := networkBroadcastErr.Error()
-						t.updateStatus(db, "failed", &desc)
-						return false
-					}
-					// if regular succeeds, pop it onto nats
-					if networkBroadcastErr == nil {
-						common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
-						payload, _ := json.Marshal(map[string]interface{}{
-							"transaction_id": t.ID.String(),
-						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+				// // xxx check what triggers a signingErr here...
+				// signingErr := t.sign(db, signer)
 
-						return true
-					}
-				}
+				// if signingErr == nil {
+				// 	// if no signing error, try regular broadcast
+				// 	networkBroadcastErr := t.broadcast(db, signer.Network, signer)
+				// 	// if regular fails, we're out
+				// 	if networkBroadcastErr != nil {
+				// 		common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
+
+				// 		t.Errors = append(t.Errors, &provide.Error{
+				// 			Message: common.StringOrNil(networkBroadcastErr.Error()),
+				// 		})
+
+				// 		desc := networkBroadcastErr.Error()
+				// 		t.updateStatus(db, "failed", &desc)
+				// 		return false
+				// 	}
+				// 	// if regular succeeds, pop it onto nats
+				// 	if networkBroadcastErr == nil {
+				// 		common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
+				// 		payload, _ := json.Marshal(map[string]interface{}{
+				// 			"transaction_id": t.ID.String(),
+				// 		})
+				// 		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+
+				// 		return true
+				// 	}
+				// }
+
+				// if signingErr != nil && t.shouldSubsidize() {
+				// 	common.Log.Debugf("attepting broadcast of tx ref: %s to bookie with signing error %s.", *t.Ref, signingErr.Error())
+				// 	// network specified in t, so not required to be specifically passed to broadcast method
+				// 	bookieBroadcastErr := t.broadcast(db, nil, nil)
+				// 	// if bookie fails, we're out
+				// 	if bookieBroadcastErr != nil {
+				// 		common.Log.Warningf("attepted broadcast of tx ref %s to bookie failed %s", *t.Ref, bookieBroadcastErr.Error())
+
+				// 		t.Errors = append(t.Errors, &provide.Error{
+				// 			Message: common.StringOrNil(bookieBroadcastErr.Error()),
+				// 		})
+
+				// 		desc := bookieBroadcastErr.Error()
+				// 		t.updateStatus(db, "failed", &desc)
+				// 		return false
+				// 	}
+				// 	// if bookie succeeds, pop it onto nats
+				// 	if bookieBroadcastErr == nil {
+				// 		payload, _ := json.Marshal(map[string]interface{}{
+				// 			"transaction_id": t.ID.String(),
+				// 		})
+				// 		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+
+				// 		return true
+				// 	}
+				// }
 			}
 		}
 	}
@@ -1025,9 +1090,6 @@ func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 	} else {
 		hashAsString := hex.EncodeToString(hash)
 		t.Hash = common.StringOrNil(hashAsString)
-
-		// ok, this looks wrong, for whatever reason as it's returning just Fe
-		//t.Hash = common.StringOrNil(string(ethcommon.FromHex(string(hash))))
 	}
 
 	return err
