@@ -473,7 +473,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", nonce, *tx.Ref)
 			if nonce == nil {
 				w.Add(1)
-				signer, _tx, hash, err = generateSignedTx(&w, txs, tx, txAddress, gas, gasPrice)
+				signer, _tx, hash, err = generateTx(&w, txs, tx, txAddress, gas, gasPrice)
 				w.Wait()
 			} else {
 				// create a signed transaction using the provided nonce
