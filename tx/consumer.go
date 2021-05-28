@@ -297,7 +297,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
-		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
+		//common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
 		err = msg.Ack()
 		if err != nil {
 			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
