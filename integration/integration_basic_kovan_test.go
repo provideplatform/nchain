@@ -92,7 +92,7 @@ func _TestForZac(t *testing.T) {
 			return
 		}
 
-		t.Logf("we are here, running test %v", testId)
+		t.Logf("we are here, running test %v with tx ref %v", testId, contractRef)
 
 		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
 			"network_id":     tc.network,
