@@ -1,4 +1,4 @@
-name: nchain-RINKEBY-s
+name: Hourly Integration (rinkeby)
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     

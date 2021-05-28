@@ -1,8 +1,8 @@
-name: nchain-integration-test-short
+name: NChain (integration)
 on:
   push:
     branches:
-      - integration   
+      - integration
 jobs:
   nchain-integration-test-ropsten-short:
     runs-on: ubuntu-latest

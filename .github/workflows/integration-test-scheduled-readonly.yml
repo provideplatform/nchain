@@ -1,4 +1,4 @@
-name: nchain-READONLY-s
+name: Hourly Integration (readonly)
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     

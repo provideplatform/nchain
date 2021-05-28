@@ -1,4 +1,4 @@
-name: nchain-KOVAN-s
+name: Hourly Integration (kovan)
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     

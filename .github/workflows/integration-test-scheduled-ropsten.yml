@@ -1,4 +1,4 @@
-name: nchain-ROPSTEN-s
+name: Hourly Integration (ropsten)
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     

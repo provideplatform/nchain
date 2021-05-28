@@ -1,3 +1,4 @@
+name: NChain Release
 on: 
   push:
     tags:
