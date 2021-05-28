@@ -14,6 +14,129 @@ import (
 	nchain "github.com/provideservices/provide-go/api/nchain"
 )
 
+func _TestForZac(t *testing.T) {
+
+	// give the test a unique identifier
+	testId, err := uuid.NewV4()
+	if err != nil {
+		t.Logf("error creating new UUID")
+	}
+
+	// set up a user
+	userToken, err := UserAndTokenFactory(testId)
+	if err != nil {
+		t.Errorf("user authentication failed. Error: %s", err.Error())
+	}
+
+	// set up an app and get a token
+	testcaseApp := Application{
+		"app" + testId.String(),
+		"appdesc " + testId.String(),
+	}
+
+	app, err := appFactory(*userToken, testcaseApp.name, testcaseApp.description)
+	if err != nil {
+		t.Errorf("error setting up application. Error: %s", err.Error())
+		return
+	}
+
+	appToken, err := appTokenFactory(*userToken, app.ID)
+	if err != nil {
+		t.Errorf("error getting app token. Error: %s", err.Error())
+		return
+	}
+
+	// set up a wallet and a derivation path
+	wallet, err := nchain.CreateWallet(*appToken.Token, map[string]interface{}{
+		"mnemonic": "traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day",
+	})
+	if err != nil {
+		t.Errorf("error creating wallet: %s", err.Error())
+		return
+	}
+
+	// this path produces the ETH address 0x6af845bae76f5cc16bc93f86b83e8928c3dfda19
+	path := `m/44'/60'/2'/0/0`
+
+	// load the readwrite compiled artifact
+	rwArtifact, err := ioutil.ReadFile("artifacts/readwritetester.json")
+	if err != nil {
+		t.Errorf("error loading readwritetester artifact. Error: %s", err.Error())
+	}
+
+	rwCompiledArtifact := nchain.CompiledArtifact{}
+	err = json.Unmarshal(rwArtifact, &rwCompiledArtifact)
+	if err != nil {
+		t.Errorf("error converting readwritetester compiled artifact. Error: %s", err.Error())
+	}
+
+	tt := []struct {
+		network        string
+		name           string
+		derivationPath string
+		walletID       string
+		artifact       nchain.CompiledArtifact
+	}{
+		//{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
+		{kovanNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
+		{kovanNetworkID, "readwrite", path, wallet.ID.String(), rwCompiledArtifact},
+	}
+
+	for _, tc := range tt {
+
+		// give this test case execution a unique contract reference number
+		contractRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+			return
+		}
+
+		contract, err := nchain.CreateContract(*appToken.Token, map[string]interface{}{
+			"network_id":     tc.network,
+			"application_id": app.ID.String(),
+			"wallet_id":      tc.walletID,
+			"name":           tc.name,
+			"address":        "0x",
+			"params": map[string]interface{}{
+				"wallet_id":          tc.walletID,
+				"hd_derivation_path": tc.derivationPath,
+				"compiled_artifact":  tc.artifact,
+				"ref":                contractRef.String(),
+			},
+		})
+		if err != nil {
+			t.Errorf("error creating %s contract. Error: %s", tc.name, err.Error())
+			return
+		}
+
+		// wait for the contract to be deployed
+		started := time.Now().Unix()
+		for {
+			if time.Now().Unix()-started >= contractTimeout {
+				t.Errorf("timed out awaiting contract address for %s contract for %s network", tc.name, tc.network)
+				return
+			}
+
+			cntrct, err := nchain.GetContractDetails(*appToken.Token, contract.ID.String(), map[string]interface{}{})
+			if err != nil {
+				t.Errorf("error fetching %s contract details; %s", tc.name, err.Error())
+				return
+			}
+
+			if cntrct.Address != nil && *cntrct.Address != "0x" {
+				t.Logf("%s contract address resolved; contract id: %s; address: %s", tc.name, cntrct.ID.String(), *cntrct.Address)
+				break
+			}
+
+			t.Logf("resolving contract for %s network ...", tc.network)
+			time.Sleep(contractSleepTime * time.Second)
+		}
+
+	} // test table loop
+
+}
+
 func TestContractHDWalletKovanApp(t *testing.T) {
 
 	t.Parallel()
