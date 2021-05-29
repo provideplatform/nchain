@@ -25,8 +25,8 @@ jobs:
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
-          path: 'nchain'                    
-      - run: docker-compose -f ./ops/docker-compose.yml build --no-cache nchain
+          path: 'nchain'
+      - run: docker build -t nchain/local --no-cache .
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain

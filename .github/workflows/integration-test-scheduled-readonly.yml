@@ -26,7 +26,7 @@ jobs:
         with:
           ref: dev        
           path: 'nchain'                    
-      - run: docker-compose -f ./ops/docker-compose.yml build --no-cache nchain
+      - run: docker build -t nchain/local --no-cache .
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
