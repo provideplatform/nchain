@@ -331,6 +331,7 @@ services:
       - IDENT_API_SCHEME=http
       - LOG_LEVEL=DEBUG
       - PORT=8080
+      - REDIS_HOSTS=redis:6379
       - REQUEST_TIMEOUT=20
       - VAULT_API_HOST=vault:8080
       - VAULT_API_PATH=api/v1
