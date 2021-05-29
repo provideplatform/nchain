@@ -1,6 +1,6 @@
 #!/bin/bash
 
-docker-compose -f ./ops/docker-compose.yml build --no-cache
+docker build -t nchain/local --no-cache .
 docker-compose -f ./ops/docker-compose.yml up -d
 TAGS=$LOCAL_TAGS ./ops/run_local_tests_short.sh
 docker-compose -f ./ops/docker-compose.yml down
