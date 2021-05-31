@@ -31,7 +31,7 @@ require (
 	github.com/kthomas/go-aws-wrapper v0.0.0-20200602073531-1d9770061122
 	github.com/kthomas/go-azure-wrapper v0.0.0-20210409115636-8b71edfc2fcc
 	github.com/kthomas/go-db-config v0.0.0-20200612131637-ec0436a9685e
-	github.com/kthomas/go-logger v0.0.0-20210411034702-66a0af9aee2c
+	github.com/kthomas/go-logger v0.0.0-20210526080020-a63672d0724c
 	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05
 	github.com/kthomas/go-pgputil v0.0.0-20200602073402-784e96083943
 	github.com/kthomas/go-redisutil v0.0.0-20200602073431-aa49de17e9ff
@@ -50,7 +50,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideapp/ident v0.0.0-00010101000000-000000000000
-	github.com/provideservices/provide-go v0.0.0-20210427025519-e2e41ce7ee6e
+	github.com/provideservices/provide-go v0.0.0-20210528064845-41b80b9b02b9
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	go.mongodb.org/mongo-driver v1.3.3

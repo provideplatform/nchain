@@ -468,7 +468,12 @@ func NewHistoricalBlockStatsDaemon(lg *logger.Logger, network *network.Network) 
 
 	chainID := network.ChainID
 	if chainID == nil {
-		_chainID := hexutil.EncodeBig(providecrypto.EVMGetChainID(network.ID.String(), network.RPCURL()))
+		chn, err := providecrypto.EVMGetChainID(network.ID.String(), network.RPCURL())
+		if err != nil {
+			common.Log.Debugf("Error getting chain ID of %s network. Error: %s", network.ID.String(), err.Error())
+			return nil
+		}
+		_chainID := hexutil.EncodeBig(chn)
 		chainID = &_chainID
 	}
 	hbd.stats = &provide.NetworkStatus{

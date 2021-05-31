@@ -163,13 +163,13 @@ func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) 
 
 // packetFragment represents a packet fragment ingest message payload; TODO: support marshaling from wire/protocol in addition to JSON
 type packetFragment struct {
-	Index           uint              `json:"index"`                          // i.e., the index of the fragment
-	Cardinality     uint              `json:"cardinality"`                    // i.e., # of total fragments comprising the packet
-	Checksum        *string           `json:"checksum"`                       // i.e., md5 checksum of the fragment payload
-	Nonce           *int64            `json:"nonce"`                          // i.e., nonce associated with the packet reassembly operation
-	Padded          bool              `json:"padded"`                         // i.e., true if the fragment payload is padded with null bytes to match a uniform chunksize
-	Payload         *string           `json:"payload"`                        // i.e., the raw fragment payload
-	PayloadChecksum *string           `json:"reassembled_checksum,omitempty"` // i.e., md5 checksum of the entire n of n payload
+	Index           uint              `json:"index"`                          // the index of the fragment
+	Cardinality     uint              `json:"cardinality"`                    // # of total fragments comprising the packet
+	Checksum        *string           `json:"checksum"`                       // md5 checksum of the fragment payload
+	Nonce           *int64            `json:"nonce"`                          // nonce associated with the packet reassembly operation
+	Padded          bool              `json:"padded"`                         // true if the fragment payload is padded with null bytes to match a uniform chunksize
+	Payload         *string           `json:"payload"`                        // the raw fragment payload
+	PayloadChecksum *string           `json:"reassembled_checksum,omitempty"` // md5 checksum of the entire n of n payload
 	Reassembly      *packetReassembly `json:"reassembly,omitempty"`           // pointer to the packet reassembly header
 
 	// TODO: forward secrecy considerations

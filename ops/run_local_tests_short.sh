@@ -35,6 +35,18 @@ if [[ -z "${TAGS}" ]]; then
   export TAGS=nchain
 fi
 
+if [[ -z "${REQUEST_TIMEOUT}" ]]; then
+  export REQUEST_TIMEOUT=30
+fi
+
+if [[ -z "${RPC_TIMEOUT}" ]]; then
+  export RPC_TIMEOUT=10
+fi
+
+if [[ -z "${EVM_SYNC_TIMEOUT}" ]]; then
+  export EVM_SYNC_TIMEOUT=10
+fi
+
 export PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBF1Db+IBEAC0nRf3s6rls6jhWeWWTAJY8Nn4+qPUbSu0ZOx1DAqOHHxYAek1
