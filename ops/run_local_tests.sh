@@ -24,7 +24,7 @@ if [[ -z "${NATS_STREAMING_SERVER_PORT}" ]]; then
 fi
 
 if [[ -z "${NATS_STREAMING_CONCURRENCY}" ]]; then
-  NATS_STREAMING_CONCURRENCY=1
+  NATS_STREAMING_CONCURRENCY=2
 fi
 
 if [[ -z "${NATS_CONCURRENCY}" ]]; then

@@ -47,6 +47,7 @@ services:
       - VAULT_API_SCHEME=http
       - VAULT_SEAL_UNSEAL_KEY=traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day      
       - REQUEST_TIMEOUT=30
+      - REDIS_HOSTS=redis:6379
     healthcheck:
       test: ["CMD", "curl", "-f", "http://vault:8080/status"]
       interval: 1m

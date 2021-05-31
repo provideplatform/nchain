@@ -135,4 +135,10 @@ statsdaemon_bounce:
 	docker kill nchain
 	docker kill nchain-consumer	
 
+bulk_bounce:
+	docker-compose -f ./ops/docker-compose.yml down
+	docker volume rm ops_provide-db
+	docker-compose -f ./ops/docker-compose.yml up -d
+	docker kill nchain
+	docker kill nchain-consumer	
 

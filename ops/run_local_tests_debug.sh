@@ -233,7 +233,7 @@ for d in "${pkgs[@]}" ; do
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
     NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
     NATS_CLUSTER_ID=provide \
-    NATS_STREAMING_CONCURRENCY=1 \
+    NATS_STREAMING_CONCURRENCY=2 \
     GIN_MODE=release \
     DATABASE_HOST=localhost \
     DATABASE_NAME=${DATABASE_NAME} \
@@ -267,7 +267,7 @@ for d in "${pkgs[@]}" ; do
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
     NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
     NATS_CLUSTER_ID=provide \
-    NATS_STREAMING_CONCURRENCY=1 \
+    NATS_STREAMING_CONCURRENCY=2 \
     GIN_MODE=release \
     DATABASE_HOST=localhost \
     DATABASE_NAME=${DATABASE_NAME} \
