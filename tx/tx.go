@@ -407,56 +407,55 @@ func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint6
 	return nonce, nil
 }
 
-func (tx *Transaction) getNonceWithMutex(db *gorm.DB) (*uint64, error) {
+func (t *Transaction) getNonceWithMutex(db *gorm.DB) (*uint64, error) {
 	nonceMutex.Lock()
 
 	defer func() {
 		nonceMutex.Unlock()
 	}()
 
+	start := time.Now()
+
 	// check if the transaction already has a nonce provided
-	params := tx.ParseParams()
+	params := t.ParseParams()
 	var nonce *uint64
 	if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
 		nonceUint := uint64(nonceFloat)
 		nonce = &nonceUint
 	}
 
+	// if the tx has a nonce provided, use it
 	if nonce != nil {
-		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *tx.Ref, *nonce)
+		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
 		return nonce, nil
 	}
 
-	// if it doesn't, let's get a nonce
-	// we need a signer factory
-	txs, err := tx.signerFactory(db)
+	// if it doesn't have a nonce, we need to get a new one
+	txs, err := t.signerFactory(db)
 	if err != nil {
-		tx.Errors = append(tx.Errors, &provide.Error{
+		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
 		return nil, err
 	}
 
-	// then use this to get the transaction address
+	// then use the signer factory to get the transaction address
 	txAddress, _, err := txs.GetSignerDetails()
 	if err != nil {
-		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *tx.Ref, err.Error())
+		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *t.Ref, err.Error())
 		return nil, err
 	}
 
-	// then use this address to get the nonce
-	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *tx.Ref)
-	nonce, err = getNonce(*txAddress, tx, txs)
+	// then use the transaction address to get the nonce
+	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
+	nonce, err = getNonce(*txAddress, t, txs)
 	if err != nil {
-		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
+		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
 		return nil, err
 	}
-	// updatedNonce, err := incrementNonce(*txAddress, *tx.Ref, *nonce)
-	// if err != nil {
-	// 	common.Log.Debugf("Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-	// 	return nil, err
-	// }
 
+	elapsed := time.Since(start)
+	common.Log.Debugf("TIMING: Getting nonce for tx ref %s took %s", *t.Ref, elapsed)
 	return nonce, nil
 }
 
@@ -914,40 +913,69 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 	}, nil
 }
 
-func (t *Transaction) NewSignAndBroadcast(db *gorm.DB, nonce *uint64) {
-	// if we have a signing error, which might be insufficient funds
-	// and we have been asked to subsidize, broadcast to bookie
+func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64) (*TransactionSigner, error) {
+
+	start := time.Now()
+
 	signer, err := t.signerFactory(db)
 	if err != nil {
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
-		return
+		return nil, err
 	}
 
-	// get the nonce, assign it to the tx
-	// nonce, err := t.getNonceWithMutex(db)
-	// if err != nil {
-	// 	common.Log.Debugf("XXY: Error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
-	// }
-
-	// now we need to pass this nonce to a goroutine that will send it asynchronously
-	// handling the nats ack nack as before so the tx can be replayed
-	// before we have some cleverness to manage this
-
-	// async sign and broadcast
-	// if it fails, correct and rebroadcast
-	// something something if it's an error that can't be fixed, and everything else is locked up behind a failed tx
-
-	// all this in a go routine
-
 	var hash []byte
-	var signingErr error
-	t.SignedTx, hash, signingErr = signer.SignWithNonce(t, nonce)
+	t.SignedTx, hash, err = signer.SignWithNonce(t, nonce)
+	if err != nil {
+		return nil, err
+	}
+	hashAsString := hex.EncodeToString(hash)
+	t.Hash = common.StringOrNil(hashAsString)
 
+	elapsed := time.Since(start)
+	common.Log.Debugf("TIMING: Signing raw tx for tx ref %s took %s", *t.Ref, elapsed)
+	return signer, nil
+}
+
+func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *TransactionSigner) error {
+	start := time.Now()
+	networkBroadcastErr := t.broadcast(db, signer.Network, signer)
+	if networkBroadcastErr != nil {
+		common.Log.Warningf("XXX: Broadcast to %s network failed for tx ref: %s. Error: %s", signer.Network.Name, *t.Ref, networkBroadcastErr.Error())
+
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(networkBroadcastErr.Error()),
+		})
+
+		desc := networkBroadcastErr.Error()
+		t.updateStatus(db, "failed", &desc)
+		return networkBroadcastErr
+	}
+
+	// if regular succeeds, pop it onto nats
+	if networkBroadcastErr == nil {
+		common.Log.Debugf("XXX: Broadcast to %s network succeeded for tx ref: %s", signer.Network.Name, *t.Ref)
+		payload, _ := json.Marshal(map[string]interface{}{
+			"transaction_id": t.ID.String(),
+		})
+		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+		elapsed := time.Since(start)
+		common.Log.Debugf("TIMING: Broadcasting signed tx for tx ref %s took %s", *t.Ref, elapsed)
+		return nil
+	}
+
+	return nil
+}
+
+func (t *Transaction) NewSignAndBroadcast(db *gorm.DB, nonce *uint64) {
+	// if we have a signing error, which might be insufficient funds
+	// and we have been asked to subsidize, broadcast to bookie
+
+	signer, signingErr := t.SignRawTransaction(db, nonce)
+	// TODO handle any errors here before trying to broadcast
 	if signingErr == nil {
-		hashAsString := hex.EncodeToString(hash)
-		t.Hash = common.StringOrNil(hashAsString)
+
 		// if no signing error, let's broadcast it!
 		networkBroadcastErr := t.broadcast(db, signer.Network, signer)
 		// if regular fails, we're out
@@ -1086,90 +1114,29 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
+
 				nonce, err := t.getNonceWithMutex(db)
 				if err != nil {
 					common.Log.Debugf("error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 					return false
 				}
 
-				// let's get the hash back from a channel
+				signer, err := t.SignRawTransaction(db, nonce)
+				if err != nil {
+					t.Errors = append(t.Errors, &provide.Error{
+						Message: common.StringOrNil(err.Error()),
+					})
+					return false
+				}
 
-				go t.NewSignAndBroadcast(db, nonce)
-				// if err != nil {
-				// 	common.Log.Debugf("XXX: Error signing and broadcasting tx ref %s. Error: %s", *t.Ref, err.Error())
-				// }
-
-				// use channels to return true or false?
-
-				// if there's no error, this tx is done
+				err = t.BroadcastSignedTransaction(db, signer)
+				if err != nil {
+					t.Errors = append(t.Errors, &provide.Error{
+						Message: common.StringOrNil(err.Error()),
+					})
+					return false
+				}
 				return true
-
-				// if we have a signing error, which might be insufficient funds
-				// and we have been asked to subsidize, broadcast to bookie
-				// signer, err := t.signerFactory(db)
-				// if err != nil {
-				// 	t.Errors = append(t.Errors, &provide.Error{
-				// 		Message: common.StringOrNil(err.Error()),
-				// 	})
-				// 	return false
-				// }
-
-				// // xxx check what triggers a signingErr here...
-				// signingErr := t.sign(db, signer)
-
-				// if signingErr == nil {
-				// 	// if no signing error, try regular broadcast
-				// 	networkBroadcastErr := t.broadcast(db, signer.Network, signer)
-				// 	// if regular fails, we're out
-				// 	if networkBroadcastErr != nil {
-				// 		common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
-
-				// 		t.Errors = append(t.Errors, &provide.Error{
-				// 			Message: common.StringOrNil(networkBroadcastErr.Error()),
-				// 		})
-
-				// 		desc := networkBroadcastErr.Error()
-				// 		t.updateStatus(db, "failed", &desc)
-				// 		return false
-				// 	}
-				// 	// if regular succeeds, pop it onto nats
-				// 	if networkBroadcastErr == nil {
-				// 		common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
-				// 		payload, _ := json.Marshal(map[string]interface{}{
-				// 			"transaction_id": t.ID.String(),
-				// 		})
-				// 		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
-				// 		return true
-				// 	}
-				// }
-
-				// if signingErr != nil && t.shouldSubsidize() {
-				// 	common.Log.Debugf("attepting broadcast of tx ref: %s to bookie with signing error %s.", *t.Ref, signingErr.Error())
-				// 	// network specified in t, so not required to be specifically passed to broadcast method
-				// 	bookieBroadcastErr := t.broadcast(db, nil, nil)
-				// 	// if bookie fails, we're out
-				// 	if bookieBroadcastErr != nil {
-				// 		common.Log.Warningf("attepted broadcast of tx ref %s to bookie failed %s", *t.Ref, bookieBroadcastErr.Error())
-
-				// 		t.Errors = append(t.Errors, &provide.Error{
-				// 			Message: common.StringOrNil(bookieBroadcastErr.Error()),
-				// 		})
-
-				// 		desc := bookieBroadcastErr.Error()
-				// 		t.updateStatus(db, "failed", &desc)
-				// 		return false
-				// 	}
-				// 	// if bookie succeeds, pop it onto nats
-				// 	if bookieBroadcastErr == nil {
-				// 		payload, _ := json.Marshal(map[string]interface{}{
-				// 			"transaction_id": t.ID.String(),
-				// 		})
-				// 		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
-				// 		return true
-				// 	}
-				// }
 			}
 		}
 	}
