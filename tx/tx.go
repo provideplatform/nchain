@@ -47,6 +47,16 @@ type Signer interface {
 	String() string
 }
 
+const currentBroadcastNonce = "nchain.broadcast.nonce"
+
+type BroadcastConfirmation struct {
+	signer    *TransactionSigner
+	address   *string
+	nonce     *uint64
+	Signed    bool
+	Broadcast bool
+}
+
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
 // identifier or b) user identifier.
 type Transaction struct {
@@ -171,6 +181,62 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 		derivationPath = key.HDDerivationPath
 	}
 	return address, derivationPath, nil
+}
+
+func getCurrentValue(key string) *uint64 {
+	var currentValue *uint64
+	var cachedValue *string
+
+	readErr := redisutil.WithRedlock(key, func() error {
+		var err error
+		cachedValue, err = redisutil.Get(key)
+		if err != nil {
+			common.Log.Debugf("TIMING: Error getting current value from key %s. Error: %s", key, err.Error())
+			// TODO check for nil value error, rather than just returning the error
+			// if it's not nil value, then return it
+			return err
+		}
+		return nil
+	})
+
+	if readErr != nil {
+		common.Log.Debugf("TIMING: error, possibly nil value? for key %s. Error: %s", key, readErr.Error())
+	}
+
+	if cachedValue == nil {
+		common.Log.Debugf("TIMING: No value found for key %s", key)
+		return nil
+	}
+
+	if cachedValue != nil {
+		cv, err := strconv.ParseUint(string(*cachedValue), 10, 64)
+		if err != nil {
+			common.Log.Debugf("TIMING: Error parsing current value %s from key %s. Error: %s", *cachedValue, key, err.Error())
+			// handle this
+			return nil
+		}
+		common.Log.Debugf("TIMING: Got current value %v from key %s.", cv, key)
+		currentValue = &cv
+	}
+
+	return currentValue
+}
+
+func setCurrentValue(key string, value *uint64) *uint64 {
+	common.Log.Debugf("TIMING: Setting value %v to key %s", *value, key)
+	setErr := redisutil.WithRedlock(key, func() error {
+		// TODO set with standard redis timeout (1 minute)
+		err := redisutil.Set(key, value, nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if setErr != nil {
+		// handle this error!
+	}
+	common.Log.Debugf("TIMING: Set value %v to key %s", *value, key)
+	return value
 }
 
 func incrementNonce(txAddress, txRef string, txNonce uint64) (*uint64, error) {
@@ -407,7 +473,7 @@ func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint6
 	return nonce, nil
 }
 
-func (t *Transaction) getNonceWithMutex(db *gorm.DB) (*uint64, error) {
+func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
 	nonceMutex.Lock()
 
 	defer func() {
@@ -415,6 +481,19 @@ func (t *Transaction) getNonceWithMutex(db *gorm.DB) (*uint64, error) {
 	}()
 
 	start := time.Now()
+
+	signer, err := t.signerFactory(db)
+	if err != nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
+		})
+		return nil, nil, err
+	}
+
+	elapsedGeneratingSigner := time.Since(start)
+	common.Log.Debugf("TIMING: Getting signer for tx ref %s took %s", *t.Ref, elapsedGeneratingSigner)
+	// restart timer
+	start = time.Now()
 
 	// check if the transaction already has a nonce provided
 	params := t.ParseParams()
@@ -427,36 +506,27 @@ func (t *Transaction) getNonceWithMutex(db *gorm.DB) (*uint64, error) {
 	// if the tx has a nonce provided, use it
 	if nonce != nil {
 		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
-		return nonce, nil
-	}
-
-	// if it doesn't have a nonce, we need to get a new one
-	txs, err := t.signerFactory(db)
-	if err != nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		return nil, err
+		return nonce, signer, nil
 	}
 
 	// then use the signer factory to get the transaction address
-	txAddress, _, err := txs.GetSignerDetails()
+	txAddress, _, err := signer.GetSignerDetails()
 	if err != nil {
 		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *t.Ref, err.Error())
-		return nil, err
+		return nil, nil, err
 	}
 
 	// then use the transaction address to get the nonce
 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
-	nonce, err = getNonce(*txAddress, t, txs)
+	nonce, err = getNonce(*txAddress, t, signer)
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
-		return nil, err
+		return nil, nil, err
 	}
 
 	elapsed := time.Since(start)
-	common.Log.Debugf("TIMING: Getting nonce for tx ref %s took %s", *t.Ref, elapsed)
-	return nonce, nil
+	common.Log.Debugf("TIMING: Getting nonce %v for tx ref %s took %s", *nonce, *t.Ref, elapsed)
+	return nonce, signer, nil
 }
 
 func (txs *TransactionSigner) SignWithNonce(tx *Transaction, nonce *uint64) (signedTx interface{}, hash []byte, err error) {
@@ -611,9 +681,6 @@ func (txs *TransactionSigner) SignWithNonce(tx *Transaction, nonce *uint64) (sig
 		}
 
 		if err == nil {
-			// signedTxJSON, _ := signedTx.(*types.Transaction).MarshalJSON()
-			// common.Log.Debugf("signed eth tx: %s for tx ref %s", signedTxJSON, *tx.Ref)
-
 			accessedAt := time.Now()
 			go func() {
 				// TODO check this, tx.account can have the wallet id and derivation path
@@ -913,29 +980,22 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 	}, nil
 }
 
-func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64) (*TransactionSigner, error) {
+func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64, signer *TransactionSigner) error {
 
 	start := time.Now()
 
-	signer, err := t.signerFactory(db)
-	if err != nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		return nil, err
-	}
-
 	var hash []byte
+	var err error
 	t.SignedTx, hash, err = signer.SignWithNonce(t, nonce)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	hashAsString := hex.EncodeToString(hash)
 	t.Hash = common.StringOrNil(hashAsString)
 
 	elapsed := time.Since(start)
 	common.Log.Debugf("TIMING: Signing raw tx for tx ref %s took %s", *t.Ref, elapsed)
-	return signer, nil
+	return nil
 }
 
 func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *TransactionSigner) error {
@@ -968,42 +1028,42 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 	return nil
 }
 
-func (t *Transaction) NewSignAndBroadcast(db *gorm.DB, nonce *uint64) {
-	// if we have a signing error, which might be insufficient funds
-	// and we have been asked to subsidize, broadcast to bookie
+// func (t *Transaction) NewSignAndBroadcast(db *gorm.DB, nonce *uint64) {
+// 	// if we have a signing error, which might be insufficient funds
+// 	// and we have been asked to subsidize, broadcast to bookie
 
-	signer, signingErr := t.SignRawTransaction(db, nonce)
-	// TODO handle any errors here before trying to broadcast
-	if signingErr == nil {
+// 	signer, signingErr := t.SignRawTransaction(db, nonce)
+// 	// TODO handle any errors here before trying to broadcast
+// 	if signingErr == nil {
 
-		// if no signing error, let's broadcast it!
-		networkBroadcastErr := t.broadcast(db, signer.Network, signer)
-		// if regular fails, we're out
-		if networkBroadcastErr != nil {
-			common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
+// 		// if no signing error, let's broadcast it!
+// 		networkBroadcastErr := t.broadcast(db, signer.Network, signer)
+// 		// if regular fails, we're out
+// 		if networkBroadcastErr != nil {
+// 			common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
 
-			t.Errors = append(t.Errors, &provide.Error{
-				Message: common.StringOrNil(networkBroadcastErr.Error()),
-			})
+// 			t.Errors = append(t.Errors, &provide.Error{
+// 				Message: common.StringOrNil(networkBroadcastErr.Error()),
+// 			})
 
-			desc := networkBroadcastErr.Error()
-			t.updateStatus(db, "failed", &desc)
-			return
-		}
-		// if regular succeeds, pop it onto nats
-		if networkBroadcastErr == nil {
-			common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
-			payload, _ := json.Marshal(map[string]interface{}{
-				"transaction_id": t.ID.String(),
-			})
-			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+// 			desc := networkBroadcastErr.Error()
+// 			t.updateStatus(db, "failed", &desc)
+// 			return
+// 		}
+// 		// if regular succeeds, pop it onto nats
+// 		if networkBroadcastErr == nil {
+// 			common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
+// 			payload, _ := json.Marshal(map[string]interface{}{
+// 				"transaction_id": t.ID.String(),
+// 			})
+// 			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 
-			return
-		}
-	} //signingError
+// 			return
+// 		}
+// 	} //signingError
 
-	return
-}
+// 	return
+// }
 
 func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
 
@@ -1081,6 +1141,68 @@ func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
 
 	return nil
 }
+func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
+
+	err := t.SignRawTransaction(db, nonce, signer)
+	if err != nil {
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(err.Error()),
+		})
+	}
+
+	address := signer.Address()
+
+	var goForBroadcast BroadcastConfirmation
+
+	for {
+		// broadcast when we get the goahead on the channel
+		goForBroadcast = <-ch
+
+		// we will only do anything if we get a go for broadcast with our address and nonce
+		// TODO likely the broadcast confirmation needs changing
+		// so it will have details of the nonce that should be broadcast,
+		// as well as the nonce it was trying to broadcast
+		// if they need to change
+		// for the moment, we'll work in happy path only
+		recdAddress := goForBroadcast.address
+		recdNonce := goForBroadcast.nonce
+
+		if *recdAddress == address && *recdNonce == *nonce {
+			common.Log.Debugf("TIMING: received go ahead for address %s nonce %v", address, *nonce)
+			break
+		}
+	}
+
+	err = t.BroadcastSignedTransaction(db, signer)
+	if err != nil {
+		// handle this
+	}
+	// now broadcast the goahead for the next transaction
+	nextNonce := *nonce + 1
+
+	goForBroadcast = BroadcastConfirmation{signer, &address, &nextNonce, true, true}
+	key := fmt.Sprintf("%s:%s", currentBroadcastNonce, address)
+	setCurrentValue(key, nonce)
+	common.Log.Debugf("TIMING: giving broadcast go-ahead for address %s nonce %v", address, nextNonce)
+	ch <- goForBroadcast
+}
+
+func (t *Transaction) xxxBroadcast(done chan BroadcastConfirmation, db *gorm.DB, conf BroadcastConfirmation) {
+	signer := conf.signer
+
+	err := t.BroadcastSignedTransaction(db, signer)
+	if err != nil {
+		confno := BroadcastConfirmation{
+			signer, conf.address, conf.nonce, conf.Broadcast, false,
+		}
+		done <- confno
+	}
+	confyes := BroadcastConfirmation{
+		signer, conf.address, conf.nonce, conf.Broadcast, true,
+	}
+
+	done <- confyes
+}
 
 // Create and persist a new transaction. Side effects include persistence of contract
 // and/or token instances when the tx represents a contract and/or token creation.
@@ -1115,31 +1237,51 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
 
-				nonce, err := t.getNonceWithMutex(db)
+				// this is inside a mutex, so happens synchronously (ish)
+				nonce, signer, err := t.getNonce(db)
 				if err != nil {
 					common.Log.Debugf("error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 					return false
 				}
 
-				signer, err := t.SignRawTransaction(db, nonce)
-				if err != nil {
-					t.Errors = append(t.Errors, &provide.Error{
-						Message: common.StringOrNil(err.Error()),
-					})
-					return false
+				// get the nonce
+				// sign and attempt to broadcast it
+				// but only broadcast it if we get the go-ahead in the channel
+				// ignore broadcast errors for now!
+				// we give the go-ahead automatically for the first tx for an address
+				// after that, it's the broadcast that enables the second
+				// and the broadcast of the second enables the third etc...
+
+				// need a buffered channel (per address, but ignore that for the moment)
+				ch := make(chan BroadcastConfirmation)
+				go t.xxxSign(ch, signer, db, nonce)
+
+				address := signer.Address()
+				key := fmt.Sprintf("%s:%s", currentBroadcastNonce, address)
+				lastBroadcastNonce := getCurrentValue(key)
+				if lastBroadcastNonce != nil {
+					common.Log.Debugf("TIMING: got last broadcast nonce of %v for key %s", *lastBroadcastNonce, key)
+				} else {
+					common.Log.Debugf("TIMING: got NIL last broadcast nonce for key %s", key)
 				}
 
-				err = t.BroadcastSignedTransaction(db, signer)
-				if err != nil {
-					t.Errors = append(t.Errors, &provide.Error{
-						Message: common.StringOrNil(err.Error()),
-					})
-					return false
+				// if this tx is the next to be broadcast
+				// or the last broadcast nonce is not known
+				if lastBroadcastNonce == nil {
+					// temp assign a huuuuge value to the last broadcast - hackyhack
+					// likely assigning it to nonce-1 would be as good :)
+					maxInt := uint64(^uint64(0) >> 1)
+					_ = setCurrentValue(key, &maxInt)
+
+					goForBroadcast := BroadcastConfirmation{signer, &address, nonce, false, false}
+					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
+					ch <- goForBroadcast
 				}
+
 				return true
-			}
-		}
-	}
+			} //rowsAffected
+		} // !db.NewRecord
+	} // db.NewRecord
 	return false
 }
 
