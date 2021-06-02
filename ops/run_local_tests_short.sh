@@ -248,6 +248,8 @@ export NATS_CLUSTER_ID=provide
 export DATABASE_HOST=localhost
 export LOG_LEVEL=DEBUG
 
+sleep 5
+
 go test "./integration" -v \
                     -timeout 1800s \
                     -race \
