@@ -316,6 +316,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
 			// TODO what to do if this fails????
 		}
+		//TODO this is not showing the errors, instead showing the tx ref
 		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", errmsg, *tx.Ref)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
