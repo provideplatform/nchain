@@ -225,8 +225,9 @@ func getCurrentValue(key string) *uint64 {
 func setCurrentValue(key string, value *uint64) *uint64 {
 	common.Log.Debugf("TIMING: Setting value %v to key %s", *value, key)
 	setErr := redisutil.WithRedlock(key, func() error {
-		// TODO set with standard redis timeout (1 minute)
-		err := redisutil.Set(key, value, nil)
+		// TODO parameterise timeout (10 minutes)
+		var ttl time.Duration = 10 * time.Minute
+		err := redisutil.Set(key, *value, &ttl)
 		if err != nil {
 			return err
 		}
@@ -1001,18 +1002,6 @@ func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64, signer *Tra
 func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *TransactionSigner) error {
 	start := time.Now()
 	networkBroadcastErr := t.broadcast(db, signer.Network, signer)
-	if networkBroadcastErr != nil {
-		common.Log.Warningf("XXX: Broadcast to %s network failed for tx ref: %s. Error: %s", signer.Network.Name, *t.Ref, networkBroadcastErr.Error())
-
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(networkBroadcastErr.Error()),
-		})
-
-		desc := networkBroadcastErr.Error()
-		t.updateStatus(db, "failed", &desc)
-		return networkBroadcastErr
-	}
-
 	// if regular succeeds, pop it onto nats
 	if networkBroadcastErr == nil {
 		common.Log.Debugf("XXX: Broadcast to %s network succeeded for tx ref: %s", signer.Network.Name, *t.Ref)
@@ -1023,9 +1012,17 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 		elapsed := time.Since(start)
 		common.Log.Debugf("TIMING: Broadcasting signed tx for tx ref %s took %s", *t.Ref, elapsed)
 		return nil
-	}
+	} else {
+		common.Log.Warningf("XXX: Broadcast to %s network failed for tx ref: %s. Error: %s", signer.Network.Name, *t.Ref, networkBroadcastErr.Error())
 
-	return nil
+		t.Errors = append(t.Errors, &provide.Error{
+			Message: common.StringOrNil(networkBroadcastErr.Error()),
+		})
+
+		desc := networkBroadcastErr.Error()
+		t.updateStatus(db, "failed", &desc)
+		return networkBroadcastErr
+	}
 }
 
 // func (t *Transaction) NewSignAndBroadcast(db *gorm.DB, nonce *uint64) {
@@ -1142,6 +1139,7 @@ func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
 	return nil
 }
 func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
+	var key string
 
 	err := t.SignRawTransaction(db, nonce, signer)
 	if err != nil {
@@ -1151,13 +1149,15 @@ func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *Transaction
 	}
 
 	address := signer.Address()
+	key = fmt.Sprintf("%s:%s", currentBroadcastNonce, address)
 
 	var goForBroadcast BroadcastConfirmation
 
 	for {
 		// broadcast when we get the goahead on the channel
+		common.Log.Debugf("TIMING: waiting for go ahead for key %s nonce %v", key, *nonce)
 		goForBroadcast = <-ch
-
+		common.Log.Debugf("TIMING: IN received broadcast on channel for key %s nonce %v", key, *nonce)
 		// we will only do anything if we get a go for broadcast with our address and nonce
 		// TODO likely the broadcast confirmation needs changing
 		// so it will have details of the nonce that should be broadcast,
@@ -1168,7 +1168,7 @@ func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *Transaction
 		recdNonce := goForBroadcast.nonce
 
 		if *recdAddress == address && *recdNonce == *nonce {
-			common.Log.Debugf("TIMING: received go ahead for address %s nonce %v", address, *nonce)
+			common.Log.Debugf("TIMING: IN key %s received go-ahead for address %s nonce %v", key, address, *nonce)
 			break
 		}
 	}
@@ -1177,13 +1177,17 @@ func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *Transaction
 	if err != nil {
 		// handle this
 	}
+	common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", key, *nonce)
 	// now broadcast the goahead for the next transaction
+	common.Log.Debugf("TIMING: key %s nonce %v here 0", key, *nonce)
 	nextNonce := *nonce + 1
-
+	common.Log.Debugf("TIMING: key %s nonce %v here 1", key, *nonce)
 	goForBroadcast = BroadcastConfirmation{signer, &address, &nextNonce, true, true}
-	key := fmt.Sprintf("%s:%s", currentBroadcastNonce, address)
+	common.Log.Debugf("TIMING: key %s nonce %v here 2", key, *nonce)
 	setCurrentValue(key, nonce)
-	common.Log.Debugf("TIMING: giving broadcast go-ahead for address %s nonce %v", address, nextNonce)
+	common.Log.Debugf("TIMING: key %s nonce %v here 3", key, *nonce)
+	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", key, address, nextNonce)
+	// below blocks until it is read
 	ch <- goForBroadcast
 }
 
@@ -1253,7 +1257,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// and the broadcast of the second enables the third etc...
 
 				// need a buffered channel (per address, but ignore that for the moment)
-				ch := make(chan BroadcastConfirmation)
+				ch := make(chan BroadcastConfirmation, 100)
+
 				go t.xxxSign(ch, signer, db, nonce)
 
 				address := signer.Address()
@@ -1263,11 +1268,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					common.Log.Debugf("TIMING: got last broadcast nonce of %v for key %s", *lastBroadcastNonce, key)
 				} else {
 					common.Log.Debugf("TIMING: got NIL last broadcast nonce for key %s", key)
-				}
-
-				// if this tx is the next to be broadcast
-				// or the last broadcast nonce is not known
-				if lastBroadcastNonce == nil {
 					// temp assign a huuuuge value to the last broadcast - hackyhack
 					// likely assigning it to nonce-1 would be as good :)
 					maxInt := uint64(^uint64(0) >> 1)
