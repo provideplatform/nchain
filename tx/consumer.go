@@ -48,6 +48,8 @@ const msgRetryRequired = "RETRY_REQUIRED"
 
 var waitGroup sync.WaitGroup
 
+var ch chan BroadcastConfirmation
+
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Tx package consumer configured to skip NATS streaming subscription setup")
@@ -60,6 +62,11 @@ func init() {
 	createNatsTxCreateSubscriptions(&waitGroup)
 	createNatsTxFinalizeSubscriptions(&waitGroup)
 	createNatsTxReceiptSubscriptions(&waitGroup)
+
+	// HACK
+	// need a buffered channel (per address, but ignore that for the moment)
+	ch = make(chan BroadcastConfirmation)
+
 }
 
 func createNatsTxSubscriptions(wg *sync.WaitGroup) {

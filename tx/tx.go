@@ -1252,8 +1252,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// after that, it's the broadcast that enables the second
 				// and the broadcast of the second enables the third etc...
 
-				// need a buffered channel (per address, but ignore that for the moment)
-				ch := make(chan BroadcastConfirmation)
 				go t.xxxSign(ch, signer, db, nonce)
 
 				address := signer.Address()
