@@ -227,21 +227,19 @@ func createContractHandler(c *gin.Context) {
 	}
 
 	// get ref from params (optional, create new if not present)
-	var ref uuid.UUID
+	var ref string
 	txRef, txRefOk := params["ref"].(string)
 
 	if txRefOk {
-		ref, err = uuid.FromString(txRef)
-		if err != nil {
-			common.Log.Warningf("Failed to process provided ref id; %s", err.Error())
-		}
+		ref = txRef
 	} else {
-		ref, err = uuid.NewV4()
+		refUUID, err := uuid.NewV4()
 		if err != nil {
 			common.Log.Warningf("Failed to generate ref id; %s", err.Error())
 		}
+		ref = refUUID.String()
 	}
-	contract.Reference = &ref
+	contract.Ref = &ref
 
 	if contract.Create() {
 		contract.enrich()

@@ -1652,10 +1652,7 @@ func (t *Transaction) handleTxReceipt(
 		common.Log.Debugf("XXX: Searching for contract for txID: %s", t.ID)
 		if kontract == nil || kontract.ID == uuid.Nil {
 			common.Log.Debugf("XXX could not find contract for tx id: %s, appID: %s, walletID: %s", t.ID, *t.ApplicationID, *t.WalletID)
-			ref, err := uuid.FromString(*t.Ref)
-			if err != nil {
-				common.Log.Debugf("XXX: error converting transaction ref to contract. Error: %s", err.Error())
-			}
+
 			kontract = &contract.Contract{
 				ApplicationID:  t.ApplicationID,
 				OrganizationID: t.OrganizationID,
@@ -1664,7 +1661,7 @@ func (t *Transaction) handleTxReceipt(
 				Name:           common.StringOrNil(contractName),
 				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
 				Params:         t.Params,
-				Reference:      &ref,
+				Ref:            t.Ref,
 			}
 			if kontract.Create() {
 				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)

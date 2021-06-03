@@ -40,7 +40,7 @@ type Contract struct {
 	Params         *json.RawMessage `sql:"type:json" json:"params,omitempty"`
 	AccessedAt     *time.Time       `json:"accessed_at"`
 	PubsubPrefix   *string          `sql:"-" json:"pubsub_prefix,omitempty"`
-	Reference      *uuid.UUID       `sql:"-" json:"ref,omitempty"`
+	Ref            *string          `sql:"-" json:"ref,omitempty"`
 }
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
@@ -338,9 +338,9 @@ func (c *Contract) Create() bool {
 						"value":              value,
 						"params":             params,
 						"published_at":       time.Now(),
-						"reference":          c.Reference.String(),
+						"reference":          c.Ref,
 					})
-					common.Log.Debugf("XXX: contract.Create: about to publish txCreateSubject for tx ref: %s", c.Reference.String())
+					common.Log.Debugf("XXX: contract.Create: about to publish txCreateSubject for tx ref: %s", c.Ref)
 					err = natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
