@@ -125,6 +125,24 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
+func getWithLock(key string) (*string, error) {
+	var status *string
+
+	lockErr := redisutil.WithRedlock(key, func() error {
+		var err error
+		status, err = redisutil.Get(key)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if lockErr != nil {
+		return nil, lockErr
+	}
+	common.Log.Debugf("Got message key %s status %s", key, *status)
+	return status, nil
+}
+
 func setWithLock(key, status string) error {
 	lockErr := redisutil.WithRedlock(key, func() error {
 		err := redisutil.Set(key, status, nil)
@@ -144,6 +162,9 @@ func setWithLock(key, status string) error {
 // with a long running process, in which case, wait for it to finish.
 // If the message has failed, processMessage will allow it to be reprocessed
 func processMessageStatus(key string) error {
+	// need to add a lock to this
+	// got a subscribe locked panic ?? or maybe that was for the cached network??  must repro
+
 	status, _ := redisutil.Get(key)
 
 	if status == nil {
