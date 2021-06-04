@@ -150,7 +150,7 @@ func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) 
 		nonce = fragmentable.(*packetFragment).Nonce
 	case *packetReassembly:
 		checksum = fragmentable.(*packetReassembly).Checksum
-		nonce = fragmentable.(*packetFragment).Nonce
+		nonce = fragmentable.(*packetReassembly).Nonce
 	default:
 		common.Log.Warning("Reflection not supported for given fragmentable")
 	}
@@ -341,6 +341,11 @@ func (p *packetReassembly) Cache() error {
 
 	payload, _ := json.Marshal(p)
 	return redisutil.Set(*headerKey, string(payload), nil)
+}
+
+// Ingest a packet
+func (p *packetReassembly) Ingest() (bool, *uint, error) {
+	return false, nil, errors.New("packet reassembly does not currently implement Ingest()")
 }
 
 // Reassemble defrags the packet and verifies the checksum of the reconstituted packet
