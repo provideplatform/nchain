@@ -1153,7 +1153,7 @@ func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
 
 	return nil
 }
-func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
+func (t *Transaction) xxxSign(channels interface{}, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
 	var key string
 
 	err := t.SignRawTransaction(db, nonce, signer)
@@ -1169,30 +1169,10 @@ func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *Transaction
 
 	var goForBroadcast BroadcastConfirmation
 
-	for {
-		// broadcast when we get the goahead on the channel
-		common.Log.Debugf("TIMING: waiting for go ahead for key %s nonce %v", key, *nonce)
-		goForBroadcast = <-ch
-		common.Log.Debugf("TIMING: IN received broadcast on channel for key %s nonce %v", key, *nonce)
-		// we will only do anything if we get a go for broadcast with our address and nonce
-		// TODO likely the broadcast confirmation needs changing
-		// so it will have details of the nonce that should be broadcast,
-		// as well as the nonce it was trying to broadcast
-		// if they need to change
-		// for the moment, we'll work in happy path only
-		recdAddress := goForBroadcast.address
-		recdNonce := goForBroadcast.nonce
-		recdNetwork := goForBroadcast.network
+	common.Log.Debugf("TIMING IN: waiting for go ahead for key %s nonce %v, on channel %+v", key, *nonce, channels.(channelPair).incoming)
+	goForBroadcast = <-channels.(channelPair).incoming
 
-		if *recdAddress == address && *recdNetwork == network && *recdNonce == *nonce {
-			common.Log.Debugf("TIMING: IN key %s received go-ahead for address %s network %s nonce %v", key, address, network, *nonce)
-			break
-		} else {
-			// HACK this is wrong, but should work
-			common.Log.Debugf("TIMING: OUT (HACK) key %s re-sending go-ahead for address %s network %s nonce %v", key, address, network, *nonce)
-			ch <- goForBroadcast
-		}
-	}
+	common.Log.Debugf("TIMING: received go ahead for on incoming channel %+v of %+v", channels.(channelPair).incoming, goForBroadcast)
 
 	err = t.BroadcastSignedTransaction(db, signer)
 	if err != nil {
@@ -1205,7 +1185,10 @@ func (t *Transaction) xxxSign(ch chan BroadcastConfirmation, signer *Transaction
 	setCurrentValue(key, nonce)
 	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", key, address, nextNonce)
 	// below blocks until it is read
-	ch <- goForBroadcast
+	channels.(channelPair).outgoing <- goForBroadcast
+	common.Log.Debugf("TIMING: OUT key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", goForBroadcast, key, address, nextNonce, channels.(channelPair).outgoing)
+	// close the outgoing channel once it is read
+	close(channels.(channelPair).outgoing)
 }
 
 func (t *Transaction) xxxBroadcast(done chan BroadcastConfirmation, db *gorm.DB, conf BroadcastConfirmation) {
@@ -1273,10 +1256,38 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// after that, it's the broadcast that enables the second
 				// and the broadcast of the second enables the third etc...
 
-				go t.xxxSign(ch, signer, db, nonce)
-
+				// get the channel for the network:account:nonce key
 				address := signer.Address()
 				network := signer.Network.ID.String()
+				chanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce)
+				prevChanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce-1)
+				var inChan chan BroadcastConfirmation
+				var outChan chan BroadcastConfirmation
+
+				// check if we have a previous one
+				if dict.Has(prevChanKey) {
+					common.Log.Debugf("TIMING: we have outgoing channel %+v for previous nonce %v", dict.Get(prevChanKey), *nonce-1)
+					// if we do, use its outgoing channel as an incoming channel
+					inChan = dict.Get(prevChanKey).outgoing
+					//inChan = channelPairs[prevChanKey].(channelPair).outgoing
+				} else {
+					common.Log.Debugf("TIMING: we have no outgoing channel for previous nonce %v", *nonce-1)
+					// otherwise make a new one (it's FIRST, so we'll broadcast on it straight away)
+					inChan = make(chan BroadcastConfirmation)
+				}
+
+				// we need to make a new dictionary entry for this nonce
+				outChan = make(chan BroadcastConfirmation)
+
+				chanPair := channelPair{
+					inChan,
+					outChan,
+				}
+
+				dict.Set(chanKey, chanPair)
+
+				go t.xxxSign(dict.Get(chanKey), signer, db, nonce)
+
 				key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
 				lastBroadcastNonce := getCurrentValue(key)
 				if lastBroadcastNonce != nil {
@@ -1290,7 +1301,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 					goForBroadcast := BroadcastConfirmation{signer, &address, &network, nonce, false, false}
 					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
-					ch <- goForBroadcast
+					dict.Get(chanKey).incoming <- goForBroadcast
+					// once it's received, close the channel
+					close(dict.Get(chanKey).incoming)
 				}
 
 				return true

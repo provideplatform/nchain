@@ -50,6 +50,47 @@ var waitGroup sync.WaitGroup
 
 var ch chan BroadcastConfirmation
 
+// incoming and outgoing channels for transactions
+type channelPair struct {
+	incoming chan BroadcastConfirmation
+	outgoing chan BroadcastConfirmation
+}
+
+// dictionary for channels (interface is channelPair struct only)
+var channelPairs map[string]interface{}
+
+type ValueDictionary struct {
+	channels map[string]channelPair
+	lock     sync.RWMutex
+}
+
+var dict ValueDictionary
+
+// Set adds a new item to the dictionary
+func (d *ValueDictionary) Set(k string, v channelPair) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	if d.channels == nil {
+		d.channels = make(map[string]channelPair)
+	}
+	d.channels[k] = v
+}
+
+// Get returns the value associated with the key
+func (d *ValueDictionary) Get(k string) channelPair {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.channels[k]
+}
+
+// Has returns true if the key exists in the dictionary
+func (d *ValueDictionary) Has(k string) bool {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	_, ok := d.channels[k]
+	return ok
+}
+
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Tx package consumer configured to skip NATS streaming subscription setup")
@@ -66,6 +107,26 @@ func init() {
 	// HACK
 	// need a buffered channel (per address, but ignore that for the moment)
 	ch = make(chan BroadcastConfirmation)
+
+	// change required
+	// so as not to be sharing one channel between everything (teh horror for sc4ling)
+	// we'll have a new channel pair for every transaction
+	// channel 1 is incoming (and will tell it to go)
+	// channel 2 is outgoing (and will tell the next one to go)
+	// once the incoming channel is read, it will close
+	// once the outgoing channel is read, it will close
+	// it will make the incoming channel and outgoing channel
+	// indexed by the nonce selected for that account and network (network:account:nonce)
+	// in a dictionary kv store. key: channel1 & 2 struct)
+	// creating a tx creates both channels
+	// the creating goroutine will take both channels
+	// read on 1
+	// write on 2
+	// when I create the tx
+	//  - check if there's a channel available (in memory dictionary)
+	//  - for both the current nonce and the previous
+	//  - if there's one for the previous, use its outgoing channel for incoming (by reference copy)
+	//  - if there isn't, we make a new incoming channel
 
 }
 
