@@ -21,8 +21,8 @@ For more information, visit the [NChain docs](https://docs.provide.services/ncha
 - Integrate your ERP to your Provide ecosystem with [**Connectors**](https://docs.provide.services/nchain/connectors)
 - Seemlessly create and manage HD Wallets
 - Record value or data exchange as a Transaction on your network of choice
-- Utilize [**Oracles**](https://docs.provide.services/nchain/oracles without loss of data-integrity or security assurances
-- 
+- Utilize [**Oracles**](https://docs.provide.services/nchain/)  without loss of data-integrity or security assurances
+
 
 
 
