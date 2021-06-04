@@ -24,7 +24,17 @@ const packetReassemblyFragmentationChunkSize = float64(4500)
 
 // Fragmentable interface
 type Fragmentable interface {
+	// Broadcast marshals and transmits the fragment metadata and payload
 	Broadcast() error
+
+	// Ingest verifies the checksum of the fragment, writes the the underlying bytes to persistent
+	// or ephemeral storage, atomically increments the internal ingest counter associated with the
+	// packet reassembly operation and returns the boolean checksum verification result, total number
+	// of fragments ingested (i.e., after ingesting this fragment-- or nil, if ingestion failed) and
+	// any error if the attempt to ingest the fragment fails
+	Ingest() (bool, *uint, error)
+
+	// Verify the fragment checksum
 	Verify() (bool, error)
 }
 
@@ -140,7 +150,7 @@ func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) 
 		nonce = fragmentable.(*packetFragment).Nonce
 	case *packetReassembly:
 		checksum = fragmentable.(*packetReassembly).Checksum
-		nonce = fragmentable.(*packetFragment).Nonce
+		nonce = fragmentable.(*packetReassembly).Nonce
 	default:
 		common.Log.Warning("Reflection not supported for given fragmentable")
 	}
@@ -331,6 +341,11 @@ func (p *packetReassembly) Cache() error {
 
 	payload, _ := json.Marshal(p)
 	return redisutil.Set(*headerKey, string(payload), nil)
+}
+
+// Ingest a packet
+func (p *packetReassembly) Ingest() (bool, *uint, error) {
+	return false, nil, errors.New("packet reassembly does not currently implement Ingest()")
 }
 
 // Reassemble defrags the packet and verifies the checksum of the reconstituted packet
