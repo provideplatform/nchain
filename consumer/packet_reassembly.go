@@ -24,7 +24,17 @@ const packetReassemblyFragmentationChunkSize = float64(4500)
 
 // Fragmentable interface
 type Fragmentable interface {
+	// Broadcast marshals and transmits the fragment metadata and payload
 	Broadcast() error
+
+	// Ingest verifies the checksum of the fragment, writes the the underlying bytes to persistent
+	// or ephemeral storage, atomically increments the internal ingest counter associated with the
+	// packet reassembly operation and returns the boolean checksum verification result, total number
+	// of fragments ingested (i.e., after ingesting this fragment-- or nil, if ingestion failed) and
+	// any error if the attempt to ingest the fragment fails
+	Ingest() (bool, *uint, error)
+
+	// Verify the fragment checksum
 	Verify() (bool, error)
 }
 
