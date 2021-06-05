@@ -1,4 +1,5 @@
-on: 
+name: NChain (dev)
+on:
   push:
     branches:
       - dev
@@ -6,11 +7,11 @@ on:
 jobs:
   push_to_branch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10    
+    timeout-minutes: 20    
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.INTEGRATION_SLACK_WEBHOOK }}
     steps:
-      - name: Setup go
+      - name: Setup golang
         uses: actions/setup-go@v2
         with:
           go-version: '1.15.1'
@@ -24,8 +25,8 @@ jobs:
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
-          path: 'nchain'                    
-      - run: docker-compose -f ./ops/docker-compose.yml build --no-cache nchain
+          path: 'nchain'
+      - run: docker build -t nchain/local --no-cache .
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
@@ -35,7 +36,7 @@ jobs:
         if: failure()
         run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain
-      - name: push_to_docker_hub
+      - name: Push Docker Image
         if: success()
         uses: docker/build-push-action@v1
         with:
@@ -44,8 +45,8 @@ jobs:
           repository: provide/nchain
           tags: dev
           path: 'nchain'
-      - name: slack channel update
-        if: failure()  
+      - name: Send Slack Notification
+        if: always()  
         uses: act10ns/slack@v1
         with:
           status: ${{ job.status }}

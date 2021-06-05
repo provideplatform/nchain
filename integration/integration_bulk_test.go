@@ -58,6 +58,8 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 
 	// this path produces the ETH address 0x6af845bae76f5cc16bc93f86b83e8928c3dfda19
 	path := `m/44'/60'/2'/0/0`
+	// use this for bookie test
+	//path := `m/44'/60'/0'/0/0`
 
 	// this path produces the ETH address 0x27C656030a2143b0Bfa8e8875a3311eb621eec9D
 	//path := `m/44'/60'/0'/0`
@@ -81,7 +83,7 @@ func TestContractHDWalletKovanBulk(t *testing.T) {
 		artifact       nchain.CompiledArtifact
 	}{
 		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
-		//{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 	}
 
 	for _, tc := range tt {

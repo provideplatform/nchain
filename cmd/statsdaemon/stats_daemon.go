@@ -709,12 +709,12 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *network.Network) *StatsDa
 
 	chainID := network.ChainID
 	if chainID == nil {
-		chnID, err := providecrypto.EVMGetChainID(network.ID.String(), network.RPCURL())
+		chn, err := providecrypto.EVMGetChainID(network.ID.String(), network.RPCURL())
 		if err != nil {
-			common.Log.Warningf("Failed to obtain ChainID using RPC. Error: %s", err.Error())
+			common.Log.Debugf("Error getting chain id for %s network. Error: %s", network.ID.String(), err.Error())
 			return nil
 		}
-		_chainID := hexutil.EncodeBig(chnID)
+		_chainID := hexutil.EncodeBig(chn)
 		chainID = &_chainID
 	}
 	sd.stats = &provide.NetworkStatus{

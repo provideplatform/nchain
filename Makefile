@@ -74,7 +74,7 @@ test: build
 # 	LOCAL_TAGS=goerli NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_long.sh
 
 integration:
-	LOCAL_TAGS=integration NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh\
+	LOCAL_TAGS=integration NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
 
 integration_nchain_short:
 	LOCAL_TAGS=nchain NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
@@ -102,6 +102,9 @@ integration_bulk:
 
 debug:
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
+
+bulk:
+	LOCAL_TAGS=bulk NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
 
 nobookie_up:
 	docker-compose -f ./ops/docker-compose-integration.yml up -d

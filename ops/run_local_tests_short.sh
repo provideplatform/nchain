@@ -47,7 +47,6 @@ if [[ -z "${EVM_SYNC_TIMEOUT}" ]]; then
   export EVM_SYNC_TIMEOUT=10
 fi
 
-
 export PGP_PUBLIC_KEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBF1Db+IBEAC0nRf3s6rls6jhWeWWTAJY8Nn4+qPUbSu0ZOx1DAqOHHxYAek1
@@ -248,6 +247,8 @@ export NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT}
 export NATS_CLUSTER_ID=provide
 export DATABASE_HOST=localhost
 export LOG_LEVEL=DEBUG
+
+sleep 5
 
 go test "./integration" -v \
                     -timeout 1800s \

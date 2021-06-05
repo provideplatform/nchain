@@ -1,4 +1,4 @@
-name: nchain-RINKEBY-s
+name: Hourly Integration (rinkeby)
 on:
   schedule:
     - cron: '0 * * * *'  # every hour on the hour     
@@ -10,7 +10,7 @@ jobs:
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.INTEGRATION_SLACK_WEBHOOK }}
     steps:
-      - name: Setup go
+      - name: Setup golang
         uses: actions/setup-go@v2
         with:
           go-version: '1.15.1'
@@ -26,7 +26,7 @@ jobs:
         with:
           ref: dev        
           path: 'nchain'                    
-      - run: docker-compose -f ./ops/docker-compose.yml build --no-cache nchain
+      - run: docker build -t nchain/local --no-cache .
         working-directory: nchain
       - run: docker-compose -f ./ops/docker-compose.yml up -d
         working-directory: nchain
@@ -36,7 +36,7 @@ jobs:
         if: failure()
         run: docker-compose -f ./ops/docker-compose.yml logs
         working-directory: nchain
-      - name: slack channel update
+      - name: Send Slack Notification
         if: failure()  
         uses: act10ns/slack@v1
         with:
