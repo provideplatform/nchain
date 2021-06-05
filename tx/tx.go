@@ -1,7 +1,6 @@
 package tx
 
 import (
-	"context"
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
@@ -45,17 +44,6 @@ type Signer interface {
 	Address() string
 	Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error)
 	String() string
-}
-
-const currentBroadcastNonce = "nchain.broadcast.nonce"
-
-type BroadcastConfirmation struct {
-	signer    *TransactionSigner //HACK remove this
-	address   *string
-	network   *string
-	nonce     *uint64
-	Signed    bool
-	Broadcast bool
 }
 
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
@@ -189,21 +177,6 @@ func getCurrentValue(key string) *uint64 {
 	var cachedValue *string
 
 	start := time.Now()
-	// readErr := redisutil.WithRedlock(key, func() error {
-	// 	var err error
-	// 	cachedValue, err = redisutil.Get(key)
-	// 	if err != nil {
-	// 		common.Log.Debugf("TIMING: Error getting current value from key %s. Error: %s", key, err.Error())
-	// 		// TODO check for nil value error, rather than just returning the error
-	// 		// if it's not nil value, then return it
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
-
-	// if readErr != nil {
-	// 	common.Log.Debugf("TIMING: error, possibly nil value? for key %s. Error: %s", key, readErr.Error())
-	// }
 
 	cachedValue, _ = redisutil.Get(key)
 
@@ -244,121 +217,6 @@ func setCurrentValue(key string, value *uint64) *uint64 {
 	}
 	common.Log.Debugf("TIMING: Set value %v to key %s", *value, key)
 	return value
-}
-
-func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
-
-	common.Log.Debugf("XXX: Incrementing redis nonce for tx ref %s", txRef)
-	// var cachedNonce *string
-	// readErr := redisutil.WithRedlock(txAddress, func() error {
-	// 	var err error
-	// 	cachedNonce, err = getWithLock(txAddress)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
-	// if readErr != nil {
-	// 	common.Log.Debugf("XXX: Error, possibly nil value for redis nonce (incrementing) for tx ref %s. Error: %s", txRef, readErr.Error())
-	// }
-
-	cachedNonce, _ := getWithLock(key)
-
-	if cachedNonce == nil {
-		common.Log.Debugf("XXX: No nonce found on redis to increment for key: %s, tx ref: %s", key, txRef)
-		updatedNonce := txNonce + 1
-		lockErr := redisutil.WithRedlock(key, func() error {
-			err := redisutil.Set(key, updatedNonce, nil)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if lockErr != nil {
-			return nil, lockErr
-		}
-
-		return &updatedNonce, nil
-		// the evmtxfactory will get the current nonce from the chain
-	}
-	if cachedNonce != nil {
-		common.Log.Debugf("XXX: Nonce of %v found on redis for key: %s, tx ref: %s", *cachedNonce, key, txRef)
-		//convert cached Nonce and increment, returning updated nonce for reference
-		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
-		if err != nil {
-			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", txRef, err.Error())
-			return nil, err
-		}
-		updatedNonce := int64nonce + 1
-		common.Log.Debugf("XXX: Incrementing redis nonce for key %s after tx ref %s to %v", key, txRef, updatedNonce)
-		lockErr := redisutil.WithRedlock(key, func() error {
-			err := redisutil.Set(key, updatedNonce, nil)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if lockErr != nil {
-			return nil, lockErr
-		}
-		common.Log.Debugf("XXX: Nonce incremented for key %s after tx ref %s to %v", key, txRef, updatedNonce)
-		return &updatedNonce, nil
-		// the evmtxfactory will get the current nonce from the chain
-	}
-
-	return nil, nil
-}
-
-func generateTxAsync(txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice, nonce *uint64) (types.Signer, *types.Transaction, []byte, error) {
-
-	common.Log.Debugf("XXX: Using nonce %v for tx ref %s", nonce, *tx.Ref)
-	// nonce, err := getNonce(*txAddress, tx, txs)
-	// if err != nil {
-	// 	common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-	// }
-
-	var signer types.Signer
-	var _tx *types.Transaction
-	var hash []byte
-
-	common.Log.Debugf("XXX: Getting signer for tx ref %s", *tx.Ref)
-
-	err := common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-		signer, _tx, hash, err = providecrypto.EVMTxFactory(
-			txs.Network.ID.String(),
-			txs.Network.RPCURL(),
-			*txAddress,
-			tx.To,
-			tx.Data,
-			tx.Value.BigInt(),
-			nonce,
-			uint64(gas),
-			gasPrice,
-		)
-		return
-	})
-
-	if err != nil {
-
-		if txs.Wallet != nil {
-			err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
-		} else {
-			err = fmt.Errorf("failed to sign %d-byte transaction payload using account ID: %s; %s", len(hash), txs.Account.ID, err.Error())
-		}
-
-		common.Log.Debugf("%s", err.Error())
-		common.Log.Warning(err.Error())
-		return nil, nil, nil, err
-	}
-
-	if err == nil {
-		_, err = incrementNonce(*txAddress, *tx.Ref, _tx.Nonce())
-		if err != nil {
-			common.Log.Debugf("XXX: Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-		}
-	}
-
-	return signer, _tx, hash, err
 }
 
 func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice *uint64) (types.Signer, *types.Transaction, []byte, error) {
@@ -416,133 +274,6 @@ func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas 
 	}
 
 	return signer, _tx, hash, err
-}
-
-func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint64, error) {
-
-	var nonce *uint64
-
-	// var cachedNonce *string
-	// readErr := redisutil.WithRedlock(txAddress, func() error {
-	// 	var err error
-	// 	cachedNonce, err = redisutil.Get(txAddress)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
-	// if readErr != nil {
-	// 	common.Log.Debugf("XXX: Error, possibly nil value for tx ref %s. Error: %s", *tx.Ref, readErr.Error())
-	// }
-	network := txs.Network.ID.String()
-	key := fmt.Sprintf("nchain.tx.nonce.%s:%s", txAddress, network)
-
-	cachedNonce, _ := redisutil.Get(key)
-
-	if cachedNonce == nil {
-		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", txAddress, network, *tx.Ref)
-		// get the nonce from the EVM
-		common.Log.Debugf("XXX: dialling evm for tx ref %s", *tx.Ref)
-		client, err := providecrypto.EVMDialJsonRpc(txs.Network.ID.String(), txs.Network.RPCURL())
-		if err != nil {
-			return nil, err
-		}
-		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *tx.Ref)
-		// get the last mined nonce, we don't want to rely on the tx pool
-		pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(txAddress), nil)
-		if err != nil {
-			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *tx.Ref, err.Error())
-			return nil, err
-		}
-		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
-		// put this in redis
-		lockErr := redisutil.WithRedlock(txAddress, func() error {
-			err := redisutil.Set(key, pendingNonce, nil)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if lockErr != nil {
-			return nil, lockErr
-		}
-		return &pendingNonce, nil
-	} else {
-		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
-		if err != nil {
-			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", *tx.Ref, err.Error())
-			return nil, err
-		} else {
-			common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, *tx.Ref)
-			nonce = &int64nonce
-			//experiment. if it's in redis, we'll always increment it by 1
-			nonce, err = incrementNonce(key, *tx.Ref, *nonce)
-			if err != nil {
-				common.Log.Debugf("XXX: Error incrementing nonce to %v tx ref: %s. Error: %s", int64nonce+1, *tx.Ref, err.Error())
-				return nil, err
-			}
-		}
-	}
-	return nonce, nil
-}
-
-func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
-	nonceMutex.Lock()
-
-	defer func() {
-		nonceMutex.Unlock()
-	}()
-
-	start := time.Now()
-
-	signer, err := t.signerFactory(db)
-	if err != nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		return nil, nil, err
-	}
-
-	elapsedGeneratingSigner := time.Since(start)
-	common.Log.Debugf("TIMING: Getting signer for tx ref %s took %s", *t.Ref, elapsedGeneratingSigner)
-
-	// check if the transaction already has a nonce provided
-	params := t.ParseParams()
-	var nonce *uint64
-	if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
-		nonceUint := uint64(nonceFloat)
-		nonce = &nonceUint
-	}
-
-	// if the tx has a nonce provided, use it
-	if nonce != nil {
-		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
-		return nonce, signer, nil
-	}
-	// signer timer
-	signerStart := time.Now()
-
-	// then use the signer factory to get the transaction address
-	txAddress, _, err := signer.GetSignerDetails()
-	if err != nil {
-		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *t.Ref, err.Error())
-		return nil, nil, err
-	}
-	signerElapsed := time.Since(signerStart)
-	common.Log.Debugf("TIMING: Getting signer for tx ref %s took %s", *t.Ref, signerElapsed)
-
-	nonceStart := time.Now()
-	// then use the transaction address to get the nonce
-	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
-	nonce, err = getNonce(*txAddress, t, signer)
-	if err != nil {
-		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
-		return nil, nil, err
-	}
-
-	elapsed := time.Since(nonceStart)
-	common.Log.Debugf("TIMING: Getting nonce %v for tx ref %s took %s", *nonce, *t.Ref, elapsed)
-	return nonce, signer, nil
 }
 
 func (txs *TransactionSigner) SignWithNonce(tx *Transaction, nonce *uint64) (signedTx interface{}, hash []byte, err error) {
@@ -1040,120 +771,7 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 	}
 }
 
-// func (t *Transaction) NewSignAndBroadcast(db *gorm.DB, nonce *uint64) {
-// 	// if we have a signing error, which might be insufficient funds
-// 	// and we have been asked to subsidize, broadcast to bookie
-
-// 	signer, signingErr := t.SignRawTransaction(db, nonce)
-// 	// TODO handle any errors here before trying to broadcast
-// 	if signingErr == nil {
-
-// 		// if no signing error, let's broadcast it!
-// 		networkBroadcastErr := t.broadcast(db, signer.Network, signer)
-// 		// if regular fails, we're out
-// 		if networkBroadcastErr != nil {
-// 			common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
-
-// 			t.Errors = append(t.Errors, &provide.Error{
-// 				Message: common.StringOrNil(networkBroadcastErr.Error()),
-// 			})
-
-// 			desc := networkBroadcastErr.Error()
-// 			t.updateStatus(db, "failed", &desc)
-// 			return
-// 		}
-// 		// if regular succeeds, pop it onto nats
-// 		if networkBroadcastErr == nil {
-// 			common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
-// 			payload, _ := json.Marshal(map[string]interface{}{
-// 				"transaction_id": t.ID.String(),
-// 			})
-// 			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
-// 			return
-// 		}
-// 	} //signingError
-
-// 	return
-// }
-
-func (t *Transaction) signAndBroadcast(db *gorm.DB) error {
-
-	// if we have a signing error, which might be insufficient funds
-	// and we have been asked to subsidize, broadcast to bookie
-	signer, err := t.signerFactory(db)
-	if err != nil {
-		t.Errors = append(t.Errors, &provide.Error{
-			Message: common.StringOrNil(err.Error()),
-		})
-		return err
-	}
-
-	// // get the nonce, assign it to the tx
-	// nonce, err := t.getNonceWithMutex(db)
-	// if err != nil {
-	// 	common.Log.Debugf("XXY: Error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
-	// }
-
-	signingErr := t.sign(db, signer)
-
-	if signingErr == nil {
-		// if no signing error, let's broadcast it!
-		networkBroadcastErr := t.broadcast(db, signer.Network, signer)
-		// if regular fails, we're out
-		if networkBroadcastErr != nil {
-			common.Log.Warningf("network broadcast failed for tx ref: %s. Error: %s", *t.Ref, networkBroadcastErr.Error())
-
-			t.Errors = append(t.Errors, &provide.Error{
-				Message: common.StringOrNil(networkBroadcastErr.Error()),
-			})
-
-			desc := networkBroadcastErr.Error()
-			t.updateStatus(db, "failed", &desc)
-			return err
-		}
-		// if regular succeeds, pop it onto nats
-		if networkBroadcastErr == nil {
-			common.Log.Debugf("XXX: tx.Create. Broadcast succeeded for tx ref: %s", *t.Ref)
-			payload, _ := json.Marshal(map[string]interface{}{
-				"transaction_id": t.ID.String(),
-			})
-			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
-			return nil
-		}
-	} //signingError
-
-	if signingErr != nil && t.shouldSubsidize() {
-		common.Log.Debugf("attepting broadcast of tx ref: %s to bookie with signing error %s.", *t.Ref, signingErr.Error())
-		// network specified in t, so not required to be specifically passed to broadcast method
-		bookieBroadcastErr := t.broadcast(db, nil, nil)
-		// if bookie fails, we're out
-		if bookieBroadcastErr != nil {
-			common.Log.Warningf("attepted broadcast of tx ref %s to bookie failed %s", *t.Ref, bookieBroadcastErr.Error())
-
-			t.Errors = append(t.Errors, &provide.Error{
-				Message: common.StringOrNil(bookieBroadcastErr.Error()),
-			})
-
-			desc := bookieBroadcastErr.Error()
-			t.updateStatus(db, "failed", &desc)
-			return err
-		}
-		// if bookie succeeds, pop it onto nats
-		if bookieBroadcastErr == nil {
-			payload, _ := json.Marshal(map[string]interface{}{
-				"transaction_id": t.ID.String(),
-			})
-			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
-			return nil
-		}
-	}
-
-	return nil
-}
-func (t *Transaction) xxxSign(channels interface{}, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
+func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
 	var key string
 
 	err := t.SignRawTransaction(db, nonce, signer)
@@ -1178,6 +796,27 @@ func (t *Transaction) xxxSign(channels interface{}, signer *TransactionSigner, d
 	if err != nil {
 		// handle this
 	}
+
+	// change
+	// so as not to be sharing one channel between everything (teh horror for sc4ling)
+	// we'll have a new channel pair for every transaction
+	// channel 1 is incoming (and will tell it to go)
+	// channel 2 is outgoing (and will tell the next one to go)
+	// once the incoming channel is read, it will close
+	// once the outgoing channel is read, it will close
+	// it will make the incoming channel and outgoing channel
+	// indexed by the nonce selected for that account and network (network:account:nonce)
+	// in a dictionary kv store. key: channel1 & 2 struct)
+	// creating a tx creates both channels
+	// the creating goroutine will take both channels
+	// read on 1
+	// write on 2
+	// when I create the tx
+	//  - check if there's a channel available (in memory dictionary)
+	//  - for both the current nonce and the previous
+	//  - if there's one for the previous, use its outgoing channel for incoming (by reference copy)
+	//  - if there isn't, we make a new incoming channel
+
 	common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", key, *nonce)
 	// now broadcast the goahead for the next transaction
 	nextNonce := *nonce + 1
@@ -1188,24 +827,8 @@ func (t *Transaction) xxxSign(channels interface{}, signer *TransactionSigner, d
 	channels.(channelPair).outgoing <- goForBroadcast
 	common.Log.Debugf("TIMING: OUT key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", goForBroadcast, key, address, nextNonce, channels.(channelPair).outgoing)
 	// close the outgoing channel once it is read
+	// TODO this should also timeout and clear itself up from the dictionary
 	close(channels.(channelPair).outgoing)
-}
-
-func (t *Transaction) xxxBroadcast(done chan BroadcastConfirmation, db *gorm.DB, conf BroadcastConfirmation) {
-	signer := conf.signer
-
-	err := t.BroadcastSignedTransaction(db, signer)
-	if err != nil {
-		confno := BroadcastConfirmation{
-			signer, conf.address, conf.network, conf.nonce, conf.Broadcast, false,
-		}
-		done <- confno
-	}
-	confyes := BroadcastConfirmation{
-		signer, conf.address, conf.network, conf.nonce, conf.Broadcast, true,
-	}
-
-	done <- confyes
 }
 
 // Create and persist a new transaction. Side effects include persistence of contract
@@ -1256,9 +879,10 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// after that, it's the broadcast that enables the second
 				// and the broadcast of the second enables the third etc...
 
-				// get the channel for the network:account:nonce key
+				// get the channel for the network:address:nonce key
 				address := signer.Address()
 				network := signer.Network.ID.String()
+				// TODO const this
 				chanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce)
 				prevChanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce-1)
 				var inChan chan BroadcastConfirmation
@@ -1271,6 +895,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					inChan = dict.Get(prevChanKey).outgoing
 					//inChan = channelPairs[prevChanKey].(channelPair).outgoing
 				} else {
+					// TODO sort out nchain-consumer restarting between bulk runs
 					common.Log.Debugf("TIMING: we have no outgoing channel for previous nonce %v", *nonce-1)
 					// otherwise make a new one (it's FIRST, so we'll broadcast on it straight away)
 					inChan = make(chan BroadcastConfirmation)
@@ -1286,7 +911,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 				dict.Set(chanKey, chanPair)
 
-				go t.xxxSign(dict.Get(chanKey), signer, db, nonce)
+				go t.SignAndReadyForBroadcast(dict.Get(chanKey), signer, db, nonce)
 
 				key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
 				lastBroadcastNonce := getCurrentValue(key)
@@ -1473,30 +1098,6 @@ func (t *Transaction) updateStatus(db *gorm.DB, status string, description *stri
 	}
 }
 
-// func (t *Transaction) attemptTxBroadcastRecovery(err error) error {
-// 	msg := err.Error()
-// 	common.Log.Debugf("Attempting to recover from failed transaction broadcast (tx id: %s); %s", t.ID.String(), msg)
-
-// 	gasFailureStr := "not enough gas to cover minimal cost of the transaction (minimal: "
-// 	isGasEstimationRecovery := strings.Contains(msg, gasFailureStr) && strings.Contains(msg, "got: 0") // HACK
-// 	if isGasEstimationRecovery {
-// 		common.Log.Debugf("Attempting to recover from gas estimation failure with supplied gas of 0 for tx id: %s", t.ID)
-// 		offset := strings.Index(msg, gasFailureStr) + len(gasFailureStr)
-// 		length := strings.Index(msg[offset:], ",")
-// 		minimalGas, err := strconv.ParseFloat(msg[offset:offset+length], 64)
-// 		if err == nil {
-// 			common.Log.Debugf("Resolved minimal gas of %v required to execute tx: %s", minimalGas, t.ID)
-// 			params := t.ParseParams()
-// 			params["gas"] = minimalGas
-// 			t.setParams(params)
-// 			return nil
-// 		}
-// 		common.Log.Debugf("failed to resolve minimal gas requirement for tx: %s; tx execution unrecoverable", t.ID)
-// 	}
-
-// 	return err
-// }
-
 func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Signer) error {
 	var err error
 
@@ -1556,30 +1157,6 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	} else {
 		broadcastAt := time.Now()
 		t.BroadcastAt = &broadcastAt
-	}
-
-	return err
-}
-
-func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
-	var err error
-	var hash []byte
-	t.SignedTx, hash, err = signer.Sign(t)
-
-	if err != nil {
-		length := 0
-		if t.Data != nil {
-			length = len(*t.Data)
-		}
-		common.Log.Warningf("failed to sign %d-byte tx using on behalf of signer: %s; %s", length, signer, err.Error())
-		// t.Errors = append(t.Errors, &provide.Error{
-		// 	Message: common.StringOrNil(err.Error()),
-		// })
-		// desc := err.Error()
-		// t.updateStatus(db, "failed", &desc)
-	} else {
-		hashAsString := hex.EncodeToString(hash)
-		t.Hash = common.StringOrNil(hashAsString)
 	}
 
 	return err

@@ -48,48 +48,8 @@ const msgRetryRequired = "RETRY_REQUIRED"
 
 var waitGroup sync.WaitGroup
 
+//TODO not needed
 var ch chan BroadcastConfirmation
-
-// incoming and outgoing channels for transactions
-type channelPair struct {
-	incoming chan BroadcastConfirmation
-	outgoing chan BroadcastConfirmation
-}
-
-// dictionary for channels (interface is channelPair struct only)
-var channelPairs map[string]interface{}
-
-type ValueDictionary struct {
-	channels map[string]channelPair
-	lock     sync.RWMutex
-}
-
-var dict ValueDictionary
-
-// Set adds a new item to the dictionary
-func (d *ValueDictionary) Set(k string, v channelPair) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	if d.channels == nil {
-		d.channels = make(map[string]channelPair)
-	}
-	d.channels[k] = v
-}
-
-// Get returns the value associated with the key
-func (d *ValueDictionary) Get(k string) channelPair {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	return d.channels[k]
-}
-
-// Has returns true if the key exists in the dictionary
-func (d *ValueDictionary) Has(k string) bool {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	_, ok := d.channels[k]
-	return ok
-}
 
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
@@ -103,30 +63,6 @@ func init() {
 	createNatsTxCreateSubscriptions(&waitGroup)
 	createNatsTxFinalizeSubscriptions(&waitGroup)
 	createNatsTxReceiptSubscriptions(&waitGroup)
-
-	// HACK
-	// need a buffered channel (per address, but ignore that for the moment)
-	ch = make(chan BroadcastConfirmation)
-
-	// change required
-	// so as not to be sharing one channel between everything (teh horror for sc4ling)
-	// we'll have a new channel pair for every transaction
-	// channel 1 is incoming (and will tell it to go)
-	// channel 2 is outgoing (and will tell the next one to go)
-	// once the incoming channel is read, it will close
-	// once the outgoing channel is read, it will close
-	// it will make the incoming channel and outgoing channel
-	// indexed by the nonce selected for that account and network (network:account:nonce)
-	// in a dictionary kv store. key: channel1 & 2 struct)
-	// creating a tx creates both channels
-	// the creating goroutine will take both channels
-	// read on 1
-	// write on 2
-	// when I create the tx
-	//  - check if there's a channel available (in memory dictionary)
-	//  - for both the current nonce and the previous
-	//  - if there's one for the previous, use its outgoing channel for incoming (by reference copy)
-	//  - if there isn't, we make a new incoming channel
 
 }
 
@@ -184,39 +120,6 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 			nil,
 		)
 	}
-}
-
-func getWithLock(key string) (*string, error) {
-	var status *string
-
-	lockErr := redisutil.WithRedlock(key, func() error {
-		var err error
-		status, err = redisutil.Get(key)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if lockErr != nil {
-		return nil, lockErr
-	}
-	common.Log.Debugf("Got message key %s status %s", key, *status)
-	return status, nil
-}
-
-func setWithLock(key, status string) error {
-	lockErr := redisutil.WithRedlock(key, func() error {
-		err := redisutil.Set(key, status, nil)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if lockErr != nil {
-		return lockErr
-	}
-	common.Log.Debugf("Set message key %s to status %s", key, status)
-	return nil
 }
 
 // processMessage checks if the message is already in flight
@@ -288,7 +191,8 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	var ref string
 	// get pointer to reference for tx object (HACK, TIDY)
-	//HACK until I find where this is getting set incorrectly
+	// this is currently a string, but needs to be a uuid
+	// (once the consumer ordering issue is sorted)
 	switch reference.(type) {
 	case string:
 		ref = reference.(string)
@@ -578,104 +482,6 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 	}
 }
 
-// func consumeTxExecutionMsg(msg *stan.Msg) {
-// 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
-
-// 	execution := &contract.Execution{}
-// 	err := json.Unmarshal(msg.Data, execution)
-// 	if err != nil {
-// 		common.Log.Warningf("Failed to unmarshal contract execution during NATS tx message handling")
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	if execution.ContractID == nil {
-// 		common.Log.Errorf("Invalid tx message; missing contract_id")
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
-// 		var executionAccountID *uuid.UUID
-// 		if executionAccount, executionAccountOk := execution.Account.(map[string]interface{}); executionAccountOk {
-// 			if executionAccountIDStr, executionAccountIDStrOk := executionAccount["id"].(string); executionAccountIDStrOk {
-// 				execAccountUUID, err := uuid.FromString(executionAccountIDStr)
-// 				if err == nil {
-// 					executionAccountID = &execAccountUUID
-// 				}
-// 			}
-// 		}
-// 		if execution.Account != nil && execution.AccountID != nil && *executionAccountID != *execution.AccountID {
-// 			common.Log.Errorf("Invalid tx message specifying a account_id and account")
-// 			natsutil.Nack(msg)
-// 			return
-// 		}
-// 		account := &wallet.Account{}
-// 		account.SetID(*execution.AccountID)
-// 		execution.Account = account
-// 	}
-
-// 	if execution.WalletID != nil && *execution.WalletID != uuid.Nil {
-// 		var executionWalletID *uuid.UUID
-// 		if executionWallet, executionWalletOk := execution.Wallet.(map[string]interface{}); executionWalletOk {
-// 			if executionWalletIDStr, executionWalletIDStrOk := executionWallet["id"].(string); executionWalletIDStrOk {
-// 				execWalletUUID, err := uuid.FromString(executionWalletIDStr)
-// 				if err == nil {
-// 					executionWalletID = &execWalletUUID
-// 				}
-// 			}
-// 		}
-// 		if execution.Wallet != nil && execution.WalletID != nil && *executionWalletID != *execution.WalletID {
-// 			common.Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
-// 			natsutil.Nack(msg)
-// 			return
-// 		}
-// 		wallet := &wallet.Wallet{}
-// 		wallet.SetID(*execution.WalletID)
-// 		execution.Wallet = wallet
-// 	}
-
-// 	db := dbconf.DatabaseConnection()
-
-// 	cntract := &contract.Contract{}
-// 	db.Where("id = ?", *execution.ContractID).Find(&cntract)
-// 	if cntract == nil || cntract.ID == uuid.Nil {
-// 		db.Where("address = ?", *execution.ContractID).Find(&cntract)
-// 	}
-// 	if cntract == nil || cntract.ID == uuid.Nil {
-// 		common.Log.Errorf("Unable to execute contract; contract not found: %s", cntract.ID)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	key := fmt.Sprintf("nchain.tx.%s", *execution.Ref)
-// 	err = processMessageStatus(key)
-// 	if err != nil {
-// 		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
-// 		return
-// 	}
-
-// 	executionResponse, err := executeTransaction(cntract, execution)
-// 	if err != nil {
-// 		common.Log.Debugf("contract execution failed; %s", err.Error())
-// 		// remove the in-flight status to this can be replayed
-// 		lockErr := setWithLock(key, msgRetryRequired)
-// 		if lockErr != nil {
-// 			common.Log.Debugf("XXX: Error resetting in flight status for key: %s. Error: %s", key, lockErr.Error())
-// 			// TODO what to do if this fails????
-// 		}
-// 		natsutil.AttemptNack(msg, txMsgTimeout)
-// 	} else {
-// 		logmsg := fmt.Sprintf("Executed contract: %s", *cntract.Address)
-// 		if executionResponse != nil && executionResponse.Response != nil {
-// 			logmsg = fmt.Sprintf("%s; response: %s", logmsg, executionResponse.Response)
-// 		}
-// 		common.Log.Debug(logmsg)
-
-// 		msg.Ack()
-// 	}
-// }
-
 // TODO: consider batching this using a buffered channel for high-volume networks
 func consumeTxFinalizeMsg(msg *stan.Msg) {
 	common.Log.Tracef("Consuming NATS tx finalize message: %s", msg)
@@ -871,6 +677,6 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	// process the receipts
+	// process the receipts asynchronously
 	go processTxReceipt(msg, tx, key, db)
 }
