@@ -190,7 +190,8 @@ func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint6
 		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
 		// put this in redis
 		lockErr := redisutil.WithRedlock(txAddress, func() error {
-			err := redisutil.Set(key, pendingNonce, nil)
+			ttl := time.Second * 5
+			err := redisutil.Set(key, pendingNonce, &ttl)
 			if err != nil {
 				return err
 			}
@@ -229,7 +230,8 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 		common.Log.Debugf("XXX: No nonce found on redis to increment for key: %s, tx ref: %s", key, txRef)
 		updatedNonce := txNonce + 1
 		lockErr := redisutil.WithRedlock(key, func() error {
-			err := redisutil.Set(key, updatedNonce, nil)
+			ttl := time.Second * 5
+			err := redisutil.Set(key, updatedNonce, &ttl)
 			if err != nil {
 				return err
 			}
@@ -253,7 +255,8 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 		updatedNonce := int64nonce + 1
 		common.Log.Debugf("XXX: Incrementing redis nonce for key %s after tx ref %s to %v", key, txRef, updatedNonce)
 		lockErr := redisutil.WithRedlock(key, func() error {
-			err := redisutil.Set(key, updatedNonce, nil)
+			ttl := time.Second * 5
+			err := redisutil.Set(key, updatedNonce, &ttl)
 			if err != nil {
 				return err
 			}
