@@ -48,9 +48,6 @@ const msgRetryRequired = "RETRY_REQUIRED"
 
 var waitGroup sync.WaitGroup
 
-//TODO not needed
-var ch chan BroadcastConfirmation
-
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Tx package consumer configured to skip NATS streaming subscription setup")
@@ -168,6 +165,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		return
 	}
 
+	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v", msg.Sequence)
 	contractID, contractIDOk := params["contract_id"]
 	data, dataOk := params["data"].(string)
 	accountIDStr, accountIDStrOk := params["account_id"].(string)
@@ -179,6 +177,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 
 	reference, referenceOk := txParams["ref"]
 
+	// TODO this reference create needs to be on the nchain side, not the consume side
 	if !referenceOk {
 		// no reference provided with the contract, so we'll make one
 		reference, err = uuid.NewV4()
@@ -199,6 +198,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	case uuid.UUID:
 		ref = reference.(uuid.UUID).String()
 	}
+	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v. Tx Ref: %s", msg.Sequence, ref)
 
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
