@@ -74,6 +74,8 @@ type Transaction struct {
 	Ref         *string          `json:"ref"`
 	Description *string          `json:"description"`
 
+	Nonce *uint64 `gorm:"column:nonce" json:"nonce,omitempty"`
+
 	// Ephemeral fields for managing the tx/rx and tracing lifecycles
 	Response *contract.ExecutionResponse `sql:"-" json:"-"`
 	SignedTx interface{}                 `sql:"-" json:"-"`
@@ -781,6 +783,10 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 		})
 	}
 
+	// save the nonce to the database
+	t.Nonce = nonce
+	db.Save(&t)
+
 	address := signer.Address()
 	network := signer.Network.ID.String()
 	key = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
@@ -1132,12 +1138,15 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 					return
 				})
 				if err == nil {
-					common.Log.Debugf("broadcast tx ref %s with hash %s", *t.Hash)
+					common.Log.Debugf("broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
 					// we have successfully broadcast the transaction
 					// so update the db with the received transaction hash
 					t.Hash = common.StringOrNil(signedTx.Hash().String())
 					db.Save(&t)
-					common.Log.Debugf("broadcast tx ref %s with hash %s - saved to db", *t.Hash)
+					common.Log.Debugf("broadcast tx ref %s with hash %s - saved to db", *t.Ref, *t.Hash)
+				} else {
+					common.Log.Debugf("failed to broadcast tx ref %s with hash %s. Error: %s", *t.Ref, *t.Hash, err.Error())
+					err = fmt.Errorf("unable to broadcast signed tx; broadcast failed for signed tx: %s", t.SignedTx)
 				}
 			} else {
 				err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)
