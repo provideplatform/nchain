@@ -231,7 +231,7 @@ if [[ -z "${NATS_STREAMING_URL}" ]]; then
 fi
 
 if [[ -z "${NATS_STREAMING_CONCURRENCY}" ]]; then
-  NATS_STREAMING_CONCURRENCY=2
+  NATS_STREAMING_CONCURRENCY=1
 fi
 
 if [[ -z "${NATS_CONCURRENCY}" ]]; then
