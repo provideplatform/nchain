@@ -781,6 +781,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				go t.SignAndReadyForBroadcast(txChannels.Get(chanKey), signer, db, nonce)
 
 				key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
+				// FIXME: remove this dep on redis - it breaks if nchain-consumer restarts
 				lastBroadcastNonce := getCurrentValue(key)
 				if lastBroadcastNonce != nil {
 					common.Log.Debugf("TIMING: got last broadcast nonce of %v for key %s", *lastBroadcastNonce, key)
