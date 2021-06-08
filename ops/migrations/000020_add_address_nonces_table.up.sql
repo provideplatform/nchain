@@ -1,9 +1,9 @@
 CREATE TABLE public.address_nonces (
 	id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-	address string NOT NULL,
+	address text NOT NULL,
 	created_at timestamp with time zone DEFAULT now() NOT NULL,
 	pending_nonce int4 NULL,
-	broadcast_nonce int4 NULL,
+	broadcast_nonce int4 NULL
 );
 
 ALTER TABLE public.address_nonces OWNER TO current_user;
