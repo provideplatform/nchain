@@ -546,7 +546,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 	tx := &Transaction{}
 	db := dbconf.DatabaseConnection()
 	common.Log.Tracef("checking local db for tx status; tx hash: %s", hash)
-	db.Where("hash = ? AND status IN (?, ?)", hash, "pending", "failed").Find(&tx)
+	db.Where("hash = ? AND status IN (?, ?, ?)", hash, "ready", "pending", "failed").Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
 		// TODO: this is integration point to upsert Wallet & Transaction... need to think thru performance implications & implementation details
 		nack(msg, fmt.Sprintf("Failed to mark block and finalized_at timestamp on tx: %s; tx not found for given hash", hash), true)

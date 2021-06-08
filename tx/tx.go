@@ -612,9 +612,9 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 		})
 	}
 
-	// save the nonce to the database
+	// save the nonce and status to the database
 	t.Nonce = nonce
-	db.Save(&t)
+	t.updateStatus(db, "ready", nil)
 
 	address := signer.Address()
 	network := signer.Network.ID.String()

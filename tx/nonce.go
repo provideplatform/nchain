@@ -35,15 +35,12 @@ type channelPair struct {
 	outgoing chan BroadcastConfirmation
 }
 
-// dictionary for channels (interface is channelPair struct only)
-var channelPairs map[string]interface{}
-
 type ValueDictionary struct {
 	value map[string]interface{}
 	lock  sync.RWMutex
 }
 
-var txChannels ValueDictionary
+var txChannels ValueDictionary //(interface is channelPair struct only)
 
 // Set adds a new item to the dictionary
 func (d *ValueDictionary) Set(k string, v interface{}) {
