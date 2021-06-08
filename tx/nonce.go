@@ -15,6 +15,9 @@ import (
 )
 
 const currentBroadcastNonce = "nchain.broadcast.nonce"
+const proposedBroadcastNonce = "nchain.tx.nonce"
+
+const RedisNonceTTL = time.Second * 5
 
 type BroadcastConfirmation struct {
 	signer    *TransactionSigner //HACK remove this
@@ -155,8 +158,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 
 	// then use the signer to get the transaction address pointer
 	txAddress := common.StringOrNil(t.EthSigner.Address())
-
-	t.Nonce, err = t.getNextNonce(txAddress)
+	t.Nonce, err = t.getNextNonce()
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
 		return nil, nil, err
@@ -170,22 +172,22 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 // and move to DB
 // to facilitate retries
 // TODO name this bettar
-func (t *Transaction) getNextNonce(txAddress *string) (*uint64, error) {
+func (t *Transaction) getNextNonce() (*uint64, error) {
 
 	nonceStart := time.Now()
-	// then use the transaction address to get the nonce
 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
 
 	var nonce *uint64
 
 	network := t.EthSigner.Network.ID.String()
-	// TODO const this
-	key := fmt.Sprintf("nchain.tx.nonce.%s:%s", *txAddress, network)
+	address := t.EthSigner.Address()
+
+	key := fmt.Sprintf("%s.%s:%s", proposedBroadcastNonce, address, network)
 
 	cachedNonce, _ := redisutil.Get(key)
 
 	if cachedNonce == nil {
-		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", txAddress, network, *t.Ref)
+		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", address, network, *t.Ref)
 		// get the nonce from the EVM
 		common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
 		client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
@@ -194,15 +196,15 @@ func (t *Transaction) getNextNonce(txAddress *string) (*uint64, error) {
 		}
 		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
 		// get the last mined nonce, we don't want to rely on the tx pool
-		pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(*txAddress), nil)
+		pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
 		if err != nil {
 			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 			return nil, err
 		}
 		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *t.Ref, pendingNonce)
 		// put this in redis
-		lockErr := redisutil.WithRedlock(*txAddress, func() error {
-			ttl := time.Second * 5
+		lockErr := redisutil.WithRedlock(key, func() error {
+			ttl := RedisNonceTTL
 			err := redisutil.Set(key, pendingNonce, &ttl)
 			if err != nil {
 				return err
@@ -248,7 +250,7 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 		common.Log.Debugf("XXX: No nonce found on redis to increment for key: %s, tx ref: %s", key, txRef)
 		updatedNonce := txNonce + 1
 		lockErr := redisutil.WithRedlock(key, func() error {
-			ttl := time.Second * 5
+			ttl := RedisNonceTTL
 			err := redisutil.Set(key, updatedNonce, &ttl)
 			if err != nil {
 				return err
@@ -262,6 +264,7 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 		return &updatedNonce, nil
 		// the evmtxfactory will get the current nonce from the chain
 	}
+
 	if cachedNonce != nil {
 		common.Log.Debugf("XXX: Nonce of %v found on redis for key: %s, tx ref: %s", *cachedNonce, key, txRef)
 		//convert cached Nonce and increment, returning updated nonce for reference
@@ -273,7 +276,7 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 		updatedNonce := int64nonce + 1
 		common.Log.Debugf("XXX: Incrementing redis nonce for key %s after tx ref %s to %v", key, txRef, updatedNonce)
 		lockErr := redisutil.WithRedlock(key, func() error {
-			ttl := time.Second * 5
+			ttl := RedisNonceTTL
 			err := redisutil.Set(key, updatedNonce, &ttl)
 			if err != nil {
 				return err
