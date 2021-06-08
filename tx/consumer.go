@@ -198,6 +198,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	case uuid.UUID:
 		ref = reference.(uuid.UUID).String()
 	}
+
 	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v. Tx Ref: %s", msg.Sequence, ref)
 
 	if !contractIDOk {
@@ -278,6 +279,8 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	tx.setParams(txParams)
 
 	key := fmt.Sprintf("nchain.tx.create.%s", *tx.Ref)
+
+	// checks if the message is currently in flight (being procesed)
 	err = processMessageStatus(key)
 	if err != nil {
 		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
@@ -287,10 +290,10 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
+		// update the contract with the tx id (unqiue to contract flow)
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
-		//		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
 		err = msg.Ack()
 		if err != nil {
 			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
@@ -450,6 +453,8 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 	tx.setParams(txParams)
 
 	key := fmt.Sprintf("nchain.tx.%s", *tx.Ref)
+
+	// checks if the message is currently in flight (being procesed)
 	err = processMessageStatus(key)
 	if err != nil {
 		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
