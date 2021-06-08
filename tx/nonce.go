@@ -119,7 +119,7 @@ func (t *Transaction) getSigner(db *gorm.DB) error {
 	return nil
 }
 
-func (t *Transaction) nonceProvided() bool {
+func (t *Transaction) HasNonce() bool {
 
 	// check if the transaction already has a nonce provided
 	params := t.ParseParams()
@@ -152,7 +152,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 		return nil, nil, err
 	}
 
-	if t.nonceProvided() {
+	if t.HasNonce() {
 		return t.Nonce, t.EthSigner, nil
 	}
 
