@@ -726,18 +726,42 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// get the channel for the network:address:nonce key
 				address := signer.Address()
 				network := signer.Network.ID.String()
+
+				// TODO
+				// we're going to take the nonce out of the broadcast channel
+				// this is in case we haven't been able to get a nonce
+				// and it's always 0
+				// and also to avoid burning the nonce into the tx description
+				// to do this
+				// the channel keys will need to change to
+				// nchain.channel.key.[network]:[address]:[sequence]
+				// where sequence is the current counter for transactions to that network.address
+				// this will be stored in memory, so will not persist
+				// so if nchain goes down, all this will disappear and
+				// need to be rebuilt from the nats messages (once they're properly idempotent)
+
+				// step 1
+				// get a sequence count for this network address
+				// this will be an atomic counter, so it's threadsafe
+				// step 2
+				// we will create a struct that's stored in the dictionary using this sequence counter
+				// so that we can create one for current sequence,
+				// and retrieve one for previous sequence (where it will be currently paused broadcasting)
+				// (later, we'll time these out and use it as the basis for the first tx logic)
+				// rather than using that hacky giant nonce below!
+
 				// TODO const this
 				chanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce)
 				prevChanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce-1)
+
 				var inChan chan BroadcastConfirmation
 				var outChan chan BroadcastConfirmation
 
 				// check if we have a previous one
-				if dict.Has(prevChanKey) {
-					common.Log.Debugf("TIMING: we have outgoing channel %+v for previous nonce %v", dict.Get(prevChanKey), *nonce-1)
+				if txChannels.Has(prevChanKey) {
+					common.Log.Debugf("TIMING: we have outgoing channel %+v for previous nonce %v", txChannels.Get(prevChanKey), *nonce-1)
 					// if we do, use its outgoing channel as an incoming channel
-					inChan = dict.Get(prevChanKey).outgoing
-					//inChan = channelPairs[prevChanKey].(channelPair).outgoing
+					inChan = txChannels.Get(prevChanKey).(channelPair).outgoing
 				} else {
 					// TODO sort out nchain-consumer restarting between bulk runs
 					common.Log.Debugf("TIMING: we have no outgoing channel for previous nonce %v", *nonce-1)
@@ -753,9 +777,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					outChan,
 				}
 
-				dict.Set(chanKey, chanPair)
+				txChannels.Set(chanKey, chanPair)
 
-				go t.SignAndReadyForBroadcast(dict.Get(chanKey), signer, db, nonce)
+				go t.SignAndReadyForBroadcast(txChannels.Get(chanKey), signer, db, nonce)
 
 				key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
 				lastBroadcastNonce := getCurrentValue(key)
@@ -770,9 +794,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 					goForBroadcast := BroadcastConfirmation{signer, &address, &network, nonce, false, false}
 					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
-					dict.Get(chanKey).incoming <- goForBroadcast
+					txChannels.Get(chanKey).(channelPair).incoming <- goForBroadcast
 					// once it's received, close the channel
-					close(dict.Get(chanKey).incoming)
+					close(txChannels.Get(chanKey).(channelPair).incoming)
 				}
 
 				return true

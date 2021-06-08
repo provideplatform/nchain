@@ -19,6 +19,7 @@ const proposedBroadcastNonce = "nchain.tx.nonce"
 
 const RedisNonceTTL = time.Second * 5
 
+// TODO tidy this up, too many unused elements
 type BroadcastConfirmation struct {
 	signer    *TransactionSigner //HACK remove this
 	address   *string
@@ -38,34 +39,35 @@ type channelPair struct {
 var channelPairs map[string]interface{}
 
 type ValueDictionary struct {
-	channels map[string]channelPair
-	lock     sync.RWMutex
+	value map[string]interface{}
+	lock  sync.RWMutex
 }
 
-var dict ValueDictionary
+var txChannels ValueDictionary
 
 // Set adds a new item to the dictionary
-func (d *ValueDictionary) Set(k string, v channelPair) {
+func (d *ValueDictionary) Set(k string, v interface{}) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	if d.channels == nil {
-		d.channels = make(map[string]channelPair)
+
+	if d.value == nil {
+		d.value = make(map[string]interface{})
 	}
-	d.channels[k] = v
+	d.value[k] = v
 }
 
 // Get returns the value associated with the key
-func (d *ValueDictionary) Get(k string) channelPair {
+func (d *ValueDictionary) Get(k string) interface{} {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	return d.channels[k]
+	return d.value[k]
 }
 
 // Has returns true if the key exists in the dictionary
 func (d *ValueDictionary) Has(k string) bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	_, ok := d.channels[k]
+	_, ok := d.value[k]
 	return ok
 }
 
