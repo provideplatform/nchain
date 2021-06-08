@@ -231,7 +231,7 @@ func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas 
 	}()
 
 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *tx.Ref)
-	nonce, err := getNonce(*txAddress, tx, txs)
+	nonce, err := tx.getNextNonce(txAddress)
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
 	}

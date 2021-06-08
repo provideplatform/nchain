@@ -116,6 +116,27 @@ func (t *Transaction) getSigner(db *gorm.DB) error {
 	return nil
 }
 
+func (t *Transaction) nonceProvided() bool {
+
+	// check if the transaction already has a nonce provided
+	params := t.ParseParams()
+	var nonce *uint64
+	if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
+		nonceUint := uint64(nonceFloat)
+		nonce = &nonceUint
+	}
+
+	// if the tx has a nonce provided, use it
+	if nonce != nil {
+		t.Nonce = nonce
+		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
+		return true
+	}
+	// otherwise, we have no nonce provided
+	return false
+
+}
+
 func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
 	nonceMutex.Lock()
 
@@ -128,78 +149,59 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 		return nil, nil, err
 	}
 
-	// check if the transaction already has a nonce provided
-	params := t.ParseParams()
-	var nonce *uint64
-	if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
-		nonceUint := uint64(nonceFloat)
-		nonce = &nonceUint
+	if t.nonceProvided() {
+		return t.Nonce, t.EthSigner, nil
 	}
 
-	// if the tx has a nonce provided, use it
-	if nonce != nil {
-		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
-		return nonce, t.EthSigner, nil
-	}
+	// then use the signer to get the transaction address pointer
+	txAddress := common.StringOrNil(t.EthSigner.Address())
 
-	// signer timer
-	signerStart := time.Now()
-
-	// then use the signer factory to get the transaction address
-	txAddress, _, err := t.EthSigner.GetSignerDetails()
-	if err != nil {
-		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *t.Ref, err.Error())
-		return nil, nil, err
-	}
-	signerElapsed := time.Since(signerStart)
-	common.Log.Debugf("TIMING: Getting signer for tx ref %s took %s", *t.Ref, signerElapsed)
-
-	nonceStart := time.Now()
-	// then use the transaction address to get the nonce
-	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
-	nonce, err = getNonce(*txAddress, t, t.EthSigner)
+	t.Nonce, err = t.getNextNonce(txAddress)
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
 		return nil, nil, err
 	}
 
-	elapsed := time.Since(nonceStart)
-	common.Log.Debugf("TIMING: Getting nonce %v for tx ref %s took %s", *nonce, *t.Ref, elapsed)
-	return nonce, t.EthSigner, nil
+	return t.Nonce, t.EthSigner, nil
 }
 
 // TODO currently using redis
 // but need to remove dep on redis for this,
 // and move to DB
 // to facilitate retries
-func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint64, error) {
+// TODO name this bettar
+func (t *Transaction) getNextNonce(txAddress *string) (*uint64, error) {
+
+	nonceStart := time.Now()
+	// then use the transaction address to get the nonce
+	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
 
 	var nonce *uint64
 
-	network := txs.Network.ID.String()
+	network := t.EthSigner.Network.ID.String()
 	// TODO const this
-	key := fmt.Sprintf("nchain.tx.nonce.%s:%s", txAddress, network)
+	key := fmt.Sprintf("nchain.tx.nonce.%s:%s", *txAddress, network)
 
 	cachedNonce, _ := redisutil.Get(key)
 
 	if cachedNonce == nil {
-		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", txAddress, network, *tx.Ref)
+		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", txAddress, network, *t.Ref)
 		// get the nonce from the EVM
-		common.Log.Debugf("XXX: dialling evm for tx ref %s", *tx.Ref)
-		client, err := providecrypto.EVMDialJsonRpc(txs.Network.ID.String(), txs.Network.RPCURL())
+		common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
+		client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
 		if err != nil {
 			return nil, err
 		}
-		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *tx.Ref)
+		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
 		// get the last mined nonce, we don't want to rely on the tx pool
-		pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(txAddress), nil)
+		pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(*txAddress), nil)
 		if err != nil {
-			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *tx.Ref, err.Error())
+			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 			return nil, err
 		}
-		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *tx.Ref, pendingNonce)
+		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *t.Ref, pendingNonce)
 		// put this in redis
-		lockErr := redisutil.WithRedlock(txAddress, func() error {
+		lockErr := redisutil.WithRedlock(*txAddress, func() error {
 			ttl := time.Second * 5
 			err := redisutil.Set(key, pendingNonce, &ttl)
 			if err != nil {
@@ -214,19 +216,25 @@ func getNonce(txAddress string, tx *Transaction, txs *TransactionSigner) (*uint6
 	} else {
 		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
 		if err != nil {
-			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", *tx.Ref, err.Error())
+			common.Log.Debugf("XXX: Error converting cached nonce to int64 for tx ref: %s. Error: %s", *t.Ref, err.Error())
 			return nil, err
 		} else {
-			common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, *tx.Ref)
+			common.Log.Debugf("XXX: Assigning nonce of %v to tx ref: %s", int64nonce, *t.Ref)
 			nonce = &int64nonce
 			//experiment. if it's in redis, we'll always increment it by 1
-			nonce, err = incrementNonce(key, *tx.Ref, *nonce)
+			nonce, err = incrementNonce(key, *t.Ref, *nonce)
 			if err != nil {
-				common.Log.Debugf("XXX: Error incrementing nonce to %v tx ref: %s. Error: %s", int64nonce+1, *tx.Ref, err.Error())
+				common.Log.Debugf("XXX: Error incrementing nonce to %v tx ref: %s. Error: %s", int64nonce+1, *t.Ref, err.Error())
 				return nil, err
 			}
 		}
 	}
+
+	// assign the proposed nonce to the tx
+	t.Nonce = nonce
+
+	elapsed := time.Since(nonceStart)
+	common.Log.Debugf("TIMING: Getting nonce %v for tx ref %s took %s", *t.Nonce, *t.Ref, elapsed)
 	return nonce, nil
 }
 
