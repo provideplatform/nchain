@@ -74,7 +74,9 @@ type Transaction struct {
 	Ref         *string          `json:"ref"`
 	Description *string          `json:"description"`
 
-	Nonce *uint64 `gorm:"column:nonce" json:"nonce,omitempty"`
+	// Ethereum specific nonce fields
+	Nonce     *uint64            `gorm:"column:nonce" json:"nonce,omitempty"`
+	EthSigner *TransactionSigner `sql:"-" json:"eth_signer,omitempty"`
 
 	// Ephemeral fields for managing the tx/rx and tracing lifecycles
 	Response *contract.ExecutionResponse `sql:"-" json:"-"`
@@ -869,6 +871,15 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
+
+				// we're getting the nonce here so we have a sequence tag for the
+				// tx, but this can fail (and outside of the sign/broadcast)
+				// so it's a point of failure
+				// better to have this as an atomic sequence per address
+				// stored in a dictionary?
+				// but note, we do need to get the address
+				// so we do have to create a signer
+				// this is pretty fast operation
 
 				// this is inside a mutex, so happens synchronously (ish)
 				nonce, signer, err := t.getNonce(db)

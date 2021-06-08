@@ -99,13 +99,7 @@ func setWithLock(key, status string) error {
 	return nil
 }
 
-func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
-	nonceMutex.Lock()
-
-	defer func() {
-		nonceMutex.Unlock()
-	}()
-
+func (t *Transaction) getSigner(db *gorm.DB) error {
 	start := time.Now()
 
 	signer, err := t.signerFactory(db)
@@ -113,11 +107,26 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
-		return nil, nil, err
+		return err
 	}
 
+	t.EthSigner = signer
 	elapsedGeneratingSigner := time.Since(start)
 	common.Log.Debugf("TIMING: Getting signer for tx ref %s took %s", *t.Ref, elapsedGeneratingSigner)
+	return nil
+}
+
+func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
+	nonceMutex.Lock()
+
+	defer func() {
+		nonceMutex.Unlock()
+	}()
+
+	err := t.getSigner(db)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// check if the transaction already has a nonce provided
 	params := t.ParseParams()
@@ -130,13 +139,14 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 	// if the tx has a nonce provided, use it
 	if nonce != nil {
 		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
-		return nonce, signer, nil
+		return nonce, t.EthSigner, nil
 	}
+
 	// signer timer
 	signerStart := time.Now()
 
 	// then use the signer factory to get the transaction address
-	txAddress, _, err := signer.GetSignerDetails()
+	txAddress, _, err := t.EthSigner.GetSignerDetails()
 	if err != nil {
 		common.Log.Debugf("error getting signer details for tx ref %s. Error: %s", *t.Ref, err.Error())
 		return nil, nil, err
@@ -147,7 +157,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 	nonceStart := time.Now()
 	// then use the transaction address to get the nonce
 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
-	nonce, err = getNonce(*txAddress, t, signer)
+	nonce, err = getNonce(*txAddress, t, t.EthSigner)
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
 		return nil, nil, err
@@ -155,7 +165,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 
 	elapsed := time.Since(nonceStart)
 	common.Log.Debugf("TIMING: Getting nonce %v for tx ref %s took %s", *nonce, *t.Ref, elapsed)
-	return nonce, signer, nil
+	return nonce, t.EthSigner, nil
 }
 
 // TODO currently using redis
