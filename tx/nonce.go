@@ -16,6 +16,7 @@ import (
 
 const currentBroadcastNonce = "nchain.broadcast.nonce"
 const proposedBroadcastNonce = "nchain.tx.nonce"
+const channelKey = "nchain.channel.key"
 
 const RedisNonceTTL = time.Second * 5
 

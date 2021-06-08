@@ -751,8 +751,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// rather than using that hacky giant nonce below!
 
 				// TODO const this
-				chanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce)
-				prevChanKey := fmt.Sprintf("nchain.channel.key.%s:%s:%v", network, address, *nonce-1)
+				chanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce)
+				prevChanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce-1)
 
 				var inChan chan BroadcastConfirmation
 				var outChan chan BroadcastConfirmation
