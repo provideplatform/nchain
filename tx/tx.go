@@ -1004,7 +1004,7 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 					// we have successfully broadcast the transaction
 					// so update the db with the received transaction hash
 					t.Hash = common.StringOrNil(signedTx.Hash().String())
-					db.Save(&t)
+					t.updateStatus(db, "broadcast", nil)
 					common.Log.Debugf("broadcast tx ref %s with hash %s - saved to db", *t.Ref, *t.Hash)
 				} else {
 					common.Log.Debugf("failed to broadcast tx ref %s with hash %s. Error: %s", *t.Ref, *t.Hash, err.Error())
