@@ -723,11 +723,17 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// after that, it's the broadcast that enables the second
 				// and the broadcast of the second enables the third etc...
 
-				// get the channel for the network:address:nonce key
+				// set up the channels for the network:address:nonce key
 				address := signer.Address()
 				network := signer.Network.ID.String()
 
-				// TODO
+				chanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce)
+				prevChanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce-1)
+
+				var inChan chan BroadcastConfirmation
+				var outChan chan BroadcastConfirmation
+
+				// TODO (changes above channel keys)
 				// we're going to take the nonce out of the broadcast channel
 				// this is in case we haven't been able to get a nonce
 				// and it's always 0
@@ -749,13 +755,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// and retrieve one for previous sequence (where it will be currently paused broadcasting)
 				// (later, we'll time these out and use it as the basis for the first tx logic)
 				// rather than using that hacky giant nonce below!
-
-				// TODO const this
-				chanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce)
-				prevChanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce-1)
-
-				var inChan chan BroadcastConfirmation
-				var outChan chan BroadcastConfirmation
 
 				// check if we have a previous one
 				if txChannels.Has(prevChanKey) {
