@@ -22,7 +22,6 @@ const RedisNonceTTL = time.Second * 5
 
 // TODO tidy this up, too many unused elements
 type BroadcastConfirmation struct {
-	signer    *TransactionSigner //HACK remove this
 	address   *string
 	network   *string
 	nonce     *uint64

@@ -658,7 +658,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", key, *nonce)
 	// now broadcast the goahead for the next transaction
 	nextNonce := *nonce + 1
-	goForBroadcast = BroadcastConfirmation{signer, &address, &network, &nextNonce, true, true}
+	goForBroadcast = BroadcastConfirmation{&address, &network, &nextNonce, true, true}
 	setCurrentValue(key, nonce)
 	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", key, address, nextNonce)
 	// below blocks until it is read
@@ -832,7 +832,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				if prevChanKey == nil {
 					common.Log.Debugf("nil prevchankey for tx ref %s", *t.Ref)
 					common.Log.Debugf("using chankey %s for tx ref %s", *chanKey, *t.Ref)
-					goForBroadcast := BroadcastConfirmation{signer, &address, &network, nonce, false, false}
+					goForBroadcast := BroadcastConfirmation{&address, &network, nonce, false, false}
 					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
 					txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
 					// once it's received, close the channel
