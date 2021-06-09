@@ -122,7 +122,7 @@ func (txs *TransactionSigner) Address() string {
 			// TODO sort this not being squashed
 			common.Log.Warningf("error obtaining address from transactionsigner. Error: %s", err.Error())
 		}
-		if txAddress != nil {
+		if txAddress != nil { // HACK got panic here (nil txAddress) - possibly vault not authorised FIXME
 			address = *txAddress
 		}
 	}
