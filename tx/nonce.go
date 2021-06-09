@@ -42,6 +42,8 @@ type ValueDictionary struct {
 }
 
 var txChannels ValueDictionary //(interface is channelPair struct only)
+var txRegister ValueDictionary
+var txSequencer ValueDictionary
 
 // Set adds a new item to the dictionary
 func (d *ValueDictionary) Set(k string, v interface{}) {

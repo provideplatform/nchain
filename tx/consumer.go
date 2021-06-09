@@ -287,6 +287,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 		return
 	}
 
+	common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
 	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)

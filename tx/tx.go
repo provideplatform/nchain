@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -121,7 +122,9 @@ func (txs *TransactionSigner) Address() string {
 			// TODO sort this not being squashed
 			common.Log.Warningf("error obtaining address from transactionsigner. Error: %s", err.Error())
 		}
-		address = *txAddress
+		if txAddress != nil {
+			address = *txAddress
+		}
 	}
 
 	return address
@@ -669,6 +672,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 // Create and persist a new transaction. Side effects include persistence of contract
 // and/or token instances when the tx represents a contract and/or token creation.
 func (t *Transaction) Create(db *gorm.DB) bool {
+	common.Log.Debugf("TIMINGNANO: about to validate tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 	if !t.Validate() {
 		return false
 	}
@@ -684,6 +688,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 			t.WalletID = nil
 		}
 		common.Log.Debugf("XXX: Create: about to create tx with ref: %v", *t.Ref)
+		common.Log.Debugf("TIMINGNANO: about to db insert tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 		result := db.Create(&t)
 		rowsAffected := result.RowsAffected
 		errors := result.GetErrors()
@@ -709,6 +714,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// this is pretty fast operation
 
 				// this is inside a mutex, so happens synchronously (ish)
+				common.Log.Debugf("TIMINGNANO: about to get nonce for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 				nonce, signer, err := t.getNonce(db)
 				if err != nil {
 					common.Log.Debugf("error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
@@ -727,8 +733,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				address := signer.Address()
 				network := signer.Network.ID.String()
 
-				chanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce)
-				prevChanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce-1)
+				// chanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce)
+				// prevChanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce-1)
 
 				var inChan chan BroadcastConfirmation
 				var outChan chan BroadcastConfirmation
@@ -749,18 +755,60 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// step 1
 				// get a sequence count for this network address
 				// this will be an atomic counter, so it's threadsafe
-				// step 2
-				// we will create a struct that's stored in the dictionary using this sequence counter
-				// so that we can create one for current sequence,
-				// and retrieve one for previous sequence (where it will be currently paused broadcasting)
-				// (later, we'll time these out and use it as the basis for the first tx logic)
-				// rather than using that hacky giant nonce below!
+				// note this will have to be idempotent,
+				// and not increment for a tx ref it already has
+				common.Log.Debugf("TIMINGNANO: about to check register for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+				// step 0. check if we're currently processing this ref
+				// note that we need to be able to accept the nats msg
+				// again and again, without creating new transactions
+				var chanKey *string
+				var prevChanKey *string
 
-				// check if we have a previous one
-				if txChannels.Has(prevChanKey) {
-					common.Log.Debugf("TIMING: we have outgoing channel %+v for previous nonce %v", txChannels.Get(prevChanKey), *nonce-1)
+				idempotentKey := fmt.Sprintf("nchain.tx.listing.%s:%s:%s", network, address, *t.Ref)
+				if !txRegister.Has(idempotentKey) {
+					common.Log.Debugf("register does not have tx ref %s", *t.Ref)
+					// we haven't seen this tx before so...
+					// we need to add this tx to the register
+					txRegister.Set(idempotentKey, true)
+
+					// increment the tx counter by 1 for this network address
+					sequenceKey := fmt.Sprintf("nchain.tx.sequence.%s:%s", network, address)
+					if txSequencer.Has(sequenceKey) {
+						common.Log.Debugf("sequencer has network address %s for tx ref %s", address, *t.Ref)
+						counter := txSequencer.Get(sequenceKey).(uint64)
+						common.Log.Debugf("sequencer has counter %v for address %s tx ref %s", counter, address, *t.Ref)
+						txSequencer.Set(sequenceKey, atomic.AddUint64(&counter, 1))
+						common.Log.Debugf("sequencer updated counter to %v for address %s tx ref %s", counter, address, *t.Ref)
+						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter))
+						common.Log.Debugf("assigning chankey of %s for tx ref %s", *chanKey, *t.Ref)
+						if counter != 0 {
+							prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter-1))
+							common.Log.Debugf("assigning prev chankey of %s for tx ref %s", *prevChanKey, *t.Ref)
+						} else {
+							common.Log.Debugf("assigning nil prev chankey for tx ref %s", *prevChanKey, *t.Ref)
+							prevChanKey = nil
+						}
+					} else {
+						common.Log.Debugf("sequencer does not have network address for tx ref %s", *t.Ref)
+						// we haven't seen this network address
+						// so start it at 0
+						zero := new(uint64)
+						txSequencer.Set(sequenceKey, *zero)
+						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *zero))
+						common.Log.Debugf("assigning chankey of %s for tx ref %s (nil prevChanKey)", *chanKey, *t.Ref)
+						prevChanKey = nil
+					}
+
+				} else {
+					common.Log.Debugf("register already has tx ref %s", *t.Ref)
+					// we have this tx in the register, so we at least got to here before
+					// todo sort this out later, once we have the channel sequences updated
+				} //!txRegister.Has()
+
+				if prevChanKey != nil && txChannels.Has(*prevChanKey) {
+					common.Log.Debugf("TIMING: we have outgoing channel %+v for previous nonce %v", txChannels.Get(*prevChanKey), *nonce-1)
 					// if we do, use its outgoing channel as an incoming channel
-					inChan = txChannels.Get(prevChanKey).(channelPair).outgoing
+					inChan = txChannels.Get(*prevChanKey).(channelPair).outgoing
 				} else {
 					// TODO sort out nchain-consumer restarting between bulk runs
 					common.Log.Debugf("TIMING: we have no outgoing channel for previous nonce %v", *nonce-1)
@@ -776,29 +824,20 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					outChan,
 				}
 
-				txChannels.Set(chanKey, chanPair)
+				txChannels.Set(*chanKey, chanPair)
+				common.Log.Debugf("TIMINGNANO: about to sign and broadcast tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+				go t.SignAndReadyForBroadcast(txChannels.Get(*chanKey), signer, db, nonce)
 
-				go t.SignAndReadyForBroadcast(txChannels.Get(chanKey), signer, db, nonce)
-
-				key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
-				// FIXME: remove this dep on redis - it breaks if nchain-consumer restarts
-				lastBroadcastNonce := getCurrentValue(key)
-				if lastBroadcastNonce != nil {
-					common.Log.Debugf("TIMING: got last broadcast nonce of %v for key %s", *lastBroadcastNonce, key)
-				} else {
-					common.Log.Debugf("TIMING: got NIL last broadcast nonce for key %s", key)
-					// temp assign a huuuuge value to the last broadcast - hackyhack
-					// likely assigning it to nonce-1 would be as good :)
-					maxInt := uint64(^uint64(0) >> 1)
-					_ = setCurrentValue(key, &maxInt)
-
+				//key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
+				if prevChanKey == nil {
+					common.Log.Debugf("nil prevchankey for tx ref %s", *t.Ref)
+					common.Log.Debugf("using chankey %s for tx ref %s", *chanKey, *t.Ref)
 					goForBroadcast := BroadcastConfirmation{signer, &address, &network, nonce, false, false}
 					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
-					txChannels.Get(chanKey).(channelPair).incoming <- goForBroadcast
+					txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
 					// once it's received, close the channel
-					close(txChannels.Get(chanKey).(channelPair).incoming)
+					close(txChannels.Get(*chanKey).(channelPair).incoming)
 				}
-
 				return true
 			} //rowsAffected
 		} // !db.NewRecord
