@@ -47,6 +47,7 @@ const msgInFlight = "IN_FLIGHT"
 const msgRetryRequired = "RETRY_REQUIRED"
 
 var waitGroup sync.WaitGroup
+var natsWG sync.WaitGroup
 
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
@@ -154,7 +155,23 @@ func processMessageStatus(key string) error {
 }
 
 func consumeTxCreateMsg(msg *stan.Msg) {
+	natsWG.Add(1)
+	start := time.Now()
+	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
+	processTxCreateMsg(msg, &natsWG)
+	elapsedTime := time.Since(start)
+	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
+	common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
+	natsWG.Wait()
+}
+
+func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
+	defer wg.Done()
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
+
+	// these need to be processed EXACTLY in order
+	// which means minimising the processing done before
+	// it joins an ordered processing queue
 
 	var params map[string]interface{}
 
