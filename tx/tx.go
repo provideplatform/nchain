@@ -318,12 +318,6 @@ func (txs *TransactionSigner) Sign(tx *Transaction, nonce *uint64) (signedTx int
 			gasPrice = &_gasPrice
 		}
 
-		// var nonce *uint64
-		// if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
-		// 	nonceUint := uint64(nonceFloat)
-		// 	nonce = &nonceUint
-		// }
-
 		var signer types.Signer
 		var _tx *types.Transaction
 		var signingWithAccount bool
@@ -606,10 +600,11 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 }
 
 func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
-	var key string
+	var currentBroadcastNonceKey string
 
 	err := t.SignRawTransaction(db, nonce, signer)
 	if err != nil {
+		// TODO, sort this out
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
@@ -621,52 +616,79 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 
 	address := signer.Address()
 	network := signer.Network.ID.String()
-	key = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
+	currentBroadcastNonceKey = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
 
 	var goForBroadcast BroadcastConfirmation
 
-	common.Log.Debugf("TIMING IN: waiting for go ahead for key %s nonce %v, on channel %+v", key, *nonce, channels.(channelPair).incoming)
+	common.Log.Debugf("TIMING IN: waiting for go ahead for key %s nonce %v, on channel %+v", currentBroadcastNonceKey, *nonce, channels.(channelPair).incoming)
 	goForBroadcast = <-channels.(channelPair).incoming
+
+	//check if the nonce specified in the channel is different to the one we're currently using
+	// if it's different, re-sign the tx
+	if *goForBroadcast.nonce != *nonce {
+		common.Log.Debugf("updated nonce for tx ref %s to %d", *t.Ref, *&goForBroadcast.nonce)
+		t.Nonce = goForBroadcast.nonce
+		err := t.SignRawTransaction(db, t.Nonce, signer)
+		if err != nil {
+			// TODO, sort this out
+			t.Errors = append(t.Errors, &provide.Error{
+				Message: common.StringOrNil(err.Error()),
+			})
+		}
+	}
 
 	common.Log.Debugf("TIMING: received go ahead for on incoming channel %+v of %+v", channels.(channelPair).incoming, goForBroadcast)
 
-	err = t.BroadcastSignedTransaction(db, signer)
-	if err != nil {
-		// handle this
+	// change the broadcast to repeatedly retry until it succeeds
+	for {
+		err = t.BroadcastSignedTransaction(db, signer)
+		if err == nil {
+			break
+		}
+		if err != nil {
+			// check for nonce too low and fix
+			if NonceTooLow(err) {
+				// get the last mined nonce
+				t.Nonce, _ = t.getLastMinedNonce(address)
+				// and re-sign transaction with this nonce
+				err := t.SignRawTransaction(db, t.Nonce, signer)
+				if err != nil {
+					t.Errors = append(t.Errors, &provide.Error{
+						Message: common.StringOrNil(err.Error()),
+					})
+				}
+			}
+			// check for already known and fix
+			if AlreadyKnown(err) {
+				// TODO increase the gas price and try again
+				// for the moment, we'll just say it's ok
+				// but this error will continue, so it will never broadcast
+				// best to increase the gas price and have it go again
+				break
+			}
+
+			// check for gas price too low and fix
+		}
 	}
 
-	// change
-	// so as not to be sharing one channel between everything (teh horror for sc4ling)
-	// we'll have a new channel pair for every transaction
-	// channel 1 is incoming (and will tell it to go)
-	// channel 2 is outgoing (and will tell the next one to go)
-	// once the incoming channel is read, it will close
-	// once the outgoing channel is read, it will close
-	// it will make the incoming channel and outgoing channel
-	// indexed by the nonce selected for that account and network (network:account:nonce)
-	// in a dictionary kv store. key: channel1 & 2 struct)
-	// creating a tx creates both channels
-	// the creating goroutine will take both channels
-	// read on 1
-	// write on 2
-	// when I create the tx
-	//  - check if there's a channel available (in memory dictionary)
-	//  - for both the current nonce and the previous
-	//  - if there's one for the previous, use its outgoing channel for incoming (by reference copy)
-	//  - if there isn't, we make a new incoming channel
+	common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", currentBroadcastNonceKey, *t.Nonce)
 
-	common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", key, *nonce)
 	// now broadcast the goahead for the next transaction
-	nextNonce := *nonce + 1
+	nextNonce := *t.Nonce + 1
 	goForBroadcast = BroadcastConfirmation{&address, &network, &nextNonce, true, true}
-	setCurrentValue(key, nonce)
-	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", key, address, nextNonce)
+	setCurrentValue(currentBroadcastNonceKey, t.Nonce)
+
+	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", currentBroadcastNonceKey, address, nextNonce)
+
 	// below blocks until it is read
 	channels.(channelPair).outgoing <- goForBroadcast
-	common.Log.Debugf("TIMING: OUT key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", goForBroadcast, key, address, nextNonce, channels.(channelPair).outgoing)
+
+	common.Log.Debugf("TIMING: OUT key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", goForBroadcast, currentBroadcastNonceKey, address, nextNonce, channels.(channelPair).outgoing)
+
 	// close the outgoing channel once it is read
 	// TODO this should also timeout and clear itself up from the dictionary
 	close(channels.(channelPair).outgoing)
+
 }
 
 // Create and persist a new transaction. Side effects include persistence of contract
@@ -714,8 +736,16 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// this is pretty fast operation
 
 				// this is inside a mutex, so happens synchronously (ish)
+				// ok, let's put this inside a waitgroup, so the code waits for it to finish
+				// gives us a bad worst case of getting nonce every time from chain (every account is different)
+				// but will be fast enough otherwise
+				// we'll continue to use redis for the nonces, for the moment, but
+				// as these are written to the db, there's not a lot of persistence required
+
 				common.Log.Debugf("TIMINGNANO: about to get nonce for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
-				nonce, signer, err := t.getNonce(db)
+				nonceWG.Add(1)
+				nonce, signer, err := t.getNonce(db, &nonceWG)
+				nonceWG.Wait()
 				if err != nil {
 					common.Log.Debugf("error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 					return false
@@ -1009,6 +1039,7 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	var err error
 
 	if t.SignedTx == nil || ntwrk == nil {
+		// bookie path
 		params := t.ParseParams()
 
 		var _ntwrk *network.Network
@@ -1030,24 +1061,30 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 		db.Save(&t)
 		common.Log.Debugf("broadcast tx: %s", *t.Hash)
 	} else {
+		// non-bookie path
 		if ntwrk.IsEthereumNetwork() {
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 				common.Log.Debugf("XXX: about to broadcast tx ref: %s", *t.Ref)
 				// retry broadcast 3 times if it fails
+
 				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
 					err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 					return
 				})
+
 				if err == nil {
 					common.Log.Debugf("broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
+
 					// we have successfully broadcast the transaction
 					// so update the db with the received transaction hash
 					t.Hash = common.StringOrNil(signedTx.Hash().String())
 					t.updateStatus(db, "broadcast", nil)
+
 					common.Log.Debugf("broadcast tx ref %s with hash %s - saved to db", *t.Ref, *t.Hash)
 				} else {
+					// we have failed to broadcast the tx (for some reason)
 					common.Log.Debugf("failed to broadcast tx ref %s with hash %s. Error: %s", *t.Ref, *t.Hash, err.Error())
-					err = fmt.Errorf("unable to broadcast signed tx; broadcast failed for signed tx: %s", t.SignedTx)
+					err = fmt.Errorf("unable to broadcast signed tx; broadcast failed for signed tx ref %s. Error: %s", *t.Ref, err.Error())
 				}
 			} else {
 				err = fmt.Errorf("unable to broadcast signed tx; typecast failed for signed tx: %s", t.SignedTx)

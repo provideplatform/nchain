@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +20,10 @@ const proposedBroadcastNonce = "nchain.tx.nonce"
 const channelKey = "nchain.channel.key"
 
 const RedisNonceTTL = time.Second * 5
+
+// used to ensure the nonces are handled synchronously
+// when pulling from the consumer
+var nonceWG sync.WaitGroup
 
 // TODO tidy this up, too many unused elements
 type BroadcastConfirmation struct {
@@ -141,13 +146,11 @@ func (t *Transaction) HasNonce() bool {
 
 }
 
-func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
-	nonceMutex.Lock()
+func (t *Transaction) getNonce(db *gorm.DB, wg *sync.WaitGroup) (*uint64, *TransactionSigner, error) {
 
-	defer func() {
-		nonceMutex.Unlock()
-	}()
+	defer wg.Done()
 
+	// TODO handle this - likely caused by vault auth failure
 	err := t.getSigner(db)
 	if err != nil {
 		return nil, nil, err
@@ -162,10 +165,30 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 	t.Nonce, err = t.getNextNonce()
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
-		return nil, nil, err
+		// we will assign 0 to the nonce to ensure it will trip nonce-too low error (in most cases)
+		zeroNonce := uint64(0)
+		t.Nonce = &zeroNonce
+		return t.Nonce, t.EthSigner, err
 	}
 
 	return t.Nonce, t.EthSigner, nil
+}
+
+// getLastMinedNonce gets the last mined nonce for the tx via RPC call
+func (t *Transaction) getLastMinedNonce(address string) (*uint64, error) {
+	common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
+	client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
+	if err != nil {
+		return nil, err
+	}
+	common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
+	// get the last mined nonce, we don't want to rely on the tx pool
+	pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
+	if err != nil {
+		common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
+		return nil, err
+	}
+	return &pendingNonce, nil
 }
 
 // TODO currently using redis
@@ -190,23 +213,29 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 	if cachedNonce == nil {
 		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", address, network, *t.Ref)
 		// get the nonce from the EVM
-		common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
-		client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
-		if err != nil {
-			return nil, err
-		}
+		// common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
+		// client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
+		// if err != nil {
+		// 	common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
+		// 	return nil, err
+		// }
 		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
 		// get the last mined nonce, we don't want to rely on the tx pool
-		pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
+		pendingNonce, err := t.getLastMinedNonce(address)
 		if err != nil {
 			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 			return nil, err
 		}
-		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *t.Ref, pendingNonce)
+
+		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *t.Ref, *pendingNonce)
 		// put this in redis
 		lockErr := redisutil.WithRedlock(key, func() error {
 			ttl := RedisNonceTTL
-			err := redisutil.Set(key, pendingNonce, &ttl)
+			err := redisutil.Set(key, *pendingNonce, &ttl)
 			if err != nil {
 				return err
 			}
@@ -215,7 +244,7 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 		if lockErr != nil {
 			return nil, lockErr
 		}
-		return &pendingNonce, nil
+		return pendingNonce, nil
 	} else {
 		int64nonce, err := strconv.ParseUint(string(*cachedNonce), 10, 64)
 		if err != nil {
@@ -293,4 +322,28 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 	}
 
 	return nil, nil
+}
+
+func AlreadyKnown(err error) bool {
+
+	// infura ropsten error
+	if strings.Contains(err.Error(), "already known") {
+		return true
+	}
+
+	return false
+}
+func NonceTooLow(err error) bool {
+
+	// infura kovan error
+	if strings.Contains(err.Error(), "nonce is too low") {
+		return true
+	}
+
+	// infura ropsten error
+	if strings.Contains(err.Error(), "nonce too low") {
+		return true
+	}
+
+	return false
 }
