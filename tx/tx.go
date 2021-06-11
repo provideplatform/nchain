@@ -55,9 +55,7 @@ type Parameters struct {
 	Path        *string    `sql:"-" json:"hd_derivation_path,omitempty"`
 	Value       *float64   `sql:"-" json:"value,omitempty"`
 	PublishedAt *string    `sql:"-" json:"published_at,omitempty"`
-
-	//TODO gas price etc
-
+	GasPrice    *float64   `sql:"-" json:"gas_price,omitempty"`
 }
 
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
@@ -642,7 +640,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	//check if the nonce specified in the channel is different to the one we're currently using
 	// if it's different, re-sign the tx
 	if *goForBroadcast.nonce != *nonce {
-		common.Log.Debugf("updated nonce for tx ref %s to %d", *t.Ref, *&goForBroadcast.nonce)
+		common.Log.Debugf("updated nonce for tx ref %s to %v", *t.Ref, *goForBroadcast.nonce)
 		t.Nonce = goForBroadcast.nonce
 		err := t.SignRawTransaction(db, t.Nonce, signer)
 		if err != nil {
@@ -659,11 +657,15 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	for {
 		err = t.BroadcastSignedTransaction(db, signer)
 		if err == nil {
+			common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", currentBroadcastNonceKey, *t.Nonce)
+			// update the db record with the updated details (currently just nonce)
+			db.Save(&t)
 			break
 		}
 		if err != nil {
 			// check for nonce too low and fix
 			if NonceTooLow(err) {
+				common.Log.Debugf("Nonce too low error for tx ref: %s", *t.Ref)
 				// get the last mined nonce
 				t.Nonce, _ = t.getLastMinedNonce(address)
 				// and re-sign transaction with this nonce
@@ -674,20 +676,31 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 					})
 				}
 			}
-			// check for already known and fix
+			// check for already known and fix by updating the gas price
 			if AlreadyKnown(err) {
-				// TODO increase the gas price and try again
-				// for the moment, we'll just say it's ok
-				// but this error will continue, so it will never broadcast
-				// best to increase the gas price and have it go again
-				break
-			}
+				common.Log.Debugf("Already known error for tx ref: %s", *t.Ref)
+				updatedGasPrice := float64(0)
+				if t.Parameters.GasPrice != nil {
+					common.Log.Debugf("tx ref %s already known. gas price: %d", *t.Ref, *t.Parameters.GasPrice)
+					updatedGasPrice = *t.Parameters.GasPrice + 5
+					common.Log.Debugf("tx ref %s already known. new gas price: %d", *t.Ref, *t.Parameters.GasPrice)
+				} else {
+					common.Log.Debugf("tx ref %s already known. no gas price specified", *t.Ref)
+					updatedGasPrice = float64(5)
+				}
 
-			// check for gas price too low and fix
+				t.Parameters.GasPrice = &updatedGasPrice
+				common.Log.Debugf("re-signing tx ref %s with gas %v", *t.Ref, *t.Parameters.GasPrice)
+				// and re-sign transaction with this updated gas price
+				err := t.SignRawTransaction(db, t.Nonce, signer)
+				if err != nil {
+					t.Errors = append(t.Errors, &provide.Error{
+						Message: common.StringOrNil(err.Error()),
+					})
+				}
+			}
 		}
 	}
-
-	common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", currentBroadcastNonceKey, *t.Nonce)
 
 	// now broadcast the goahead for the next transaction
 	nextNonce := *t.Nonce + 1
