@@ -118,7 +118,7 @@ func TestContractHDWalletKovanBulk_NonceTooLow(t *testing.T) {
 						"hd_derivation_path": tc.derivationPath,
 						"compiled_artifact":  tc.artifact,
 						"ref":                ref,
-						"nonce":              0,
+						"nonce":              0, // to force a nonce too low for the first tx of each batch
 					},
 				})
 			} else {
