@@ -1059,13 +1059,8 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 		if ntwrk.IsEthereumNetwork() {
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 				common.Log.Debugf("XXX: about to broadcast tx ref: %s", *t.Ref)
-				// retry broadcast 3 times if it fails
 
-				err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-					err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
-					return
-				})
-
+				err = providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 				if err == nil {
 					common.Log.Debugf("broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
 
