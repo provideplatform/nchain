@@ -201,7 +201,7 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 
-		// update the contract with the tx id (unqiue to contract flow)
+		// update the contract with the tx id (unique to contract flow?)
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
 
@@ -368,6 +368,16 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		nonceUint = &nonce
 	}
 
+	// handle any provided gas price
+	var gasPrice *float64
+	gasPriceFloat, gasPriceFloatOk := txParams["gas_price"].(float64)
+	if !gasPriceFloatOk {
+		gasPrice = nil
+	}
+	if gasPriceFloatOk {
+		gasPrice = &gasPriceFloat
+	}
+
 	var parameters Parameters
 
 	parameters.ContractID = contract.ContractID
@@ -377,6 +387,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	parameters.Path = &hdDerivationPath
 	parameters.Value = &valueFloat
 	parameters.PublishedAt = &publishedAt
+	parameters.GasPrice = gasPrice
 
 	// TODO note the contract deps on this tx create
 	tx := &Transaction{
@@ -682,7 +693,8 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 
 	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
-		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx hash %s. Error: %s", *tx.Hash, err.Error()))
+		// TODO got a panic here on *tx.hash (removed temporarily)
+		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt. Error: %s", err.Error()))
 		// remove the in-flight status to this can be replayed
 		lockErr := setWithLock(*key, msgRetryRequired)
 		if lockErr != nil {
