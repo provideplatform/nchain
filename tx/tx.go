@@ -47,6 +47,19 @@ type Signer interface {
 	String() string
 }
 
+type Parameters struct {
+	ContractID  *uuid.UUID `sql:"-" json:"contract_id,omitempty"`
+	Data        *string    `sql:"-" json:"data,omitempty"`
+	AccountID   *uuid.UUID `sql:"-" json:"account_id,omitempty"`
+	WalletID    *uuid.UUID `sql:"-" json:"wallet_id,omitempty"`
+	Path        *string    `sql:"-" json:"hd_derivation_path,omitempty"`
+	Value       *float64   `sql:"-" json:"value,omitempty"`
+	PublishedAt *string    `sql:"-" json:"published_at,omitempty"`
+
+	//TODO gas price etc
+
+}
+
 // Transaction instances are associated with a signing wallet and exactly one matching instance of either an a) application
 // identifier or b) user identifier.
 type Transaction struct {
@@ -78,6 +91,9 @@ type Transaction struct {
 	// Ethereum specific nonce fields
 	Nonce     *uint64            `gorm:"column:nonce" json:"nonce,omitempty"`
 	EthSigner *TransactionSigner `sql:"-" json:"eth_signer,omitempty"`
+
+	// parameter fields as struct (todo replace params above?)
+	Parameters *Parameters `sql:"-" json:"parameters,omitempty"`
 
 	// Ephemeral fields for managing the tx/rx and tracing lifecycles
 	Response *contract.ExecutionResponse `sql:"-" json:"-"`
@@ -695,6 +711,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 // and/or token instances when the tx represents a contract and/or token creation.
 func (t *Transaction) Create(db *gorm.DB) bool {
 	common.Log.Debugf("TIMINGNANO: about to validate tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+
 	if !t.Validate() {
 		return false
 	}
@@ -709,8 +726,10 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		if t.WalletID != nil && *t.WalletID == uuid.Nil {
 			t.WalletID = nil
 		}
+
 		common.Log.Debugf("XXX: Create: about to create tx with ref: %v", *t.Ref)
 		common.Log.Debugf("TIMINGNANO: about to db insert tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+
 		result := db.Create(&t)
 		rowsAffected := result.RowsAffected
 		errors := result.GetErrors()
@@ -726,16 +745,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
 
-				// we're getting the nonce here so we have a sequence tag for the
-				// tx, but this can fail (and outside of the sign/broadcast)
-				// so it's a point of failure
-				// better to have this as an atomic sequence per address
-				// stored in a dictionary?
-				// but note, we do need to get the address
-				// so we do have to create a signer
-				// this is pretty fast operation
-
-				// this is inside a mutex, so happens synchronously (ish)
 				// ok, let's put this inside a waitgroup, so the code waits for it to finish
 				// gives us a bad worst case of getting nonce every time from chain (every account is different)
 				// but will be fast enough otherwise
@@ -743,6 +752,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// as these are written to the db, there's not a lot of persistence required
 
 				common.Log.Debugf("TIMINGNANO: about to get nonce for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+
 				nonceWG.Add(1)
 				nonce, signer, err := t.getNonce(db, &nonceWG)
 				nonceWG.Wait()
@@ -754,39 +764,23 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// get the nonce
 				// sign and attempt to broadcast it
 				// but only broadcast it if we get the go-ahead in the channel
-				// ignore broadcast errors for now!
 				// we give the go-ahead automatically for the first tx for an address
-				// after that, it's the broadcast that enables the second
+				// after that, the broadcast of the first enables the second
 				// and the broadcast of the second enables the third etc...
 
-				// set up the channels for the network:address:nonce key
+				// set up the channels for the network:address:sequence key
 				address := signer.Address()
 				network := signer.Network.ID.String()
-
-				// chanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce)
-				// prevChanKey := fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *nonce-1)
 
 				var inChan chan BroadcastConfirmation
 				var outChan chan BroadcastConfirmation
 
-				// TODO (changes above channel keys)
-				// we're going to take the nonce out of the broadcast channel
-				// this is in case we haven't been able to get a nonce
-				// and it's always 0
-				// and also to avoid burning the nonce into the tx description
-				// to do this
-				// the channel keys will need to change to
-				// nchain.channel.key.[network]:[address]:[sequence]
+				// channelkey is nchain.channel.key.[network]:[address]:[sequence]
 				// where sequence is the current counter for transactions to that network.address
 				// this will be stored in memory, so will not persist
 				// so if nchain goes down, all this will disappear and
 				// need to be rebuilt from the nats messages (once they're properly idempotent)
 
-				// step 1
-				// get a sequence count for this network address
-				// this will be an atomic counter, so it's threadsafe
-				// note this will have to be idempotent,
-				// and not increment for a tx ref it already has
 				common.Log.Debugf("TIMINGNANO: about to check register for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 				// step 0. check if we're currently processing this ref
 				// note that we need to be able to accept the nats msg
@@ -794,38 +788,36 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				var chanKey *string
 				var prevChanKey *string
 
+				// have we seen this tx before
 				idempotentKey := fmt.Sprintf("nchain.tx.listing.%s:%s:%s", network, address, *t.Ref)
 				if !txRegister.Has(idempotentKey) {
 					common.Log.Debugf("register does not have tx ref %s", *t.Ref)
-					// we haven't seen this tx before so...
-					// we need to add this tx to the register
+					// we haven't seen this tx before
+					// so we need to add this tx to the register
 					txRegister.Set(idempotentKey, true)
 
-					// increment the tx counter by 1 for this network address
+					// have we processed a previous tx for this network address?
 					sequenceKey := fmt.Sprintf("nchain.tx.sequence.%s:%s", network, address)
 					if txSequencer.Has(sequenceKey) {
-						common.Log.Debugf("sequencer has network address %s for tx ref %s", address, *t.Ref)
+						//if we have, get its counter
 						counter := txSequencer.Get(sequenceKey).(uint64)
-						common.Log.Debugf("sequencer has counter %v for address %s tx ref %s", counter, address, *t.Ref)
+
+						// increment the counter
 						txSequencer.Set(sequenceKey, atomic.AddUint64(&counter, 1))
-						common.Log.Debugf("sequencer updated counter to %v for address %s tx ref %s", counter, address, *t.Ref)
+
+						// create the channel keys
 						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter))
-						common.Log.Debugf("assigning chankey of %s for tx ref %s", *chanKey, *t.Ref)
-						if counter != 0 {
-							prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter-1))
-							common.Log.Debugf("assigning prev chankey of %s for tx ref %s", *prevChanKey, *t.Ref)
-						} else {
-							common.Log.Debugf("assigning nil prev chankey for tx ref %s", *prevChanKey, *t.Ref)
-							prevChanKey = nil
-						}
+						prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter-1))
+
 					} else {
 						common.Log.Debugf("sequencer does not have network address for tx ref %s", *t.Ref)
-						// we haven't seen this network address
+						// we haven't processed a tx for this network address
 						// so start it at 0
 						zero := new(uint64)
 						txSequencer.Set(sequenceKey, *zero)
+
+						// create the channel keys for this first tx for this network address
 						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *zero))
-						common.Log.Debugf("assigning chankey of %s for tx ref %s (nil prevChanKey)", *chanKey, *t.Ref)
 						prevChanKey = nil
 					}
 
@@ -833,16 +825,16 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					common.Log.Debugf("register already has tx ref %s", *t.Ref)
 					// we have this tx in the register, so we at least got to here before
 					// todo sort this out later, once we have the channel sequences updated
+					// TODO nats idempotency
 				} //!txRegister.Has()
 
+				// check if we have channels for the sequence directly before this one
 				if prevChanKey != nil && txChannels.Has(*prevChanKey) {
-					common.Log.Debugf("TIMING: we have outgoing channel %+v for previous nonce %v", txChannels.Get(*prevChanKey), *nonce-1)
-					// if we do, use its outgoing channel as an incoming channel
+					// if we have an OUT channel for the previous sequence
+					// use it as an IN channel for this tx
 					inChan = txChannels.Get(*prevChanKey).(channelPair).outgoing
 				} else {
-					// TODO sort out nchain-consumer restarting between bulk runs
-					common.Log.Debugf("TIMING: we have no outgoing channel for previous nonce %v", *nonce-1)
-					// otherwise make a new one (it's FIRST, so we'll broadcast on it straight away)
+					// otherwise make a new one
 					inChan = make(chan BroadcastConfirmation)
 				}
 
@@ -854,14 +846,15 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					outChan,
 				}
 
+				// add the IN and OUT channel pair to this tx dictionary
 				txChannels.Set(*chanKey, chanPair)
+
 				common.Log.Debugf("TIMINGNANO: about to sign and broadcast tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+
 				go t.SignAndReadyForBroadcast(txChannels.Get(*chanKey), signer, db, nonce)
 
-				//key := fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
+				// if this is the first tx for this network address, give it the broadcast go straight away
 				if prevChanKey == nil {
-					common.Log.Debugf("nil prevchankey for tx ref %s", *t.Ref)
-					common.Log.Debugf("using chankey %s for tx ref %s", *chanKey, *t.Ref)
 					goForBroadcast := BroadcastConfirmation{&address, &network, nonce, false, false}
 					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
 					txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
@@ -1054,6 +1047,7 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 
 		result, err := common.BroadcastTransaction(t.To, t.Data, params)
 		if err != nil {
+			// TODO if this fails, don't retry, fail the tx stack
 			return fmt.Errorf("failed to broadcast bookie tx; %s", err.Error())
 		}
 

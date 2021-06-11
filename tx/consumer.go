@@ -165,21 +165,88 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	natsWG.Wait()
 }
 
+// these need to be processed EXACTLY in order
+// which means minimising the processing done before
+// it joins an ordered processing queue
+// TODO name this properly
 func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
+
 	defer wg.Done()
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
-	// these need to be processed EXACTLY in order
-	// which means minimising the processing done before
-	// it joins an ordered processing queue
+	db := dbconf.DatabaseConnection()
+
+	// process msg data
+	tx, contract, err := processNATSTxCreateMsg(msg, db)
+	if err != nil {
+		common.Log.Debugf("Error processing MATS %v message. Error: %s", msg.Subject, err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+
+	// ******************************************************************
+	// TODO remove this once the idempotency is in
+	key := fmt.Sprintf("nchain.tx.create.%s", *tx.Ref)
+	// checks if the message is currently in flight (being procesed)
+	err = processMessageStatus(key)
+	if err != nil {
+		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
+		return
+	}
+	// ******************************************************************
+
+	common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
+	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
+
+	if tx.Create(db) {
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
+
+		// update the contract with the tx id (unqiue to contract flow)
+		contract.TransactionID = &tx.ID
+		db.Save(&contract)
+
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
+
+		err = msg.Ack()
+		if err != nil {
+			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
+		}
+
+		common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *tx.Ref)
+	} else {
+		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
+		for _, err := range tx.Errors {
+			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
+		}
+
+		// ******************************************************************
+		// remove the in-flight status to this can be replayed
+		// TODO get rid of this when idempotency in
+		lockErr := setWithLock(key, msgRetryRequired)
+		if lockErr != nil {
+			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
+			// TODO what to do if this fails????
+		}
+		// ******************************************************************
+
+		//TODO this is not showing the errors, instead showing the tx ref
+		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", errmsg, *tx.Ref)
+		natsutil.AttemptNack(msg, txCreateMsgTimeout)
+	}
+}
+
+// processNATSTxCreateMsg processes a NATS msg into a Transaction object
+// TODO wg here?
+// TODO name this properly
+func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract.Contract, error) {
 
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal tx creation message; %s", err.Error())
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling tx creation message from NATS %v message. Error: %s", msg.Subject, err.Error())
+		return nil, nil, err
 	}
 
 	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v", msg.Sequence)
@@ -195,13 +262,15 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 	reference, referenceOk := txParams["ref"]
 
 	// TODO this reference create needs to be on the nchain side, not the consume side
+	// so if this doesn't have a reference, we nack it because something
+	// has gone terribly wrong
 	if !referenceOk {
 		// no reference provided with the contract, so we'll make one
 		reference, err = uuid.NewV4()
 		if err != nil {
 			common.Log.Warningf("Failed to create unique tx ref. Error: %s", err.Error())
-			natsutil.Nack(msg)
-			return
+			err = fmt.Errorf("Error creating unique ref for tx. Error: %s", err.Error())
+			return nil, nil, err
 		}
 	}
 
@@ -218,39 +287,40 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 
 	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v. Tx Ref: %s", msg.Sequence, ref)
 
+	// TODO flag around this as it's only for the contract create message
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling contract_id from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 	if !dataOk {
 		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling data from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 	if !accountIDStrOk && !walletIDStrOk {
 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling both accountID and walletID from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 	if !valueOk {
 		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling value from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 	if !paramsOk {
 		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling params from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 	if !publishedAtOk {
 		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error unmarshaling published_at from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 
+	// TODO contract flag?
 	contract := &contract.Contract{}
-	db := dbconf.DatabaseConnection()
 	db.Where("id = ?", contractID).Find(&contract)
 
 	var accountID *uuid.UUID
@@ -268,17 +338,36 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 
 	if accountID == nil && walletID == nil {
 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error converting accountID and walletID to uuid from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
 		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
-		natsutil.Nack(msg)
-		return
+		err := fmt.Errorf("Error parsing published_at time from NATS %v message", msg.Subject)
+		return nil, nil, err
 	}
 
+	// convert value to float64 (shouldn't this be uint64?) if it's present
+	valueFloat, valueFloatOk := value.(float64)
+	if !valueFloatOk {
+		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
+		err := fmt.Errorf("Error converting value to float64 from NATS %v message", msg.Subject)
+		return nil, nil, err
+	}
+
+	var parameters Parameters
+
+	parameters.ContractID = contract.ContractID
+	parameters.Data = &data
+	parameters.AccountID = accountID
+	parameters.WalletID = walletID
+	parameters.Path = &hdDerivationPath
+	parameters.Value = &valueFloat
+	parameters.PublishedAt = &publishedAt
+
+	// TODO note the contract deps on this tx create
 	tx := &Transaction{
 		ApplicationID:  contract.ApplicationID,
 		OrganizationID: contract.OrganizationID,
@@ -291,49 +380,10 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:    &publishedAtTime,
 		Ref:            &ref,
+		Parameters:     &parameters,
 	}
 
-	tx.setParams(txParams)
-
-	key := fmt.Sprintf("nchain.tx.create.%s", *tx.Ref)
-
-	// checks if the message is currently in flight (being procesed)
-	err = processMessageStatus(key)
-	if err != nil {
-		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
-		return
-	}
-
-	common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
-	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
-	if tx.Create(db) {
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
-		// update the contract with the tx id (unqiue to contract flow)
-		contract.TransactionID = &tx.ID
-		db.Save(&contract)
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
-		err = msg.Ack()
-		if err != nil {
-			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
-		}
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *tx.Ref)
-	} else {
-		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
-		for _, err := range tx.Errors {
-			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
-		}
-		// got rid of the subsidize code that's managed by bookie now
-
-		// remove the in-flight status to this can be replayed
-		lockErr := setWithLock(key, msgRetryRequired)
-		if lockErr != nil {
-			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
-			// TODO what to do if this fails????
-		}
-		//TODO this is not showing the errors, instead showing the tx ref
-		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", errmsg, *tx.Ref)
-		natsutil.AttemptNack(msg, txCreateMsgTimeout)
-	}
+	return tx, contract, nil
 }
 
 // subsidize the given beneficiary with a drip equal to the given val
