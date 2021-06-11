@@ -150,7 +150,6 @@ func (t *Transaction) getNonce(db *gorm.DB, wg *sync.WaitGroup) (*uint64, *Trans
 
 	defer wg.Done()
 
-	// TODO handle this - likely caused by vault auth failure
 	err := t.getSigner(db)
 	if err != nil {
 		return nil, nil, err
@@ -161,6 +160,8 @@ func (t *Transaction) getNonce(db *gorm.DB, wg *sync.WaitGroup) (*uint64, *Trans
 	}
 
 	// then use the signer to get the transaction address pointer
+	// ethsigner address sometimes fails (vault auth?)
+	// TODO handle this failure
 	txAddress := common.StringOrNil(t.EthSigner.Address())
 	t.Nonce, err = t.getNextNonce()
 	if err != nil {
