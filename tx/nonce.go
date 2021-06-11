@@ -307,6 +307,11 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 
 func AlreadyKnown(err error) bool {
 
+	// infura kovan error
+	if strings.Contains(err.Error(), "same hash was already imported") {
+		return true
+	}
+
 	// infura ropsten error
 	if strings.Contains(err.Error(), "already known") {
 		return true
