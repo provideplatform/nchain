@@ -125,27 +125,6 @@ func (t *Transaction) getSigner(db *gorm.DB) error {
 	return nil
 }
 
-func (t *Transaction) HasNonce() bool {
-
-	// check if the transaction already has a nonce provided
-	params := t.ParseParams()
-	var nonce *uint64
-	if nonceFloat, nonceOk := params["nonce"].(float64); nonceOk {
-		nonceUint := uint64(nonceFloat)
-		nonce = &nonceUint
-	}
-
-	// if the tx has a nonce provided, use it
-	if nonce != nil {
-		t.Nonce = nonce
-		common.Log.Debugf("Transaction ref %s has nonce %v provided.", *t.Ref, *nonce)
-		return true
-	}
-	// otherwise, we have no nonce provided
-	return false
-
-}
-
 func (t *Transaction) getNonce(db *gorm.DB, wg *sync.WaitGroup) (*uint64, *TransactionSigner, error) {
 
 	defer wg.Done()
@@ -155,7 +134,8 @@ func (t *Transaction) getNonce(db *gorm.DB, wg *sync.WaitGroup) (*uint64, *Trans
 		return nil, nil, err
 	}
 
-	if t.HasNonce() {
+	// if we have a nonce provided, we're done here
+	if t.Nonce != nil {
 		return t.Nonce, t.EthSigner, nil
 	}
 

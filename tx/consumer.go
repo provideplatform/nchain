@@ -357,6 +357,17 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		return nil, nil, err
 	}
 
+	// handle any provided nonce
+	var nonceUint *uint64
+	txNonce, txNonceOk := txParams["nonce"].(float64)
+	if !txNonceOk {
+		nonceUint = nil
+	}
+	if txNonceOk {
+		nonce := uint64(txNonce)
+		nonceUint = &nonce
+	}
+
 	var parameters Parameters
 
 	parameters.ContractID = contract.ContractID
@@ -381,6 +392,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		PublishedAt:    &publishedAtTime,
 		Ref:            &ref,
 		Parameters:     &parameters,
+		Nonce:          nonceUint,
 	}
 
 	return tx, contract, nil
