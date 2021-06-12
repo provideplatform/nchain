@@ -658,8 +658,8 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 		err = t.BroadcastSignedTransaction(db, signer)
 		if err == nil {
 			common.Log.Debugf("TIMING: key %s broadcast tx successfully with nonce %v", currentBroadcastNonceKey, *t.Nonce)
-			// update the db record with the updated details (currently just nonce)
-			db.Save(&t)
+			// update the db record with the updated details (currently just nonce, but remove any fail desc and update status)
+			t.updateStatus(db, "broadcast", nil)
 			break
 		}
 		if err != nil {
