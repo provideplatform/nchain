@@ -202,6 +202,8 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 	common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
 	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 
+	// check if we have this tx ref in the database
+
 	if tx.Create(db) {
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 
@@ -428,7 +430,72 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		Nonce:          nonceUint,
 	}
 
+	// not quite working yet
+	// err = tx.checkForExistingTx(db)
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
+
 	return tx, contract, nil
+}
+
+func (tx *Transaction) checkForExistingTx(db *gorm.DB) error {
+	var dbTx Transaction
+	var err error
+	db.Where("ref = ?", *tx.Ref).Find(&dbTx)
+	if &dbTx != nil {
+		// we have this tx ref from before
+		// check that the parameters are the same and we don't have an attempt to replay a ref
+		if dbTx.ApplicationID != nil && tx.ApplicationID != nil {
+			if *dbTx.ApplicationID != *tx.ApplicationID {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+
+		if dbTx.OrganizationID != nil && tx.OrganizationID != nil {
+			if *dbTx.OrganizationID != *tx.OrganizationID {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+
+		if dbTx.AccountID != nil && tx.AccountID != nil {
+			if *dbTx.AccountID != *tx.AccountID {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+
+		if dbTx.WalletID != nil && tx.WalletID != nil {
+			if *dbTx.WalletID != *tx.WalletID {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+
+		if dbTx.Path != nil && tx.Path != nil {
+			if *dbTx.Path != *tx.Path {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+
+		if dbTx.Value != nil && tx.Value != nil {
+			if dbTx.Value.value.Cmp(tx.Value.value) != 0 {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+
+		if dbTx.Data != nil && tx.Data != nil {
+			if *dbTx.Data != *tx.Data {
+				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+			}
+		}
+	}
+
+	if err != nil {
+		return err
+	} else {
+		// replace the tx with the one from the db
+		tx = &dbTx
+		return nil
+	}
 }
 
 // subsidize the given beneficiary with a drip equal to the given val
