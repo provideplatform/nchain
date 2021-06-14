@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -20,10 +19,6 @@ const proposedBroadcastNonce = "nchain.tx.nonce"
 const channelKey = "nchain.channel.key"
 
 const RedisNonceTTL = time.Second * 5
-
-// used to ensure the nonces are handled synchronously
-// when pulling from the consumer
-var nonceWG sync.WaitGroup
 
 // TODO tidy this up, too many unused elements
 type BroadcastConfirmation struct {
@@ -90,9 +85,7 @@ func (t *Transaction) getSigner(db *gorm.DB) error {
 	return nil
 }
 
-func (t *Transaction) getNonce(db *gorm.DB, wg *sync.WaitGroup) (*uint64, *TransactionSigner, error) {
-
-	defer wg.Done()
+func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error) {
 
 	err := t.getSigner(db)
 	if err != nil {

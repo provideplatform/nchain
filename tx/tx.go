@@ -779,17 +779,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 		if !db.NewRecord(t) {
 			if rowsAffected > 0 {
 
-				// ok, let's put this inside a waitgroup, so the code waits for it to finish
-				// gives us a bad worst case of getting nonce every time from chain (every account is different)
-				// but will be fast enough otherwise
-				// we'll continue to use redis for the nonces, for the moment, but
-				// as these are written to the db, there's not a lot of persistence required
-
 				common.Log.Debugf("TIMINGNANO: about to get nonce for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 
-				nonceWG.Add(1)
-				nonce, signer, err := t.getNonce(db, &nonceWG)
-				nonceWG.Wait()
+				nonce, signer, err := t.getNonce(db)
 				if err != nil {
 					common.Log.Debugf("error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 					return false
@@ -832,7 +824,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				var prevChanKey *string
 
 				// have we seen this tx before
-				idempotentKey := fmt.Sprintf("nchain.tx.listing.%s:%s:%s", network, address, *t.Ref)
+				idempotentKey := fmt.Sprintf("nchain.tx.listing.%s:%s:%s", network, *address, *t.Ref)
 				if !txRegister.Has(idempotentKey) {
 					common.Log.Debugf("register does not have tx ref %s", *t.Ref)
 					// we haven't seen this tx before
