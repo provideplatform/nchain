@@ -44,7 +44,7 @@ const DefaultJSONRPCRetries = 3
 // Signer interface for signing transactions
 type Signer interface {
 	Address() string
-	Sign(tx *Transaction, nonce *uint64) (signedTx interface{}, hash []byte, err error)
+	Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error)
 	String() string
 }
 
@@ -331,7 +331,7 @@ func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas 
 }
 
 // Sign implements the Signer interface
-func (txs *TransactionSigner) Sign(tx *Transaction, nonce *uint64) (signedTx interface{}, hash []byte, err error) {
+func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error) {
 	if tx == nil {
 		err := errors.New("cannot sign nil transaction payload")
 		common.Log.Warning(err.Error())
@@ -386,31 +386,18 @@ func (txs *TransactionSigner) Sign(tx *Transaction, nonce *uint64) (signedTx int
 		}
 		common.Log.Debugf("XXX: got address %s", *txAddress)
 
-		common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", *nonce, *tx.Ref)
-		err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-			signer, _tx, hash, err = providecrypto.EVMTxFactory(
-				txs.Network.ID.String(),
-				txs.Network.RPCURL(),
-				*txAddress,
-				tx.To,
-				tx.Data,
-				tx.Value.BigInt(),
-				nonce,
-				uint64(gas),
-				gasPrice,
-			)
-			return
-		})
-
-		if err != nil && strings.Contains(err.Error(), "nonce is too low)") {
-			common.Log.Debugf("got nonce too low error for tx ref %s", *tx.Ref)
-			// this error should trigger a reset of the nonce to the last mined nonce
-		}
-
-		if err != nil && strings.Contains(err.Error(), "the same hash was already imported)") {
-			common.Log.Debugf("transaction already imported error for tx ref %s", *tx.Ref)
-			// this error should trigger an increase in the gas to overwrite the previously imported tx?
-		}
+		common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", *tx.Nonce, *tx.Ref)
+		signer, _tx, hash, err = providecrypto.EVMTxFactory(
+			txs.Network.ID.String(),
+			txs.Network.RPCURL(),
+			*txAddress,
+			tx.To,
+			tx.Data,
+			tx.Value.BigInt(),
+			tx.Nonce,
+			uint64(gas),
+			gasPrice,
+		)
 
 		if err != nil {
 			err = fmt.Errorf("failed to create raw tx for address %s; %s", *txAddress, err.Error())
@@ -608,7 +595,7 @@ func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64, signer *Tra
 
 	var hash []byte
 	var err error
-	t.SignedTx, hash, err = signer.Sign(t, nonce)
+	t.SignedTx, hash, err = signer.Sign(t)
 	if err != nil {
 		return err
 	}
@@ -981,6 +968,7 @@ func (t *Transaction) Validate() bool {
 		})
 	}
 
+	// CHECKME signer account and wallet relationship?
 	if t.Signer != nil {
 		if t.AccountID != nil {
 			t.Errors = append(t.Errors, &provide.Error{
