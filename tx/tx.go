@@ -43,7 +43,7 @@ const DefaultJSONRPCRetries = 3
 
 // Signer interface for signing transactions
 type Signer interface {
-	Address() string
+	Address() (*string, error)
 	Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error)
 	String() string
 }
@@ -156,25 +156,24 @@ func (t *Transaction) getAddressIdentifier() *string {
 }
 
 // Address returns the public network address of the underlying Signer
-func (txs *TransactionSigner) Address() string {
-	var address string
+func (txs *TransactionSigner) Address() (*string, error) {
+	var address *string
 	if txs.Account != nil {
-		address = txs.Account.Address
+		address = common.StringOrNil(txs.Account.Address)
 	} else if txs.Wallet != nil {
 
 		// if we have a path provided for the wallet, then we'll validate it and use that to derive the address
 		// if we don't have a path, we'll use the default path when deriving an address
-		txAddress, _, err := txs.GetSignerDetails()
+		var err error
+		address, _, err = txs.GetSignerDetails()
 		if err != nil {
 			// TODO sort this not being squashed
 			common.Log.Warningf("error obtaining address from transactionsigner. Error: %s", err.Error())
-		}
-		if txAddress != nil { // HACK got panic here (nil txAddress) - possibly vault not authorised FIXME
-			address = *txAddress
+			return nil, err
 		}
 	}
 
-	return address
+	return address, nil
 }
 
 // GetSignerDetails gets the address and derivation path used for wallet signing
@@ -648,7 +647,6 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	t.Nonce = nonce
 	t.updateStatus(db, "ready", nil)
 
-	signerAddress := signer.Address()
 	address := t.getAddressIdentifier()
 	network := signer.Network.ID.String()
 	currentBroadcastNonceKey = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, *address, network)
@@ -687,14 +685,22 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			// check for nonce too low and fix
 			if NonceTooLow(err) {
 				common.Log.Debugf("Nonce too low error for tx ref: %s", *t.Ref)
-				// get the last mined nonce
-				t.Nonce, _ = t.getLastMinedNonce(signerAddress)
-				// and re-sign transaction with this nonce
-				err := t.SignRawTransaction(db, t.Nonce, signer)
+				// get the address for the signer
+				signerAddress, err := signer.Address()
 				if err != nil {
 					t.Errors = append(t.Errors, &provide.Error{
 						Message: common.StringOrNil(err.Error()),
 					})
+				} else {
+					// get the last mined nonce
+					t.Nonce, _ = t.getLastMinedNonce(*signerAddress)
+					// and re-sign transaction with this nonce
+					err := t.SignRawTransaction(db, t.Nonce, signer)
+					if err != nil {
+						t.Errors = append(t.Errors, &provide.Error{
+							Message: common.StringOrNil(err.Error()),
+						})
+					}
 				}
 			}
 			// check for already known and fix by updating the gas price

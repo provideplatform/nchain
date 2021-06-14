@@ -79,6 +79,8 @@ func (t *Transaction) getSigner(db *gorm.DB) error {
 		return err
 	}
 
+	// check if we need this ethsigner?
+	// we have a signer, but we'd need to unmarshal it each time most likely
 	t.EthSigner = signer
 	elapsedGeneratingSigner := time.Since(start)
 	common.Log.Debugf("TIMING: Getting signer for tx ref %s took %s", *t.Ref, elapsedGeneratingSigner)
@@ -100,7 +102,15 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 	// then use the signer to get the transaction address pointer
 	// ethsigner address sometimes fails (vault auth?)
 	// TODO handle this failure
-	txAddress := common.StringOrNil(t.EthSigner.Address())
+	txAddress, err := t.EthSigner.Address()
+	if err != nil {
+		common.Log.Debugf("Error getting address for tx ref %s. Error: %s", *t.Ref, err.Error())
+		// we will assign 0 to the nonce to ensure it will trip nonce-too low error (in most cases)
+		zeroNonce := uint64(0)
+		t.Nonce = &zeroNonce
+		return t.Nonce, t.EthSigner, err
+	}
+	//txAddress := common.StringOrNil(t.EthSigner.Address())
 	t.Nonce, err = t.getNextNonce()
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
@@ -143,28 +153,21 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 	var nonce *uint64
 
 	network := t.EthSigner.Network.ID.String()
-	address := t.EthSigner.Address()
+	address, err := t.EthSigner.Address()
+	if err != nil {
+		//TODO check how this is handled
+		return nil, err
+	}
 
-	key := fmt.Sprintf("%s.%s:%s", proposedBroadcastNonce, address, network)
+	key := fmt.Sprintf("%s.%s:%s", proposedBroadcastNonce, *address, network)
 
 	cachedNonce, _ := redisutil.Get(key)
 
 	if cachedNonce == nil {
-		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", address, network, *t.Ref)
-		// get the nonce from the EVM
-		// common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
-		// client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
-		// if err != nil {
-		// 	common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
-		// 	return nil, err
-		// }
+		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", *address, network, *t.Ref)
 		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
 		// get the last mined nonce, we don't want to rely on the tx pool
-		pendingNonce, err := t.getLastMinedNonce(address)
+		pendingNonce, err := t.getLastMinedNonce(*address)
 		if err != nil {
 			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
 			return nil, err

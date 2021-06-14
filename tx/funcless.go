@@ -174,7 +174,14 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 			if abiMethod.IsConstant() {
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				client, err := providecrypto.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
-				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)
+				if err != nil {
+					return nil, err
+				}
+				address, err := signer.Address()
+				if err != nil {
+					return nil, err
+				}
+				msg := tx.asEthereumCallMsg(*address, 0, 0)
 				result, err = client.CallContract(context.TODO(), msg, nil)
 				if err != nil {
 					err = fmt.Errorf("Failed to read constant method %s on contract: %s; %s", method, c.ID, err.Error())

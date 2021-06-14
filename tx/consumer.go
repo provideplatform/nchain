@@ -714,7 +714,20 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 		return
 	}
 
-	err = tx.fetchReceipt(db, signer.Network, signer.Address())
+	address, err := signer.Address()
+	if err != nil {
+		// let's try processing this one again
+		common.Log.Debugf(fmt.Sprintf("Failed to get account address from signer. Error: %s", err.Error()))
+		// remove the in-flight status to this can be replayed
+		lockErr := setWithLock(*key, msgRetryRequired)
+		if lockErr != nil {
+			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, err.Error())
+			// TODO what to do if this fails????
+		}
+		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+	}
+
+	err = tx.fetchReceipt(db, signer.Network, *address)
 	if err != nil {
 		// TODO got a panic here on *tx.hash (removed temporarily)
 		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt. Error: %s", err.Error()))
