@@ -49,6 +49,10 @@ const msgRetryRequired = "RETRY_REQUIRED"
 var waitGroup sync.WaitGroup
 var natsWG sync.WaitGroup
 
+var txChannels common.ValueDictionary //(interface is channelPair struct only)
+var txRegister common.ValueDictionary
+var txSequencer common.ValueDictionary
+
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Tx package consumer configured to skip NATS streaming subscription setup")
@@ -158,7 +162,7 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	natsWG.Add(1)
 	start := time.Now()
 	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
-	processTxCreateMsg(msg, &natsWG)
+	go processTxCreateMsg(msg, &natsWG)
 	elapsedTime := time.Since(start)
 	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
 	common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
@@ -662,6 +666,7 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 		tx.NetworkLatency = &networkLatency
 	}
 
+	// CHECKME when this is triggered, it populates the stats correctly
 	tx.updateStatus(db, "success", nil)
 	result := db.Save(&tx)
 	errors := result.GetErrors()
