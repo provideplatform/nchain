@@ -123,12 +123,12 @@ type TransactionSigner struct {
 var m sync.Mutex
 var nonceMutex sync.Mutex
 
-// getAccountIdentifier converts the tx account/wallet+path
+// getAddressIdentifier converts the tx account/wallet+path
 // into a unique identifier for that account
 // rather than relying on having the signer succeed to get
 // the account address before batching up txs
 // returns hex encoded value
-func (t *Transaction) getAccountIdentifier() *string {
+func (t *Transaction) getAddressIdentifier() *string {
 
 	if t.AccountID != nil {
 		// hash the account id and return
@@ -662,7 +662,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	t.updateStatus(db, "ready", nil)
 
 	signerAddress := signer.Address()
-	address := t.getAccountIdentifier()
+	address := t.getAddressIdentifier()
 	network := signer.Network.ID.String()
 	currentBroadcastNonceKey = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, *address, network)
 
