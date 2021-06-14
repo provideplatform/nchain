@@ -825,7 +825,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// if we don't we'll assign it to 0 and fix when we're trying to broadcast
 
 				//address := signer.Address()
-				address := t.getAccountIdentifier()
+				address := t.getAddressIdentifier()
 				network := signer.Network.ID.String()
 
 				var inChan chan BroadcastConfirmation
