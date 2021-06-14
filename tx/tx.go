@@ -704,6 +704,8 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 				}
 			}
 			// check for already known and fix by updating the gas price
+			// TODO gas price not part of tx hash?
+			// TODO cap the gas price
 			if AlreadyKnown(err) {
 				common.Log.Debugf("Already known error for tx ref: %s", *t.Ref)
 				updatedGasPrice := float64(0)
