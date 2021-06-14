@@ -346,6 +346,24 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		return nil, nil, err
 	}
 
+	// ensure we only have EITHER an accountID OR a walletID
+	if accountID != nil {
+		if walletID != nil {
+			common.Log.Warningf("Both account_id and wallet_id present in NATS %v message", msg.Subject)
+			err := fmt.Errorf("Error in tx. Both accountID and walletID present in NATS %v message", msg.Subject)
+			return nil, nil, err
+		}
+	}
+
+	// ensure we only have EITHER an accountID OR a walletID
+	if walletID != nil {
+		if accountID != nil {
+			common.Log.Warningf("Both account_id and wallet_id present in NATS %v message", msg.Subject)
+			err := fmt.Errorf("Error in tx. Both accountID and walletID present in NATS %v message", msg.Subject)
+			return nil, nil, err
+		}
+	}
+
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
 		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())

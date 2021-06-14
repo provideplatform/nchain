@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
@@ -121,6 +122,38 @@ type TransactionSigner struct {
 
 var m sync.Mutex
 var nonceMutex sync.Mutex
+
+// getAccountIdentifier converts the tx account/wallet+path
+// into a unique identifier for that account
+// rather than relying on having the signer succeed to get
+// the account address before batching up txs
+// returns hex encoded value
+func (t *Transaction) getAccountIdentifier() *string {
+
+	if t.AccountID != nil {
+		// hash the account id and return
+		accountid := *t.AccountID
+		identifier := crypto.Keccak256Hash(accountid.Bytes())
+		retval := common.StringOrNil(identifier.Hex())
+		return retval
+	}
+
+	if t.WalletID != nil {
+		walletid := *t.WalletID
+		identifierStr := walletid.String()
+
+		// get the optional path
+		path := t.Parameters.Path
+		if path != nil {
+			identifierStr = fmt.Sprintf("%s:%s", identifierStr, *path)
+		}
+		// hash up the walletid + optional path and return
+		identifier := crypto.Keccak256Hash([]byte(identifierStr))
+		retval := common.StringOrNil(identifier.Hex())
+		return retval
+	}
+	return nil
+}
 
 // Address returns the public network address of the underlying Signer
 func (txs *TransactionSigner) Address() string {
@@ -628,9 +661,10 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	t.Nonce = nonce
 	t.updateStatus(db, "ready", nil)
 
-	address := signer.Address()
+	signerAddress := signer.Address()
+	address := t.getAccountIdentifier()
 	network := signer.Network.ID.String()
-	currentBroadcastNonceKey = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, address, network)
+	currentBroadcastNonceKey = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, *address, network)
 
 	var goForBroadcast BroadcastConfirmation
 
@@ -667,7 +701,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			if NonceTooLow(err) {
 				common.Log.Debugf("Nonce too low error for tx ref: %s", *t.Ref)
 				// get the last mined nonce
-				t.Nonce, _ = t.getLastMinedNonce(address)
+				t.Nonce, _ = t.getLastMinedNonce(signerAddress)
 				// and re-sign transaction with this nonce
 				err := t.SignRawTransaction(db, t.Nonce, signer)
 				if err != nil {
@@ -704,15 +738,15 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 
 	// now broadcast the goahead for the next transaction
 	nextNonce := *t.Nonce + 1
-	goForBroadcast = BroadcastConfirmation{&address, &network, &nextNonce, true, true}
+	goForBroadcast = BroadcastConfirmation{address, &network, &nextNonce, true, true}
 	setCurrentValue(currentBroadcastNonceKey, t.Nonce)
 
-	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", currentBroadcastNonceKey, address, nextNonce)
+	common.Log.Debugf("TIMING: OUT key %s giving broadcast go-ahead for address %s nonce %v", currentBroadcastNonceKey, *address, nextNonce)
 
 	// below blocks until it is read
 	channels.(channelPair).outgoing <- goForBroadcast
 
-	common.Log.Debugf("TIMING: OUT key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", goForBroadcast, currentBroadcastNonceKey, address, nextNonce, channels.(channelPair).outgoing)
+	common.Log.Debugf("TIMING: OUT key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", goForBroadcast, currentBroadcastNonceKey, *address, nextNonce, channels.(channelPair).outgoing)
 
 	// close the outgoing channel once it is read
 	// TODO this should also timeout and clear itself up from the dictionary
@@ -782,7 +816,16 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 				// and the broadcast of the second enables the third etc...
 
 				// set up the channels for the network:address:sequence key
-				address := signer.Address()
+
+				// we're not going to use signer.address as the unique identifier
+				// as this puts a dep on getting an rpc return before the tx has
+				// even been created
+				// instead we're going to use hash(account_id) or hash (wallet_id + opt(path))
+				// then if we get a nonce, awesome
+				// if we don't we'll assign it to 0 and fix when we're trying to broadcast
+
+				//address := signer.Address()
+				address := t.getAccountIdentifier()
 				network := signer.Network.ID.String()
 
 				var inChan chan BroadcastConfirmation
@@ -810,7 +853,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 					txRegister.Set(idempotentKey, true)
 
 					// have we processed a previous tx for this network address?
-					sequenceKey := fmt.Sprintf("nchain.tx.sequence.%s:%s", network, address)
+					sequenceKey := fmt.Sprintf("nchain.tx.sequence.%s:%s", network, *address)
 					if txSequencer.Has(sequenceKey) {
 						//if we have, get its counter
 						counter := txSequencer.Get(sequenceKey).(uint64)
@@ -819,8 +862,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 						txSequencer.Set(sequenceKey, atomic.AddUint64(&counter, 1))
 
 						// create the channel keys
-						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter))
-						prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, counter-1))
+						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, counter))
+						prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, counter-1))
 
 					} else {
 						common.Log.Debugf("sequencer does not have network address for tx ref %s", *t.Ref)
@@ -830,7 +873,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 						txSequencer.Set(sequenceKey, *zero)
 
 						// create the channel keys for this first tx for this network address
-						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, address, *zero))
+						chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *zero))
 						prevChanKey = nil
 					}
 
@@ -868,8 +911,8 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 
 				// if this is the first tx for this network address, give it the broadcast go straight away
 				if prevChanKey == nil {
-					goForBroadcast := BroadcastConfirmation{&address, &network, nonce, false, false}
-					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", address, *nonce)
+					goForBroadcast := BroadcastConfirmation{address, &network, nonce, false, false}
+					common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", *address, *nonce)
 					txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
 					// once it's received, close the channel
 					close(txChannels.Get(*chanKey).(channelPair).incoming)
