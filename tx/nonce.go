@@ -99,9 +99,11 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 		return t.Nonce, t.EthSigner, nil
 	}
 
-	// then use the signer to get the transaction address pointer
+	// TODO check the DB for the highest nonce for this account_id/wallet_id/hd_derivation_path combo
+	// TODO that isn't failed (maybe - it might just be an in process failure?)
+	// TODO although this is unlikely to be an issue as this will only be broadcast in strict sequence
+
 	// ethsigner address sometimes fails (vault auth?)
-	// TODO handle this failure
 	txAddress, err := t.EthSigner.Address()
 	if err != nil {
 		common.Log.Debugf("Error getting address for tx ref %s. Error: %s", *t.Ref, err.Error())
@@ -110,7 +112,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 		t.Nonce = &zeroNonce
 		return t.Nonce, t.EthSigner, err
 	}
-	//txAddress := common.StringOrNil(t.EthSigner.Address())
+
 	t.Nonce, err = t.getNextNonce()
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
@@ -121,23 +123,6 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 	}
 
 	return t.Nonce, t.EthSigner, nil
-}
-
-// getLastMinedNonce gets the last mined nonce for the tx via RPC call
-func (t *Transaction) getLastMinedNonce(address string) (*uint64, error) {
-	common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
-	client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
-	if err != nil {
-		return nil, err
-	}
-	common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
-	// get the last mined nonce, we don't want to rely on the tx pool
-	pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
-	if err != nil {
-		common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
-		return nil, err
-	}
-	return &pendingNonce, nil
 }
 
 // TODO currently using redis
@@ -212,6 +197,23 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 	return nonce, nil
 }
 
+// getLastMinedNonce gets the last mined nonce for the tx via RPC call
+func (t *Transaction) getLastMinedNonce(address string) (*uint64, error) {
+	common.Log.Debugf("XXX: dialling evm for tx ref %s", *t.Ref)
+	client, err := providecrypto.EVMDialJsonRpc(t.EthSigner.Network.ID.String(), t.EthSigner.Network.RPCURL())
+	if err != nil {
+		return nil, err
+	}
+	common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
+	// get the last mined nonce, we don't want to rely on the tx pool
+	pendingNonce, err := client.NonceAt(context.TODO(), providecrypto.HexToAddress(address), nil)
+	if err != nil {
+		common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
+		return nil, err
+	}
+	return &pendingNonce, nil
+}
+
 func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 
 	common.Log.Debugf("XXX: Incrementing redis nonce for tx ref %s", txRef)
@@ -264,6 +266,16 @@ func incrementNonce(key, txRef string, txNonce uint64) (*uint64, error) {
 	}
 
 	return nil, nil
+}
+
+func UnderPriced(err error) bool {
+
+	// infura ropsten error
+	if strings.Contains(err.Error(), "transaction underpriced") {
+		return true
+	}
+
+	return false
 }
 
 func AlreadyKnown(err error) bool {

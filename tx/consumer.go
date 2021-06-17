@@ -49,9 +49,9 @@ const msgRetryRequired = "RETRY_REQUIRED"
 var waitGroup sync.WaitGroup
 var natsWG sync.WaitGroup
 
-var txChannels common.ValueDictionary //(interface is channelPair struct only)
-var txRegister common.ValueDictionary
-var txSequencer common.ValueDictionary
+var txChannels common.ValueDictionary  //(interface is channelPair struct only)
+var txRegister common.ValueDictionary  // stores tx references for idempotent processing
+var txSequencer common.ValueDictionary // stores identifiers for broadcast sequencing
 
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
@@ -165,17 +165,17 @@ func consumeTxCreateMsg(msg *stan.Msg) {
 	go processTxCreateMsg(msg, &natsWG)
 	elapsedTime := time.Since(start)
 	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
-	common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
 	natsWG.Wait()
+	common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
 }
 
 // these need to be processed EXACTLY in order
 // which means minimising the processing done before
 // it joins an ordered processing queue
-// TODO name this properly
 func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 
 	defer wg.Done()
+
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
 	db := dbconf.DatabaseConnection()
@@ -188,16 +188,18 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 		return
 	}
 
-	// ******************************************************************
-	// TODO remove this once the idempotency is in
-	key := fmt.Sprintf("nchain.tx.create.%s", *tx.Ref)
-	// checks if the message is currently in flight (being procesed)
-	err = processMessageStatus(key)
-	if err != nil {
-		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
-		return
-	}
-	// ******************************************************************
+	// // ******************************************************************
+	// // TODO remove this once the idempotency is in
+	// key := fmt.Sprintf("nchain.tx.create.%s", *tx.Ref)
+	// // checks if the message is currently in flight (being procesed)
+	// err = processMessageStatus(key)
+	// if err != nil {
+	// 	common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
+	// 	// HACK WHILE TESTING ONLY
+	// 	// HACK THIS REMOVES ANY IN FLIGHT CALCS!!!
+	// 	//return
+	// }
+	// // ******************************************************************
 
 	common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
 	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
@@ -213,30 +215,24 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 
 		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
 
-		err = msg.Ack()
-		if err != nil {
-			common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *tx.Ref)
-		}
-
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *tx.Ref)
 	} else {
+
 		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
-		// ******************************************************************
-		// remove the in-flight status to this can be replayed
-		// TODO get rid of this when idempotency in
-		lockErr := setWithLock(key, msgRetryRequired)
-		if lockErr != nil {
-			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
-			// TODO what to do if this fails????
-		}
-		// ******************************************************************
+		// // ******************************************************************
+		// // remove the in-flight status to this can be replayed
+		// // TODO get rid of this when idempotency in
+		// lockErr := setWithLock(key, msgRetryRequired)
+		// if lockErr != nil {
+		// 	common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
+		// 	// TODO what to do if this fails????
+		// }
+		// // ******************************************************************
 
-		//TODO this is not showing the errors, instead showing the tx ref
-		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", errmsg, *tx.Ref)
+		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 }
@@ -428,20 +424,23 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		Ref:            &ref,
 		Parameters:     &parameters,
 		Nonce:          nonceUint,
+		Message:        msg,
 	}
 
-	// not quite working yet
-	// err = tx.checkForExistingTx(db)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
+	// replaces this tx with the db tx (if it exists and matches)
+	err = tx.replaceWithDatabaseTxIfExists(db)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return tx, contract, nil
 }
 
-func (tx *Transaction) checkForExistingTx(db *gorm.DB) error {
+func (tx *Transaction) replaceWithDatabaseTxIfExists(db *gorm.DB) error {
 	var dbTx Transaction
 	var err error
+	msg := tx.Message
+
 	db.Where("ref = ?", *tx.Ref).Find(&dbTx)
 	if &dbTx != nil {
 		// we have this tx ref from before
@@ -487,15 +486,21 @@ func (tx *Transaction) checkForExistingTx(db *gorm.DB) error {
 				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
 			}
 		}
-	}
 
-	if err != nil {
-		return err
-	} else {
-		// replace the tx with the one from the db
-		tx = &dbTx
-		return nil
+		if err != nil {
+			return err
+		} else {
+			ref := *tx.Ref
+			common.Log.Debugf("Replacing tx ref %s with tx in database", ref)
+			// replace the tx with the one from the db
+			db.Where("ref = ?", ref).Find(&tx)
+			// update the nats message (HACK)
+			tx.Message = msg
+			// TODO check if anything else is needed other than the ID
+			return nil
+		}
 	}
+	return nil
 }
 
 // subsidize the given beneficiary with a drip equal to the given val
@@ -792,12 +797,13 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 			// TODO what to do if this fails????
 		}
 		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
+		return
 	}
 
 	err = tx.fetchReceipt(db, signer.Network, *address)
 	if err != nil {
 		// TODO got a panic here on *tx.hash (removed temporarily)
-		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt. Error: %s", err.Error()))
+		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt for tx ref %s. Error: %s", *tx.Ref, err.Error()))
 		// remove the in-flight status to this can be replayed
 		lockErr := setWithLock(*key, msgRetryRequired)
 		if lockErr != nil {
@@ -806,7 +812,7 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 		}
 		natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 	} else {
-		common.Log.Debugf("Fetched tx receipt for hash: %s", *tx.Hash)
+		common.Log.Debugf("Fetched tx receipt for tx ref %s, hash: %s", *tx.Ref, *tx.Hash)
 
 		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
 		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
@@ -877,6 +883,9 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
+	common.Log.Debugf("XXX: Starting processTxReceipt for tx ref: %s", *tx.Ref)
+	// TODO occasionally throws panic on startup
+	// caused by vault not being available, so the signer.address is not populated (:803-ish)
 	// process the receipts asynchronously
 	go processTxReceipt(msg, tx, key, db)
 }

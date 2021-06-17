@@ -235,10 +235,13 @@ func createContractHandler(c *gin.Context) {
 	} else {
 		refUUID, err := uuid.NewV4()
 		if err != nil {
-			common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+			err := fmt.Errorf("Failed to generate ref id; %s", err.Error())
+			provide.RenderError(err.Error(), 400, c)
+			return
 		}
 		ref = refUUID.String()
 	}
+
 	contract.Ref = &ref
 
 	if contract.Create() {

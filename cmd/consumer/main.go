@@ -59,6 +59,7 @@ func main() {
 		case sig := <-sigs:
 			common.Log.Infof("Received signal: %s", sig)
 			common.Log.Warningf("NATS streaming connection subscriptions are not yet being drained...")
+			common.Log.Debugf("received signal")
 			shutdown()
 		case <-shutdownCtx.Done():
 			close(sigs)
