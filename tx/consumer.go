@@ -222,16 +222,6 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
-		// // ******************************************************************
-		// // remove the in-flight status to this can be replayed
-		// // TODO get rid of this when idempotency in
-		// lockErr := setWithLock(key, msgRetryRequired)
-		// if lockErr != nil {
-		// 	common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
-		// 	// TODO what to do if this fails????
-		// }
-		// // ******************************************************************
-
 		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
