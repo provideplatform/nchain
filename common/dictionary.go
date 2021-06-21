@@ -34,3 +34,14 @@ func (d *ValueDictionary) Has(k string) bool {
 	_, ok := d.value[k]
 	return ok
 }
+
+// Delete removes a value from the dictionary
+func (d *ValueDictionary) Delete(k string) bool {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	_, ok := d.value[k]
+	if ok {
+		delete(d.value, k)
+	}
+	return ok
+}

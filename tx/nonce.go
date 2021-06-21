@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	dbconf "github.com/kthomas/go-db-config"
 	"github.com/kthomas/go-redisutil"
 	"github.com/provideapp/nchain/common"
 	provide "github.com/provideservices/provide-go/api"
@@ -136,7 +137,7 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
 
 	var nonce *uint64
-
+	var pendingNonce *uint64
 	network := t.EthSigner.Network.ID.String()
 	address, err := t.EthSigner.Address()
 	if err != nil {
@@ -151,11 +152,38 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 	if cachedNonce == nil {
 		common.Log.Debugf("XXX: No nonce found on redis for address: %s on network %s, tx ref: %s", *address, network, *t.Ref)
 		common.Log.Debugf("XXX: Getting nonce from chain for tx ref %s", *t.Ref)
-		// get the last mined nonce, we don't want to rely on the tx pool
-		pendingNonce, err := t.getLastMinedNonce(*address)
-		if err != nil {
-			common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
-			return nil, err
+		// get the highest db nonce
+		accountID := t.AccountID
+		walletID := t.WalletID
+		path := t.Parameters.Path
+
+		if accountID != nil || walletID != nil {
+			if accountID != nil {
+				db := dbconf.DatabaseConnection()
+				db.Raw("SELECT MAX(nonce) from Transactions WHERE account_id=?", *accountID).Pluck("nonce", pendingNonce)
+				common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
+			}
+			if walletID != nil {
+				db := dbconf.DatabaseConnection()
+				if path != nil {
+					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND hd_derivation_path=?", *walletID, *path).Pluck("nonce", pendingNonce)
+				} else {
+					// HACK = check what actually happens when a path is not specified...
+					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=?", *walletID).Pluck("nonce", pendingNonce)
+				}
+			}
+		}
+		// if we don't have any prior txs in the db, get the pending nonce from the chain
+		if pendingNonce == nil {
+			common.Log.Debugf("PENDING hit for tx ref %s", *t.Ref)
+			// get the last mined nonce, we don't want to rely on the tx pool
+			pendingNonce, err = t.getLastMinedNonce(*address)
+			if err != nil {
+				common.Log.Debugf("XXX: Error getting pending nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
+				return nil, err
+			}
+		} else {
+			common.Log.Debugf("NONCE: found max db nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
 		}
 
 		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *t.Ref, *pendingNonce)
