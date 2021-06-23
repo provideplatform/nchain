@@ -160,22 +160,22 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 		if accountID != nil || walletID != nil {
 			if accountID != nil {
 				db := dbconf.DatabaseConnection()
-				db.Raw("SELECT MAX(nonce) from Transactions WHERE account_id=?", *accountID).Pluck("nonce", pendingNonce)
+				db.Raw("SELECT MAX(nonce) from Transactions WHERE account_id=? AND status in ('broadcast','success')", *accountID).Pluck("nonce", pendingNonce)
 				common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
 			}
 			if walletID != nil {
 				db := dbconf.DatabaseConnection()
 				if path != nil {
-					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND hd_derivation_path=?", *walletID, *path).Pluck("nonce", pendingNonce)
+					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success')", *walletID, *path).Pluck("nonce", pendingNonce)
 				} else {
 					// HACK = check what actually happens when a path is not specified...
-					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=?", *walletID).Pluck("nonce", pendingNonce)
+					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND status in ('broadcast','success')", *walletID).Pluck("nonce", pendingNonce)
 				}
 			}
 		}
 		// if we don't have any prior txs in the db, get the pending nonce from the chain
 		if pendingNonce == nil {
-			common.Log.Debugf("PENDING hit for tx ref %s", *t.Ref)
+			common.Log.Debugf("PENDING MISS for tx ref %s", *t.Ref)
 			// get the last mined nonce, we don't want to rely on the tx pool
 			pendingNonce, err = t.getLastMinedNonce(*address)
 			if err != nil {
