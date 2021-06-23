@@ -31,7 +31,7 @@ const txMsgTimeout = int64(txAckWait * 5)
 const natsTxCreateSubject = "nchain.tx.create"
 const natsTxCreateMaxInFlight = 2048
 const txCreateAckWait = time.Second * 60
-const txCreateMsgTimeout = int64(txCreateAckWait * 15)
+const txCreateMsgTimeout = int64(txCreateAckWait * 5)
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
@@ -159,22 +159,26 @@ func processMessageStatus(key string) error {
 }
 
 func consumeTxCreateMsg(msg *stan.Msg) {
-	natsWG.Add(1)
 	start := time.Now()
-	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
-	go processTxCreateMsg(msg, &natsWG)
+	//common.Log.Debugf("TIMINGNANO: about to process nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
+	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v", msg.Sequence)
+	processTxCreateMsg(msg)
 	elapsedTime := time.Since(start)
 	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
-	natsWG.Wait()
-	common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
+	//common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
+
+	// TODO
+	// push these onto a buffered channel (X txs)
+	// get the tx into the database (or pull if reprocessing)
+	// get it signed and ready to broadcast (blocking)
+	// give the next msg go-ahead to be processed
+
 }
 
 // these need to be processed EXACTLY in order
 // which means minimising the processing done before
 // it joins an ordered processing queue
-func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
-
-	defer wg.Done()
+func processTxCreateMsg(msg *stan.Msg) {
 
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
@@ -187,8 +191,18 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 		natsutil.Nack(msg)
 		return
 	}
+	if tx == nil {
+		common.Log.Debugf("ACK: Acking previously processed NATS msg seq: %v", msg.Sequence)
+		err := msg.Ack()
+		if err != nil {
+			common.Log.Debugf("ACK: Error acking previously processed NATS msg seq: %v. Error: %s", msg.Sequence, err.Error())
+			//common.Log.Debugf("ACK: Error acking tx ref %s. Error: %s", *tx.Ref, err.Error())
+			natsutil.AttemptNack(msg, txCreateMsgTimeout)
+		}
+		return
+	}
 
-	common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
+	//common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
 	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 
 	// check if we have this tx ref in the database
@@ -200,7 +214,7 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
 
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
+		//common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
 
 	} else {
 
@@ -212,6 +226,10 @@ func processTxCreateMsg(msg *stan.Msg, wg *sync.WaitGroup) {
 		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
+
+	// HACK
+	natsutil.AttemptNack(msg, txCreateMsgTimeout)
+
 }
 
 // processNATSTxCreateMsg processes a NATS msg into a Transaction object
@@ -228,7 +246,6 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		return nil, nil, err
 	}
 
-	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v", msg.Sequence)
 	contractID, contractIDOk := params["contract_id"]
 	data, dataOk := params["data"].(string)
 	accountIDStr, accountIDStrOk := params["account_id"].(string)
@@ -264,7 +281,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		ref = reference.(uuid.UUID).String()
 	}
 
-	common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v. Tx Ref: %s", msg.Sequence, ref)
+	//common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v. Tx Ref: %s", msg.Sequence, ref)
 
 	// TODO flag around this as it's only for the contract create message
 	if !contractIDOk {
@@ -386,8 +403,10 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	parameters.PublishedAt = &publishedAt
 	parameters.GasPrice = gasPrice
 
+	var tx Transaction
+
 	// TODO note the contract deps on this tx create
-	tx := &Transaction{
+	tx = Transaction{
 		ApplicationID:  contract.ApplicationID,
 		OrganizationID: contract.OrganizationID,
 		Data:           common.StringOrNil(data),
@@ -405,29 +424,41 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	}
 
 	// replaces this tx with the db tx (if it exists and matches)
-	err = tx.replaceWithDatabaseTxIfExists(db)
+	replacementTx, err := tx.replaceWithDatabaseTxIfExists(db, ref)
 	if err != nil {
 		common.Log.Debugf("Error retrieving tx ref %s from database", *tx.Ref)
 		return nil, nil, err
 	}
 
-	if tx.Status != nil {
-		if *tx.Status == "success" {
-			common.Log.Debugf("Acking previously processed tx ref %s", *tx.Ref)
-			msg.Ack()
-		}
-	} //HACK reprocess this properly
+	//common.Log.Debugf("XXX: Finished processing NATS create message. tx ref %s", *tx.Ref)
 
-	return tx, contract, nil
+	if replacementTx != nil {
+		common.Log.Debugf("Found tx ref %s in db", *tx.Ref)
+		// HACK
+		status := replacementTx.Status
+		if status != nil {
+			if *status == "success" {
+				return nil, contract, nil
+			}
+		}
+		tx.ID = replacementTx.ID
+		tx.PublishedAt = replacementTx.PublishedAt
+		tx.Nonce = replacementTx.Nonce
+		tx.Status = replacementTx.Status
+		return &tx, contract, nil
+	} else {
+		common.Log.Debugf("Did not find tx ref %s in db", *tx.Ref)
+		return &tx, contract, nil
+	}
 }
 
-func (tx *Transaction) replaceWithDatabaseTxIfExists(db *gorm.DB) error {
+func (tx *Transaction) replaceWithDatabaseTxIfExists(db *gorm.DB, ref string) (*Transaction, error) {
 	var dbTx Transaction
 	var err error
 	msg := tx.Message
 
-	db.Where("ref = ?", *tx.Ref).Find(&dbTx)
-	if &dbTx != nil {
+	db.Where("ref = ?", ref).Find(&dbTx)
+	if dbTx.ID != uuid.Nil {
 		// we have this tx ref from before
 		// check that the parameters are the same and we don't have an attempt to replay a ref
 		if dbTx.ApplicationID != nil && tx.ApplicationID != nil {
@@ -473,19 +504,15 @@ func (tx *Transaction) replaceWithDatabaseTxIfExists(db *gorm.DB) error {
 		}
 
 		if err != nil {
-			return err
+			return nil, err
 		} else {
-			ref := *tx.Ref
-			common.Log.Debugf("Replacing tx ref %s with tx in database", ref)
 			// replace the tx with the one from the db
-			db.Where("ref = ?", ref).Find(&tx)
-			// update the nats message (HACK)
-			tx.Message = msg
+			dbTx.Message = msg
 			// TODO check if anything else is needed other than the ID
-			return nil
+			return &dbTx, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // subsidize the given beneficiary with a drip equal to the given val
@@ -633,12 +660,12 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 
 	common.Log.Debugf("XXX: ConsumeTxExecMsg, about to create tx with ref: %s", *tx.Ref)
 	if tx.Create(db) {
-		common.Log.Debugf("XXX: ConsumeTxExecMsg, created tx with ref: %s", *tx.Ref)
+		common.Log.Debugf("ACK: ConsumeTxExecMsg, about to ack tx with ref: %s", *tx.Ref)
 		err = msg.Ack()
 		if err != nil {
-			common.Log.Debugf("XXX: ConsumeTxExecMsg, error acking tx ref: %s", *tx.Ref)
+			common.Log.Debugf("ACK: ConsumeTxExecMsg, error acking tx ref: %s. Error: %s", *tx.Ref, err.Error())
 		}
-		common.Log.Debugf("XXX: ConsumeTxExecMsg, msg acked tx ref: %s", *tx.Ref)
+		common.Log.Debugf("ACK: ConsumeTxExecMsg, msg acked tx ref: %s", *tx.Ref)
 	} else {
 		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
 		for _, err := range tx.Errors {

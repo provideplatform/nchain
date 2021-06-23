@@ -149,9 +149,11 @@ func (t *Transaction) getAddressIdentifier() *string {
 		identifierStr := walletid.String()
 
 		// get the optional path
-		path := t.Parameters.Path
-		if path != nil {
-			identifierStr = fmt.Sprintf("%s:%s", identifierStr, *path)
+		if t.Parameters != nil {
+			path := t.Parameters.Path
+			if path != nil {
+				identifierStr = fmt.Sprintf("%s:%s", identifierStr, *path)
+			}
 		}
 		// hash up the walletid + optional path and return
 		identifier := crypto.Keccak256Hash([]byte(identifierStr))
@@ -626,6 +628,7 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 		payload, _ := json.Marshal(map[string]interface{}{
 			"transaction_id": t.ID.String(),
 		})
+		common.Log.Debugf("Setting tx ref %s status to BROADCAST", *t.Ref)
 		t.updateStatus(db, "broadcast", nil)
 		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 		elapsed := time.Since(start)
@@ -683,7 +686,7 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 	// we will need to make sure that it sticks with this
 	// because effectively a reprocess means keeping that nonce
 	// even if it wasn't user-created
-	common.Log.Debugf("TIMINGNANO: about to get nonce for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+	//common.Log.Debugf("TIMINGNANO: about to get nonce for tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 	nonce, signer, err := t.getNonce(db)
 	if err != nil {
 		common.Log.Debugf("error getting nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
@@ -739,15 +742,17 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 		// add the IN and OUT channel pair to this tx dictionary
 		txChannels.Set(*chanKey, chanPair)
 
-		common.Log.Debugf("TIMINGNANO: about to sign and broadcast tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+		//common.Log.Debugf("TIMINGNANO: about to sign and broadcast tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 
 		go t.SignAndReadyForBroadcast(txChannels.Get(*chanKey), signer, db, nonce)
 
 		// if this is the first tx for this network address, or we've previously broadcast it, give it the broadcast go straight away
-		if prevChanKey == nil || t.ReBroadcast == true {
-			goForBroadcast := BroadcastConfirmation{address, &network, nonce, false, false}
-			common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", *address, *nonce)
-			txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
+		if prevChanKey == nil {
+			if !t.ReBroadcast {
+				goForBroadcast := BroadcastConfirmation{address, &network, nonce, false, false}
+				common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", *address, *nonce)
+				txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
+			}
 			// once it's received, close the channel
 			// TODO close channels for this chankey sequence when we get the receipt confirmation
 			// channels are cheap?
@@ -765,60 +770,92 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 
 	err := t.SignRawTransaction(db, nonce, signer)
 	if err != nil {
-		// TODO, sort this out
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
-		common.Log.Debugf("IDEMPOTENT: Error signing raw tx for tx ref %s", *t.Ref)
-		return // TODO safe for moment, but confirm
+		common.Log.Debugf("IDEMPOTENT: Error signing raw tx for tx ref %s. Error: %s", *t.Ref, err.Error())
+	} else {
+		common.Log.Debugf("Raw tx signed for tx ref %s", *t.Ref)
 	}
-	common.Log.Debugf("Raw tx signed for tx ref %s", *t.Ref)
+
 	// save the nonce and status to the database
 	t.Nonce = nonce
-	t.updateStatus(db, "ready", nil)
+	if !t.ReBroadcast {
+		t.updateStatus(db, "ready", nil)
+
+		// // this is important, we can't have a stale status
+		// var currentStatus *string
+		// db.Table("transactions").Select("status").Where("transactions.ref=?", *t.Ref).Pluck("status", currentStatus)
+		// if currentStatus != nil {
+		// 	*t.Status = *currentStatus
+		// 	if *t.Status != "broadcast" && *t.Status != "success" {
+		// 		common.Log.Debugf("Setting tx ref %s status to READY from %s", *t.Ref, *t.Status)
+
+		// 	} else {
+		// 		common.Log.Debugf("Leaving tx ref %s status at %s", *t.Ref, *t.Status)
+		// 	}
+		// }
+	}
 
 	address := t.getAddressIdentifier()
 	network := signer.Network.ID.String()
 	currentBroadcastNonceKey = fmt.Sprintf("%s:%s:%s", currentBroadcastNonce, *address, network)
-
 	var goForBroadcast BroadcastConfirmation
+	if !t.ReBroadcast {
 
-	common.Log.Debugf("TIMING IN: waiting for go ahead for tx ref %s for key %s nonce %v, on channel %+v", *t.Ref, currentBroadcastNonceKey, *nonce, channels.(channelPair).incoming)
-	// BLOCK until channel read
-	goForBroadcast = <-channels.(channelPair).incoming
+		common.Log.Debugf("TIMING IN: waiting for go ahead for tx ref %s for key %s nonce %v, on channel %+v", *t.Ref, currentBroadcastNonceKey, *nonce, channels.(channelPair).incoming)
+		// BLOCK until channel read
+		goForBroadcast = <-channels.(channelPair).incoming
+		common.Log.Debugf("TIMING: received go ahead for tx ref %s on incoming channel %+v of %+v", *t.Ref, channels.(channelPair).incoming, goForBroadcast)
 
-	if goForBroadcast.nonce == nil {
-		common.Log.Debugf("ERRRRRROOOOOOOOOOOR. nil channel nonce for tx ref %s", *t.Ref)
-	}
-	if nonce == nil {
-		common.Log.Debugf("ERRRRRROOOOOOOOOOOR. nil nonce for tx ref %s", *t.Ref)
-	}
-	//check if the nonce specified in the channel is different to the one we're currently using
-	// if it's different, re-sign the tx
-	if *goForBroadcast.nonce != *nonce {
-		common.Log.Debugf("updated nonce for tx ref %s to %v", *t.Ref, *goForBroadcast.nonce)
-		t.Nonce = goForBroadcast.nonce
-		err := t.SignRawTransaction(db, t.Nonce, signer)
-		if err != nil {
-			// TODO, sort this out
-			t.Errors = append(t.Errors, &provide.Error{
-				Message: common.StringOrNil(err.Error()),
-			})
-			common.Log.Debugf("IDEMPOTENT: Error re-signing raw tx for tx ref %s", *t.Ref)
+		if goForBroadcast.nonce == nil {
+			common.Log.Debugf("ERRRRRROOOOOOOOOOOR. nil channel nonce for tx ref %s", *t.Ref)
+			zero := uint64(0)
+			goForBroadcast.nonce = &zero
 		}
-		common.Log.Debugf("Updated nonce to %v for tx ref %s", *t.Nonce, *t.Ref)
-	}
 
-	common.Log.Debugf("TIMING: received go ahead for tx ref %s on incoming channel %+v of %+v", *t.Ref, channels.(channelPair).incoming, goForBroadcast)
+		if t.Nonce == nil {
+			common.Log.Debugf("ERRRRRROOOOOOOOOOOR. nil nonce for tx ref %s", *t.Ref)
+			// set nonce to 0 and attempt to fix in the broadcast
+			zero := uint64(0)
+			t.Nonce = &zero
+		}
+
+		//check if the nonce specified in the channel is different to the one we're currently using
+		// if it's different, re-sign the tx
+		if *goForBroadcast.nonce != *nonce {
+			common.Log.Debugf("updated nonce for tx ref %s to %v", *t.Ref, *goForBroadcast.nonce)
+			t.Nonce = goForBroadcast.nonce
+			err := t.SignRawTransaction(db, t.Nonce, signer)
+			if err != nil {
+				// TODO, sort this out
+				t.Errors = append(t.Errors, &provide.Error{
+					Message: common.StringOrNil(err.Error()),
+				})
+				//common.Log.Debugf("IDEMPOTENT: Error re-signing raw tx for tx ref %s. Error: %s", *t.Ref, err.Error())
+			}
+			common.Log.Debugf("Updated nonce to %v for tx ref %s", *t.Nonce, *t.Ref)
+		}
+	} else {
+		common.Log.Debugf("Rebroadcast of tx ref %s. No go ahead waited on", *t.Ref)
+		// TODO check the tx status so we're not rebroadcasting successfult transactions
+		//  t.Reload()
+		//  if t.Status != nil {
+		// 	if *t.Status == "success" {
+		// 		break
+		// 	}
+		// }
+	}
 
 	// broadcast repeatedly until it succeeds
 	for {
 		err = t.broadcast(db, signer.Network, signer)
 		if err == nil {
-			common.Log.Debugf("TIMING: tx ref %s key %s broadcast tx successfully with nonce %v", *t.Ref, currentBroadcastNonceKey, *t.Nonce)
+			//common.Log.Debugf("TIMING: tx ref %s key %s broadcast tx successfully with nonce %v", *t.Ref, currentBroadcastNonceKey, *t.Nonce)
 			payload, _ := json.Marshal(map[string]interface{}{
 				"transaction_id": t.ID.String(),
 			})
+			common.Log.Debugf("setting tx ref %s status to BROADCAST", *t.Ref)
 			t.updateStatus(db, "broadcast", nil)
 			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 
@@ -829,9 +866,9 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			// if we're reprocessing this
 			// status broadcast
 			// - ignore already known errors
-
+			common.Log.Debugf("Error broadcasting tx ref %s. Error: %s", *t.Ref, err.Error())
 			// check for nonce too low and fix
-			if NonceTooLow(err) {
+			if NonceTooLow(err) && !t.ReBroadcast {
 				common.Log.Debugf("Nonce too low error for tx ref: %s", *t.Ref)
 				// get the address for the signer
 				signerAddress, err := signer.Address()
@@ -854,20 +891,20 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			} //NonceTooLow
 
 			// TODO parameterise and cap the gas price
-			if UnderPriced(err) {
+			if UnderPriced(err) && !t.ReBroadcast {
 				common.Log.Debugf("Under Priced error for tx ref: %s", *t.Ref)
 				updatedGasPrice := float64(0)
 				if t.Parameters.GasPrice != nil {
-					common.Log.Debugf("tx ref %s under priced. gas price: %d", *t.Ref, *t.Parameters.GasPrice)
+					//common.Log.Debugf("tx ref %s under priced. gas price: %d", *t.Ref, *t.Parameters.GasPrice)
 					updatedGasPrice = *t.Parameters.GasPrice + 1000000000 //TODO min/max gas price
-					common.Log.Debugf("tx ref %s under priced. new gas price: %d", *t.Ref, *t.Parameters.GasPrice)
+					//common.Log.Debugf("tx ref %s under priced. new gas price: %d", *t.Ref, *t.Parameters.GasPrice)
 				} else {
-					common.Log.Debugf("tx ref %s under priced. no gas price specified", *t.Ref)
+					//common.Log.Debugf("tx ref %s under priced. no gas price specified", *t.Ref)
 					updatedGasPrice = float64(1000000000) //TODO min/max gas price
 				}
 
 				t.Parameters.GasPrice = &updatedGasPrice
-				common.Log.Debugf("re-signing tx ref %s with gas %v", *t.Ref, *t.Parameters.GasPrice)
+				//common.Log.Debugf("re-signing tx ref %s with gas %v", *t.Ref, *t.Parameters.GasPrice)
 				// and re-sign transaction with this updated gas price
 				err := t.SignRawTransaction(db, t.Nonce, signer)
 				if err != nil {
@@ -879,34 +916,41 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			} //UnderPriced
 
 			// this is ok, we're just refreshing the broadcast to ensure it's in the mempool
+			// TODO this will get extended for the gas pricing increases when it goes in
 			if AlreadyKnown(err) {
 				common.Log.Debugf("Already known error for tx ref: %s", *t.Ref)
 				t.Hash = common.StringOrNil(t.SignedTx.(*types.Transaction).Hash().String())
-				payload, _ := json.Marshal(map[string]interface{}{
-					"transaction_id": t.ID.String(),
-				})
+				// payload, _ := json.Marshal(map[string]interface{}{
+				// 	"transaction_id": t.ID.String(),
+				// })
+				//	common.Log.Debugf("IDEMOPOTENT: hash %s for already known tx ref: %s.", *t.Hash, *t.Ref)
 				t.updateStatus(db, "broadcast", nil)
-				natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-				// ok, let's ask for the receipt again
-				// it should only do this once a minute (hopefully won't break my infura!)
+				if !t.ReBroadcast {
+					// ok, let's ask for the receipt when it's first broadcast
+					// it should only do this once a minute (hopefully won't break my infura!)
+					//natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+				}
 				break
 			} // AlreadyKnown
 
 		} //broadcast error check
 	} //for (broadcast loop)
 
-	// now broadcast the goahead for the next transaction
-	nextNonce := *t.Nonce + 1
-	goForBroadcast = BroadcastConfirmation{address, &network, &nextNonce, true, true}
 	setCurrentValue(currentBroadcastNonceKey, t.Nonce)
 
-	common.Log.Debugf("TIMING: OUT tx ref %s key %s giving broadcast go-ahead for address %s nonce %v", *t.Ref, currentBroadcastNonceKey, *address, nextNonce)
+	if !t.ReBroadcast {
+		// now broadcast the goahead for the next transaction
+		nextNonce := *t.Nonce + 1
+		common.Log.Debugf("TIMING: OUT tx ref %s giving broadcast go-ahead for address %s nonce %v", *t.Ref, *address, nextNonce)
+		goForBroadcast = BroadcastConfirmation{address, &network, &nextNonce, true, true}
 
-	// below blocks until it is read
-	channels.(channelPair).outgoing <- goForBroadcast
+		// below blocks until it is read
+		channels.(channelPair).outgoing <- goForBroadcast
 
-	common.Log.Debugf("TIMING: OUT tx ref %s key %s broadcast go-ahead %+v delivered for address %s nonce %v on channel %+v", *t.Ref, goForBroadcast, currentBroadcastNonceKey, *address, nextNonce, channels.(channelPair).outgoing)
-
+		common.Log.Debugf("TIMING: OUT tx ref %s broadcast go-ahead  delivered for address %s nonce %v on channel %+v", *t.Ref, *address, nextNonce, channels.(channelPair).outgoing)
+	} else {
+		common.Log.Debugf("IDEMPOTENT: rebroadcast tx ref %s. No go-ahead published", *t.Ref)
+	}
 	// close the outgoing channel once it is read
 	// TODO this should also timeout and clear itself up from the dictionary
 	// TODO close these when we get the receipt confirmation
@@ -917,7 +961,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 // Create and persist a new transaction. Side effects include persistence of contract
 // and/or token instances when the tx represents a contract and/or token creation.
 func (t *Transaction) Create(db *gorm.DB) bool {
-	common.Log.Debugf("TIMINGNANO: about to validate tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+	//common.Log.Debugf("TIMINGNANO: about to validate tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 
 	if !t.Validate() {
 		return false
@@ -934,8 +978,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 			t.WalletID = nil
 		}
 
-		common.Log.Debugf("XXX: Create: about to create tx with ref: %v", *t.Ref)
-		common.Log.Debugf("TIMINGNANO: about to db insert tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+		//common.Log.Debugf("XXX: Create: about to create tx with ref: %v", *t.Ref)
 
 		result := db.Create(&t)
 
@@ -974,65 +1017,62 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 func (t *Transaction) ContinueWithBroadcast(idempotentKey string) bool {
 
 	if txRegister.Has(idempotentKey) {
+		common.Log.Debugf("IDEMPOTENT: Register has tx ref %s. Status: %s", *t.Ref, *t.Status)
 		// we have this tx in memory, so we only need to reprocess it potentially
 		// if it's broadcast (unsticking it from mempool)
 		switch *t.Status {
 		case "ready":
-			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that is ready for broadcast", *t.Ref)
-			return true
+			common.Log.Debugf("IDEMPOTENT: NOT reprocessing tx ref %s that is ready for broadcast", *t.Ref)
+			return false
 		case "pending":
-			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that is pending broadcast", *t.Ref)
-			return true
+			common.Log.Debugf("IDEMPOTENT: NOT reprocessing tx ref %s that is pending broadcast", *t.Ref)
+			return false
 		case "broadcast":
 			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that has been broadcast", *t.Ref)
 			t.ReBroadcast = true
 			return true
 		case "success":
-			common.Log.Debugf("IDEMPOTENT: Acknowledging successful delivery of tx ref %s", *t.Ref)
-
+			common.Log.Debugf("ACK: Acknowledging successful delivery of tx ref %s", *t.Ref)
+			// TODO pass this ack back to the consume method
 			err := t.Message.Ack()
 			if err != nil {
-				common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *t.Ref)
-			} else {
-				// remove the idempotentkey from the dictionary
-				txRegister.Delete(idempotentKey)
-				// TODO remove channels as well?
-
+				common.Log.Debugf("ACK: Error acking tx ref %s. Error: %s", *t.Ref, err.Error())
 			}
-			common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *t.Ref)
+			common.Log.Debugf("ACK: ConsumeTxCreateMsg, msg acked tx ref: %s", *t.Ref)
 			return false
 		default:
 			common.Log.Debugf("IDEMPOTENT: tx ref %s is in progress", *t.Ref)
 			return false
 		}
 	} else {
+		common.Log.Debugf("IDEMPOTENT: Register does NOT have tx ref %s. Status: %s", *t.Ref, *t.Status)
 		// we don't have this tx process details in memory
 		// possibly it's because of an nchain crash
 		switch *t.Status {
 		case "pending":
-			// try again, just in case nchain restarted
-			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that is pending", *t.Ref)
+			common.Log.Debugf("IDEMPOTENT: processing tx ref %s that is pending", *t.Ref)
 			return true
 		case "ready":
 			// try again, just in case nchain restarted
-			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that is ready for broadcast", *t.Ref)
+			common.Log.Debugf("IDEMPOTENT: processing tx ref %s that is ready for broadcast", *t.Ref)
 			return true
 		case "broadcast":
 			// try again, just in case it's stuck in the mempool
-			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that has been broadcast", *t.Ref)
+			common.Log.Debugf("IDEMPOTENT: processing tx ref %s that has been broadcast", *t.Ref)
+			t.ReBroadcast = true
 			return true
 		case "failed":
 			// try again
-			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that has failed to broadcast", *t.Ref)
+			common.Log.Debugf("IDEMPOTENT: processing tx ref %s that has failed to broadcast", *t.Ref)
 			return true
 		case "success":
 			// ack the NATS message as we don't need this any more
-			common.Log.Debugf("IDEMPOTENT: Acknowledging successful delivery of tx ref %s", *t.Ref)
+			common.Log.Debugf("ACK: Acknowledging successful delivery of tx ref %s", *t.Ref)
 			err := t.Message.Ack()
 			if err != nil {
-				common.Log.Debugf("XXX: ConsumeTxCreateMsg, error acking tx ref: %s", *t.Ref)
+				common.Log.Debugf("ACK: ConsumeTxCreateMsg, error acking tx ref: %s. Error: %s", *t.Ref, err.Error())
 			}
-			common.Log.Debugf("XXX: ConsumeTxCreateMsg, msg acked tx ref: %s", *t.Ref)
+			common.Log.Debugf("ACK: ConsumeTxCreateMsg, msg acked tx ref: %s", *t.Ref)
 			return false
 		default:
 			common.Log.Debugf("IDEMPOTENT: unknown db status found (%s) for tx ref %s", *t.Status, *t.Ref)
