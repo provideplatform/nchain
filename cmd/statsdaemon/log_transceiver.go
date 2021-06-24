@@ -18,9 +18,9 @@ import (
 	logger "github.com/kthomas/go-logger"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
+	provide "github.com/provideplatform/provide-go/api/nchain"
 )
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"

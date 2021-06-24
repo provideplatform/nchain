@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/ident/common"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	"github.com/provideplatform/ident/common"
+	provide "github.com/provideplatform/provide-go/api/nchain"
 )
 
 // ropsten

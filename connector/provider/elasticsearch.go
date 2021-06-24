@@ -10,9 +10,9 @@ import (
 
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
-	c2 "github.com/provideservices/provide-go/api/c2"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
+	c2 "github.com/provideplatform/provide-go/api/c2"
 )
 
 // ElasticsearchProvider is a connector.ProviderAPI implementing orchestration for Elasticsearch

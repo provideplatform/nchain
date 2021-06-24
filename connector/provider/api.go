@@ -3,7 +3,7 @@ package provider
 import (
 	"time"
 
-	provide "github.com/provideservices/provide-go/api"
+	provide "github.com/provideplatform/provide-go/api"
 )
 
 const ElasticsearchConnectorProvider = "elasticsearch"

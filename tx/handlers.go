@@ -10,13 +10,13 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/contract"
-	"github.com/provideapp/nchain/filter"
-	"github.com/provideapp/nchain/wallet"
-	vault "github.com/provideservices/provide-go/api/vault"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/contract"
+	"github.com/provideplatform/nchain/filter"
+	"github.com/provideplatform/nchain/wallet"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // InstallTransactionsAPI installs the handlers using the given gin Engine

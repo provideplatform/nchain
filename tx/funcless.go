@@ -11,11 +11,11 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/contract"
-	"github.com/provideapp/nchain/network"
-	provideAPI "github.com/provideservices/provide-go/api"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/contract"
+	"github.com/provideplatform/nchain/network"
+	provideAPI "github.com/provideplatform/provide-go/api"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 func executeTransaction(c *contract.Contract, execution *contract.Execution) (*contract.ExecutionResponse, error) {

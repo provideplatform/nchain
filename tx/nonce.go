@@ -10,9 +10,9 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	"github.com/kthomas/go-redisutil"
-	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go/api"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	provide "github.com/provideplatform/provide-go/api"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const currentBroadcastNonce = "nchain.broadcast.nonce"

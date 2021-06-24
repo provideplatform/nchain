@@ -7,7 +7,7 @@ import (
 
 	"github.com/kthomas/go-natsutil"
 	"github.com/nats-io/stan.go"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 )
 
 // TODO: audit arbitrary max in flight & timeouts

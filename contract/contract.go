@@ -14,11 +14,11 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
-	provide "github.com/provideservices/provide-go/api"
-	api "github.com/provideservices/provide-go/api/nchain"
-	prvdcrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
+	provide "github.com/provideplatform/provide-go/api"
+	api "github.com/provideplatform/provide-go/api/nchain"
+	prvdcrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const resolveTokenTickerInterval = time.Millisecond * 5000

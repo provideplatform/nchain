@@ -10,8 +10,8 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go/api"
+	"github.com/provideplatform/nchain/common"
+	provide "github.com/provideplatform/provide-go/api"
 )
 
 const natsStreamingTxFilterExecSubjectPrefix = "ml.filter.exec"

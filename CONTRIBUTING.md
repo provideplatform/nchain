@@ -20,7 +20,7 @@ NChain, like all of our microservices, relies heavily on the use of [goroutines]
 
 ---
 
-![NChain Architecture](https://github.com/provideapp/nchain/blob/dev/architecture.svg)
+![NChain Architecture](https://github.com/provideplatform/nchain/blob/dev/architecture.svg)
 
 ---
 
@@ -28,7 +28,7 @@ See installation instructions below for how to get NChain running locally on you
 
 ### Installation/Pre-Requisites
 
-1. Read and follow [these instructions](https://github.com/provideapp/provide/blob/dev/CONTRIBUTING.md)
+1. Read and follow [these instructions](https://github.com/provideplatform/provide/blob/dev/CONTRIBUTING.md)
 
 2. Create a PostgreSQL database for the nchain service. The following should work:
     `createuser nchain -s` ## WARNING: this gives nchain superuser access to your PostgreSQL installation; this is probably OK for convenience sake on your localhost. If this is not acceptable you will need to manually run the `CREATE EXTENSION IF NOT EXISTS` SQL statements found near the top of `database.go` on your `nchain_dev` db as the superuser.

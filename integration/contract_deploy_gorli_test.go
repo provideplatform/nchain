@@ -9,7 +9,7 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	nchain "github.com/provideservices/provide-go/api/nchain"
+	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
 func TestDeployEkhoContractGoerli(t *testing.T) {

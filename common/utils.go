@@ -10,7 +10,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	pgputil "github.com/kthomas/go-pgputil"
-	bookie "github.com/provideservices/provide-go/api/bookie"
+	bookie "github.com/provideplatform/provide-go/api/bookie"
 )
 
 var natsStreamingConnectionMutex sync.Mutex

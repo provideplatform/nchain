@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
 )
 
 // Execution represents a request payload used to execute functionality encapsulated by a contract.

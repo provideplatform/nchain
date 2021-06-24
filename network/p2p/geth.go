@@ -10,9 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go/api/nchain"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	provide "github.com/provideplatform/provide-go/api/nchain"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 // GethP2PProvider is a network.p2p.API implementing the parity API

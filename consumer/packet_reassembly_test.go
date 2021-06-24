@@ -5,8 +5,8 @@ package consumer_test
 import (
 	"testing"
 
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/consumer"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/consumer"
 )
 
 func TestBroadcastFragments(t *testing.T) {

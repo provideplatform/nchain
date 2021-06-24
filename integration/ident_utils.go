@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	uuid "github.com/kthomas/go.uuid"
-	provide "github.com/provideservices/provide-go/api/ident"
+	provide "github.com/provideplatform/provide-go/api/ident"
 )
 
 type User struct {

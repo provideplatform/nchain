@@ -16,12 +16,12 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network/p2p"
-	provide "github.com/provideservices/provide-go/api"
-	c2 "github.com/provideservices/provide-go/api/c2"
-	provideapi "github.com/provideservices/provide-go/api/nchain"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network/p2p"
+	provide "github.com/provideplatform/provide-go/api"
+	c2 "github.com/provideplatform/provide-go/api/c2"
+	provideapi "github.com/provideplatform/provide-go/api/nchain"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const defaultWebappPort = 3000

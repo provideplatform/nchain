@@ -10,8 +10,8 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/ident/common"
-	nchain "github.com/provideservices/provide-go/api/nchain"
+	"github.com/provideplatform/ident/common"
+	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
 func TestContractHDWalletGoerli(t *testing.T) {
