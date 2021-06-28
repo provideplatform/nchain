@@ -114,12 +114,12 @@ func AppAndTokenFactory(testID uuid.UUID, userID uuid.UUID) (*string, error) {
 		"appdesc " + testID.String(),
 	}
 
-	app, err := appFactory(*token.Token, nchainApp.name, nchainApp.description)
+	app, err := appFactory(*token.AccessToken, nchainApp.name, nchainApp.description)
 	if err != nil {
 		return nil, fmt.Errorf("error generating application. Error: %s", err.Error())
 	}
 
-	appToken, err := appTokenFactory(*token.Token, app.ID)
+	appToken, err := appTokenFactory(*token.AccessToken, app.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error generating app token. Error: %s", err.Error())
 	}
