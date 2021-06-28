@@ -858,7 +858,8 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			// - ignore already known errors
 			common.Log.Debugf("Error broadcasting tx ref %s. Error: %s", *t.Ref, err.Error())
 			// check for nonce too low and fix
-			if NonceTooLow(err) && !t.ReBroadcast {
+			// TODO add manualnonce check - do not alter if nonce has been applied manually
+			if NonceTooLow(err) {
 				common.Log.Debugf("Nonce too low error for tx ref: %s", *t.Ref)
 				// get the address for the signer
 				signerAddress, err := signer.Address()
@@ -1251,6 +1252,7 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 			broadcastError = fmt.Errorf("failed to broadcast bookie tx; %s", err.Error())
 			return broadcastError
 		}
+		// TODO check that this is correct after nonce too low re-broadcast
 		t.Hash = result
 		db.Save(&t)
 		common.Log.Debugf("broadcast tx %s via bookie: got hash %s", *t.Ref, *t.Hash)
