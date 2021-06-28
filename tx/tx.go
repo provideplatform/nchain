@@ -629,6 +629,8 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 			"transaction_id": t.ID.String(),
 		})
 		common.Log.Debugf("Setting tx ref %s status to BROADCAST", *t.Ref)
+		broadcastAt := time.Now()
+		t.BroadcastAt = &broadcastAt
 		t.updateStatus(db, "broadcast", nil)
 		natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 		elapsed := time.Since(start)
@@ -742,7 +744,7 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 		// add the IN and OUT channel pair to this tx dictionary
 		txChannels.Set(*chanKey, chanPair)
 
-		//common.Log.Debugf("TIMINGNANO: about to sign and broadcast tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
+		common.Log.Debugf("TIMINGNANO: tx ref %s chankey %s, signer %v, nonce %v", *t.Ref, *chanKey, signer, nonce)
 
 		go t.SignAndReadyForBroadcast(txChannels.Get(*chanKey), signer, db, nonce)
 
@@ -782,19 +784,6 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	t.Nonce = nonce
 	if !t.ReBroadcast {
 		t.updateStatus(db, "ready", nil)
-
-		// // this is important, we can't have a stale status
-		// var currentStatus *string
-		// db.Table("transactions").Select("status").Where("transactions.ref=?", *t.Ref).Pluck("status", currentStatus)
-		// if currentStatus != nil {
-		// 	*t.Status = *currentStatus
-		// 	if *t.Status != "broadcast" && *t.Status != "success" {
-		// 		common.Log.Debugf("Setting tx ref %s status to READY from %s", *t.Ref, *t.Status)
-
-		// 	} else {
-		// 		common.Log.Debugf("Leaving tx ref %s status at %s", *t.Ref, *t.Status)
-		// 	}
-		// }
 	}
 
 	address := t.getAddressIdentifier()
@@ -856,9 +845,10 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 				"transaction_id": t.ID.String(),
 			})
 			common.Log.Debugf("setting tx ref %s status to BROADCAST", *t.Ref)
+			broadcastAt := time.Now()
+			t.BroadcastAt = &broadcastAt
 			t.updateStatus(db, "broadcast", nil)
 			natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-
 			// update the db record with the updated details (currently just nonce, but remove any fail desc and update status)
 			break
 		}
@@ -919,17 +909,10 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			// TODO this will get extended for the gas pricing increases when it goes in
 			if AlreadyKnown(err) {
 				common.Log.Debugf("Already known error for tx ref: %s", *t.Ref)
-				t.Hash = common.StringOrNil(t.SignedTx.(*types.Transaction).Hash().String())
-				// payload, _ := json.Marshal(map[string]interface{}{
-				// 	"transaction_id": t.ID.String(),
-				// })
-				//	common.Log.Debugf("IDEMOPOTENT: hash %s for already known tx ref: %s.", *t.Hash, *t.Ref)
-				t.updateStatus(db, "broadcast", nil)
-				if !t.ReBroadcast {
-					// ok, let's ask for the receipt when it's first broadcast
-					// it should only do this once a minute (hopefully won't break my infura!)
-					//natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
-				}
+				// t.Hash = common.StringOrNil(t.SignedTx.(*types.Transaction).Hash().String())
+				// broadcastAt := time.Now()
+				// t.BroadcastAt = &broadcastAt
+				// t.updateStatus(db, "broadcast", nil)
 				break
 			} // AlreadyKnown
 
@@ -1304,9 +1287,6 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(broadcastError.Error()),
 		})
-		// we'll handle db updates in the calling function, not here
-		// desc := broadcastError.Error()
-		// t.updateStatus(db, "failed", &desc)
 	} else {
 		broadcastAt := time.Now()
 		t.BroadcastAt = &broadcastAt

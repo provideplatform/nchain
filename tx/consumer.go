@@ -564,12 +564,12 @@ func consumeTxExecutionMsg(msg *stan.Msg) {
 
 	var ref string
 	// get pointer to reference for tx object (HACK, TIDY)
-	//HACK until I find where this is getting set incorrectly
-	switch reference.(type) {
+	// HACK for testing, not using pure uuids, but should swap once testing complete
+	switch reference := reference.(type) {
 	case string:
-		ref = reference.(string)
+		ref = reference
 	case uuid.UUID:
-		ref = reference.(uuid.UUID).String()
+		ref = reference.String()
 	}
 
 	if !contractIDOk {
@@ -824,6 +824,20 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 			tx.Block = &receiptBlock
 			receiptFinalized := time.Now()
 			tx.FinalizedAt = &receiptFinalized
+
+			if tx.BroadcastAt != nil {
+				if tx.PublishedAt != nil {
+					queueLatency := uint64(tx.BroadcastAt.Sub(*tx.PublishedAt)) / uint64(time.Millisecond)
+					tx.QueueLatency = &queueLatency
+
+					e2eLatency := uint64(tx.FinalizedAt.Sub(*tx.PublishedAt)) / uint64(time.Millisecond)
+					tx.E2ELatency = &e2eLatency
+				}
+
+				networkLatency := uint64(tx.FinalizedAt.Sub(*tx.BroadcastAt)) / uint64(time.Millisecond)
+				tx.NetworkLatency = &networkLatency
+			}
+
 			common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
 		}
 		tx.updateStatus(db, "success", nil)
@@ -837,13 +851,6 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("recovered from failed tx receipt message; %s", r)
-			if key != nil {
-				lockErr := setWithLock(*key, msgRetryRequired)
-				if lockErr != nil {
-					common.Log.Debugf("XXX: Error resetting in flight status for key: %s. Error: %s", *key, lockErr.Error())
-					// TODO what to do if this fails????
-				}
-			}
 			natsutil.AttemptNack(msg, txReceiptMsgTimeout)
 		}
 	}()
@@ -876,13 +883,6 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		natsutil.Nack(msg)
 		return
 	}
-
-	// key = common.StringOrNil(fmt.Sprintf("nchain.tx.receipt%s", transactionID))
-	// err = processMessageStatus(*key)
-	// if err != nil {
-	// 	common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
-	// 	return
-	// }
 
 	common.Log.Debugf("XXX: Starting processTxReceipt for tx ref: %s", *tx.Ref)
 	// TODO occasionally throws panic on startup
