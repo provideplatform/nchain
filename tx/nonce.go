@@ -166,7 +166,9 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 			if walletID != nil {
 				db := dbconf.DatabaseConnection()
 				if path != nil {
-					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success')", *walletID, *path).Pluck("nonce", pendingNonce)
+					// FIXME - either get this working, or put the address into the table
+					cleansedPath := strings.ReplaceAll(*path, "'", "''")
+					db.Raw("SELECT MAX(nonce) from transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success')", *walletID, cleansedPath).Pluck("nonce", pendingNonce)
 				} else {
 					// HACK = check what actually happens when a path is not specified...
 					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND status in ('broadcast','success')", *walletID).Pluck("nonce", pendingNonce)
