@@ -92,13 +92,7 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		// create unique references
-		txRef, err := uuid.NewV4()
-		if err != nil {
-			t.Errorf("error creating unique tx ref. Error: %s", err.Error())
-			return
-		}
-
+		// create unique contract reference
 		contractRef, err := uuid.NewV4()
 		if err != nil {
 			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
@@ -116,6 +110,7 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
 				"compiled_artifact":  tc.artifact,
+				"gas_price":          6000000000, //6 GWei
 				"ref":                contractRef.String(),
 			},
 		})
@@ -153,21 +148,31 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 		t.Logf("executing contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 
 		params := map[string]interface{}{}
+		var txRef uuid.UUID
 
 		switch tc.name {
 		case "ekho":
-			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
+			txRef, err = uuid.NewV4()
+			if err != nil {
+				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+				return
+			}
+			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
 			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		case "readwrite":
-			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
+			txRef, err = uuid.NewV4()
+			if err != nil {
+				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+				return
+			}
+			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
 			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		}
 
 		// execute the contract method
 		t.Logf("%s Executing contract using params %+v", time.Now(), params)
-		t.Logf("executing transaction using tx ref: %s", txRef)
 		execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
 		if err != nil {
 			t.Logf("%s got error %s, and execresponse is: %v", time.Now(), err.Error(), execResponse)

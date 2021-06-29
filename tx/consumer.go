@@ -160,19 +160,10 @@ func processMessageStatus(key string) error {
 
 func consumeTxCreateMsg(msg *stan.Msg) {
 	start := time.Now()
-	//common.Log.Debugf("TIMINGNANO: about to process nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
 	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v", msg.Sequence)
 	processTxCreateMsg(msg)
 	elapsedTime := time.Since(start)
 	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
-	//common.Log.Debugf("TIMINGNANO: completed processing nats sequence %v at %d", msg.Sequence, time.Now().UnixNano())
-
-	// TODO
-	// push these onto a buffered channel (X txs)
-	// get the tx into the database (or pull if reprocessing)
-	// get it signed and ready to broadcast (blocking)
-	// give the next msg go-ahead to be processed
-
 }
 
 // these need to be processed EXACTLY in order
@@ -185,7 +176,7 @@ func processTxCreateMsg(msg *stan.Msg) {
 	db := dbconf.DatabaseConnection()
 
 	// process msg data
-	tx, contract, err := processNATSTxCreateMsg(msg, db)
+	tx, contract, err := processNATSTxMsg(msg, db, true)
 	if err != nil {
 		common.Log.Debugf("Error processing NATS %v message. Error: %s", msg.Subject, err.Error())
 		natsutil.Nack(msg)
@@ -229,20 +220,19 @@ func processTxCreateMsg(msg *stan.Msg) {
 
 	// HACK
 	natsutil.AttemptNack(msg, txCreateMsgTimeout)
-
 }
 
 // processNATSTxCreateMsg processes a NATS msg into a Transaction object
 // TODO wg here?
 // TODO name this properly
-func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract.Contract, error) {
+func processNATSTxMsg(msg *stan.Msg, db *gorm.DB, newContract bool) (*Transaction, *contract.Contract, error) {
 
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to unmarshal tx creation message; %s", err.Error())
-		err := fmt.Errorf("Error unmarshaling tx creation message from NATS %v message. Error: %s", msg.Subject, err.Error())
+		err := fmt.Errorf("error unmarshaling tx creation message from NATS %v message. Error: %s", msg.Subject, err.Error())
 		return nil, nil, err
 	}
 
@@ -255,7 +245,14 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	txParams, paramsOk := params["params"].(map[string]interface{})
 	publishedAt, publishedAtOk := params["published_at"].(string)
 
-	reference, referenceOk := txParams["ref"]
+	// HACK TODO - tidy this up on the nchain side, don't change the consumer
+	var reference interface{}
+	var referenceOk bool
+	if newContract {
+		reference, referenceOk = txParams["ref"]
+	} else {
+		reference, referenceOk = params["reference"]
+	}
 
 	// TODO this reference create needs to be on the nchain side, not the consume side
 	// so if this doesn't have a reference, we nack it because something
@@ -265,57 +262,50 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		reference, err = uuid.NewV4()
 		if err != nil {
 			common.Log.Warningf("Failed to create unique tx ref. Error: %s", err.Error())
-			err = fmt.Errorf("Error creating unique ref for tx. Error: %s", err.Error())
+			err = fmt.Errorf("error creating unique ref for tx. Error: %s", err.Error())
 			return nil, nil, err
 		}
 	}
 
 	var ref string
-	// get pointer to reference for tx object (HACK, TIDY)
-	// this is currently a string, but needs to be a uuid
-	// (once the consumer ordering issue is sorted)
-	switch reference.(type) {
+	switch reference := reference.(type) {
 	case string:
-		ref = reference.(string)
+		ref = reference
 	case uuid.UUID:
-		ref = reference.(uuid.UUID).String()
+		ref = reference.String()
 	}
 
-	//common.Log.Debugf("TIMING NATS: Processing contract create msg from NATS. Sequence: %v. Tx Ref: %s", msg.Sequence, ref)
-
-	// TODO flag around this as it's only for the contract create message
 	if !contractIDOk {
 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error unmarshaling contract_id from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error unmarshaling contract_id from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 	if !dataOk {
 		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error unmarshaling data from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error unmarshaling data from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 	if !accountIDStrOk && !walletIDStrOk {
 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error unmarshaling both accountID and walletID from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error unmarshaling both accountID and walletID from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 	if !valueOk {
 		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error unmarshaling value from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error unmarshaling value from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 	if !paramsOk {
 		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error unmarshaling params from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error unmarshaling params from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 	if !publishedAtOk {
 		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error unmarshaling published_at from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error unmarshaling published_at from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 
-	// TODO contract flag?
 	contract := &contract.Contract{}
 	db.Where("id = ?", contractID).Find(&contract)
 
@@ -334,7 +324,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 
 	if accountID == nil && walletID == nil {
 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error converting accountID and walletID to uuid from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error converting accountID and walletID to uuid from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 
@@ -342,7 +332,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	if accountID != nil {
 		if walletID != nil {
 			common.Log.Warningf("Both account_id and wallet_id present in NATS %v message", msg.Subject)
-			err := fmt.Errorf("Error in tx. Both accountID and walletID present in NATS %v message", msg.Subject)
+			err := fmt.Errorf("error in tx. Both accountID and walletID present in NATS %v message", msg.Subject)
 			return nil, nil, err
 		}
 	}
@@ -351,7 +341,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	if walletID != nil {
 		if accountID != nil {
 			common.Log.Warningf("Both account_id and wallet_id present in NATS %v message", msg.Subject)
-			err := fmt.Errorf("Error in tx. Both accountID and walletID present in NATS %v message", msg.Subject)
+			err := fmt.Errorf("error in tx. Both accountID and walletID present in NATS %v message", msg.Subject)
 			return nil, nil, err
 		}
 	}
@@ -359,7 +349,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
 		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
-		err := fmt.Errorf("Error parsing published_at time from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error parsing published_at time from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 
@@ -367,7 +357,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	valueFloat, valueFloatOk := value.(float64)
 	if !valueFloatOk {
 		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
-		err := fmt.Errorf("Error converting value to float64 from NATS %v message", msg.Subject)
+		err := fmt.Errorf("error converting value to float64 from NATS %v message", msg.Subject)
 		return nil, nil, err
 	}
 
@@ -403,10 +393,18 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 	parameters.PublishedAt = &publishedAt
 	parameters.GasPrice = gasPrice
 
-	var tx Transaction
+	//var tx Transaction
+	var address *string
+	if newContract {
+		// address will come once the contract is deployed on chain
+		address = nil
+	} else {
+		// we will use the provided contract address
+		address = contract.Address
+	}
 
 	// TODO note the contract deps on this tx create
-	tx = Transaction{
+	tx := &Transaction{
 		ApplicationID:  contract.ApplicationID,
 		OrganizationID: contract.OrganizationID,
 		Data:           common.StringOrNil(data),
@@ -414,7 +412,7 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		AccountID:      accountID,
 		WalletID:       walletID,
 		Path:           common.StringOrNil(hdDerivationPath),
-		To:             nil,
+		To:             address,
 		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
 		PublishedAt:    &publishedAtTime,
 		Ref:            &ref,
@@ -445,10 +443,10 @@ func processNATSTxCreateMsg(msg *stan.Msg, db *gorm.DB) (*Transaction, *contract
 		tx.PublishedAt = replacementTx.PublishedAt
 		tx.Nonce = replacementTx.Nonce
 		tx.Status = replacementTx.Status
-		return &tx, contract, nil
+		return tx, contract, nil
 	} else {
 		common.Log.Debugf("Did not find tx ref %s in db", *tx.Ref)
-		return &tx, contract, nil
+		return tx, contract, nil
 	}
 }
 
@@ -530,6 +528,60 @@ func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas in
 }
 
 func consumeTxExecutionMsg(msg *stan.Msg) {
+	start := time.Now()
+	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v", msg.Sequence)
+	processTxExecutionMsg(msg)
+	elapsedTime := time.Since(start)
+	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
+}
+
+func processTxExecutionMsg(msg *stan.Msg) {
+
+	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
+
+	db := dbconf.DatabaseConnection()
+
+	// process msg data
+	tx, _, err := processNATSTxMsg(msg, db, false)
+	if err != nil {
+		common.Log.Debugf("Error processing NATS %v message. Error: %s", msg.Subject, err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+	if tx == nil {
+		common.Log.Debugf("ACK: Acking previously processed NATS msg seq: %v", msg.Sequence)
+		err := msg.Ack()
+		if err != nil {
+			common.Log.Debugf("ACK: Error acking previously processed NATS msg seq: %v. Error: %s", msg.Sequence, err.Error())
+			//common.Log.Debugf("ACK: Error acking tx ref %s. Error: %s", *tx.Ref, err.Error())
+			natsutil.AttemptNack(msg, txCreateMsgTimeout)
+		}
+		return
+	}
+
+	//common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
+	common.Log.Debugf("XXX: ConsumeTxExecutionMsg, about to execute tx with ref: %s", *tx.Ref)
+
+	// check if we have this tx ref in the database
+
+	if tx.Create(db) {
+		common.Log.Debugf("XXX: ConsumeTxExecutionMsg, executed tx with ref: %s", *tx.Ref)
+	} else {
+
+		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
+		for _, err := range tx.Errors {
+			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
+		}
+
+		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
+		natsutil.AttemptNack(msg, txMsgTimeout)
+	}
+
+	// HACK
+	natsutil.AttemptNack(msg, txCreateMsgTimeout)
+}
+
+func consumeTxExecutionMsg_Old(msg *stan.Msg) {
 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
 	var params map[string]interface{}
