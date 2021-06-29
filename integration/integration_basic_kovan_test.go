@@ -16,8 +16,6 @@ import (
 
 func TestContractHDWalletKovanApp(t *testing.T) {
 
-	t.Parallel()
-
 	testId, err := uuid.NewV4()
 	if err != nil {
 		t.Logf("error creating new UUID")
@@ -245,9 +243,7 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 }
 
 // XXX temporarily disabled to reduce test noise
-func _TestContractHDWalletKovanOrg(t *testing.T) {
-
-	t.Parallel()
+func TestContractHDWalletKovanOrg(t *testing.T) {
 
 	testId, err := uuid.NewV4()
 	if err != nil {
