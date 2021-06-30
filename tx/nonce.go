@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	dbconf "github.com/kthomas/go-db-config"
 	"github.com/kthomas/go-redisutil"
 	"github.com/provideplatform/nchain/common"
 	provide "github.com/provideplatform/provide-go/api"
@@ -114,7 +113,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 		return t.Nonce, t.EthSigner, err
 	}
 
-	t.Nonce, err = t.getNextNonce()
+	t.Nonce, err = t.getNextNonce(db)
 	if err != nil {
 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *t.Ref, err.Error())
 		// we will assign 0 to the nonce to ensure it will trip nonce-too low error (in most cases)
@@ -131,7 +130,7 @@ func (t *Transaction) getNonce(db *gorm.DB) (*uint64, *TransactionSigner, error)
 // and move to DB
 // to facilitate retries
 // TODO name this bettar
-func (t *Transaction) getNextNonce() (*uint64, error) {
+func (t *Transaction) getNextNonce(db *gorm.DB) (*uint64, error) {
 
 	nonceStart := time.Now()
 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *t.Ref)
@@ -157,21 +156,30 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 		walletID := t.WalletID
 		path := t.Parameters.Path
 
+		var Maxnonce []interface{}
+
 		if accountID != nil || walletID != nil {
 			if accountID != nil {
-				db := dbconf.DatabaseConnection()
-				db.Raw("SELECT MAX(nonce) from Transactions WHERE account_id=? AND status in ('broadcast','success')", *accountID).Pluck("nonce", pendingNonce)
-				common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
+				// FIXME - so it's like the wallet/path
+				db.Raw("SELECT MAX(nonce) from Transactions WHERE account_id=? AND status in ('broadcast','success')", *accountID).Take(Maxnonce)
+				common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", Maxnonce, *t.Ref)
 			}
 			if walletID != nil {
-				db := dbconf.DatabaseConnection()
 				if path != nil {
-					// FIXME - either get this working, or put the address into the table
-					cleansedPath := strings.ReplaceAll(*path, "'", "''")
-					db.Raw("SELECT MAX(nonce) from transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success')", *walletID, cleansedPath).Pluck("nonce", pendingNonce)
+
+					var results []uint64
+					//db.Raw("SELECT * FROM transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success') AND nonce IS NOT NULL ORDER BY nonce DESC", *walletID, cleansedPath).Scan(&results)
+					db.Raw("SELECT max(nonce) FROM transactions WHERE wallet_id=? AND hd_derivation_path=? AND network_id=? AND status in ('broadcast','success') AND nonce IS NOT NULL", *walletID, *path, network).Pluck("nonce", &results)
+					//common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", results, *t.Ref)
+					if len(results) > 0 {
+						pendingNonce = &results[0]
+						common.Log.Debugf("NONCE: found max db nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
+					}
 				} else {
 					// HACK = check what actually happens when a path is not specified...
-					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND status in ('broadcast','success')", *walletID).Pluck("nonce", pendingNonce)
+					// FIXME - so it's like the wallet/path
+					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND status in ('broadcast','success')", *walletID).Pluck("nonce", &Maxnonce)
+					common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", Maxnonce, *t.Ref)
 				}
 			}
 		}
@@ -185,7 +193,9 @@ func (t *Transaction) getNextNonce() (*uint64, error) {
 				return nil, err
 			}
 		} else {
-			common.Log.Debugf("NONCE: found max db nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
+			// increment the nonce found in the DB by 1
+			next := *pendingNonce + 1
+			pendingNonce = &next
 		}
 
 		common.Log.Debugf("XXX: Pending nonce found for tx Ref %s. Nonce: %v", *t.Ref, *pendingNonce)
