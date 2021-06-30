@@ -10,15 +10,12 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
-	"github.com/kthomas/go-redisutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	api "github.com/provideplatform/provide-go/api"
-	bookie "github.com/provideplatform/provide-go/api/bookie"
 	provide "github.com/provideplatform/provide-go/api/nchain"
-	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // TODO: should this be calculated dynamically against average blocktime for the network and subscriptions reestablished?
@@ -122,40 +119,6 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 			nil,
 		)
 	}
-}
-
-// processMessage checks if the message is already in flight
-// with a long running process, in which case, wait for it to finish.
-// If the message has failed, processMessage will allow it to be reprocessed
-func processMessageStatus(key string) error {
-	// need to add a lock to this
-	// got a subscribe locked panic ?? or maybe that was for the cached network??  must repro
-
-	status, _ := redisutil.Get(key)
-
-	if status == nil {
-		common.Log.Debugf("Setting message key %s status to in flight", key)
-		lockErr := setWithLock(key, msgInFlight)
-		if lockErr != nil {
-			err := fmt.Errorf("Error setting message key %s to in flight status. Error: %s", key, lockErr.Error())
-			return err
-		}
-	}
-
-	if status != nil {
-		switch *status {
-		case msgInFlight:
-			err := fmt.Errorf("Message key %s is in flight", key)
-			return err
-		case msgRetryRequired:
-			lockErr := setWithLock(key, msgInFlight)
-			if lockErr != nil {
-				err := fmt.Errorf("Error resetting message key %s back to in flight status", key)
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func consumeTxCreateMsg(msg *stan.Msg) {
@@ -461,43 +424,43 @@ func (tx *Transaction) replaceWithDatabaseTxIfExists(db *gorm.DB, ref string) (*
 		// check that the parameters are the same and we don't have an attempt to replay a ref
 		if dbTx.ApplicationID != nil && tx.ApplicationID != nil {
 			if *dbTx.ApplicationID != *tx.ApplicationID {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
 		if dbTx.OrganizationID != nil && tx.OrganizationID != nil {
 			if *dbTx.OrganizationID != *tx.OrganizationID {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
 		if dbTx.AccountID != nil && tx.AccountID != nil {
 			if *dbTx.AccountID != *tx.AccountID {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
 		if dbTx.WalletID != nil && tx.WalletID != nil {
 			if *dbTx.WalletID != *tx.WalletID {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
 		if dbTx.Path != nil && tx.Path != nil {
 			if *dbTx.Path != *tx.Path {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
 		if dbTx.Value != nil && tx.Value != nil {
 			if dbTx.Value.value.Cmp(tx.Value.value) != 0 {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
 		if dbTx.Data != nil && tx.Data != nil {
 			if *dbTx.Data != *tx.Data {
-				err = fmt.Errorf("Data mismatch in duplicate transaction. Transaction rejected.")
+				err = fmt.Errorf("data mismatch in duplicate transaction. Transaction rejected")
 			}
 		}
 
@@ -513,19 +476,19 @@ func (tx *Transaction) replaceWithDatabaseTxIfExists(db *gorm.DB, ref string) (*
 	return nil, nil
 }
 
-// subsidize the given beneficiary with a drip equal to the given val
-func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas int64) error {
-	payment, err := bookie.CreatePayment(util.DefaultVaultAccessJWT, map[string]interface{}{
-		"to":   beneficiary,
-		"data": common.StringOrNil("0x"),
-	})
-	if err != nil {
-		return err
-	}
+// // subsidize the given beneficiary with a drip equal to the given val
+// func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas int64) error {
+// 	payment, err := bookie.CreatePayment(util.DefaultVaultAccessJWT, map[string]interface{}{
+// 		"to":   beneficiary,
+// 		"data": common.StringOrNil("0x"),
+// 	})
+// 	if err != nil {
+// 		return err
+// 	}
 
-	common.Log.Debugf("subsidized transaction using api.providepayments.com; beneficiary: %s; tx hash: %s", beneficiary, payment.Params["result"].(string))
-	return nil
-}
+// 	common.Log.Debugf("subsidized transaction using api.providepayments.com; beneficiary: %s; tx hash: %s", beneficiary, payment.Params["result"].(string))
+// 	return nil
+// }
 
 func consumeTxExecutionMsg(msg *stan.Msg) {
 	start := time.Now()
@@ -581,160 +544,160 @@ func processTxExecutionMsg(msg *stan.Msg) {
 	natsutil.AttemptNack(msg, txCreateMsgTimeout)
 }
 
-func consumeTxExecutionMsg_Old(msg *stan.Msg) {
-	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
+// func consumeTxExecutionMsg_Old(msg *stan.Msg) {
+// 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
 
-	var params map[string]interface{}
+// 	var params map[string]interface{}
 
-	err := json.Unmarshal(msg.Data, &params)
-	if err != nil {
-		common.Log.Warningf("Failed to unmarshal tx execution message; %s", err.Error())
-		natsutil.Nack(msg)
-		return
-	}
+// 	err := json.Unmarshal(msg.Data, &params)
+// 	if err != nil {
+// 		common.Log.Warningf("Failed to unmarshal tx execution message; %s", err.Error())
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
 
-	contractID, contractIDOk := params["contract_id"]
-	data, dataOk := params["data"].(string)
-	accountIDStr, accountIDStrOk := params["account_id"].(string)
-	walletIDStr, walletIDStrOk := params["wallet_id"].(string)
-	hdDerivationPath, _ := params["hd_derivation_path"].(string)
-	value, valueOk := params["value"]
-	txParams, paramsOk := params["params"].(map[string]interface{})
-	publishedAt, publishedAtOk := params["published_at"].(string)
+// 	contractID, contractIDOk := params["contract_id"]
+// 	data, dataOk := params["data"].(string)
+// 	accountIDStr, accountIDStrOk := params["account_id"].(string)
+// 	walletIDStr, walletIDStrOk := params["wallet_id"].(string)
+// 	hdDerivationPath, _ := params["hd_derivation_path"].(string)
+// 	value, valueOk := params["value"]
+// 	txParams, paramsOk := params["params"].(map[string]interface{})
+// 	publishedAt, publishedAtOk := params["published_at"].(string)
 
-	reference, referenceOk := params["reference"]
+// 	reference, referenceOk := params["reference"]
 
-	if !referenceOk {
-		// no reference provided with the contract, so we'll make one
-		reference, err = uuid.NewV4()
-		if err != nil {
-			common.Log.Warningf("Failed to create unique tx ref. Error: %s", err.Error())
-			natsutil.Nack(msg)
-			return
-		}
-	}
+// 	if !referenceOk {
+// 		// no reference provided with the contract, so we'll make one
+// 		reference, err = uuid.NewV4()
+// 		if err != nil {
+// 			common.Log.Warningf("Failed to create unique tx ref. Error: %s", err.Error())
+// 			natsutil.Nack(msg)
+// 			return
+// 		}
+// 	}
 
-	var ref string
-	// get pointer to reference for tx object (HACK, TIDY)
-	// HACK for testing, not using pure uuids, but should swap once testing complete
-	switch reference := reference.(type) {
-	case string:
-		ref = reference
-	case uuid.UUID:
-		ref = reference.String()
-	}
+// 	var ref string
+// 	// get pointer to reference for tx object (HACK, TIDY)
+// 	// HACK for testing, not using pure uuids, but should swap once testing complete
+// 	switch reference := reference.(type) {
+// 	case string:
+// 		ref = reference
+// 	case uuid.UUID:
+// 		ref = reference.String()
+// 	}
 
-	if !contractIDOk {
-		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
-	if !dataOk {
-		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
-	if !accountIDStrOk && !walletIDStrOk {
-		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
-	if !valueOk {
-		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
-	if !paramsOk {
-		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
-	if !publishedAtOk {
-		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
+// 	if !contractIDOk {
+// 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
+// 	if !dataOk {
+// 		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
+// 	if !accountIDStrOk && !walletIDStrOk {
+// 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
+// 	if !valueOk {
+// 		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
+// 	if !paramsOk {
+// 		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
+// 	if !publishedAtOk {
+// 		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
 
-	contract := &contract.Contract{}
-	db := dbconf.DatabaseConnection()
-	db.Where("id = ?", contractID).Find(&contract)
+// 	contract := &contract.Contract{}
+// 	db := dbconf.DatabaseConnection()
+// 	db.Where("id = ?", contractID).Find(&contract)
 
-	var accountID *uuid.UUID
-	var walletID *uuid.UUID
+// 	var accountID *uuid.UUID
+// 	var walletID *uuid.UUID
 
-	accountUUID, accountUUIDErr := uuid.FromString(accountIDStr)
-	if accountUUIDErr == nil {
-		accountID = &accountUUID
-	}
+// 	accountUUID, accountUUIDErr := uuid.FromString(accountIDStr)
+// 	if accountUUIDErr == nil {
+// 		accountID = &accountUUID
+// 	}
 
-	walletUUID, walletUUIDErr := uuid.FromString(walletIDStr)
-	if walletUUIDErr == nil {
-		walletID = &walletUUID
-	}
+// 	walletUUID, walletUUIDErr := uuid.FromString(walletIDStr)
+// 	if walletUUIDErr == nil {
+// 		walletID = &walletUUID
+// 	}
 
-	if accountID == nil && walletID == nil {
-		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		natsutil.Nack(msg)
-		return
-	}
+// 	if accountID == nil && walletID == nil {
+// 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
 
-	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
-	if err != nil {
-		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
-		natsutil.Nack(msg)
-		return
-	}
+// 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
+// 	if err != nil {
+// 		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
+// 		natsutil.Nack(msg)
+// 		return
+// 	}
 
-	tx := &Transaction{
-		ApplicationID:  contract.ApplicationID,
-		OrganizationID: contract.OrganizationID,
-		Data:           common.StringOrNil(data),
-		NetworkID:      contract.NetworkID,
-		AccountID:      accountID,
-		WalletID:       walletID,
-		Path:           common.StringOrNil(hdDerivationPath),
-		To:             contract.Address,
-		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
-		PublishedAt:    &publishedAtTime,
-		Ref:            &ref,
-	}
+// 	tx := &Transaction{
+// 		ApplicationID:  contract.ApplicationID,
+// 		OrganizationID: contract.OrganizationID,
+// 		Data:           common.StringOrNil(data),
+// 		NetworkID:      contract.NetworkID,
+// 		AccountID:      accountID,
+// 		WalletID:       walletID,
+// 		Path:           common.StringOrNil(hdDerivationPath),
+// 		To:             contract.Address,
+// 		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
+// 		PublishedAt:    &publishedAtTime,
+// 		Ref:            &ref,
+// 	}
 
-	tx.setParams(txParams)
+// 	tx.setParams(txParams)
 
-	key := fmt.Sprintf("nchain.tx.%s", *tx.Ref)
+// 	key := fmt.Sprintf("nchain.tx.%s", *tx.Ref)
 
-	// checks if the message is currently in flight (being procesed)
-	err = processMessageStatus(key)
-	if err != nil {
-		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
-		return
-	}
+// 	// checks if the message is currently in flight (being procesed)
+// 	err = processMessageStatus(key)
+// 	if err != nil {
+// 		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
+// 		return
+// 	}
 
-	common.Log.Debugf("XXX: ConsumeTxExecMsg, about to create tx with ref: %s", *tx.Ref)
-	if tx.Create(db) {
-		common.Log.Debugf("ACK: ConsumeTxExecMsg, about to ack tx with ref: %s", *tx.Ref)
-		err = msg.Ack()
-		if err != nil {
-			common.Log.Debugf("ACK: ConsumeTxExecMsg, error acking tx ref: %s. Error: %s", *tx.Ref, err.Error())
-		}
-		common.Log.Debugf("ACK: ConsumeTxExecMsg, msg acked tx ref: %s", *tx.Ref)
-	} else {
-		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
-		for _, err := range tx.Errors {
-			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
-		}
-		// got rid of the subsidize code that's managed by bookie now
+// 	common.Log.Debugf("XXX: ConsumeTxExecMsg, about to create tx with ref: %s", *tx.Ref)
+// 	if tx.Create(db) {
+// 		common.Log.Debugf("ACK: ConsumeTxExecMsg, about to ack tx with ref: %s", *tx.Ref)
+// 		err = msg.Ack()
+// 		if err != nil {
+// 			common.Log.Debugf("ACK: ConsumeTxExecMsg, error acking tx ref: %s. Error: %s", *tx.Ref, err.Error())
+// 		}
+// 		common.Log.Debugf("ACK: ConsumeTxExecMsg, msg acked tx ref: %s", *tx.Ref)
+// 	} else {
+// 		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
+// 		for _, err := range tx.Errors {
+// 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
+// 		}
+// 		// got rid of the subsidize code that's managed by bookie now
 
-		// remove the in-flight status to this can be replayed
-		lockErr := setWithLock(key, msgRetryRequired)
-		if lockErr != nil {
-			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
-			// TODO what to do if this fails????
-		}
-		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
-		natsutil.AttemptNack(msg, txMsgTimeout)
-	}
-}
+// 		// remove the in-flight status to this can be replayed
+// 		lockErr := setWithLock(key, msgRetryRequired)
+// 		if lockErr != nil {
+// 			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
+// 			// TODO what to do if this fails????
+// 		}
+// 		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
+// 		natsutil.AttemptNack(msg, txMsgTimeout)
+// 	}
+// }
 
 // TODO: consider batching this using a buffered channel for high-volume networks
 func consumeTxFinalizeMsg(msg *stan.Msg) {
@@ -820,7 +783,6 @@ func consumeTxFinalizeMsg(msg *stan.Msg) {
 		tx.NetworkLatency = &networkLatency
 	}
 
-	// CHECKME when this is triggered, it populates the stats correctly
 	tx.updateStatus(db, "success", nil)
 	result := db.Save(&tx)
 	errors := result.GetErrors()
