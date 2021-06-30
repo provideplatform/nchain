@@ -14,7 +14,7 @@ import (
 	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
-func _TestContractHDWalletRinkebyApp(t *testing.T) {
+func TestContractHDWalletRinkebyApp(t *testing.T) {
 
 	testId, err := uuid.NewV4()
 	if err != nil {
@@ -196,11 +196,9 @@ func _TestContractHDWalletRinkebyApp(t *testing.T) {
 					t.Errorf("tx error; tx id: %s; Error: %s", tx.ID.String(), *tx.Description)
 					return
 				}
-				if tx.Status != nil {
-					if *tx.Status == "success" {
-						t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
-						break
-					}
+				if tx.Block != nil && *tx.Hash != "0x" {
+					t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
+					break
 				}
 				t.Logf("resolving transaction...")
 			}
@@ -244,6 +242,7 @@ func _TestContractHDWalletRinkebyApp(t *testing.T) {
 	}
 }
 
+// XXX temporarily disabled to reduce test noise
 func TestContractHDWalletRinkebyOrg(t *testing.T) {
 
 	testId, err := uuid.NewV4()
@@ -320,14 +319,16 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 	}
 
 	for _, tc := range tt {
+
 		// create unique contract reference
 		contractRef, err := uuid.NewV4()
 		if err != nil {
 			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
 			return
 		}
-
-		t.Logf("creating contract using ref %s", contractRef)
+		//TODO add a test that doesn't add a ref or gas price
+		// currently refs are getting repeated (likely not getting created properly on nchain, before nats)
+		t.Logf("creating contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 		contract, err := nchain.CreateContract(*orgToken.Token, map[string]interface{}{
 			"network_id":      tc.network,
 			"organization_id": org.ID.String(),
@@ -337,6 +338,7 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 			"params": map[string]interface{}{
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
+				"gas_price":          6000000000, //6 GWei
 				"compiled_artifact":  tc.artifact,
 				"ref":                contractRef.String(),
 			},
@@ -384,7 +386,8 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
 				return
 			}
-			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
+			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		case "readwrite":
 			txRef, err = uuid.NewV4()
@@ -392,7 +395,8 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
 				return
 			}
-			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
+			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		}
 
@@ -423,19 +427,12 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 			}
 
 			if err == nil {
-				if tx.Description != nil {
-					t.Errorf("tx error; tx id: %s; Error: %s", tx.ID.String(), *tx.Description)
-					return
-				}
-				if tx.Status != nil {
-					if *tx.Status == "success" {
-						t.Logf("tx resolved; tx id: %s; hash: %s; block: %d, ref: %s", tx.ID.String(), *tx.Hash, *tx.Block, *tx.Ref)
-						break
-					}
+				if tx.Block != nil && *tx.Hash != "0x" {
+					t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
+					break
 				}
 				t.Logf("resolving transaction...")
 			}
-
 			time.Sleep(transactionSleepTime * time.Second)
 		}
 
@@ -452,7 +449,7 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 				return
 			}
 			if execResponse.Response != nil {
-				//t.Logf("execution response: %v", execResponse.Response)
+				t.Logf("execution response: %v", execResponse.Response)
 				if execResponse.Response != msg {
 					t.Errorf("expected msg %s returned. got %v", msg, execResponse.Response)
 					return
@@ -467,7 +464,6 @@ func TestContractHDWalletRinkebyOrg(t *testing.T) {
 				t.Errorf("error executing contract: %s", err.Error())
 				return
 			}
-			t.Logf("read only test successful. expected: %v, received: %s", execResponse.Response, msg)
 		}
 
 		t.Logf("contract execution successful")

@@ -137,11 +137,11 @@ func _TestContractHDWalletKovanSingle_AlreadyKnown_Manual(t *testing.T) {
 	}
 }
 
-func TestContractHDWalletKovanBulk_NonceTooLow(t *testing.T) {
+func _TestContractHDWalletKovanBulk_NonceTooLow(t *testing.T) {
 
 	t.Parallel()
 
-	const numberOfTransactions = 20
+	const numberOfTransactions = 100
 	deployedContracts := make([]string, numberOfTransactions)
 
 	testId, err := uuid.NewV4()
@@ -273,11 +273,11 @@ func TestContractHDWalletKovanBulk_NonceTooLow(t *testing.T) {
 	}
 }
 
-func _TestBulkContractDeployHDWalletKovanRopsten(t *testing.T) {
+func TestBulkContractDeployHDWalletKovanRopsten(t *testing.T) {
 
 	t.Parallel()
 
-	const numberOfTransactions = 25
+	const numberOfTransactions = 50
 	deployedContracts := make([]string, numberOfTransactions)
 
 	testId, err := uuid.NewV4()
@@ -373,6 +373,7 @@ func _TestBulkContractDeployHDWalletKovanRopsten(t *testing.T) {
 					"wallet_id":          tc.walletID,
 					"hd_derivation_path": tc.derivationPath,
 					"compiled_artifact":  tc.artifact,
+					"gas_price":          6000000000, //6 GWei
 					"ref":                ref,
 				},
 			})

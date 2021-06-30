@@ -320,6 +320,14 @@ func TestContractHDWalletKovanOrg(t *testing.T) {
 
 	for _, tc := range tt {
 
+		// create unique contract reference
+		contractRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+			return
+		}
+		//TODO add a test that doesn't add a ref or gas price
+		// currently refs are getting repeated (likely not getting created properly on nchain, before nats)
 		t.Logf("creating contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 		contract, err := nchain.CreateContract(*orgToken.Token, map[string]interface{}{
 			"network_id":      tc.network,
@@ -330,7 +338,9 @@ func TestContractHDWalletKovanOrg(t *testing.T) {
 			"params": map[string]interface{}{
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
+				"gas_price":          6000000000, //6 GWei
 				"compiled_artifact":  tc.artifact,
+				"ref":                contractRef.String(),
 			},
 		})
 		if err != nil {
@@ -367,13 +377,26 @@ func TestContractHDWalletKovanOrg(t *testing.T) {
 		t.Logf("executing contract using wallet id: %s, derivation path: %s", tc.walletID, tc.derivationPath)
 
 		params := map[string]interface{}{}
+		var txRef uuid.UUID
 
 		switch tc.name {
 		case "ekho":
-			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
+			txRef, err = uuid.NewV4()
+			if err != nil {
+				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+				return
+			}
+			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		case "readwrite":
-			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s"}`, tc.derivationPath, msg, tc.walletID)
+			txRef, err = uuid.NewV4()
+			if err != nil {
+				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+				return
+			}
+			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		}
 
