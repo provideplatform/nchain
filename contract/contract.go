@@ -338,7 +338,7 @@ func (c *Contract) Create() bool {
 						"value":              value,
 						"params":             params,
 						"published_at":       time.Now(),
-						"reference":          c.Ref,
+						"ref":                c.Ref,
 					})
 					common.Log.Debugf("XXX: contract.Create: about to publish txCreateSubject for tx ref: %s", c.Ref)
 					err = natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
