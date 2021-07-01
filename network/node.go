@@ -358,7 +358,8 @@ func (n *Node) ParseConfig() map[string]interface{} {
 
 // Delete a network node
 func (n *Node) Delete(token string) bool {
-	err := c2.DeleteNode(token, n.ID.String())
+	// CHECKME updates in provide-go for c2 work
+	_, err := c2.DeleteNode(token, n.ID.String())
 	if err != nil {
 		n.Errors = append(n.Errors, &provide.Error{
 			Message: common.StringOrNil(fmt.Sprintf("Failed to delete network node; %s", err.Error())),
