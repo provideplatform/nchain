@@ -212,7 +212,7 @@ func processNATSTxMsg(msg *stan.Msg, db *gorm.DB, newContract bool) (*Transactio
 	var reference interface{}
 	var referenceOk bool
 	if newContract {
-		reference, referenceOk = txParams["ref"]
+		reference, referenceOk = params["ref"]
 	} else {
 		reference, referenceOk = params["reference"]
 	}
