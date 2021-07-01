@@ -339,7 +339,7 @@ func processNATSTxMsg(msg *stan.Msg, db *gorm.DB, newContract bool) (*Transactio
 	var gasPrice *float64
 	gasPriceFloat, gasPriceFloatOk := txParams["gas_price"].(float64)
 	if !gasPriceFloatOk {
-		gasPrice = nil
+		gasPrice = MinimumGasPrice()
 	}
 	if gasPriceFloatOk {
 		gasPrice = &gasPriceFloat

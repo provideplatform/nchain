@@ -108,7 +108,7 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
 				"compiled_artifact":  tc.artifact,
-				"gas_price":          6000000000, //6 GWei
+				"gas_price":          7000000000, //6 GWei
 				"ref":                contractRef.String(),
 			},
 		})
@@ -117,6 +117,7 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 			return
 		}
 
+		//t.Logf("contract created with ref: %s", *contract.Ref)
 		// wait for the contract to be deployed
 		started := time.Now().Unix()
 		for {
@@ -155,7 +156,8 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
 				return
 			}
-			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 7000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			//parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
 			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		case "readwrite":
@@ -164,7 +166,8 @@ func TestContractHDWalletKovanApp(t *testing.T) {
 				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
 				return
 			}
-			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 6000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s", "gas_price": 7000000000}`, tc.derivationPath, msg, tc.walletID, txRef)
+			//parameter := fmt.Sprintf(`{"method":"setString", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
 			t.Logf("parameter is: %s", parameter)
 			json.Unmarshal([]byte(parameter), &params)
 		}
@@ -338,16 +341,17 @@ func TestContractHDWalletKovanOrg(t *testing.T) {
 			"params": map[string]interface{}{
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
-				"gas_price":          6000000000, //6 GWei
-				"compiled_artifact":  tc.artifact,
-				"ref":                contractRef.String(),
+				//"gas_price":          6000000000, //6 GWei
+				"compiled_artifact": tc.artifact,
+				"ref":               contractRef.String(),
 			},
 		})
+
 		if err != nil {
 			t.Errorf("error creating %s contract. Error: %s", tc.name, err.Error())
 			return
 		}
-
+		//t.Logf("contract created with ref: %s", *contract.Ref)
 		// wait for the contract to be deployed
 		started := time.Now().Unix()
 		for {
