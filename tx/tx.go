@@ -280,63 +280,6 @@ func setCurrentValue(key string, value *uint64) *uint64 {
 	return value
 }
 
-// func generateTx(txs *TransactionSigner, tx *Transaction, txAddress *string, gas float64, gasPrice *uint64) (types.Signer, *types.Transaction, []byte, error) {
-// 	m.Lock()
-
-// 	defer func() {
-// 		m.Unlock()
-// 	}()
-
-// 	common.Log.Debugf("XXX: Getting nonce for tx ref %s", *tx.Ref)
-// 	nonce, err := tx.getNextNonce()
-// 	if err != nil {
-// 		common.Log.Debugf("Error getting nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-// 	}
-
-// 	var signer types.Signer
-// 	var _tx *types.Transaction
-// 	var hash []byte
-
-// 	common.Log.Debugf("XXX: Getting signer for tx ref %s", *tx.Ref)
-
-// 	err = common.Retry(DefaultJSONRPCRetries, 1*time.Second, func() (err error) {
-// 		signer, _tx, hash, err = providecrypto.EVMTxFactory(
-// 			txs.Network.ID.String(),
-// 			txs.Network.RPCURL(),
-// 			*txAddress,
-// 			tx.To,
-// 			tx.Data,
-// 			tx.Value.BigInt(),
-// 			nonce,
-// 			uint64(gas),
-// 			gasPrice,
-// 		)
-// 		return
-// 	})
-
-// 	if err != nil {
-
-// 		if txs.Wallet != nil {
-// 			err = fmt.Errorf("failed to sign %d-byte transaction payload using hardened account for HD wallet: %s; %s", len(hash), txs.Wallet.ID, err.Error())
-// 		} else {
-// 			err = fmt.Errorf("failed to sign %d-byte transaction payload using account ID: %s; %s", len(hash), txs.Account.ID, err.Error())
-// 		}
-
-// 		common.Log.Debugf("%s", err.Error())
-// 		common.Log.Warning(err.Error())
-// 		return nil, nil, nil, err
-// 	}
-
-// 	if err == nil {
-// 		_, err = incrementNonce(*txAddress, *tx.Ref, _tx.Nonce())
-// 		if err != nil {
-// 			common.Log.Debugf("XXX: Error incrementing nonce for Address %s, tx ref %s. Error: %s", *txAddress, *tx.Ref, err.Error())
-// 		}
-// 	}
-
-// 	return signer, _tx, hash, err
-// }
-
 // Sign implements the Signer interface
 func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash []byte, err error) {
 	if tx == nil {
@@ -396,9 +339,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			return nil, nil, err
 		}
 
-		common.Log.Debugf("XXX: got address %s", *txAddress)
-
-		common.Log.Debugf("XXX: provided nonce of %v for tx ref %s", *tx.Nonce, *tx.Ref)
+		common.Log.Debugf("Provided nonce of %v for tx ref %s", *tx.Nonce, *tx.Ref)
 		signer, _tx, hash, err = providecrypto.EVMTxFactory(
 			txs.Network.ID.String(),
 			txs.Network.RPCURL(),
@@ -624,7 +565,7 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 	networkBroadcastErr := t.broadcast(db, signer.Network, signer)
 	// if regular succeeds, pop it onto nats
 	if networkBroadcastErr == nil {
-		common.Log.Debugf("XXX: Broadcast to %s network succeeded for tx ref: %s", *signer.Network.Name, *t.Ref)
+		common.Log.Debugf("Broadcast to %s network succeeded for tx ref: %s", *signer.Network.Name, *t.Ref)
 		payload, _ := json.Marshal(map[string]interface{}{
 			"transaction_id": t.ID.String(),
 		})
@@ -637,7 +578,7 @@ func (t *Transaction) BroadcastSignedTransaction(db *gorm.DB, signer *Transactio
 		common.Log.Debugf("TIMING: Broadcasting signed tx for tx ref %s took %s", *t.Ref, elapsed)
 		return nil
 	} else {
-		common.Log.Warningf("XXX: Broadcast to %s network failed for tx ref: %s. Error: %s", *signer.Network.Name, *t.Ref, networkBroadcastErr.Error())
+		common.Log.Warningf("Broadcast to %s network failed for tx ref: %s. Error: %s", *signer.Network.Name, *t.Ref, networkBroadcastErr.Error())
 
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(networkBroadcastErr.Error()),
@@ -925,7 +866,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	if !t.ReBroadcast {
 		// now broadcast the goahead for the next transaction
 		nextNonce := *t.Nonce + 1
-		common.Log.Debugf("TIMING: OUT tx ref %s giving broadcast go-ahead for address %s nonce %v", *t.Ref, *address, nextNonce)
+		common.Log.Debugf("TIMING: OUT tx ref %s giving broadcast go-ahead for key %s nonce %v on channel %+v", *t.Ref, currentBroadcastNonceKey, nextNonce, channels.(channelPair).outgoing)
 		goForBroadcast = BroadcastConfirmation{address, &network, &nextNonce, true, true}
 
 		// below blocks until it is read
@@ -962,8 +903,6 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 			t.WalletID = nil
 		}
 
-		//common.Log.Debugf("XXX: Create: about to create tx with ref: %v", *t.Ref)
-
 		result := db.Create(&t)
 
 		rowsAffected := result.RowsAffected
@@ -983,9 +922,9 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 			}
 			return false
 		}
-		common.Log.Debugf("IDEMPOTENT: Attempting to broadcast NEW tx %s", *t.Ref)
+		common.Log.Debugf("Attempting to broadcast NEW tx %s", *t.Ref)
 	} else {
-		common.Log.Debugf("IDEMPOTENT: Attempting to broadcast EXISTING tx %s", *t.Ref)
+		common.Log.Debugf("Attempting to broadcast EXISTING tx %s", *t.Ref)
 	}
 
 	// attempt to broadcast it, whether it's in the db or not
@@ -1262,17 +1201,17 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 		if ntwrk.IsEthereumNetwork() {
 
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
-				common.Log.Debugf("XXX: about to broadcast tx ref: %s", *t.Ref)
+				common.Log.Debugf("About to broadcast tx ref: %s", *t.Ref)
 
 				err := providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 				if err == nil {
-					common.Log.Debugf("broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
+					common.Log.Debugf("Broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
 					// we have successfully broadcast the transaction
 					// so update the tx with the received transaction hash
 					t.Hash = common.StringOrNil(signedTx.Hash().String())
 				} else {
 					// we have failed to broadcast the tx (for some reason)
-					common.Log.Debugf("failed to broadcast tx ref %s with hash %s. Error: %s", *t.Ref, *t.Hash, err.Error())
+					common.Log.Debugf("Failed to broadcast tx ref %s with hash %s. Error: %s", *t.Ref, *t.Hash, err.Error())
 					broadcastError = fmt.Errorf("unable to broadcast signed tx; broadcast failed for signed tx ref %s. Error: %s", *t.Ref, err.Error())
 				} //evmbroadcast
 
@@ -1374,9 +1313,9 @@ func (t *Transaction) handleTxReceipt(
 		}
 
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)
-		common.Log.Debugf("XXX: Searching for contract for txID: %s", t.ID)
+		common.Log.Debugf("Searching for contract for txID: %s", t.ID)
 		if kontract == nil || kontract.ID == uuid.Nil {
-			common.Log.Debugf("XXX could not find contract for tx id: %s, appID: %s, walletID: %s", t.ID, *t.ApplicationID, *t.WalletID)
+			common.Log.Debugf("Could not find contract for tx id: %s, appID: %s, walletID: %s", t.ID, *t.ApplicationID, *t.WalletID)
 
 			kontract = &contract.Contract{
 				ApplicationID:  t.ApplicationID,
@@ -1398,7 +1337,7 @@ func (t *Transaction) handleTxReceipt(
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s, txID: %s", kontract.ID, *network.Name, *t.Hash, t.ID)
 			kontract.Address = common.StringOrNil(receipt.ContractAddress.Hex())
 			db.Save(&kontract)
-			common.Log.Debugf("XXX: updated contract with address for txID: %s", t.ID)
+			common.Log.Debugf("Updated contract with address for txID: %s", t.ID)
 			kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 		}
 	}

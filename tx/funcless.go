@@ -135,8 +135,7 @@ func executeTransaction(c *contract.Contract, execution *contract.Execution) (*c
 			Ref:         ref,
 			View:        readonlyMethod,
 		}
-		common.Log.Debugf("XXXresp is: %+v", resp)
-		common.Log.Debugf("XXX: Execution of tx response for tx ref %s has transaction %v", *resp.Ref, resp.Transaction)
+
 	} else if tx.Response.Transaction == nil {
 		//?? when does this get tripped?
 		//tx.Response.Transaction = tx
@@ -222,9 +221,7 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 					"reference":          tx.Ref,
 				})
 
-				common.Log.Debugf("XXX: contract.Execute: about to publish exec tx to nats for tx ref: %s", *tx.Ref)
 				err = natsutil.NatsStreamingPublish(natsTxSubject, txExecutionMsg)
-
 				if err != nil {
 					common.Log.Warningf("Failed to publish contract deployment tx ref %s. Error: %s", *tx.Ref, err.Error())
 					c.Errors = append(c.Errors, &provideAPI.Error{
@@ -241,7 +238,7 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 			if result != nil {
 				outptr, err := abiMethod.Outputs.UnpackValues(result)
 				if err != nil {
-					return nil, fmt.Errorf("Failed to unpack contract execution response for contract: %s; method: %s; signature with encoded parameters: %s; %s", c.ID, methodDescriptor, *tx.Data, err.Error())
+					return nil, fmt.Errorf("failed to unpack contract execution response for contract: %s; method: %s; signature with encoded parameters: %s; %s", c.ID, methodDescriptor, *tx.Data, err.Error())
 				}
 				if len(outptr) == 1 {
 					out["response"] = outptr[0]

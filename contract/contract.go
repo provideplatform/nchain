@@ -328,7 +328,7 @@ func (c *Contract) Create() bool {
 							data = fmt.Sprintf("%s%x", data, string(encodedArgv))
 						}
 					}
-					common.Log.Debugf("XXX: CHECK: contract is %+v", c)
+
 					txCreationMsg, _ := json.Marshal(map[string]interface{}{
 						"contract_id":        c.ID,
 						"data":               data,
@@ -340,7 +340,6 @@ func (c *Contract) Create() bool {
 						"published_at":       time.Now(),
 						"ref":                c.Ref,
 					})
-					common.Log.Debugf("XXX: contract.Create: about to publish txCreateSubject for tx ref: %s", c.Ref)
 					err = natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
@@ -412,7 +411,6 @@ func (c *Contract) ExecuteFromTx(
 	gasPrice := execution.GasPrice
 	nonce := execution.Nonce
 
-	//xxx add path to params
 	path := execution.HDPath
 
 	// publishedAt := execution.PublishedAt

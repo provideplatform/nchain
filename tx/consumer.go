@@ -156,19 +156,16 @@ func processTxCreateMsg(msg *stan.Msg) {
 		return
 	}
 
-	//common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
-	common.Log.Debugf("XXX: ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
+	common.Log.Debugf("ConsumeTxCreateMsg, about to create tx with ref: %s", *tx.Ref)
 
 	// check if we have this tx ref in the database
 
 	if tx.Create(db) {
-		common.Log.Debugf("XXX: ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
+		common.Log.Debugf("ConsumeTxCreateMsg, created tx with ref: %s", *tx.Ref)
 
 		// update the contract with the tx id (unique to contract flow?)
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
-
-		//common.Log.Debugf("XXX: ConsumeTxCreateMsg, updated contract with txID %s for tx ref: %s", tx.ID, *tx.Ref)
 
 	} else {
 
@@ -177,17 +174,14 @@ func processTxCreateMsg(msg *stan.Msg) {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
-		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
+		common.Log.Debugf("Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
 		natsutil.AttemptNack(msg, txCreateMsgTimeout)
 	}
 
-	// HACK
 	natsutil.AttemptNack(msg, txCreateMsgTimeout)
 }
 
-// processNATSTxCreateMsg processes a NATS msg into a Transaction object
-// TODO wg here?
-// TODO name this properly
+// processNATSTxCreateMsg processes a NATS msg into Transaction and Contract objects
 func processNATSTxMsg(msg *stan.Msg, db *gorm.DB, newContract bool) (*Transaction, *contract.Contract, error) {
 
 	var params map[string]interface{}
@@ -391,8 +385,6 @@ func processNATSTxMsg(msg *stan.Msg, db *gorm.DB, newContract bool) (*Transactio
 		return nil, nil, err
 	}
 
-	//common.Log.Debugf("XXX: Finished processing NATS create message. tx ref %s", *tx.Ref)
-
 	if replacementTx != nil {
 		common.Log.Debugf("Found tx ref %s in db", *tx.Ref)
 		// HACK
@@ -516,19 +508,16 @@ func processTxExecutionMsg(msg *stan.Msg) {
 		err := msg.Ack()
 		if err != nil {
 			common.Log.Debugf("ACK: Error acking previously processed NATS msg seq: %v. Error: %s", msg.Sequence, err.Error())
-			//common.Log.Debugf("ACK: Error acking tx ref %s. Error: %s", *tx.Ref, err.Error())
 			natsutil.AttemptNack(msg, txCreateMsgTimeout)
 		}
 		return
 	}
 
-	//common.Log.Debugf("TIMINGNANO: about to create tx with ref: %s at %d", *tx.Ref, time.Now().UnixNano())
-	common.Log.Debugf("XXX: ConsumeTxExecutionMsg, about to execute tx with ref: %s", *tx.Ref)
+	common.Log.Debugf("ConsumeTxExecutionMsg, about to execute tx with ref: %s", *tx.Ref)
 
 	// check if we have this tx ref in the database
-
 	if tx.Create(db) {
-		common.Log.Debugf("XXX: ConsumeTxExecutionMsg, executed tx with ref: %s", *tx.Ref)
+		common.Log.Debugf("ConsumeTxExecutionMsg, executed tx with ref: %s", *tx.Ref)
 	} else {
 
 		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
@@ -536,168 +525,13 @@ func processTxExecutionMsg(msg *stan.Msg) {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
-		common.Log.Debugf("XXX: Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
+		common.Log.Debugf("Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
 		natsutil.AttemptNack(msg, txMsgTimeout)
 	}
 
-	// HACK
+	// Default status (if not nacked) is to let this be reprocessed until it succeeds
 	natsutil.AttemptNack(msg, txCreateMsgTimeout)
 }
-
-// func consumeTxExecutionMsg_Old(msg *stan.Msg) {
-// 	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
-
-// 	var params map[string]interface{}
-
-// 	err := json.Unmarshal(msg.Data, &params)
-// 	if err != nil {
-// 		common.Log.Warningf("Failed to unmarshal tx execution message; %s", err.Error())
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	contractID, contractIDOk := params["contract_id"]
-// 	data, dataOk := params["data"].(string)
-// 	accountIDStr, accountIDStrOk := params["account_id"].(string)
-// 	walletIDStr, walletIDStrOk := params["wallet_id"].(string)
-// 	hdDerivationPath, _ := params["hd_derivation_path"].(string)
-// 	value, valueOk := params["value"]
-// 	txParams, paramsOk := params["params"].(map[string]interface{})
-// 	publishedAt, publishedAtOk := params["published_at"].(string)
-
-// 	reference, referenceOk := params["reference"]
-
-// 	if !referenceOk {
-// 		// no reference provided with the contract, so we'll make one
-// 		reference, err = uuid.NewV4()
-// 		if err != nil {
-// 			common.Log.Warningf("Failed to create unique tx ref. Error: %s", err.Error())
-// 			natsutil.Nack(msg)
-// 			return
-// 		}
-// 	}
-
-// 	var ref string
-// 	// get pointer to reference for tx object (HACK, TIDY)
-// 	// HACK for testing, not using pure uuids, but should swap once testing complete
-// 	switch reference := reference.(type) {
-// 	case string:
-// 		ref = reference
-// 	case uuid.UUID:
-// 		ref = reference.String()
-// 	}
-
-// 	if !contractIDOk {
-// 		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-// 	if !dataOk {
-// 		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-// 	if !accountIDStrOk && !walletIDStrOk {
-// 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-// 	if !valueOk {
-// 		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-// 	if !paramsOk {
-// 		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-// 	if !publishedAtOk {
-// 		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	contract := &contract.Contract{}
-// 	db := dbconf.DatabaseConnection()
-// 	db.Where("id = ?", contractID).Find(&contract)
-
-// 	var accountID *uuid.UUID
-// 	var walletID *uuid.UUID
-
-// 	accountUUID, accountUUIDErr := uuid.FromString(accountIDStr)
-// 	if accountUUIDErr == nil {
-// 		accountID = &accountUUID
-// 	}
-
-// 	walletUUID, walletUUIDErr := uuid.FromString(walletIDStr)
-// 	if walletUUIDErr == nil {
-// 		walletID = &walletUUID
-// 	}
-
-// 	if accountID == nil && walletID == nil {
-// 		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
-// 	if err != nil {
-// 		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
-// 		natsutil.Nack(msg)
-// 		return
-// 	}
-
-// 	tx := &Transaction{
-// 		ApplicationID:  contract.ApplicationID,
-// 		OrganizationID: contract.OrganizationID,
-// 		Data:           common.StringOrNil(data),
-// 		NetworkID:      contract.NetworkID,
-// 		AccountID:      accountID,
-// 		WalletID:       walletID,
-// 		Path:           common.StringOrNil(hdDerivationPath),
-// 		To:             contract.Address,
-// 		Value:          &TxValue{value: big.NewInt(int64(value.(float64)))},
-// 		PublishedAt:    &publishedAtTime,
-// 		Ref:            &ref,
-// 	}
-
-// 	tx.setParams(txParams)
-
-// 	key := fmt.Sprintf("nchain.tx.%s", *tx.Ref)
-
-// 	// checks if the message is currently in flight (being procesed)
-// 	err = processMessageStatus(key)
-// 	if err != nil {
-// 		common.Log.Debugf("Error processing message status for key %s. Error: %s", key, err.Error())
-// 		return
-// 	}
-
-// 	common.Log.Debugf("XXX: ConsumeTxExecMsg, about to create tx with ref: %s", *tx.Ref)
-// 	if tx.Create(db) {
-// 		common.Log.Debugf("ACK: ConsumeTxExecMsg, about to ack tx with ref: %s", *tx.Ref)
-// 		err = msg.Ack()
-// 		if err != nil {
-// 			common.Log.Debugf("ACK: ConsumeTxExecMsg, error acking tx ref: %s. Error: %s", *tx.Ref, err.Error())
-// 		}
-// 		common.Log.Debugf("ACK: ConsumeTxExecMsg, msg acked tx ref: %s", *tx.Ref)
-// 	} else {
-// 		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
-// 		for _, err := range tx.Errors {
-// 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
-// 		}
-// 		// got rid of the subsidize code that's managed by bookie now
-
-// 		// remove the in-flight status to this can be replayed
-// 		lockErr := setWithLock(key, msgRetryRequired)
-// 		if lockErr != nil {
-// 			common.Log.Debugf("XXX: Error resetting in flight status for tx ref: %s. Error: %s", *tx.Ref, lockErr.Error())
-// 			// TODO what to do if this fails????
-// 		}
-// 		common.Log.Debugf("XXX: Tx ref %s failed. Attempting nacking", *tx.Ref)
-// 		natsutil.AttemptNack(msg, txMsgTimeout)
-// 	}
-// }
 
 // TODO: consider batching this using a buffered channel for high-volume networks
 func consumeTxFinalizeMsg(msg *stan.Msg) {
@@ -829,7 +663,6 @@ func processTxReceipt(msg *stan.Msg, tx *Transaction, key *string, db *gorm.DB) 
 	} else {
 		common.Log.Debugf("Fetched tx receipt for tx ref %s, hash: %s", *tx.Ref, *tx.Hash)
 
-		common.Log.Debugf("XXX: receipt is: %+v", tx.Response.Receipt.(*provide.TxReceipt))
 		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
 		// if we have a block number in the receipt, and the tx has no block
 		// populate the block and finalized timestamp
@@ -887,7 +720,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	common.Log.Debugf("XXX: Consuming tx receipt for tx id: %s", transactionID)
+	common.Log.Debugf("Consuming tx receipt for tx id: %s", transactionID)
 	db := dbconf.DatabaseConnection()
 
 	tx := &Transaction{}
@@ -898,7 +731,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 		return
 	}
 
-	common.Log.Debugf("XXX: Starting processTxReceipt for tx ref: %s", *tx.Ref)
+	common.Log.Debugf("Starting processTxReceipt for tx ref: %s", *tx.Ref)
 	// TODO occasionally throws panic on startup
 	// caused by vault not being available, so the signer.address is not populated (:803-ish)
 	// process the receipts asynchronously

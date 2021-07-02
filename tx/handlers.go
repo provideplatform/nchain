@@ -346,7 +346,7 @@ func contractExecutionHandler(c *gin.Context) {
 				}
 
 				execution.AccountAddress = key.Address
-				common.Log.Debugf("xxx using address: %s, derived from wallet using path %s", *key.Address, pathstr)
+				common.Log.Debugf("Using address: %s, derived from wallet using path %s", *key.Address, pathstr)
 			}
 
 			if wallet.Path == nil {
@@ -361,7 +361,7 @@ func contractExecutionHandler(c *gin.Context) {
 					return
 				}
 				execution.AccountAddress = key.Address
-				common.Log.Debugf("xxx using address: %s, derived from wallet using DEFAULT path", *key.Address)
+				common.Log.Debugf("Using address: %s, derived from wallet using DEFAULT path", *key.Address)
 			}
 		}
 
