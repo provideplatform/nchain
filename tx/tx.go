@@ -639,16 +639,16 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 	address := t.getAddressIdentifier()
 	network := signer.Network.ID.String()
 
-	var inChan chan BroadcastConfirmation
-	var outChan chan BroadcastConfirmation
-
-	var chanKey *string
-	var prevChanKey *string
-
 	idempotentKey := fmt.Sprintf("nchain.tx.listing.%s:%s:%s", network, *address, *t.Ref)
 
 	// check if we have to try to broadcast this tx
 	if t.ContinueWithBroadcast(idempotentKey) {
+
+		var inChan chan BroadcastConfirmation
+		var outChan chan BroadcastConfirmation
+
+		var chanKey *string
+		var prevChanKey *string
 
 		// get the sequenceCounter
 		// for this address (if new)
@@ -658,9 +658,11 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 		if *counter == 0 {
 			chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *counter))
 			prevChanKey = nil
+			common.Log.Debugf("tx ref: %s counter %v, idempotentKey: %s chankey: %s, prev chankey nil", *t.Ref, *counter, idempotentKey, *chanKey)
 		} else {
 			chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *counter))
 			prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *counter-1))
+			common.Log.Debugf("tx ref: %s counter %v, idempotentKey: %s chankey: %s, prev chankey %s", *t.Ref, *counter, idempotentKey, *chanKey, *prevChanKey)
 		}
 
 		if prevChanKey != nil && txChannels.Has(*prevChanKey) {
@@ -668,20 +670,32 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 			// use it as an IN channel for this tx
 			inChan = txChannels.Get(*prevChanKey).(channelPair).outgoing
 			// TODO if this is closed, we need to recreate it
-
+			common.Log.Debugf("using prev chan for tx ref: %s. inchan: %+v", *t.Ref, inChan)
 		} else {
 			// otherwise make a new one
 			inChan = make(chan BroadcastConfirmation)
+			common.Log.Debugf("making new chan for tx ref: %s. inchan: %+v", *t.Ref, inChan)
 		}
 
-		// we need to make a new dictionary entry for this nonce
-		outChan = make(chan BroadcastConfirmation)
+		var chanPair channelPair
 
-		chanPair := channelPair{
+		oc := txChannels.Get(*chanKey)
+		if oc == nil {
+			common.Log.Debugf("tx ref %s: nil outbound channel for chan key %s", *t.Ref, *chanKey)
+			// we need to make a new tx channels dictionary entry for this nonce
+			outChan = make(chan BroadcastConfirmation)
+		} else {
+			common.Log.Debugf("tx ref %s: outbound channel %+v for chan key %s", *t.Ref, oc.(channelPair).outgoing, *chanKey)
+			// we will use the existing tx channels dictionary entry for this nonce
+			outChan = oc.(channelPair).outgoing
+		}
+
+		chanPair = channelPair{
 			inChan,
 			outChan,
 		}
 
+		common.Log.Debugf("tx ref: %s. chankey: %s inchan %+v, outchan: %+v. chanpair: %+v", *t.Ref, *chanKey, chanPair.incoming, chanPair.outgoing, chanPair)
 		// add the IN and OUT channel pair to this tx dictionary
 		txChannels.Set(*chanKey, chanPair)
 
@@ -693,7 +707,7 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 		if prevChanKey == nil {
 			if !t.ReBroadcast {
 				goForBroadcast := BroadcastConfirmation{address, &network, nonce, false, false}
-				common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v", *address, *nonce)
+				common.Log.Debugf("TIMING: FIRST: giving broadcast go-ahead for address %s nonce %v. chan %+v", *address, *nonce, txChannels.Get(*chanKey).(channelPair).incoming)
 				txChannels.Get(*chanKey).(channelPair).incoming <- goForBroadcast
 			}
 			// once it's received, close the channel
@@ -768,13 +782,6 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 		}
 	} else {
 		common.Log.Debugf("Rebroadcast of tx ref %s. No go ahead waited on", *t.Ref)
-		// TODO check the tx status so we're not rebroadcasting successfult transactions
-		//  t.Reload()
-		//  if t.Status != nil {
-		// 	if *t.Status == "success" {
-		// 		break
-		// 	}
-		// }
 	}
 
 	// broadcast repeatedly until it succeeds
@@ -851,10 +858,6 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			// TODO this will get extended for the gas pricing increases when it goes in
 			if AlreadyKnown(err) {
 				common.Log.Debugf("Already known error for tx ref: %s", *t.Ref)
-				// t.Hash = common.StringOrNil(t.SignedTx.(*types.Transaction).Hash().String())
-				// broadcastAt := time.Now()
-				// t.BroadcastAt = &broadcastAt
-				// t.updateStatus(db, "broadcast", nil)
 				break
 			} // AlreadyKnown
 
@@ -1202,13 +1205,12 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 
 			if signedTx, ok := t.SignedTx.(*types.Transaction); ok {
 				common.Log.Debugf("About to broadcast tx ref: %s", *t.Ref)
+				t.Hash = common.StringOrNil(signedTx.Hash().String())
 
 				err := providecrypto.EVMBroadcastSignedTx(ntwrk.ID.String(), ntwrk.RPCURL(), signedTx)
 				if err == nil {
-					common.Log.Debugf("Broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
 					// we have successfully broadcast the transaction
-					// so update the tx with the received transaction hash
-					t.Hash = common.StringOrNil(signedTx.Hash().String())
+					common.Log.Debugf("Broadcast tx ref %s with hash %s", *t.Ref, *t.Hash)
 				} else {
 					// we have failed to broadcast the tx (for some reason)
 					common.Log.Debugf("Failed to broadcast tx ref %s with hash %s. Error: %s", *t.Ref, *t.Hash, err.Error())
