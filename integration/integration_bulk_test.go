@@ -14,6 +14,205 @@ import (
 	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
+func TestBulkExecuteContractHdWalletKovan(t *testing.T) {
+
+	testId, err := uuid.NewV4()
+	if err != nil {
+		t.Logf("error creating new UUID")
+	}
+
+	const numberofContractExecutions = 100
+
+	userToken, err := UserAndTokenFactory(testId)
+	if err != nil {
+		t.Errorf("user authentication failed. Error: %s", err.Error())
+	}
+
+	testcaseApp := Application{
+		"app" + testId.String(),
+		"appdesc " + testId.String(),
+	}
+
+	app, err := appFactory(*userToken, testcaseApp.name, testcaseApp.description)
+	if err != nil {
+		t.Errorf("error setting up application. Error: %s", err.Error())
+		return
+	}
+
+	appToken, err := appTokenFactory(*userToken, app.ID)
+	if err != nil {
+		t.Errorf("error getting app token. Error: %s", err.Error())
+		return
+	}
+
+	wallet, err := nchain.CreateWallet(*appToken.Token, map[string]interface{}{
+		"mnemonic": "traffic charge swing glimpse will citizen push mutual embrace volcano siege identify gossip battle casual exit enrich unlock muscle vast female initial please day",
+	})
+	if err != nil {
+		t.Errorf("error creating wallet: %s", err.Error())
+		return
+	}
+
+	// this path produces the ETH address 0x6af845bae76f5cc16bc93f86b83e8928c3dfda19
+	path := `m/44'/60'/2'/0/0`
+
+	// deploy the contract
+	// load the ekho compiled artifact
+	ekhoArtifact, err := ioutil.ReadFile("artifacts/ekho.json")
+	if err != nil {
+		t.Errorf("error loading ekho artifact. Error: %s", err.Error())
+	}
+
+	ekhoCompiledArtifact := nchain.CompiledArtifact{}
+	err = json.Unmarshal(ekhoArtifact, &ekhoCompiledArtifact)
+	if err != nil {
+		t.Errorf("error converting ekho compiled artifact. Error: %s", err.Error())
+	}
+	tt := []struct {
+		network        string
+		name           string
+		derivationPath string
+		walletID       string
+		artifact       nchain.CompiledArtifact
+	}{
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+	}
+
+	for _, tc := range tt {
+
+		contractRef, err := uuid.NewV4()
+		if err != nil {
+			t.Errorf("error creating unique contract ref. Error: %s", err.Error())
+			return
+		}
+
+		var contract *nchain.Contract
+		contract, err = nchain.CreateContract(*appToken.Token, map[string]interface{}{
+			"network_id":     tc.network,
+			"application_id": app.ID.String(),
+			"wallet_id":      tc.walletID,
+			"name":           tc.name,
+			"address":        "0x",
+			"params": map[string]interface{}{
+				"wallet_id":          tc.walletID,
+				"hd_derivation_path": tc.derivationPath,
+				"compiled_artifact":  tc.artifact,
+				"ref":                contractRef.String(),
+			},
+		})
+		if err != nil {
+			t.Errorf("error creating %s contract. Error: %s", tc.name, err.Error())
+			return
+		}
+		t.Logf("created contract with ref %s", *contract.Ref)
+
+		started := time.Now().Unix()
+
+		for {
+
+			if time.Now().Unix()-started >= contractTimeout {
+				t.Error("timed out awaiting contract address")
+				return
+			}
+
+			// loop through the deployed contracts to see if they have been deployed successfully
+
+			deployedContract, err := nchain.GetContractDetails(*appToken.Token, contract.ID.String(), map[string]interface{}{})
+			if err != nil {
+				t.Errorf("error fetching contract details; %s", err.Error())
+				return
+			}
+
+			if deployedContract.Address != nil && *deployedContract.Address != "0x" {
+				t.Logf("contract address resolved; contract id: %s; address: %s", deployedContract.ID.String(), *deployedContract.Address)
+				break
+			}
+
+			t.Logf("contract address has not yet been resolved; contract id: %s", deployedContract.ID.String())
+
+			time.Sleep(contractSleepTime * time.Second)
+		}
+
+		var references [numberofContractExecutions]string //we'll store the returned references in here
+
+		// send a bunch of transactions at the contract
+		for execloop := 0; execloop < (numberofContractExecutions); execloop++ {
+
+			var txRef uuid.UUID
+			txRef, err = uuid.NewV4()
+			if err != nil {
+				t.Errorf("error creating unique tx ref. Error: %s", err.Error())
+				return
+			}
+
+			msg := common.RandomString(118)
+
+			params := map[string]interface{}{}
+			parameter := fmt.Sprintf(`{"method":"broadcast", "hd_derivation_path": "%s", "params": ["%s"], "value":0, "wallet_id":"%s", "ref": "%s"}`, tc.derivationPath, msg, tc.walletID, txRef)
+			json.Unmarshal([]byte(parameter), &params)
+
+			execResponse, err := nchain.ExecuteContract(*appToken.Token, contract.ID.String(), params)
+			if err != nil {
+				t.Errorf("error executing contract: %s", err.Error())
+				return
+			}
+			references[execloop] = *execResponse.Reference
+		}
+
+		// ok, now we'll confirm that each of the transactions has succeeded
+		// (or at least hit the mempool and has a transaction hash )
+		started = time.Now().Unix()
+		mined := 0
+
+		for txloop := 0; txloop < (numberofContractExecutions); txloop++ {
+			for {
+				found := false
+				if time.Now().Unix()-started >= transactionTimeout {
+					t.Error("timed out awaiting transaction hash")
+					return
+				}
+
+				tx, err := nchain.GetTransactionDetails(*appToken.Token, references[txloop], map[string]interface{}{})
+				//this is populated by nchain consumer, so it can take a moment to appear, so we won't quit right away on a 404
+				if err != nil {
+					t.Logf("error fetching transaction; %s", err.Error())
+				}
+
+				if err == nil {
+					if tx.Block != nil && *tx.Hash != "0x" {
+						t.Logf("tx resolved; tx id: %s; hash: %s; block: %d", tx.ID.String(), *tx.Hash, *tx.Block)
+						mined++
+						found = true
+						break
+					}
+					t.Logf("resolving transaction...")
+				} //err
+				if found == true {
+					break
+				}
+
+				time.Sleep(transactionSleepTime * time.Second)
+			} //for
+
+		} //txloop
+
+		if mined != (numberofContractExecutions) {
+			t.Errorf("not all transactions were mined. expected %d, mined %d", (numberofContractExecutions), mined)
+			return
+		}
+		t.Logf("%d transactions mined successfully", mined)
+	}
+}
+
 func _TestContractHDWalletKovanSingle_AlreadyKnown_Manual(t *testing.T) {
 
 	// note this test will create 2 txs with very high identical nonces
@@ -273,7 +472,7 @@ func _TestContractHDWalletKovanBulk_NonceTooLow(t *testing.T) {
 	}
 }
 
-func TestBulkContractDeployHDWalletKovanRopsten(t *testing.T) {
+func _TestBulkContractDeployHDWalletKovanRopsten(t *testing.T) {
 
 	t.Parallel()
 
