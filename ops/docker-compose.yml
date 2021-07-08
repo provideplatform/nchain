@@ -299,6 +299,7 @@ services:
       - REQUEST_TIMEOUT=20
       - RPC_TIMEOUT=10
       - EVM_SYNC_TIMEOUT=10
+      - MINIMUM_GAS_PRICE_IN_WEI=50000000000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://nchain-consumer:8080/status"] # FIXME
       interval: 1m
