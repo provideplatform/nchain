@@ -701,7 +701,21 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 
 		common.Log.Debugf("TIMINGNANO: tx ref %s chankey %s, signer %v, nonce %v", *t.Ref, *chanKey, signer, nonce)
 
-		go t.SignAndReadyForBroadcast(txChannels.Get(*chanKey), signer, db, nonce)
+		broadcast := make(chan bool)
+		go t.SignAndReadyForBroadcast(txChannels.Get(*chanKey), signer, db, nonce, broadcast)
+
+		common.Log.Debugf("!!!: waiting for sign and broadcast ok for tx ref: %s", *t.Ref)
+		txBroadcast := <-broadcast
+		common.Log.Debugf("!!!: got sign and broadcast %v for tx ref: %s", txBroadcast, *t.Ref)
+		if !txBroadcast {
+			broadcastError := fmt.Errorf("error signing and broadcasting tx ref: %s", *t.Ref)
+			return broadcastError
+		}
+
+		// todo add channel to capture bool for continue
+		// if true, we have signed etc, and should attempt broadcast
+		// if false, we have failed to sign, and should exit with an error
+		// and wait for the rebroadcast to catch it
 
 		// if this is the first tx for this network address, or we've previously broadcast it, give it the broadcast go straight away
 		if prevChanKey == nil {
@@ -722,7 +736,7 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 	return nil
 }
 
-func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *TransactionSigner, db *gorm.DB, nonce *uint64) {
+func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *TransactionSigner, db *gorm.DB, nonce *uint64, broadcast chan bool) {
 	var currentBroadcastNonceKey string
 
 	err := t.SignRawTransaction(db, nonce, signer)
@@ -730,7 +744,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 		t.Errors = append(t.Errors, &provide.Error{
 			Message: common.StringOrNil(err.Error()),
 		})
-		common.Log.Debugf("IDEMPOTENT: Error signing raw tx for tx ref %s. Error: %s", *t.Ref, err.Error())
+		common.Log.Debugf("!!!: Error signing raw tx for tx ref %s. Error: %s", *t.Ref, err.Error())
+		errDesc := fmt.Sprintf("signing error: %s", err.Error())
+		t.updateStatus(db, "failed", &errDesc)
+		broadcast <- false
+		return
 	} else {
 		common.Log.Debugf("Raw tx signed for tx ref %s", *t.Ref)
 	}
@@ -740,6 +758,10 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 	if !t.ReBroadcast {
 		t.updateStatus(db, "ready", nil)
 	}
+
+	common.Log.Debugf("!!!: sign and broadcast ok for tx ref: %s", *t.Ref)
+	broadcast <- true
+	common.Log.Debugf("!!!: gave sign and broadcast ok for tx ref: %s", *t.Ref)
 
 	address := t.getAddressIdentifier()
 	network := signer.Network.ID.String()
@@ -776,7 +798,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 				t.Errors = append(t.Errors, &provide.Error{
 					Message: common.StringOrNil(err.Error()),
 				})
-				//common.Log.Debugf("IDEMPOTENT: Error re-signing raw tx for tx ref %s. Error: %s", *t.Ref, err.Error())
+				common.Log.Debugf("!!!: Error re-signing raw tx with new nonce for tx ref %s. Error: %s", *t.Ref, err.Error())
+				errDesc := fmt.Sprintf("signing error updating nonce: %s", err.Error())
+				t.updateStatus(db, "failed", &errDesc)
+				broadcast <- false
+				return
 			}
 			common.Log.Debugf("Updated nonce to %v for tx ref %s", *t.Nonce, *t.Ref)
 		}
@@ -824,6 +850,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 						t.Errors = append(t.Errors, &provide.Error{
 							Message: common.StringOrNil(err.Error()),
 						})
+						common.Log.Debugf("!!!: Error re-signing raw tx (nonce too low) for tx ref %s. Error: %s", *t.Ref, err.Error())
+						errDesc := fmt.Sprintf("signing error re-signing nonce too low tx: %s", err.Error())
+						t.updateStatus(db, "failed", &errDesc)
+						broadcast <- false
+						return
 					}
 					common.Log.Debugf("signed raw tx for tx ref %s", *t.Ref)
 				}
@@ -831,7 +862,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 
 			// TODO parameterise and cap the gas price
 			if UnderPriced(err) && !t.ReBroadcast {
-				common.Log.Debugf("Under Priced error for tx ref: %s", *t.Ref)
+				common.Log.Debugf("!!!: Under Priced error for tx ref: %s", *t.Ref)
 				updatedGasPrice := float64(0)
 				if t.Parameters.GasPrice != nil {
 					//common.Log.Debugf("tx ref %s under priced. gas price: %d", *t.Ref, *t.Parameters.GasPrice)
@@ -850,8 +881,13 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 					t.Errors = append(t.Errors, &provide.Error{
 						Message: common.StringOrNil(err.Error()),
 					})
+					common.Log.Debugf("!!!: Error re-signing raw tx (underpriced) for tx ref %s. Error: %s", *t.Ref, err.Error())
+					errDesc := fmt.Sprintf("signing error under priced tx: %s", err.Error())
+					t.updateStatus(db, "failed", &errDesc)
+					broadcast <- false
+					return
 				}
-				common.Log.Debugf("Signed raw tx for tx ref %s", *t.Ref)
+				common.Log.Debugf("Underpriced tx. re-Signed raw tx for tx ref %s", *t.Ref)
 			} //UnderPriced
 
 			// this is ok, we're just refreshing the broadcast to ensure it's in the mempool
@@ -956,6 +992,8 @@ func (t *Transaction) ContinueWithBroadcast(idempotentKey string) bool {
 		case "broadcast":
 			common.Log.Debugf("IDEMPOTENT: reprocessing tx ref %s that has been broadcast", *t.Ref)
 			t.ReBroadcast = true
+			return true
+		case "failed":
 			return true
 		case "success":
 			common.Log.Debugf("ACK: Acknowledging successful delivery of tx ref %s", *t.Ref)
@@ -1173,8 +1211,8 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	var broadcastError error
 
 	// TODO ensure subsidize param is set, or we don't broadcast to bookie
-	if t.SignedTx == nil || ntwrk == nil {
-
+	if (t.SignedTx == nil || ntwrk == nil) && t.shouldSubsidize() {
+		common.Log.Debugf("!!!: tx ref %s going down bookie path! ", *t.Ref)
 		// bookie path
 		params := t.ParseParams()
 
