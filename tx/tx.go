@@ -656,23 +656,25 @@ func (t *Transaction) attemptBroadcast(db *gorm.DB) error {
 		counter := t.getSequenceCounter(idempotentKey, network, *address)
 
 		if *counter == 0 {
+			// first tx for this address
 			chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *counter))
 			prevChanKey = nil
 			common.Log.Debugf("tx ref: %s counter %v, idempotentKey: %s chankey: %s, prev chankey nil", *t.Ref, *counter, idempotentKey, *chanKey)
 		} else {
+			// not first tx for this address
 			chanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *counter))
 			prevChanKey = common.StringOrNil(fmt.Sprintf("%s.%s:%s:%v", channelKey, network, *address, *counter-1))
 			common.Log.Debugf("tx ref: %s counter %v, idempotentKey: %s chankey: %s, prev chankey %s", *t.Ref, *counter, idempotentKey, *chanKey, *prevChanKey)
 		}
 
 		if prevChanKey != nil && txChannels.Has(*prevChanKey) {
-			// if we have an OUT channel for the previous sequence
+			// if we have an OUT channel for the previous counter
 			// use it as an IN channel for this tx
 			inChan = txChannels.Get(*prevChanKey).(channelPair).outgoing
 			// TODO if this is closed, we need to recreate it
 			common.Log.Debugf("using prev chan for tx ref: %s. inchan: %+v", *t.Ref, inChan)
 		} else {
-			// otherwise make a new one
+			// otherwise make a new inbound channel for broadcast go ahead
 			inChan = make(chan BroadcastConfirmation)
 			common.Log.Debugf("making new chan for tx ref: %s. inchan: %+v", *t.Ref, inChan)
 		}
