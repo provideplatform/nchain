@@ -794,7 +794,6 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			t.Nonce = goForBroadcast.nonce
 			err := t.SignRawTransaction(db, t.Nonce, signer)
 			if err != nil {
-				// TODO, sort this out
 				t.Errors = append(t.Errors, &provide.Error{
 					Message: common.StringOrNil(err.Error()),
 				})
@@ -833,7 +832,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			common.Log.Debugf("Error broadcasting tx ref %s. Error: %s", *t.Ref, err.Error())
 			// check for nonce too low and fix
 			// TODO add manualnonce check - do not alter if nonce has been applied manually
-			if NonceTooLow(err) {
+			if NonceTooLow(err) && !t.ReBroadcast {
 				common.Log.Debugf("Nonce too low error for tx ref: %s", *t.Ref)
 				// get the address for the signer
 				signerAddress, err := signer.Address()
@@ -858,6 +857,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 					}
 					common.Log.Debugf("signed raw tx for tx ref %s", *t.Ref)
 				}
+			} //NonceTooLow
+
+			if NonceTooLow(err) && t.ReBroadcast {
+				common.Log.Debugf("Nonce too low error rebroadcast error for tx ref: %s", *t.Ref)
+				break
 			} //NonceTooLow
 
 			// TODO parameterise and cap the gas price
@@ -888,6 +892,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 					return
 				}
 				common.Log.Debugf("Underpriced tx. re-Signed raw tx for tx ref %s", *t.Ref)
+			} //UnderPriced
+
+			if UnderPriced(err) && t.ReBroadcast {
+				common.Log.Debugf("!!!: Under Priced rebroadcast error for tx ref: %s", *t.Ref)
+				break
 			} //UnderPriced
 
 			// this is ok, we're just refreshing the broadcast to ensure it's in the mempool
