@@ -1,4 +1,4 @@
-package reassembly
+package consumer
 
 import (
 	"crypto/md5"
@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"strconv"
 	"time"
@@ -480,8 +479,6 @@ func (p *PacketReassembly) Verify() (bool, error) {
 
 	var checksumBytes [16]byte
 	copy(checksumBytes[:], *p.Checksum)
-
-	ioutil.WriteFile("reassembled.txt", []byte(hex.EncodeToString(*p.Payload)), 0644)
 
 	return (checksumBytes == md5.Sum(*p.Payload)), nil
 }
