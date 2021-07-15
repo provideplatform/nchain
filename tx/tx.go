@@ -36,11 +36,14 @@ import (
 	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
-const defaultDerivedCoinType = uint32(60)
-const defaultDerivedChainPath = uint32(0) // i.e., the external or internal chain (also known as change addresses if internal chain)
-const firstHardenedChildIndex = uint32(0x80000000)
+// const defaultDerivedCoinType = uint32(60)
+// const defaultDerivedChainPath = uint32(0) // i.e., the external or internal chain (also known as change addresses if internal chain)
+// const firstHardenedChildIndex = uint32(0x80000000)
 
 const DefaultJSONRPCRetries = 3
+
+// chaosMonkeyCounter used to trigger error scenarios for testing
+var chaosMonkeyCounter = 0
 
 // Signer interface for signing transactions
 type Signer interface {
@@ -545,6 +548,12 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64, signer *TransactionSigner) error {
 
 	start := time.Now()
+
+	chaosMonkeyCounter++
+	// if chaosMonkeyCounter%2 == 1 {
+	// 	chaosErr := fmt.Errorf("chaos monkey error for tx ref %s", *t.Ref)
+	// 	return chaosErr
+	// }
 
 	var hash []byte
 	var err error
