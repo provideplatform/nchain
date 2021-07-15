@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -128,9 +127,6 @@ type TransactionSigner struct {
 	Account *wallet.Account
 	Wallet  *wallet.Wallet
 }
-
-var m sync.Mutex
-var nonceMutex sync.Mutex
 
 // getAddressIdentifier converts the tx account/wallet+path
 // into a unique identifier for that account
@@ -757,7 +753,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 		})
 		common.Log.Debugf("!!!: Error signing raw tx for tx ref %s. Error: %s", *t.Ref, err.Error())
 		errDesc := fmt.Sprintf("signing error: %s", err.Error())
-		t.updateStatus(db, "failed", &errDesc)
+
+		// only set tx status to failed if it's not a rebroadcast attempt
+		if !t.ReBroadcast {
+			t.updateStatus(db, "failed", &errDesc)
+		}
 		broadcast <- false
 		return
 	} else {
@@ -766,6 +766,7 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 
 	// save the nonce and status to the database
 	t.Nonce = nonce
+	// only set tx status to ready if it's not a rebroadcast attempt
 	if !t.ReBroadcast {
 		t.updateStatus(db, "ready", nil)
 	}
