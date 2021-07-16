@@ -21,7 +21,7 @@ func TestBulkExecuteContractHdWalletKovan(t *testing.T) {
 		t.Logf("error creating new UUID")
 	}
 
-	const numberofContractExecutions = 100
+	const numberofContractExecutions = 5
 
 	userToken, err := UserAndTokenFactory(testId)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestBulkExecuteContractHdWalletKovan(t *testing.T) {
 		return
 	}
 
-	// this path produces the ETH address 0x6af845bae76f5cc16bc93f86b83e8928c3dfda19
+	// this path produces the ETH address
 	path := `m/44'/60'/2'/0/0`
 
 	// deploy the contract
@@ -75,6 +75,76 @@ func TestBulkExecuteContractHdWalletKovan(t *testing.T) {
 		walletID       string
 		artifact       nchain.CompiledArtifact
 	}{
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
+		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		{ropstenNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},
 		{kovanNetworkID, "ekho", path, wallet.ID.String(), ekhoCompiledArtifact},

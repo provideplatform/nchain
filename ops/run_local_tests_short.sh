@@ -251,7 +251,7 @@ export LOG_LEVEL=DEBUG
 sleep 5
 
 go test "./integration" -v \
-                    -timeout 1800s \
+                    -timeout 10800s \
                     -race \
                     -count=1\
                     -parallel 1 \

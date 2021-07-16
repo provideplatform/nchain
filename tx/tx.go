@@ -546,7 +546,7 @@ func (t *Transaction) SignRawTransaction(db *gorm.DB, nonce *uint64, signer *Tra
 	start := time.Now()
 
 	chaosMonkeyCounter++
-	// if chaosMonkeyCounter%2 == 1 {
+	// if chaosMonkeyCounter%5 == 0 {
 	// 	chaosErr := fmt.Errorf("chaos monkey error for tx ref %s", *t.Ref)
 	// 	return chaosErr
 	// }
@@ -914,7 +914,11 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 			// this is ok, we're just refreshing the broadcast to ensure it's in the mempool
 			// TODO this will get extended for the gas pricing increases when it goes in
 			if AlreadyKnown(err) {
-				common.Log.Debugf("Already known error for tx ref: %s", *t.Ref)
+				common.Log.Debugf("Already known error for tx ref: %s. Requesting new receipt.", *t.Ref)
+				payload, _ := json.Marshal(map[string]interface{}{
+					"transaction_id": t.ID.String(),
+				})
+				natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
 				break
 			} // AlreadyKnown
 

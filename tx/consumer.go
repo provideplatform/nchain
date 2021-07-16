@@ -38,13 +38,9 @@ const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 const natsTxReceiptSubject = "nchain.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
 const txReceiptAckWait = time.Second * 15
-const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
-
-const msgInFlight = "IN_FLIGHT"
-const msgRetryRequired = "RETRY_REQUIRED"
+const txReceiptMsgTimeout = int64(txReceiptAckWait * 30)
 
 var waitGroup sync.WaitGroup
-var natsWG sync.WaitGroup
 
 var txChannels common.ValueDictionary  //(interface is channelPair struct only)
 var txRegister common.ValueDictionary  // stores tx references for idempotent processing
