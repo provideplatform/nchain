@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/provideplatform/nchain/common"
@@ -115,6 +117,111 @@ func createTransactionHandler(c *gin.Context) {
 	tx.ApplicationID = appID
 	tx.OrganizationID = orgID
 	tx.UserID = userID
+
+	params := tx.ParseParams()
+
+	// get ref from params (optional, create new if not present)
+	var ref string
+	txRef, txRefOk := params["ref"].(string)
+
+	if txRefOk {
+		ref = txRef
+	} else {
+		refUUID, err := uuid.NewV4()
+		if err != nil {
+			err := fmt.Errorf("failed to generate ref id; %s", err.Error())
+			provide.RenderError(err.Error(), 400, c)
+			return
+		}
+		ref = refUUID.String()
+	}
+
+	tx.Ref = &ref
+
+	// value := uint64(0)
+	// if val, valOk := params["value"].(float64); valOk {
+	// 	value = uint64(val)
+	// }
+
+	var accountID *string
+	if acctID, acctIDOk := params["account_id"].(string); acctIDOk {
+		accountID = &acctID
+	}
+
+	var walletID *string
+	var hdDerivationPath *string
+	if wlltID, wlltIDOk := params["wallet_id"].(string); wlltIDOk {
+		walletID = &wlltID
+
+		if path, pathOk := params["hd_derivation_path"].(string); pathOk {
+			hdDerivationPath = &path
+		}
+	}
+
+	// end goal
+	// send as a message to NATS
+	txExecutionMsg, _ := json.Marshal(map[string]interface{}{
+		"account_id":         accountID,
+		"wallet_id":          walletID,
+		"hd_derivation_path": hdDerivationPath,
+		"value":              tx.Value,
+		"params":             params,
+		"published_at":       time.Now(),
+		"reference":          ref,
+	})
+
+	err = natsutil.NatsStreamingPublish(natsTxTransferSubject, txExecutionMsg)
+	if err != nil {
+		provide.RenderError("error creating transaction", 500, c)
+
+	} else {
+		provide.Render(tx, 201, c)
+	}
+}
+
+// commented out for reference as it's rebuilt
+func _createTransactionHandler(c *gin.Context) {
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	userID := util.AuthorizedSubjectID(c, "user")
+	if appID == nil && orgID == nil && userID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	tx := &Transaction{}
+	err = json.Unmarshal(buf, tx)
+	if err != nil {
+		provide.RenderError(err.Error(), 422, c)
+		return
+	}
+
+	tx.ApplicationID = appID
+	tx.OrganizationID = orgID
+	tx.UserID = userID
+
+	params := tx.ParseParams()
+
+	//get ref from params (optional, create new if not present)
+	var ref string
+	txRef, txRefOk := params["ref"]
+
+	if txRefOk {
+		ref = txRef.(string)
+	} else {
+		uuidRef, err := uuid.NewV4()
+		if err != nil {
+			common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+		}
+		ref = uuidRef.String()
+	}
+	tx.Ref = &ref
 
 	db := dbconf.DatabaseConnection()
 
