@@ -156,13 +156,17 @@ func (t *Transaction) getNextNonce(db *gorm.DB) (*uint64, error) {
 		walletID := t.WalletID
 		path := t.Parameters.Path
 
-		var Maxnonce []interface{}
-
 		if accountID != nil || walletID != nil {
 			if accountID != nil {
 				// FIXME - so it's like the wallet/path
-				db.Raw("SELECT MAX(nonce) from Transactions WHERE account_id=? AND status in ('broadcast','success')", *accountID).Take(Maxnonce)
-				common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", Maxnonce, *t.Ref)
+				var results []uint64
+				//db.Raw("SELECT * FROM transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success') AND nonce IS NOT NULL ORDER BY nonce DESC", *walletID, cleansedPath).Scan(&results)
+				db.Raw("SELECT max(nonce) FROM transactions WHERE account_id=? AND network_id=? AND status in ('broadcast','success') AND nonce IS NOT NULL", *accountID, network).Pluck("nonce", &results)
+				//common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", results, *t.Ref)
+				if len(results) > 0 {
+					pendingNonce = &results[0]
+					common.Log.Debugf("NONCE: found max db nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
+				}
 			}
 			if walletID != nil {
 				if path != nil {
@@ -177,9 +181,14 @@ func (t *Transaction) getNextNonce(db *gorm.DB) (*uint64, error) {
 					}
 				} else {
 					// HACK = check what actually happens when a path is not specified...
-					// FIXME - so it's like the wallet/path
-					db.Raw("SELECT MAX(nonce) from Transactions WHERE wallet_id=? AND status in ('broadcast','success')", *walletID).Pluck("nonce", &Maxnonce)
-					common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", Maxnonce, *t.Ref)
+					var results []uint64
+					//db.Raw("SELECT * FROM transactions WHERE wallet_id=? AND hd_derivation_path=? AND status in ('broadcast','success') AND nonce IS NOT NULL ORDER BY nonce DESC", *walletID, cleansedPath).Scan(&results)
+					db.Raw("SELECT max(nonce) FROM transactions WHERE wallet_id=? AND network_id=? AND status in ('broadcast','success') AND nonce IS NOT NULL", *walletID, network).Pluck("nonce", &results)
+					//common.Log.Debugf("NONCE: found max nonce of %v for tx ref %s", results, *t.Ref)
+					if len(results) > 0 {
+						pendingNonce = &results[0]
+						common.Log.Debugf("NONCE: found max db nonce of %v for tx ref %s", *pendingNonce, *t.Ref)
+					}
 				}
 			}
 		}

@@ -30,6 +30,11 @@ const natsTxCreateMaxInFlight = 2048
 const txCreateAckWait = time.Second * 60
 const txCreateMsgTimeout = int64(txCreateAckWait * 5)
 
+const natsTxTransferSubject = "nchain.tx.transfer"
+const natsTxTransferMaxInFlight = 2048
+const txTransferAckWait = time.Second * 60
+const txTransferMsgTimeout = int64(txCreateAckWait * 5)
+
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
 const txFinalizeAckWait = time.Second * 15
@@ -56,6 +61,7 @@ func init() {
 
 	createNatsTxSubscriptions(&waitGroup)
 	createNatsTxCreateSubscriptions(&waitGroup)
+	createNatsTxTransferSubscriptions(&waitGroup)
 	createNatsTxFinalizeSubscriptions(&waitGroup)
 	createNatsTxReceiptSubscriptions(&waitGroup)
 
@@ -89,6 +95,20 @@ func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
+func createNatsTxTransferSubscriptions(wg *sync.WaitGroup) {
+	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
+		natsutil.RequireNatsStreamingSubscription(wg,
+			txTransferAckWait,
+			natsTxTransferSubject,
+			natsTxTransferSubject,
+			consumeTxTransferMsg,
+			txTransferAckWait,
+			natsTxTransferMaxInFlight,
+			nil,
+		)
+	}
+}
+
 func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsStreamingSubscription(wg,
@@ -117,12 +137,65 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
+func consumeTxTransferMsg(msg *stan.Msg) {
+	start := time.Now()
+	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v", msg.Sequence)
+	processTxTransferMsg(msg)
+	elapsedTime := time.Since(start)
+	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
+}
+
 func consumeTxCreateMsg(msg *stan.Msg) {
 	start := time.Now()
 	common.Log.Debugf("TIMINGNANO: about to process nats sequence %v", msg.Sequence)
 	processTxCreateMsg(msg)
 	elapsedTime := time.Since(start)
 	common.Log.Debugf("TIMINGNANO: processed nats sequence %v in %s", msg.Sequence, elapsedTime)
+}
+
+// processTxTransferMsg processes ETH value transfer NATS messages
+func processTxTransferMsg(msg *stan.Msg) {
+
+	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", msg.Size(), msg.Subject)
+
+	db := dbconf.DatabaseConnection()
+
+	// process msg data
+	// TODO alter this to support transfers
+	tx, _, err := processNATSTxMsg(msg, db, false)
+	if err != nil {
+		common.Log.Debugf("Error processing NATS %v message. Error: %s", msg.Subject, err.Error())
+		natsutil.Nack(msg)
+		return
+	}
+	if tx == nil {
+		common.Log.Debugf("ACK: Acking previously processed NATS msg seq: %v", msg.Sequence)
+		err := msg.Ack()
+		if err != nil {
+			common.Log.Debugf("ACK: Error acking previously processed NATS msg seq: %v. Error: %s", msg.Sequence, err.Error())
+			natsutil.AttemptNack(msg, txCreateMsgTimeout)
+		}
+		return
+	}
+
+	common.Log.Debugf("ConsumeTxExecutionMsg, about to execute tx with ref: %s", *tx.Ref)
+
+	// check if we have this tx ref in the database
+	if tx.Create(db) {
+		common.Log.Debugf("ConsumeTxExecutionMsg, executed tx with ref: %s", *tx.Ref)
+	} else {
+
+		errmsg := fmt.Sprintf("Failed to execute transaction; tx ref %s failed with %d error(s)", *tx.Ref, len(tx.Errors))
+		for _, err := range tx.Errors {
+			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
+		}
+
+		common.Log.Debugf("Tx ref %s failed. Error: %s, Attempting nacking", *tx.Ref, errmsg)
+		natsutil.AttemptNack(msg, txMsgTimeout)
+	}
+
+	// Default status (if not nacked) is to let this be reprocessed until it succeeds
+	natsutil.AttemptNack(msg, txCreateMsgTimeout)
 }
 
 // these need to be processed EXACTLY in order
@@ -383,7 +456,6 @@ func processNATSTxMsg(msg *stan.Msg, db *gorm.DB, newContract bool) (*Transactio
 
 	if replacementTx != nil {
 		common.Log.Debugf("Found tx ref %s in db", *tx.Ref)
-		// HACK
 		status := replacementTx.Status
 		if status != nil {
 			if *status == "success" {

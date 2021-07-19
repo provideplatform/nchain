@@ -950,7 +950,6 @@ func (t *Transaction) SignAndReadyForBroadcast(channels interface{}, signer *Tra
 // Create and persist a new transaction. Side effects include persistence of contract
 // and/or token instances when the tx represents a contract and/or token creation.
 func (t *Transaction) Create(db *gorm.DB) bool {
-	//common.Log.Debugf("TIMINGNANO: about to validate tx ref: %s at %d", *t.Ref, time.Now().UnixNano())
 
 	if !t.Validate() {
 		return false
