@@ -108,7 +108,6 @@ func TestContractHDWalletRopstenApp(t *testing.T) {
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
 				"compiled_artifact":  tc.artifact,
-				"gas_price":          6000000000, //6 GWei
 				"ref":                contractRef.String(),
 			},
 		})
@@ -338,7 +337,6 @@ func TestContractHDWalletRopstenOrg(t *testing.T) {
 			"params": map[string]interface{}{
 				"wallet_id":          tc.walletID,
 				"hd_derivation_path": tc.derivationPath,
-				"gas_price":          6000000000, //6 GWei
 				"compiled_artifact":  tc.artifact,
 				"ref":                contractRef.String(),
 			},
