@@ -1,13 +1,15 @@
-package reassembly
+package consumer
 
 import (
+	"bytes"
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/json"
 	"os"
 	"testing"
 
 	"github.com/kthomas/go-redisutil"
+	"github.com/provideapp/nchain/common"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func setEnvVarIfNotExists(name string, value string) {
@@ -35,25 +37,20 @@ func getTestFile(t *testing.T, path string) []byte {
 
 func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 	// Decode data into a fragment
-	fragment := &PacketFragment{}
-	err := json.Unmarshal(msg, &fragment)
+	fragment := &packetFragment{}
+	err := msgpack.Unmarshal(msg, &fragment)
 
 	if err != nil {
 		t.Errorf("Unable to decode message (call #%d)", call)
 		return
 	}
 
-	// Check that fragment had a payload & decode it into raw bytes
-	var decodedPayload []byte
+	// Check that fragment has a payload
 	if fragment.Payload == nil {
 		t.Errorf("Fragment contained no Payload, (call #%d)", call)
+		return
 	} else {
-		var derr error
-		decodedPayload, derr = base64.StdEncoding.DecodeString(*fragment.Payload)
-		if derr != nil {
-			t.Errorf("Unable to b64 decode Payload (call #%d)", call)
-		}
-		actualSize := uint(len(decodedPayload))
+		actualSize := uint(len(*fragment.Payload))
 		if actualSize != fragment.PayloadSize {
 			t.Errorf("Incorrect fragment packet size. Payload was %d bytes, but Size set to %d", actualSize, fragment.PayloadSize)
 		}
@@ -62,18 +59,13 @@ func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 	// Check that the checksum is present & correct
 	if fragment.Checksum == nil {
 		t.Errorf("Fragment contained no checksum, (call #%d)", call)
+		return
 	} else {
-		_, derr := base64.StdEncoding.DecodeString(*fragment.Checksum)
-		if derr != nil {
-			t.Errorf("Unable to b64 decode Checksum (call #%d)", call)
-		}
-
 		// Manually check the checksum
-		// Hash the decoded payload & encode in b64 to compare with Checksum
-		hashBytes := md5.Sum(decodedPayload)
-		expectedHash := base64.StdEncoding.EncodeToString(hashBytes[:])
+		// Hash the Payload & compare with Checksum
+		hashBytes := md5.Sum(*fragment.Payload)
 
-		if *fragment.Checksum != expectedHash {
+		if !bytes.Equal(*fragment.Checksum, hashBytes[:]) {
 			t.Errorf("Fragment hash was not as expected. (call #%d)", call)
 		}
 	}
@@ -94,10 +86,10 @@ func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 	}
 }
 
-func checkReassemblyIsValid(t *testing.T, msg []byte) *PacketReassembly {
+func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
 	// Decode data into a fragment
-	reassembly := &PacketReassembly{}
-	err := json.Unmarshal(msg, &reassembly)
+	reassembly := &packetReassembly{}
+	err := msgpack.Unmarshal(msg, &reassembly)
 
 	if err != nil {
 		t.Errorf("Unable to reassembly packet")
@@ -111,17 +103,21 @@ func checkReassemblyIsValid(t *testing.T, msg []byte) *PacketReassembly {
 func TestBroadcastFragments(t *testing.T) {
 	// Load a large test file to use as a binary blob to broadcast
 	payload := getTestFile(t, "test/test1.bin")
-
+	payloadLength := uint(len(payload))
 	setupRedis()
 
 	// Stub out the publish function so that BroadcastFragments will use our stub above to "send" data.
 	var callsToPublish uint64 = 0
-	var reassembly *PacketReassembly = nil
+	var reassembly *packetReassembly = nil
+	var totalMsgSize uint = 0
 	SetBroadcastPublishFunction(func(subject string, msg []byte) error {
 		callsToPublish++
 
-		if len(msg) > 7000 {
-			t.Errorf("Large fragment found. Expected size: <= 7000, Actual: %d", len(msg))
+		length := uint(len(msg))
+		totalMsgSize += length
+
+		if length > 7000 {
+			t.Errorf("Large fragment found. Expected size: <= 7000, Actual: %d. subject: '%s'", len(msg), subject)
 		}
 
 		// Subject is always natsPacketFragmentIngestSubject?
@@ -140,17 +136,19 @@ func TestBroadcastFragments(t *testing.T) {
 	})
 
 	// Run the actual fragment broadcast
-	err := BroadcastFragments(payload)
+	err := BroadcastFragments(payload, nil)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}
 
+	// Check size
+	common.Log.Debugf("Payload Length: %d, Total Bytes Sent: %d, Overhead: %.1f%%", payloadLength, totalMsgSize, (1-(float32(payloadLength)/float32(totalMsgSize)))*100)
+
+	// Reassemble the packets
 	if reassembly == nil {
 		t.Error("BroadcastFragments() error; did not get reassembly packet")
 		return
 	}
-
-	// Reassemble the packets
 	ass_ret, ass_err := reassembly.Reassemble()
 	if !ass_ret {
 		t.Error("reassembly.Reassemble() returned false")
@@ -167,26 +165,19 @@ func TestBroadcastFragments(t *testing.T) {
 	}
 }
 
-func loadPacket(t *testing.T, path string) *PacketFragment {
+func loadPacket(t *testing.T, path string) *packetFragment {
 	data := string(getTestFile(t, path))
 
-	var fragment *PacketFragment
+	var fragment *packetFragment
 	err := json.Unmarshal([]byte(data), &fragment)
 	if err != nil {
-		t.Error("test error; unable to unserialise 'test/valid-packet.json' PacketFragment")
+		t.Errorf("test error; unable to unserialise '%s' PacketFragment", path)
 	}
 
 	return fragment
 }
 
-func expectFragmentDecodes(t *testing.T, fragment *PacketFragment) {
-	err := fragment.Decode()
-	if err != nil {
-		t.Errorf("Decode() error; Decode returned error, expected no error. err: '%s'.", err)
-	}
-}
-
-func expectFragmentIsValid(t *testing.T, fragment *PacketFragment) {
+func expectFragmentIsValid(t *testing.T, fragment *packetFragment) {
 	valid, err := fragment.Verify()
 	if !valid {
 		t.Errorf("Verify() error; Verify returned false, expected true, err: '%s'.", err)
@@ -196,7 +187,7 @@ func expectFragmentIsValid(t *testing.T, fragment *PacketFragment) {
 	}
 }
 
-func expectFragmentIsNotValid(t *testing.T, fragment *PacketFragment, expectedError error) {
+func expectFragmentIsNotValid(t *testing.T, fragment *packetFragment, expectedError error) {
 	valid, verr := fragment.Verify()
 	if valid {
 		t.Errorf("Verify() error; Verify returned true, expected false.")
@@ -247,14 +238,12 @@ func TestVerify(t *testing.T) {
 	// Valid packet
 	{
 		fragment := loadPacket(t, "test/valid-packet.json")
-		expectFragmentDecodes(t, fragment)
 		expectFragmentIsValid(t, fragment)
 	}
 
 	// Wrong Checksum
 	{
 		fragment := loadPacket(t, "test/invalid-packet-wrong-checksum.json")
-		expectFragmentDecodes(t, fragment)
 		expectFragmentIsNotValid(t, fragment, nil)
 	}
 

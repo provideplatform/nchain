@@ -1,13 +1,13 @@
 package consumer
 
 import (
-	"encoding/json"
 	"sync"
 	"time"
 
 	"github.com/kthomas/go-natsutil"
 	"github.com/nats-io/stan.go"
 	"github.com/provideapp/nchain/common"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // TODO: audit arbitrary max in flight & timeouts
@@ -71,7 +71,7 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS packet fragment ingest message: %s", msg)
 
 	fragment := &packetFragment{}
-	err := json.Unmarshal(msg.Data, &fragment)
+	err := msgpack.Unmarshal(msg.Data, &fragment)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet fragment ingest message; %s", err.Error())
 		natsutil.Nack(msg)
@@ -102,14 +102,6 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		return
 	}
 
-	if fragment.Index == 0 {
-		if fragment.Reassembly == nil {
-			common.Log.Warning("Failed to ingest packet fragment; reassembly 'header' required within 'fragment 0' encapsulation")
-			natsutil.Nack(msg)
-			return
-		}
-	}
-
 	common.Log.Debugf("Attempting to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d)", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality)
 	ingestVerified, i, ingestErr := fragment.Ingest()
 	if ingestErr != nil || !ingestVerified {
@@ -120,18 +112,17 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 
 	progress := float64(*i) / float64(fragment.Cardinality)
 	if progress == 1 {
-		common.Log.Debugf("All fragments ingested for packet with checksum %s; dispatching reassembly message on subject: %s", *fragment.Checksum, *fragment.Reassembly.Next)
 
-		if fragment.Reassembly == nil {
-			_, err := fragment.FetchReassemblyHeader()
-			if err != nil {
-				common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", natsPacketReassembleSubject, err.Error())
-				natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
-				return
-			}
+		reassembly, err := fragment.FetchReassemblyHeader()
+		if err != nil {
+			common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", natsPacketReassembleSubject, err.Error())
+			natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
+			return
 		}
 
-		payload, _ := json.Marshal(fragment.Reassembly)
+		common.Log.Debugf("All fragments ingested for packet with checksum %s; dispatching reassembly message on subject: %s", *fragment.Checksum, *reassembly.Next)
+
+		payload, _ := msgpack.Marshal(reassembly)
 		err = natsutil.NatsPublish(natsPacketReassembleSubject, payload)
 		if err != nil {
 			common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), natsPacketReassembleSubject, err.Error())
@@ -148,7 +139,7 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS packet reassembly message: %s", msg)
 
 	reassembly := &packetReassembly{}
-	err := json.Unmarshal(msg.Data, &reassembly)
+	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet reassembly message; %s", err.Error())
 		natsutil.Nack(msg)
@@ -157,12 +148,6 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 
 	if reassembly.Checksum == nil {
 		common.Log.Warning("Failed to reassemble packet; nil checksum")
-		natsutil.Nack(msg)
-		return
-	}
-
-	if reassembly.Next == nil {
-		common.Log.Warning("Failed to reassemble packet; next hop not specified") // TODO-- relax this to support pure p2p file transfer
 		natsutil.Nack(msg)
 		return
 	}
@@ -196,7 +181,8 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 			return
 		}
 
-		payload, _ := json.Marshal(reassembly)
+		// TODO: Pretty sure this won't work at all
+		payload, _ := msgpack.Marshal(reassembly)
 		err = natsutil.NatsPublish(*reassembly.Next, payload)
 		if err != nil {
 			common.Log.Warningf("Failed to publish %d-byte next hop message on subject: %s; %s", len(payload), *reassembly.Next, err.Error())
