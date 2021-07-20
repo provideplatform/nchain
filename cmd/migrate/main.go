@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"

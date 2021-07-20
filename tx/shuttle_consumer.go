@@ -11,9 +11,9 @@ import (
 	"github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/nats-io/stan.go"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/contract"
-	"github.com/provideapp/nchain/token"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/contract"
+	"github.com/provideplatform/nchain/token"
 	provide "github.com/provideservices/provide-go/api"
 )
 

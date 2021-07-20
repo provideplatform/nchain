@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 	provide "github.com/provideservices/provide-go/api/nchain"
 	providecrypto "github.com/provideservices/provide-go/crypto"
 )

@@ -15,7 +15,7 @@ import (
 	azurewrapper "github.com/kthomas/go-azure-wrapper"
 	provide "github.com/provideservices/provide-go/api/c2"
 
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 )
 
 // AzureOrchestrationProvider is a network.orchestration.API implementing the Azure API

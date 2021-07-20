@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/contract"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/contract"
 	provide "github.com/provideservices/provide-go/api"
 )
 

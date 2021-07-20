@@ -242,7 +242,7 @@ services:
       - DATABASE_USER=nchain
       - DATABASE_PASSWORD=nchain
       - LOG_LEVEL=DEBUG
-      - NATS_CLUSTER_ID=provide   
+      - NATS_CLUSTER_ID=provide
       - NATS_CLIENT_PREFIX=nchain-consumer
       - NATS_URL=nats://nats:4222
       - NATS_STREAMING_URL=nats://nats-streaming:4222

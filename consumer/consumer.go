@@ -1,12 +1,13 @@
 package consumer
 
 import (
+	"encoding/hex"
 	"sync"
 	"time"
 
 	"github.com/kthomas/go-natsutil"
 	"github.com/nats-io/stan.go"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -21,6 +22,8 @@ const natsPacketReassembleSubject = "prvd.packet.reassemble"
 const natsPacketReassembleMaxInFlight = 256
 const natsPacketReassembleInvocationTimeout = time.Second * 30 // FIXME!!! (see above)
 const natsPacketReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see above)
+
+const natsPacketCompleteSubject = "prvd.packet.complete"
 
 var (
 	waitGroup     sync.WaitGroup
@@ -67,6 +70,19 @@ func createNatsPacketReassemblySubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
+// Common reassembly code - this is called once all fragments & the header have been consumed
+// TODO: Figure this out
+func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
+	common.Log.Debugf("All fragments ingested for packet with checksum %s", hex.EncodeToString(*reassembly.Checksum))
+
+	payload, _ := msgpack.Marshal(reassembly)
+	err := natsutil.NatsPublish(natsPacketCompleteSubject, payload)
+	if err != nil {
+		common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), natsPacketReassembleSubject, err.Error())
+		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
+	}
+}
+
 func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 	common.Log.Debugf("Consuming NATS packet fragment ingest message: %s", msg)
 
@@ -74,30 +90,6 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 	err := msgpack.Unmarshal(msg.Data, &fragment)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet fragment ingest message; %s", err.Error())
-		natsutil.Nack(msg)
-		return
-	}
-
-	if fragment.Checksum == nil {
-		common.Log.Warning("Failed to ingest packet fragment; nil checksum")
-		natsutil.Nack(msg)
-		return
-	}
-
-	if fragment.Payload == nil {
-		common.Log.Warning("Failed to ingest packet fragment; nil payload")
-		natsutil.Nack(msg)
-		return
-	}
-
-	if fragment.Cardinality == 0 {
-		common.Log.Warning("Failed to ingest packet fragment; cardinality must be greater than zero")
-		natsutil.Nack(msg)
-		return
-	}
-
-	if fragment.Index >= fragment.Cardinality {
-		common.Log.Warning("Failed to ingest packet fragment; fragment index must be less than the packet cardinality")
 		natsutil.Nack(msg)
 		return
 	}
@@ -110,9 +102,8 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		return
 	}
 
-	progress := float64(*i) / float64(fragment.Cardinality)
-	if progress == 1 {
-
+	remaining := fragment.Cardinality - *i
+	if remaining == 0 {
 		reassembly, err := fragment.FetchReassemblyHeader()
 		if err != nil {
 			common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", natsPacketReassembleSubject, err.Error())
@@ -120,18 +111,10 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 			return
 		}
 
-		common.Log.Debugf("All fragments ingested for packet with checksum %s; dispatching reassembly message on subject: %s", *fragment.Checksum, *reassembly.Next)
-
-		payload, _ := msgpack.Marshal(reassembly)
-		err = natsutil.NatsPublish(natsPacketReassembleSubject, payload)
-		if err != nil {
-			common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), natsPacketReassembleSubject, err.Error())
-			natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
-			return
-		}
+		handleReassembly(msg, reassembly)
 	}
 
-	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested (%f%%)", fragment.Index+1, *fragment.Checksum, i, fragment.Cardinality, progress)
+	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index+1, hex.EncodeToString(*fragment.Checksum), i, fragment.Cardinality)
 	msg.Ack()
 }
 
@@ -146,54 +129,18 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 		return
 	}
 
-	if reassembly.Checksum == nil {
-		common.Log.Warning("Failed to reassemble packet; nil checksum")
-		natsutil.Nack(msg)
-		return
-	}
-
-	if reassembly.Cardinality == 0 {
-		common.Log.Warning("Failed to reassemble packet; cardinality must be greater than zero")
-		natsutil.Nack(msg)
-		return
-	}
-
 	fragSize := reassembly.Size / reassembly.Cardinality
-	progress, i, err := reassembly.fragmentIngestProgress()
+	remaining, i, err := reassembly.fragmentsRemaining()
 	if err != nil {
 		common.Log.Warningf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); failed atomically reading or parsing fragment ingest progress; %s", reassembly.Size, reassembly.Cardinality, fragSize, err.Error())
 		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
 		return
 	}
 
-	if *progress == 1 {
-		common.Log.Debugf("All fragments ingested for packet with checksum %s; dispatching next hop with pointer to reconstituted packet as message on subject: %s", *reassembly.Checksum, *reassembly.Next)
-
-		reassemblyVerified, reassemblyErr := reassembly.Reassemble()
-		if reassemblyErr != nil || !reassemblyVerified {
-			if reassemblyErr != nil {
-				common.Log.Warningf(reassemblyErr.Error())
-			} else {
-				common.Log.Warningf("Failed to reassemble packet with checksum %s; verification failed", *reassembly.Checksum)
-			}
-
-			natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
-			return
-		}
-
-		// TODO: Pretty sure this won't work at all
-		payload, _ := msgpack.Marshal(reassembly)
-		err = natsutil.NatsPublish(*reassembly.Next, payload)
-		if err != nil {
-			common.Log.Warningf("Failed to publish %d-byte next hop message on subject: %s; %s", len(payload), *reassembly.Next, err.Error())
-			natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
-			return
-		}
-
-		common.Log.Debugf("Published %d-byte next hop message after successful reassembly of packet with checksum %s on subject: %s", len(payload), *reassembly.Checksum, *reassembly.Next)
-		msg.Ack()
+	if *remaining == 0 {
+		handleReassembly(msg, reassembly)
 	} else {
-		common.Log.Warningf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); only %d fragments ingested (%f%%)", reassembly.Size, reassembly.Cardinality, fragSize, *i, *progress)
+		common.Log.Warningf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); only %d fragments ingested", reassembly.Size, reassembly.Cardinality, fragSize, *i)
 		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
 		return
 	}

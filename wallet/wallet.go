@@ -14,7 +14,7 @@ import (
 	util "github.com/provideservices/provide-go/common/util"
 
 	"github.com/jinzhu/gorm"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 )
 
 // Wallet instances are logical collections of accounts; wallet instances are HD wallets

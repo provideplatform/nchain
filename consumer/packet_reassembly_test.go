@@ -8,22 +8,11 @@ import (
 	"testing"
 
 	"github.com/kthomas/go-redisutil"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-func setEnvVarIfNotExists(name string, value string) {
-	existing := os.Getenv(name)
-	if existing == "" {
-		os.Setenv(name, value)
-	}
-}
-
 func setupRedis() {
-	setEnvVarIfNotExists("REDIS_HOSTS", "127.0.0.1:6379")
-	setEnvVarIfNotExists("REDIS_DB_INDEX", "1")
-	setEnvVarIfNotExists("REDIS_PASSWORD", "test")
-
 	redisutil.RequireRedis()
 }
 
@@ -136,7 +125,7 @@ func TestBroadcastFragments(t *testing.T) {
 	})
 
 	// Run the actual fragment broadcast
-	err := BroadcastFragments(payload, nil)
+	err := BroadcastFragments(payload)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}
