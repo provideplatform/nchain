@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	awsconf "github.com/kthomas/go-aws-config"
@@ -87,7 +88,7 @@ func init() {
 	Log = logger.NewLogger("nchain", lvl, endpoint)
 
 	DefaultAWSConfig = awsconf.GetConfig()
-	ConsumeNATSStreamingSubscriptions = true //strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
+	ConsumeNATSStreamingSubscriptions = strings.ToLower(os.Getenv("CONSUME_NATS_STREAMING_SUBSCRIPTIONS")) == "true"
 }
 
 func RequireInfrastructureSupport() {
