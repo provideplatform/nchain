@@ -38,25 +38,25 @@ func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 	if fragment.Payload == nil {
 		t.Errorf("Fragment contained no Payload, (call #%d)", call)
 		return
-	} else {
-		actualSize := uint(len(*fragment.Payload))
-		if actualSize != fragment.PayloadSize {
-			t.Errorf("Incorrect fragment packet size. Payload was %d bytes, but Size set to %d", actualSize, fragment.PayloadSize)
-		}
+	}
+
+	actualSize := uint(len(*fragment.Payload))
+	if actualSize != fragment.PayloadSize {
+		t.Errorf("Incorrect fragment packet size. Payload was %d bytes, but Size set to %d", actualSize, fragment.PayloadSize)
 	}
 
 	// Check that the checksum is present & correct
 	if fragment.Checksum == nil {
 		t.Errorf("Fragment contained no checksum, (call #%d)", call)
 		return
-	} else {
-		// Manually check the checksum
-		// Hash the Payload & compare with Checksum
-		hashBytes := md5.Sum(*fragment.Payload)
+	}
 
-		if !bytes.Equal(*fragment.Checksum, hashBytes[:]) {
-			t.Errorf("Fragment hash was not as expected. (call #%d)", call)
-		}
+	// Manually check the checksum
+	// Hash the Payload & compare with Checksum
+	hashBytes := md5.Sum(*fragment.Payload)
+
+	if !bytes.Equal(*fragment.Checksum, hashBytes[:]) {
+		t.Errorf("Fragment hash was not as expected. (call #%d)", call)
 	}
 
 	// Ensure Index is within Cardinality range
@@ -138,12 +138,12 @@ func TestBroadcastFragments(t *testing.T) {
 		t.Error("BroadcastFragments() error; did not get reassembly packet")
 		return
 	}
-	ass_ret, ass_err := reassembly.Reassemble()
-	if !ass_ret {
+	assRet, assErr := reassembly.Reassemble()
+	if !assRet {
 		t.Error("reassembly.Reassemble() returned false")
 	}
-	if ass_err != nil {
-		t.Errorf("reassembly.Reassemble() error; %s", ass_err.Error())
+	if assErr != nil {
+		t.Errorf("reassembly.Reassemble() error; %s", assErr.Error())
 	}
 
 	// While we might not care about how specifically the packets are broken down - for the large test file

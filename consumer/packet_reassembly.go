@@ -20,7 +20,7 @@ const packetReassemblyHeaderKeySuffix = "header"
 const packetReassemblyFragmentIngestCountKeySuffix = "fragments.ingest-count"
 const packetReassemblyFragmentPersistenceKeySuffix = "fragments.persistence"
 
-const PacketReassemblyFragmentationChunkSize = uint(4500)
+const packetReassemblyFragmentationChunkSize = uint(4500)
 
 // Fragmentable interface
 type Fragmentable interface {
@@ -43,9 +43,8 @@ type Fragmentable interface {
 // of all fragments such that reassembly of the packet is guaranteed within the `nextHop` handler at runtime (i.e.
 // such a handler can be thought of as an "exit node" for the reassembled packet and terminates execution on it).
 func BroadcastFragments(packet []byte) error {
-
 	packetSize := uint(len(packet))
-	chunkSize := PacketReassemblyFragmentationChunkSize
+	chunkSize := packetReassemblyFragmentationChunkSize
 	common.Log.Debugf("fragmented broadcast of %d-byte packet into %d-byte chunks requested...", packetSize, chunkSize)
 
 	numChunks := uint(1)
@@ -116,20 +115,20 @@ func packetReassemblyFactory(packet []byte, cardinality uint) *packetReassembly 
 	}
 }
 
-// PacketReassemblyIndexKeyFactory returns a unique identifier for in-memory cache & mutexes,
+// packetReassemblyIndexKeyFactory returns a unique identifier for in-memory cache & mutexes,
 // fragment persistent storage facilities, etc. for in-flight packet reassembly operations
 // for the given Fragmentable
 func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) *string {
 	var checksum *[]byte
 	var nonce *int64
 
-	switch p := fragmentable.(type) {
+	switch packet := fragmentable.(type) {
 	case *packetFragment:
-		checksum = p.ReassembledChecksum
-		nonce = p.Nonce
+		checksum = packet.ReassembledChecksum
+		nonce = packet.Nonce
 	case *packetReassembly:
-		checksum = p.Checksum
-		nonce = p.Nonce
+		checksum = packet.Checksum
+		nonce = packet.Nonce
 	default:
 		common.Log.Warning("Reflection not supported for given fragmentable")
 	}
@@ -152,9 +151,9 @@ func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) 
 
 func fragmentIndexKeyFactory(nonce *int64, index uint, reassembledChecksum *[]byte, suffix *string) *string {
 	digest := sha256.New()
-	str2 := fmt.Sprintf("%s.%d.%s.%d", natsPacketFragmentIngestSubject, *nonce, hex.EncodeToString(*reassembledChecksum), index)
-	digest.Write([]byte(str2))
-	key := hex.EncodeToString(digest.Sum(nil))
+	key := fmt.Sprintf("%s.%d.%s.%d", natsPacketFragmentIngestSubject, *nonce, hex.EncodeToString(*reassembledChecksum), index)
+	digest.Write([]byte(key))
+	key = hex.EncodeToString(digest.Sum(nil))
 
 	if suffix != nil {
 		key = fmt.Sprintf("%s.%s", key, *suffix)
@@ -163,7 +162,7 @@ func fragmentIndexKeyFactory(nonce *int64, index uint, reassembledChecksum *[]by
 	return &key
 }
 
-// PacketFragment represents a packet fragment ingest message payload; TODO: support marshaling from wire/protocol in addition to JSON
+// packetFragment represents a packet fragment ingest message payload; TODO: support marshaling from wire/protocol in addition to JSON
 type packetFragment struct {
 	Index               uint    `msgpack:"index"`                // the index of the fragment
 	Cardinality         uint    `msgpack:"cardinality"`          // # of total fragments comprising the packet
@@ -176,11 +175,13 @@ type packetFragment struct {
 	// TODO: forward secrecy considerations
 }
 
+// BroadcastFunctionFunc is the signature for the method that broadcasts the packets out
 type BroadcastFunctionFunc = func(string, []byte) error
 
 // Method to use to publish - can be stubbed in tests
 var streamingPublish BroadcastFunctionFunc = natsutil.NatsStreamingPublish
 
+// SetBroadcastPublishFunction sets the implementation that will be used to broadcast packets (default is natsutil.NatsStreamingPublish)
 func SetBroadcastPublishFunction(function BroadcastFunctionFunc) {
 	streamingPublish = function
 }
@@ -293,7 +294,7 @@ func (p *packetFragment) Verify() (bool, error) {
 		return false, errors.New("failed to validate fragment; cardinality is zero")
 	}
 	if p.Index >= p.Cardinality {
-		return false, fmt.Errorf("failed to validate fragment; invalid index (%d) greater than cardinality (%d).", p.Index, p.Cardinality)
+		return false, fmt.Errorf("failed to validate fragment; invalid index (%d) greater than cardinality (%d)", p.Index, p.Cardinality)
 	}
 
 	// Verify checksum
@@ -305,7 +306,7 @@ func (p *packetFragment) Verify() (bool, error) {
 	return (checksumBytes == md5.Sum([]byte(*p.Payload))), nil
 }
 
-// PacketReassembly represents a NATS packet reassembly message payload
+// packetReassembly represents a NATS packet reassembly message payload
 type packetReassembly struct {
 	Cardinality uint    `msgpack:"cardinality"` // i.e., # of total fragments comprising the packet
 	Checksum    *[]byte `msgpack:"checksum"`    // i.e., md5 checksum of the entire n of n payload

@@ -84,8 +84,6 @@ func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
 }
 
 func consumePacketFragmentIngestMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS packet fragment ingest message: %s", msg)
-
 	fragment := &packetFragment{}
 	err := msgpack.Unmarshal(msg.Data, &fragment)
 	if err != nil {
@@ -94,7 +92,6 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		return
 	}
 
-	common.Log.Debugf("Attempting to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d)", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality)
 	ingestVerified, i, ingestErr := fragment.Ingest()
 	if ingestErr != nil || !ingestVerified {
 		common.Log.Warningf("Failed to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d); %s", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality, ingestErr.Error())
@@ -119,8 +116,6 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 }
 
 func consumePacketReassembleMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS packet reassembly message: %s", msg)
-
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
@@ -130,7 +125,7 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 	}
 
 	fragSize := reassembly.Size / reassembly.Cardinality
-	remaining, i, err := reassembly.fragmentsRemaining()
+	remaining, _, err := reassembly.fragmentsRemaining()
 	if err != nil {
 		common.Log.Warningf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); failed atomically reading or parsing fragment ingest progress; %s", reassembly.Size, reassembly.Cardinality, fragSize, err.Error())
 		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
@@ -139,9 +134,5 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 
 	if *remaining == 0 {
 		handleReassembly(msg, reassembly)
-	} else {
-		common.Log.Warningf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); only %d fragments ingested", reassembly.Size, reassembly.Cardinality, fragSize, *i)
-		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
-		return
 	}
 }
