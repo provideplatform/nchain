@@ -4,16 +4,24 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
+	"math/rand"
 	"os"
 	"testing"
 
 	"github.com/kthomas/go-redisutil"
-	"github.com/provideplatform/nchain/common"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 func setupRedis() {
 	redisutil.RequireRedis()
+}
+
+func generateRandomBytes(length int) []byte {
+	data := make([]byte, length)
+	for i := range data {
+		data[i] = byte(rand.Intn(255))
+	}
+	return data
 }
 
 func getTestFile(t *testing.T, path string) []byte {
@@ -40,11 +48,6 @@ func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 		return
 	}
 
-	actualSize := uint(len(*fragment.Payload))
-	if actualSize != fragment.PayloadSize {
-		t.Errorf("Incorrect fragment packet size. Payload was %d bytes, but Size set to %d", actualSize, fragment.PayloadSize)
-	}
-
 	// Check that the checksum is present & correct
 	if fragment.Checksum == nil {
 		t.Errorf("Fragment contained no checksum, (call #%d)", call)
@@ -68,15 +71,15 @@ func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 	// Ingest the fragment
 	valid, _, verr := fragment.Ingest()
 	if !valid {
-		t.Errorf("Fragment verify returned false. (call #%d)", call)
+		t.Errorf("Fragment Ingest returned false. (call #%d)", call)
 	}
 	if verr != nil {
-		t.Errorf("Fragment verify encountered error: '%s' (call #%d)", verr, call)
+		t.Errorf("Fragment Ingest encountered error: '%s' (call #%d)", verr, call)
 	}
 }
 
 func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
-	// Decode data into a fragment
+	// Decode data into a reassembly packet
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg, &reassembly)
 
@@ -85,21 +88,27 @@ func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
 		return nil
 	}
 
-	reassembly.Cache()
+	// Ingest the fragment
+	valid, _, verr := reassembly.Ingest()
+	if !valid {
+		t.Error("Reassembly Ingest returned false")
+	}
+	if verr != nil {
+		t.Errorf("Reassembly Ingest encountered error: '%s'", verr)
+	}
+
 	return reassembly
 }
 
 func TestBroadcastFragments(t *testing.T) {
-	// Load a large test file to use as a binary blob to broadcast
-	payload := getTestFile(t, "test/test1.bin")
-	payloadLength := uint(len(payload))
+	payload := generateRandomBytes(1024 * 128)
 	setupRedis()
 
 	// Stub out the publish function so that BroadcastFragments will use our stub above to "send" data.
 	var callsToPublish uint64 = 0
 	var reassembly *packetReassembly = nil
 	var totalMsgSize uint = 0
-	SetBroadcastPublishFunction(func(subject string, msg []byte) error {
+	setBroadcastPublishFunction(func(subject string, msg []byte) error {
 		callsToPublish++
 
 		length := uint(len(msg))
@@ -125,32 +134,27 @@ func TestBroadcastFragments(t *testing.T) {
 	})
 
 	// Run the actual fragment broadcast
-	err := BroadcastFragments(payload)
+	err := BroadcastFragments(payload, true)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}
-
-	// Check size
-	common.Log.Debugf("Payload Length: %d, Total Bytes Sent: %d, Overhead: %.1f%%", payloadLength, totalMsgSize, (1-(float32(payloadLength)/float32(totalMsgSize)))*100)
 
 	// Reassemble the packets
 	if reassembly == nil {
 		t.Error("BroadcastFragments() error; did not get reassembly packet")
 		return
 	}
-	assRet, assErr := reassembly.Reassemble()
-	if !assRet {
+	ret, err := reassembly.Reassemble()
+	if !ret {
 		t.Error("reassembly.Reassemble() returned false")
 	}
-	if assErr != nil {
-		t.Errorf("reassembly.Reassemble() error; %s", assErr.Error())
+	if err != nil {
+		t.Errorf("reassembly.Reassemble() error; %s", err.Error())
 	}
 
-	// While we might not care about how specifically the packets are broken down - for the large test file
-	// we expect that it is broken down into a large number of packets, so the streamingPublish method should
-	// be called more than 10000 times for this file.
-	if 5000 > callsToPublish {
-		t.Errorf("BroadcastFragments() not called correct amount of times. Expected: over 10000, Actual: %d.", callsToPublish)
+	// Note: this may change as packet size or test data size is tweaked.
+	if callsToPublish != 31 {
+		t.Errorf("BroadcastFragments() not called correct amount of times. Expected: 31, Actual: %d.", callsToPublish)
 	}
 }
 
@@ -177,12 +181,12 @@ func expectFragmentIsValid(t *testing.T, fragment *packetFragment) {
 }
 
 func expectFragmentIsNotValid(t *testing.T, fragment *packetFragment, expectedError error) {
-	valid, verr := fragment.Verify()
+	valid, err := fragment.Verify()
 	if valid {
 		t.Errorf("Verify() error; Verify returned true, expected false.")
 	}
-	if verr != expectedError {
-		t.Errorf("Verify() error; Verify error not as expected. Actual: '%s'. Expected: '%s'.", verr, expectedError)
+	if err != expectedError {
+		t.Errorf("Verify() error; Verify error not as expected. Actual: '%s'. Expected: '%s'.", err, expectedError)
 	}
 }
 

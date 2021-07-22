@@ -32,17 +32,16 @@ type Fragmentable interface {
 	// packet reassembly operation and returns the boolean checksum verification result, total number
 	// of fragments ingested (i.e., after ingesting this fragment-- or nil, if ingestion failed) and
 	// any error if the attempt to ingest the fragment fails
-	//Ingest() (bool, *uint, error)
+	Ingest() (bool, *uint, error)
 
 	// Verify the fragment checksum
 	Verify() (bool, error)
 }
 
 // BroadcastFragments splits the given packet into chunks. Each chunk is broadcast as a fragment for remote packet
-// reassembly. If a `nextHop` subject is provided, a pointer to the reassembled packet is forwarded upon ingestion
-// of all fragments such that reassembly of the packet is guaranteed within the `nextHop` handler at runtime (i.e.
-// such a handler can be thought of as an "exit node" for the reassembled packet and terminates execution on it).
-func BroadcastFragments(packet []byte) error {
+// reassembly. If `usePadding` is true then the last packet sent will be padded if required to make sure that all
+// packets sent have an equal size.
+func BroadcastFragments(packet []byte, usePadding bool) error {
 	packetSize := uint(len(packet))
 	chunkSize := packetReassemblyFragmentationChunkSize
 	common.Log.Debugf("fragmented broadcast of %d-byte packet into %d-byte chunks requested...", packetSize, chunkSize)
@@ -62,13 +61,24 @@ func BroadcastFragments(packet []byte) error {
 	for index <= numChunks-1 {
 		start := index * chunkSize
 		end := start + chunkSize
+		padChunk := false
 
 		if bytesRemaining < chunkSize {
 			end = start + bytesRemaining
+
+			if usePadding {
+				padChunk = true
+			}
 		}
 
-		var fragmentPayload = packet[start:end]
-		copy(fragmentPayload[:], packet[start:end])
+		var fragmentPayload []byte
+		if padChunk {
+			fragmentPayload = make([]byte, chunkSize)
+			copy(fragmentPayload[:], packet[start:end])
+		} else {
+			fragmentPayload = packet[start:end]
+		}
+
 		checksum := md5.Sum(fragmentPayload)
 		checksumSlice := checksum[:]
 
@@ -77,7 +87,6 @@ func BroadcastFragments(packet []byte) error {
 			Cardinality:         numChunks,
 			Checksum:            &checksumSlice,
 			Nonce:               PacketReassembly.Nonce,
-			PayloadSize:         end - start,
 			Payload:             &fragmentPayload,
 			ReassembledChecksum: PacketReassembly.Checksum,
 		}
@@ -168,21 +177,19 @@ type packetFragment struct {
 	Cardinality         uint    `msgpack:"cardinality"`          // # of total fragments comprising the packet
 	Checksum            *[]byte `msgpack:"checksum"`             // md5 checksum of the fragment payload
 	Nonce               *int64  `msgpack:"nonce"`                // nonce associated with the packet reassembly operation
-	PayloadSize         uint    `msgpack:"size"`                 // size of raw fragment of payload
 	Payload             *[]byte `msgpack:"payload,inline"`       // the raw fragment payload
 	ReassembledChecksum *[]byte `msgpack:"reassembled_checksum"` // md5 checksum of the entire n of n payload
 
 	// TODO: forward secrecy considerations
 }
 
-// BroadcastFunctionFunc is the signature for the method that broadcasts the packets out
-type BroadcastFunctionFunc = func(string, []byte) error
+// broadcastFn is the signature for the method that broadcasts the packets out
+type broadcastFn = func(string, []byte) error
 
-// Method to use to publish - can be stubbed in tests
-var streamingPublish BroadcastFunctionFunc = natsutil.NatsStreamingPublish
+var streamingPublish broadcastFn = natsutil.NatsStreamingPublish
 
-// SetBroadcastPublishFunction sets the implementation that will be used to broadcast packets (default is natsutil.NatsStreamingPublish)
-func SetBroadcastPublishFunction(function BroadcastFunctionFunc) {
+// setBroadcastPublishFunction sets the implementation that will be used to broadcast packets (default is natsutil.NatsStreamingPublish)
+func setBroadcastPublishFunction(function broadcastFn) {
 	streamingPublish = function
 }
 
@@ -267,6 +274,9 @@ func (p *packetFragment) Ingest() (bool, *uint, error) {
 	}
 
 	ingestCount := uint(*i)
+
+	common.Log.Debugf("Fragment #%d. i: %d. Ingest Count: %d", p.Index, *i, ingestCount)
+
 	return verified, &ingestCount, nil
 }
 
@@ -319,32 +329,32 @@ type packetReassembly struct {
 
 // fragmentIngestProgress calculates and returns the fragment ingest progress (expressed as a percentage), the
 // total number of fragments ingested and any error if the attempt to retrieve or calculate the progress fails
-func (p *packetReassembly) fragmentsRemaining() (*uint, *uint, error) {
+func (p *packetReassembly) fragmentIngestProgress() (*float64, *uint, error) {
 	ingestCountKey := packetReassemblyIndexKeyFactory(p, common.StringOrNil(packetReassemblyFragmentIngestCountKeySuffix))
 	if ingestCountKey == nil {
-		return nil, nil, fmt.Errorf("failed to reassemble packet with checksum %s; reassembly key factory returned nil key", *p.Checksum)
+		return nil, nil, fmt.Errorf("Failed to reassemble packet with checksum %s; reassembly key factory returned nil key", *p.Checksum)
 	}
 
-	var ingested uint
+	var count uint
 
 	rawval, err := redisutil.Get(*ingestCountKey)
 	if err == nil && rawval != nil {
 		intval, converr := strconv.Atoi(*rawval)
 		if converr == nil {
-			ingested = uint(intval)
+			count = uint(intval)
 		} else {
 			err = converr
 		}
 	} else if rawval == nil {
-		err = fmt.Errorf("retrieved nil value from redis for packet reassembly ingest count key: %s", *ingestCountKey)
+		err = fmt.Errorf("Retrieved nil value from redis for packet reassembly ingest count key: %s", *ingestCountKey)
 	}
 
 	if err != nil {
 		return nil, nil, err
 	}
 
-	remaining := p.Cardinality - ingested
-	return &remaining, &ingested, nil
+	progress := float64(count) / float64(p.Cardinality)
+	return &progress, &count, nil
 }
 
 // Broadcast marshals and transmits the packet reassembly header payload
@@ -356,15 +366,32 @@ func (p *packetReassembly) Broadcast() error {
 	return streamingPublish(natsPacketReassembleSubject, payload)
 }
 
-// Cache the packet reassembly as a header (i.e., without its payload)
-func (p *packetReassembly) Cache() error {
+// Ingest and cache the packet reassembly as a header (i.e., without its payload)
+func (p *packetReassembly) Ingest() (bool, *uint, error) {
 	headerKey := packetReassemblyIndexKeyFactory(p, common.StringOrNil(packetReassemblyHeaderKeySuffix))
 	if headerKey == nil {
-		return errors.New("failed to cache reassembly header; packet reassembly key factory returned nil header key")
+		return false, nil, errors.New("failed to ingest reassembly header; packet reassembly key factory returned nil header key")
+	}
+	payload, _ := msgpack.Marshal(p)
+	err := redisutil.Set(*headerKey, string(payload), nil)
+	if err != nil {
+		return false, nil, err
 	}
 
-	payload, _ := msgpack.Marshal(p)
-	return redisutil.Set(*headerKey, string(payload), nil)
+	ingestCountKey := packetReassemblyIndexKeyFactory(p, common.StringOrNil(packetReassemblyFragmentIngestCountKeySuffix))
+	if ingestCountKey == nil {
+		return false, nil, errors.New("failed to ingest packet fragment; packet reassembly key factory returned nil fragment ingest count key")
+	}
+	i, err := redisutil.Increment(*ingestCountKey)
+	if err != nil || i == nil {
+		// TODO: if this fails but the cache of the payload worked?
+		return false, nil, err
+	}
+
+	common.Log.Debugf("Reassembly Ingest Count: %d", *i)
+
+	ingestCount := uint(*i)
+	return true, &ingestCount, nil
 }
 
 // Reassemble defrags the packet and verifies the checksum of the reconstituted packet
@@ -387,13 +414,12 @@ func (p *packetReassembly) Reassemble() (bool, error) {
 
 	p.Payload = nil // side-effect of this method sets payload pointer
 
-	fragSize := p.Size / p.Cardinality
-	remaining, i, err := p.fragmentsRemaining()
+	progress, _, err := p.fragmentIngestProgress()
 	if err != nil {
-		return false, fmt.Errorf("failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); failed atomically reading or parsing fragment ingest progress; %s", p.Size, p.Cardinality, fragSize, err.Error())
+		return false, fmt.Errorf("failed to reassemble %d-byte packet consisting of %d fragment(s); failed atomically reading or parsing fragment ingest progress; %s", p.Size, p.Cardinality, err.Error())
 	}
-	if *remaining > 0 {
-		return false, fmt.Errorf("failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); %d of required fragments ingested", p.Size, p.Cardinality, fragSize, *i)
+	if *progress < 1 {
+		return false, fmt.Errorf("failed to reassemble %d-byte packet consisting of %d fragment(s); only %.2f%% of packets ingested", p.Size, p.Cardinality, *progress)
 	}
 
 	common.Log.Debugf("All %d fragments required to reassemble %d-byte packet with checksum %s have been ingested; attempting reassembly and verification...", p.Cardinality, p.Size, hex.EncodeToString(*p.Checksum))
@@ -415,8 +441,15 @@ func (p *packetReassembly) Reassemble() (bool, error) {
 			return false, fmt.Errorf("failed to unmarshal packet index %d with key '%s' from storage", i, *persistKey)
 		}
 
-		copy(payload[lastIndex:lastIndex+fragment.PayloadSize], *fragment.Payload)
-		lastIndex += fragment.PayloadSize
+		payloadSize := uint(len(*fragment.Payload))
+		remainingBytes := p.Size - lastIndex
+		if remainingBytes < payloadSize {
+			// Don't copy padding
+			payloadSize = remainingBytes
+		}
+
+		copy(payload[lastIndex:lastIndex+payloadSize], *fragment.Payload)
+		lastIndex += payloadSize
 	}
 
 	p.Payload = &payload

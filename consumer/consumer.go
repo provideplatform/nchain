@@ -18,12 +18,12 @@ const natsPacketFragmentIngestInvocationTimeout = time.Second * 5 // FIXME!!! (s
 const natsPacketFragmentIngestTimeout = int64(time.Second * 8)    // FIXME!!! (see above)
 
 // TODO: audit arbitrary max in flight & timeouts; investigate dynamic timeout based on reassembled packet size
-const natsPacketReassembleSubject = "prvd.packet.reassemble"
+const natsPacketReassembleSubject = "prvd.packet.reassemble.ingest"
 const natsPacketReassembleMaxInFlight = 256
 const natsPacketReassembleInvocationTimeout = time.Second * 30 // FIXME!!! (see above)
 const natsPacketReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see above)
 
-const natsPacketCompleteSubject = "prvd.packet.complete"
+const natsPacketCompleteSubject = "prvd.packet.reassemble.finalize"
 
 var (
 	waitGroup     sync.WaitGroup
@@ -92,14 +92,15 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		return
 	}
 
-	ingestVerified, i, ingestErr := fragment.Ingest()
-	if ingestErr != nil || !ingestVerified {
-		common.Log.Warningf("Failed to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d); %s", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality, ingestErr.Error())
+	ingestVerified, ingestCounter, err := fragment.Ingest()
+	if err != nil || !ingestVerified {
+		common.Log.Warningf("Failed to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d); %s", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality, err.Error())
 		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
 		return
 	}
 
-	remaining := fragment.Cardinality - *i
+	// Add one to cardinality as we need to account for the reassembly message too
+	remaining := (fragment.Cardinality + 1) - *ingestCounter
 	if remaining == 0 {
 		reassembly, err := fragment.FetchReassemblyHeader()
 		if err != nil {
@@ -111,7 +112,7 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		handleReassembly(msg, reassembly)
 	}
 
-	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index+1, hex.EncodeToString(*fragment.Checksum), i, fragment.Cardinality)
+	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index, hex.EncodeToString(*fragment.Checksum), *ingestCounter, fragment.Cardinality+1)
 	msg.Ack()
 }
 
@@ -124,15 +125,19 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 		return
 	}
 
-	fragSize := reassembly.Size / reassembly.Cardinality
-	remaining, _, err := reassembly.fragmentsRemaining()
-	if err != nil {
-		common.Log.Warningf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); failed atomically reading or parsing fragment ingest progress; %s", reassembly.Size, reassembly.Cardinality, fragSize, err.Error())
-		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
+	ingestVerified, ingestCounter, err := reassembly.Ingest()
+	if err != nil || !ingestVerified {
+		common.Log.Warningf("Failed to ingest %d-byte packet header; %s", len(msg.Data), err.Error())
+		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
 		return
 	}
 
-	if *remaining == 0 {
+	remaining := (reassembly.Cardinality + 1) - *ingestCounter
+
+	if remaining == 0 {
 		handleReassembly(msg, reassembly)
 	}
+
+	common.Log.Debugf("Successfully ingested reassembly header. %d of %d total fragments needed for reassembly have been ingested", *ingestCounter, reassembly.Cardinality+1)
+	msg.Ack()
 }
