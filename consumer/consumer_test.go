@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"bytes"
 	"sync"
 	"testing"
 	"time"
@@ -14,31 +15,38 @@ var (
 	testDone sync.WaitGroup
 )
 
-func consumePacketCompleteMsg(t *testing.T, msg *stan.Msg) {
+func consumePacketCompleteMsg(t *testing.T, msg *stan.Msg, expectedPayload *[]byte) {
+	msg.Ack()
+
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
 		t.Errorf("Failed to umarshal packet reassembly message; %s", err.Error())
-		natsutil.Nack(msg)
 		return
 	}
 
-	fragSize := reassembly.Size / reassembly.Cardinality
 	percentComplete, i, err := reassembly.fragmentIngestProgress()
 	if err != nil {
-		t.Errorf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); failed atomically reading or parsing fragment ingest progress; %s", reassembly.Size, reassembly.Cardinality, fragSize, err.Error())
-		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
+		t.Errorf("Failed to reassemble %d-byte packet consisting of %d fragment(s); failed atomically reading or parsing fragment ingest progress; %s", reassembly.Size, reassembly.Cardinality, err.Error())
 		return
 	}
 
 	if *percentComplete != 1 {
-		t.Errorf("Failed to reassemble %d-byte packet consisting of %d %d-byte fragment(s); only %d fragments ingested", reassembly.Size, reassembly.Cardinality, fragSize, *i)
-		natsutil.AttemptNack(msg, natsPacketReassembleTimeout)
+		t.Errorf("Failed to reassemble %d-byte packet consisting of %d fragment(s); only %d fragments ingested", reassembly.Size, reassembly.Cardinality, *i)
 		return
 	}
 
+	assembled, err := reassembly.Reassemble()
+	if !assembled || err != nil {
+		t.Errorf("Failed to reassemble data - err: '%s'", err)
+	}
+
+	// In theory Reassemble does a checksum comparison but just as an extra test we compare payload to expected
+	if bytes.Compare(*expectedPayload, *reassembly.Payload) != 0 {
+		t.Error("Reassembled payload did not match expected")
+	}
+
 	testDone.Done()
-	msg.Ack()
 }
 
 func TestConsumerBroadcastAndReassemble(t *testing.T) {
@@ -50,7 +58,7 @@ func TestConsumerBroadcastAndReassemble(t *testing.T) {
 		time.Second*200,
 		natsPacketCompleteSubject,
 		natsPacketCompleteSubject,
-		func(msg *stan.Msg) { consumePacketCompleteMsg(t, msg) },
+		func(msg *stan.Msg) { consumePacketCompleteMsg(t, msg, &payload) },
 		time.Second*200,
 		1024,
 		nil,

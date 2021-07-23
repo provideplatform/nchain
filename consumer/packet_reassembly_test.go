@@ -108,7 +108,7 @@ func TestBroadcastFragments(t *testing.T) {
 	var callsToPublish uint64 = 0
 	var reassembly *packetReassembly = nil
 	var totalMsgSize uint = 0
-	setBroadcastPublishFunction(func(subject string, msg []byte) error {
+	setBroadcastPublishFunction(func(subject string, msg []byte) (*string, error) {
 		callsToPublish++
 
 		length := uint(len(msg))
@@ -130,7 +130,7 @@ func TestBroadcastFragments(t *testing.T) {
 			t.Errorf("Unknown fragment subject. Subject: '%s'", subject)
 		}
 
-		return nil
+		return nil, nil
 	})
 
 	// Run the actual fragment broadcast

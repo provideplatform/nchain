@@ -71,12 +71,11 @@ func createNatsPacketReassemblySubscriptions(wg *sync.WaitGroup) {
 }
 
 // Common reassembly code - this is called once all fragments & the header have been consumed
-// TODO: Figure this out
 func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
 	common.Log.Debugf("All fragments ingested for packet with checksum %s", hex.EncodeToString(*reassembly.Checksum))
 
 	payload, _ := msgpack.Marshal(reassembly)
-	err := natsutil.NatsPublish(natsPacketCompleteSubject, payload)
+	_, err := natsutil.NatsStreamingPublishAsync(natsPacketCompleteSubject, payload)
 	if err != nil {
 		common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), natsPacketReassembleSubject, err.Error())
 		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
@@ -84,60 +83,61 @@ func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
 }
 
 func consumePacketFragmentIngestMsg(msg *stan.Msg) {
+	common.Log.Debugf("Recieved fragment message: Seq:%d, RedeliveryCount: %d", msg.Sequence, msg.RedeliveryCount)
+
 	fragment := &packetFragment{}
 	err := msgpack.Unmarshal(msg.Data, &fragment)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet fragment ingest message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Ack() // Acknowledge the bad packet so it's not resent
 		return
 	}
 
 	ingestVerified, ingestCounter, err := fragment.Ingest()
 	if err != nil || !ingestVerified {
 		common.Log.Warningf("Failed to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d); %s", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality, err.Error())
-		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
+		// No acknowledgement here - so we can try again
 		return
 	}
 
 	// Add one to cardinality as we need to account for the reassembly message too
+	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index, hex.EncodeToString(*fragment.Checksum), *ingestCounter, fragment.Cardinality+1)
 	remaining := (fragment.Cardinality + 1) - *ingestCounter
 	if remaining == 0 {
 		reassembly, err := fragment.FetchReassemblyHeader()
 		if err != nil {
 			common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", natsPacketReassembleSubject, err.Error())
-			natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
-			return
+		} else {
+			handleReassembly(msg, reassembly)
 		}
-
-		handleReassembly(msg, reassembly)
 	}
 
-	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index, hex.EncodeToString(*fragment.Checksum), *ingestCounter, fragment.Cardinality+1)
 	msg.Ack()
 }
 
 func consumePacketReassembleMsg(msg *stan.Msg) {
+	common.Log.Debugf("Recieved assembly message: Seq:%d, RedeliveryCount: %d", msg.Sequence, msg.RedeliveryCount)
+
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet reassembly message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Ack() // Acknowledge the bad packet so it's not resent
 		return
 	}
 
 	ingestVerified, ingestCounter, err := reassembly.Ingest()
 	if err != nil || !ingestVerified {
 		common.Log.Warningf("Failed to ingest %d-byte packet header; %s", len(msg.Data), err.Error())
-		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
+		// No acknowledgement here - so we can try again
 		return
 	}
 
+	common.Log.Debugf("Successfully ingested reassembly header. %d of %d total fragments needed for reassembly have been ingested", *ingestCounter, reassembly.Cardinality+1)
 	remaining := (reassembly.Cardinality + 1) - *ingestCounter
-
 	if remaining == 0 {
 		handleReassembly(msg, reassembly)
 	}
 
-	common.Log.Debugf("Successfully ingested reassembly header. %d of %d total fragments needed for reassembly have been ingested", *ingestCounter, reassembly.Cardinality+1)
 	msg.Ack()
 }

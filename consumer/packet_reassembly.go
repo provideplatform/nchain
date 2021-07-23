@@ -184,9 +184,9 @@ type packetFragment struct {
 }
 
 // broadcastFn is the signature for the method that broadcasts the packets out
-type broadcastFn = func(string, []byte) error
+type broadcastFn = func(string, []byte) (*string, error)
 
-var streamingPublish broadcastFn = natsutil.NatsStreamingPublish
+var streamingPublish broadcastFn = natsutil.NatsStreamingPublishAsync
 
 // setBroadcastPublishFunction sets the implementation that will be used to broadcast packets (default is natsutil.NatsStreamingPublish)
 func setBroadcastPublishFunction(function broadcastFn) {
@@ -200,8 +200,10 @@ func (p *packetFragment) Broadcast() error {
 		return err
 	}
 
-	//common.Log.Debugf("attempting to broadcast %d-byte fragment", len(payload))
-	return streamingPublish(natsPacketFragmentIngestSubject, payload)
+	common.Log.Debugf("attempting to broadcast %d-byte fragment for Nonce %d - index #%d", len(payload), p.Nonce, p.Index)
+	guid, err := streamingPublish(natsPacketFragmentIngestSubject, payload)
+	common.Log.Debugf("message guid for Nonce %d - index #%d: '%s'", p.Nonce, p.Index, *guid)
+	return err
 }
 
 // FetchReassemblyHeader fetches the previously-cached packet reassembly header, warms the fragment-local
@@ -353,7 +355,7 @@ func (p *packetReassembly) fragmentIngestProgress() (*float64, *uint, error) {
 		return nil, nil, err
 	}
 
-	progress := float64(count) / float64(p.Cardinality)
+	progress := float64(count) / float64(p.Cardinality+1)
 	return &progress, &count, nil
 }
 
@@ -363,7 +365,9 @@ func (p *packetReassembly) Broadcast() error {
 	if err != nil {
 		return err
 	}
-	return streamingPublish(natsPacketReassembleSubject, payload)
+	guid, err := streamingPublish(natsPacketReassembleSubject, payload)
+	common.Log.Debugf("message guid for Nonce %d - reassembly: '%s'", p.Nonce, *guid)
+	return err
 }
 
 // Ingest and cache the packet reassembly as a header (i.e., without its payload)
