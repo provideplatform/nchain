@@ -9,13 +9,13 @@ import (
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
-	"github.com/provideapp/nchain/token"
-	provide "github.com/provideservices/provide-go/api"
-	vault "github.com/provideservices/provide-go/api/vault"
-	util "github.com/provideservices/provide-go/common/util"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
+	"github.com/provideplatform/nchain/token"
+	provide "github.com/provideplatform/provide-go/api"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	util "github.com/provideplatform/provide-go/common/util"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 // Account represents a single address associated with a specific network and application or user

@@ -14,11 +14,11 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
-	provide "github.com/provideservices/provide-go/api"
-	api "github.com/provideservices/provide-go/api/nchain"
-	prvdcrypto "github.com/provideservices/provide-go/crypto"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
+	provide "github.com/provideplatform/provide-go/api"
+	api "github.com/provideplatform/provide-go/api/nchain"
+	prvdcrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const resolveTokenTickerInterval = time.Millisecond * 5000
@@ -40,6 +40,7 @@ type Contract struct {
 	Params         *json.RawMessage `sql:"type:json" json:"params,omitempty"`
 	AccessedAt     *time.Time       `json:"accessed_at"`
 	PubsubPrefix   *string          `sql:"-" json:"pubsub_prefix,omitempty"`
+	Ref            *string          `sql:"-" json:"ref,omitempty"`
 }
 
 // ContractListQuery returns a DB query configured to select columns suitable for a paginated API response
@@ -337,8 +338,8 @@ func (c *Contract) Create() bool {
 						"value":              value,
 						"params":             params,
 						"published_at":       time.Now(),
+						"ref":                c.Ref,
 					})
-
 					err = natsutil.NatsStreamingPublish(natsTxCreateSubject, txCreationMsg)
 					if err != nil {
 						common.Log.Warningf("Failed to publish contract deployment tx; %s", err.Error())
@@ -410,7 +411,6 @@ func (c *Contract) ExecuteFromTx(
 	gasPrice := execution.GasPrice
 	nonce := execution.Nonce
 
-	//xxx add path to params
 	path := execution.HDPath
 
 	// publishedAt := execution.PublishedAt
@@ -419,8 +419,6 @@ func (c *Contract) ExecuteFromTx(
 	if c.Address != nil {
 		txParams["to"] = *c.Address
 	}
-
-	// TODO get the hd-derivation-path (if present) into the txparams
 
 	accountID := accountFn(account, txParams)
 	walletID := walletFn(wallet, txParams)

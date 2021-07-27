@@ -1,4 +1,4 @@
-// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly bulk
+// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly bulk transfer
 
 package integration
 
@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	uuid "github.com/kthomas/go.uuid"
-	provide "github.com/provideservices/provide-go/api/ident"
+	provide "github.com/provideplatform/provide-go/api/ident"
 )
 
 type User struct {
@@ -114,12 +114,12 @@ func AppAndTokenFactory(testID uuid.UUID, userID uuid.UUID) (*string, error) {
 		"appdesc " + testID.String(),
 	}
 
-	app, err := appFactory(*token.Token, nchainApp.name, nchainApp.description)
+	app, err := appFactory(*token.AccessToken, nchainApp.name, nchainApp.description)
 	if err != nil {
 		return nil, fmt.Errorf("error generating application. Error: %s", err.Error())
 	}
 
-	appToken, err := appTokenFactory(*token.Token, app.ID)
+	appToken, err := appTokenFactory(*token.AccessToken, app.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error generating app token. Error: %s", err.Error())
 	}
@@ -135,7 +135,7 @@ func UserAndTokenFactory(testID uuid.UUID) (*string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error generating token. Error: %s", err.Error())
 	}
-	return token.Token, nil
+	return token.AccessToken, nil
 }
 
 func appFactory(token, name, desc string) (*provide.Application, error) {

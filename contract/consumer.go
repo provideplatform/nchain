@@ -13,8 +13,8 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/network"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/network"
 )
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"
@@ -72,6 +72,7 @@ func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contrac
 		cachedContracts = cachedCntrcts
 	} else {
 		cachedContracts = map[string]*Contract{}
+		// CHECKME - this throws a subscribelocked panic occasionally
 		cachedNetworkContracts[networkID.String()] = cachedContracts
 	}
 
@@ -281,6 +282,7 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 
 	common.Log.Tracef("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
 
+	// CHECKME - root of the panic thrown occasionally
 	network := cachedNetwork(networkUUID)
 	if network == nil || network.ID == uuid.Nil {
 		common.Log.Warningf("Failed to process log transceiver event emission message; network lookup failed for network id: %s", networkID)

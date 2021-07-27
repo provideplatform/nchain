@@ -2,7 +2,7 @@ package bridge
 
 import (
 	uuid "github.com/kthomas/go.uuid"
-	provide "github.com/provideservices/provide-go/api"
+	provide "github.com/provideplatform/provide-go/api"
 )
 
 // Bridge instances are still in the process of being defined.

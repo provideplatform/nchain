@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	"github.com/provideplatform/nchain/common"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 
-	"github.com/provideapp/ident/token"
+	"github.com/provideplatform/ident/token"
 )
 
 // InstallContractsAPI installs the handlers using the given gin Engine
@@ -225,6 +225,24 @@ func createContractHandler(c *gin.Context) {
 	if rawSourceOk && contract.Address == nil {
 		contract.Address = common.StringOrNil("0x")
 	}
+
+	// get ref from params (optional, create new if not present)
+	var ref string
+	txRef, txRefOk := params["ref"].(string)
+
+	if txRefOk {
+		ref = txRef
+	} else {
+		refUUID, err := uuid.NewV4()
+		if err != nil {
+			err := fmt.Errorf("Failed to generate ref id; %s", err.Error())
+			provide.RenderError(err.Error(), 400, c)
+			return
+		}
+		ref = refUUID.String()
+	}
+
+	contract.Ref = &ref
 
 	if contract.Create() {
 		contract.enrich()

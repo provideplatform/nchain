@@ -1,4 +1,4 @@
-// +build integration nchain ropsten rinkeby kovan goerli basic bookie readonly
+// +build integration nchain ropsten rinkeby kovan goerli basic bookie readonly transfer
 
 package integration
 
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	provide "github.com/provideplatform/provide-go/api/nchain"
 )
 
 // Note: this will fail if the db volume isn't removed, as this uses an existing chain_id

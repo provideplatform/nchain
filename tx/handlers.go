@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/contract"
-	"github.com/provideapp/nchain/filter"
-	"github.com/provideapp/nchain/wallet"
-	vault "github.com/provideservices/provide-go/api/vault"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/contract"
+	"github.com/provideplatform/nchain/filter"
+	"github.com/provideplatform/nchain/wallet"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // InstallTransactionsAPI installs the handlers using the given gin Engine
@@ -116,6 +118,111 @@ func createTransactionHandler(c *gin.Context) {
 	tx.OrganizationID = orgID
 	tx.UserID = userID
 
+	params := tx.ParseParams()
+
+	// get ref from params (optional, create new if not present)
+	var ref string
+	txRef, txRefOk := params["ref"].(string)
+
+	if txRefOk {
+		ref = txRef
+	} else {
+		refUUID, err := uuid.NewV4()
+		if err != nil {
+			err := fmt.Errorf("failed to generate ref id; %s", err.Error())
+			provide.RenderError(err.Error(), 400, c)
+			return
+		}
+		ref = refUUID.String()
+	}
+
+	tx.Ref = &ref
+
+	// value := uint64(0)
+	// if val, valOk := params["value"].(float64); valOk {
+	// 	value = uint64(val)
+	// }
+
+	var accountID *string
+	if acctID, acctIDOk := params["account_id"].(string); acctIDOk {
+		accountID = &acctID
+	}
+
+	var walletID *string
+	var hdDerivationPath *string
+	if wlltID, wlltIDOk := params["wallet_id"].(string); wlltIDOk {
+		walletID = &wlltID
+
+		if path, pathOk := params["hd_derivation_path"].(string); pathOk {
+			hdDerivationPath = &path
+		}
+	}
+
+	// end goal
+	// send as a message to NATS
+	txExecutionMsg, _ := json.Marshal(map[string]interface{}{
+		"account_id":         accountID,
+		"wallet_id":          walletID,
+		"hd_derivation_path": hdDerivationPath,
+		"value":              tx.Value,
+		"params":             params,
+		"published_at":       time.Now(),
+		"reference":          ref,
+	})
+
+	err = natsutil.NatsStreamingPublish(natsTxTransferSubject, txExecutionMsg)
+	if err != nil {
+		provide.RenderError("error creating transaction", 500, c)
+
+	} else {
+		provide.Render(tx, 201, c)
+	}
+}
+
+// commented out for reference as it's rebuilt
+func _createTransactionHandler(c *gin.Context) {
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	userID := util.AuthorizedSubjectID(c, "user")
+	if appID == nil && orgID == nil && userID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	tx := &Transaction{}
+	err = json.Unmarshal(buf, tx)
+	if err != nil {
+		provide.RenderError(err.Error(), 422, c)
+		return
+	}
+
+	tx.ApplicationID = appID
+	tx.OrganizationID = orgID
+	tx.UserID = userID
+
+	params := tx.ParseParams()
+
+	//get ref from params (optional, create new if not present)
+	var ref string
+	txRef, txRefOk := params["ref"]
+
+	if txRefOk {
+		ref = txRef.(string)
+	} else {
+		uuidRef, err := uuid.NewV4()
+		if err != nil {
+			common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+		}
+		ref = uuidRef.String()
+	}
+	tx.Ref = &ref
+
 	db := dbconf.DatabaseConnection()
 
 	if tx.Create(db) {
@@ -210,141 +317,6 @@ func networkTransactionDetailsHandler(c *gin.Context) {
 	provide.Render(tx, 200, c)
 }
 
-// func contractArbitraryExecutionHandler(c *gin.Context, db *gorm.DB, buf []byte) {
-// 	userID := util.AuthorizedSubjectID(c, "user")
-// 	if userID == nil {
-// 		provide.RenderError("unauthorized", 401, c)
-// 		return
-// 	}
-
-// 	wal := &wallet.Account{} // signer for the tx
-
-// 	params := map[string]interface{}{}
-// 	err := json.Unmarshal(buf, &params)
-// 	if err != nil {
-// 		provide.RenderError(err.Error(), 422, c)
-// 		return
-// 	}
-// 	publicKey, publicKeyOk := params["public_key"].(string)
-// 	privateKey, privateKeyOk := params["private_key"].(string)
-// 	gas, gasOk := params["gas"].(float64)
-// 	gasPrice, gasPriceOk := params["gas_price"].(float64)
-// 	nonce, nonceOk := params["nonce"].(float64)
-// 	subsidize, subsidizeOk := params["subsidize"].(bool)
-// 	// xxx hd derivation path for contract execution
-
-// 	ref, err := uuid.NewV4()
-// 	if err != nil {
-// 		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
-// 	}
-
-// 	execution := &contract.Execution{
-// 		Ref: common.StringOrNil(ref.String()),
-// 	}
-
-// 	err = json.Unmarshal(buf, execution)
-// 	if err != nil {
-// 		provide.RenderError(err.Error(), 422, c)
-// 		return
-// 	}
-// 	if execution.AccountID != nil && *execution.AccountID != uuid.Nil {
-// 		if execution.Wallet != nil {
-// 			err := fmt.Errorf("invalid request specifying a account_id and wallet")
-// 			provide.RenderError(err.Error(), 422, c)
-// 			return
-// 		}
-// 		wal.SetID(*execution.AccountID)
-// 	} else if publicKeyOk && privateKeyOk {
-// 		wal.Address = publicKey
-// 		wal.PrivateKey = common.StringOrNil(privateKey)
-// 	}
-// 	execution.Wallet = wal
-
-// 	if gasOk {
-// 		execution.Gas = &gas
-// 	}
-
-// 	if gasPriceOk {
-// 		execution.GasPrice = &gasPrice
-// 	}
-
-// 	if nonceOk {
-// 		nonceUint := uint64(nonce)
-// 		execution.Nonce = &nonceUint
-// 	}
-
-// 	if subsidizeOk {
-// 		execution.Subsidize = subsidize
-// 	}
-
-// 	ntwrk := &network.Network{}
-// 	if execution.NetworkID != nil && *execution.NetworkID != uuid.Nil {
-// 		db.Where("id = ?", execution.NetworkID).Find(&ntwrk)
-// 	}
-
-// 	if ntwrk == nil || ntwrk.ID == uuid.Nil {
-// 		provide.RenderError("network not found for arbitrary contract execution", 404, c)
-// 		return
-// 	}
-
-// 	params = map[string]interface{}{
-// 		"abi": execution.ABI,
-// 	}
-// 	paramsJSON, err := json.Marshal(params)
-// 	if err != nil {
-// 		provide.RenderError("failed to marshal ephemeral contract params containing ABI", 422, c)
-// 		return
-// 	}
-// 	paramsMsg := json.RawMessage(paramsJSON)
-
-// 	ephemeralContract := &contract.Contract{
-// 		NetworkID: ntwrk.ID,
-// 		Address:   common.StringOrNil(c.Param("id")),
-// 		Params:    &paramsMsg,
-// 	}
-
-// 	resp, err := executeTransaction(ephemeralContract, execution)
-// 	if err == nil {
-// 		provide.Render(resp, 202, c)
-// 	} else {
-// 		obj := map[string]interface{}{}
-// 		obj["errors"] = []string{err.Error()}
-// 		provide.Render(obj, 422, c)
-// 	}
-// }
-
-// func arbitraryRPCExecutionHandler(db *gorm.DB, networkID *uuid.UUID, params map[string]interface{}, c *gin.Context) {
-// 	network := &network.Network{}
-// 	db.Where("id = ?", networkID).Find(&network)
-// 	if network == nil || network.ID == uuid.Nil {
-// 		provide.RenderError("not found", 404, c)
-// 		return
-// 	}
-// 	method := params["method"].(string)
-// 	authorizedMethod := false
-// 	cfg := network.ParseConfig()
-// 	if whitelist, whitelistOk := cfg["rpc_method_whitelist"].([]interface{}); whitelistOk {
-// 		for _, mthd := range whitelist {
-// 			mthdStr := mthd.(string)
-// 			authorizedMethod = mthdStr == method
-// 			if authorizedMethod {
-// 				break
-// 			}
-// 		}
-// 	}
-// 	if !authorizedMethod {
-// 		provide.RenderError(fmt.Sprintf("forbidden rpc method %s", method), 403, c)
-// 		return
-// 	}
-// 	common.Log.Debugf("%s", params)
-// 	resp, err := network.InvokeJSONRPC(method, params["params"].([]interface{}))
-// 	if err != nil {
-// 		provide.RenderError(err.Error(), 422, c)
-// 		return
-// 	}
-// 	provide.Render(resp, 200, c)
-// }
-
 func contractExecutionHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	orgID := util.AuthorizedSubjectID(c, "organization")
@@ -363,7 +335,7 @@ func contractExecutionHandler(c *gin.Context) {
 	params := map[string]interface{}{}
 	err = json.Unmarshal(buf, &params)
 	if err != nil {
-		err = fmt.Errorf("Failed to parse JSON-RPC params; %s", err.Error())
+		err = fmt.Errorf("failed to parse JSON-RPC params; %s", err.Error())
 		provide.RenderError(err.Error(), 400, c)
 		return
 	}
@@ -371,22 +343,7 @@ func contractExecutionHandler(c *gin.Context) {
 	db := dbconf.DatabaseConnection()
 
 	contractID := c.Param("id")
-	// rpcHack := strings.Index(contractID, "rpc:") == 0
-	// if rpcHack {
-	// 	rpcNetworkIDStr := contractID[4:]
-	// 	rpcNetworkID, err := uuid.FromString(rpcNetworkIDStr)
-	// 	if err != nil {
-	// 		err = fmt.Errorf("Failed to parse RPC network id as valid uuid: %s; %s", rpcNetworkIDStr, err.Error())
-	// 		provide.RenderError(err.Error(), 400, c)
-	// 		return
-	// 	}
-	// 	common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
-	// 	arbitraryRPCExecutionHandler(db, &rpcNetworkID, params, c)
-	// 	return
-	// }
-
 	var contractObj = &contract.Contract{}
-
 	db.Where("id = ?", contractID).Find(&contractObj)
 
 	// if we can't find by ID, attempt to lookup the contract by address
@@ -406,14 +363,8 @@ func contractExecutionHandler(c *gin.Context) {
 	}
 
 	if contractObj == nil || contractObj.ID == uuid.Nil {
-		//if appID != nil {
 		provide.RenderError("contract not found", 404, c)
 		return
-		//}
-
-		// common.Log.Debugf("Attempting arbitrary, non-permissioned contract execution on behalf of user with id: %s", userID)
-		// contractArbitraryExecutionHandler(c, db, buf)
-		// return
 	}
 
 	if appID != nil && *contractObj.ApplicationID != *appID {
@@ -426,9 +377,17 @@ func contractExecutionHandler(c *gin.Context) {
 		return
 	}
 
-	ref, err := uuid.NewV4()
-	if err != nil {
-		common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+	// get ref from params (optional, create new if not present)
+	var ref uuid.UUID
+	txRef, txRefOk := params["ref"].(uuid.UUID)
+
+	if txRefOk {
+		ref = txRef
+	} else {
+		ref, err = uuid.NewV4()
+		if err != nil {
+			common.Log.Warningf("Failed to generate ref id; %s", err.Error())
+		}
 	}
 
 	execution := &contract.Execution{
@@ -494,7 +453,7 @@ func contractExecutionHandler(c *gin.Context) {
 				}
 
 				execution.AccountAddress = key.Address
-				common.Log.Debugf("xxx using address: %s, derived from wallet using path %s", *key.Address, pathstr)
+				common.Log.Debugf("Using address: %s, derived from wallet using path %s", *key.Address, pathstr)
 			}
 
 			if wallet.Path == nil {
@@ -509,7 +468,7 @@ func contractExecutionHandler(c *gin.Context) {
 					return
 				}
 				execution.AccountAddress = key.Address
-				common.Log.Debugf("xxx using address: %s, derived from wallet using DEFAULT path", *key.Address)
+				common.Log.Debugf("Using address: %s, derived from wallet using DEFAULT path", *key.Address)
 			}
 		}
 
@@ -525,6 +484,8 @@ func contractExecutionHandler(c *gin.Context) {
 
 	if gasPriceOk {
 		execution.GasPrice = &gasPrice
+	} else {
+		execution.GasPrice = MinimumGasPrice()
 	}
 
 	if nonceOk {

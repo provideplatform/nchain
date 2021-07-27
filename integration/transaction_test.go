@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
-	nchain "github.com/provideservices/provide-go/api/nchain"
+	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
 // ExecutionResponse is returned upon successful contract execution

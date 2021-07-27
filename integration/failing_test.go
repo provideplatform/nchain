@@ -10,8 +10,8 @@ import (
 	"time"
 
 	uuid "github.com/kthomas/go.uuid"
-	nchain "github.com/provideservices/provide-go/api/nchain"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	nchain "github.com/provideplatform/provide-go/api/nchain"
+	provide "github.com/provideplatform/provide-go/api/nchain"
 )
 
 // Note: this fails because none of the default networks are enabled

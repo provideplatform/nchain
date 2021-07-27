@@ -234,6 +234,10 @@ if [[ -z "${NATS_STREAMING_CONCURRENCY}" ]]; then
   NATS_STREAMING_CONCURRENCY=1
 fi
 
+if [[ -z "${NATS_CONCURRENCY}" ]]; then
+  NATS_CONCURRENCY=1
+fi
+
 if [[ -z "${NATS_FORCE_TLS}" ]]; then
   NATS_FORCE_TLS=false
 fi

@@ -11,12 +11,12 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 
-	"github.com/provideapp/nchain/common"
-	_ "github.com/provideapp/nchain/connector"
-	_ "github.com/provideapp/nchain/consumer"
-	_ "github.com/provideapp/nchain/contract"
-	_ "github.com/provideapp/nchain/network"
-	_ "github.com/provideapp/nchain/tx"
+	"github.com/provideplatform/nchain/common"
+	_ "github.com/provideplatform/nchain/connector"
+	_ "github.com/provideplatform/nchain/consumer"
+	_ "github.com/provideplatform/nchain/contract"
+	_ "github.com/provideplatform/nchain/network"
+	_ "github.com/provideplatform/nchain/tx"
 )
 
 const natsStreamingSubscriptionStatusTickerInterval = 5 * time.Second
@@ -59,6 +59,7 @@ func main() {
 		case sig := <-sigs:
 			common.Log.Infof("Received signal: %s", sig)
 			common.Log.Warningf("NATS streaming connection subscriptions are not yet being drained...")
+			common.Log.Debugf("received signal")
 			shutdown()
 		case <-shutdownCtx.Done():
 			close(sigs)
