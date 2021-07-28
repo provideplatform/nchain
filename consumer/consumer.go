@@ -8,6 +8,7 @@ import (
 	"github.com/kthomas/go-natsutil"
 	"github.com/nats-io/stan.go"
 	"github.com/provideplatform/nchain/common"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // TODO: audit arbitrary max in flight & timeouts
