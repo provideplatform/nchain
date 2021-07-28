@@ -201,8 +201,7 @@ func (p *packetFragment) Broadcast() error {
 	}
 
 	common.Log.Debugf("attempting to broadcast %d-byte fragment for Nonce %d - index #%d", len(payload), p.Nonce, p.Index)
-	guid, err := streamingPublish(natsPacketFragmentIngestSubject, payload)
-	common.Log.Debugf("message guid for Nonce %d - index #%d: '%s'", p.Nonce, p.Index, *guid)
+	_, err = streamingPublish(natsPacketFragmentIngestSubject, payload)
 	return err
 }
 
@@ -276,8 +275,6 @@ func (p *packetFragment) Ingest() (bool, *uint, error) {
 	}
 
 	ingestCount := uint(*i)
-
-	common.Log.Debugf("Fragment #%d. i: %d. Ingest Count: %d", p.Index, *i, ingestCount)
 
 	return verified, &ingestCount, nil
 }
@@ -365,8 +362,7 @@ func (p *packetReassembly) Broadcast() error {
 	if err != nil {
 		return err
 	}
-	guid, err := streamingPublish(natsPacketReassembleSubject, payload)
-	common.Log.Debugf("message guid for Nonce %d - reassembly: '%s'", p.Nonce, *guid)
+	_, err = streamingPublish(natsPacketReassembleSubject, payload)
 	return err
 }
 

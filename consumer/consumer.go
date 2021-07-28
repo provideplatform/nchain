@@ -30,6 +30,27 @@ var (
 	currencyPairs = []string{}
 )
 
+type subscribeFn = func(*sync.WaitGroup, time.Duration, string, string, stan.MsgHandler, time.Duration, int, *string)
+
+var subscribe subscribeFn = natsutil.RequireNatsStreamingSubscription
+
+// setSubscribeFn sets the implementation that will be used to listen for packets (default is natsutil.RequireNatsStreamingSubscription)
+func setSubscribeFunction(function subscribeFn) {
+	subscribe = function
+}
+
+func natsAck(msg *stan.Msg) {
+	msg.Ack()
+}
+
+type ackFn = func(*stan.Msg)
+
+var ack ackFn = natsAck
+
+func setAckFunction(function ackFn) {
+	ack = function
+}
+
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Consumer package configured to skip NATS streaming subscription setup")
@@ -44,7 +65,7 @@ func init() {
 
 func createNatsPacketFragmentIngestSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		subscribe(wg,
 			natsPacketFragmentIngestInvocationTimeout,
 			natsPacketFragmentIngestSubject,
 			natsPacketFragmentIngestSubject,
@@ -58,7 +79,7 @@ func createNatsPacketFragmentIngestSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsPacketReassemblySubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		subscribe(wg,
 			natsPacketReassembleInvocationTimeout,
 			natsPacketReassembleSubject,
 			natsPacketReassembleSubject,
@@ -75,7 +96,7 @@ func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
 	common.Log.Debugf("All fragments ingested for packet with checksum %s", hex.EncodeToString(*reassembly.Checksum))
 
 	payload, _ := msgpack.Marshal(reassembly)
-	_, err := natsutil.NatsStreamingPublishAsync(natsPacketCompleteSubject, payload)
+	_, err := streamingPublish(natsPacketCompleteSubject, payload)
 	if err != nil {
 		common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), natsPacketReassembleSubject, err.Error())
 		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
@@ -83,13 +104,11 @@ func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
 }
 
 func consumePacketFragmentIngestMsg(msg *stan.Msg) {
-	common.Log.Debugf("Recieved fragment message: Seq:%d, RedeliveryCount: %d", msg.Sequence, msg.RedeliveryCount)
-
 	fragment := &packetFragment{}
 	err := msgpack.Unmarshal(msg.Data, &fragment)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet fragment ingest message; %s", err.Error())
-		msg.Ack() // Acknowledge the bad packet so it's not resent
+		ack(msg) // Acknowledge the bad packet so it's not resent
 		return
 	}
 
@@ -112,7 +131,7 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		}
 	}
 
-	msg.Ack()
+	ack(msg)
 }
 
 func consumePacketReassembleMsg(msg *stan.Msg) {
@@ -122,7 +141,7 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet reassembly message; %s", err.Error())
-		msg.Ack() // Acknowledge the bad packet so it's not resent
+		ack(msg) // Acknowledge the bad packet so it's not resent
 		return
 	}
 
@@ -139,5 +158,5 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 		handleReassembly(msg, reassembly)
 	}
 
-	msg.Ack()
+	ack(msg)
 }

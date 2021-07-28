@@ -16,7 +16,7 @@ var (
 )
 
 func consumePacketCompleteMsg(t *testing.T, msg *stan.Msg, expectedPayload *[]byte) {
-	msg.Ack()
+	ack(msg)
 
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
@@ -49,7 +49,13 @@ func consumePacketCompleteMsg(t *testing.T, msg *stan.Msg, expectedPayload *[]by
 	testDone.Done()
 }
 
+// TestConsumerBroadcastAndReassemble uses a real NATS-Streaming connection to test broadcast and reassembly of data
 func TestConsumerBroadcastAndReassemble(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	payload := generateRandomBytes(1024 * 16)
 	setupRedis()
 
