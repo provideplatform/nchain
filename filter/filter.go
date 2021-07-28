@@ -11,7 +11,7 @@ import (
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
-	provide "github.com/provideservices/provide-go/api"
+	provide "github.com/provideplatform/provide-go/api"
 )
 
 const natsStreamingTxFilterExecSubjectPrefix = "ml.filter.exec"

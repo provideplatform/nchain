@@ -42,8 +42,8 @@ setup_go()
     export GOBIN=$GOPATH/bin
     export PATH=~/.local/bin:$GOBIN:$PATH
     echo "PATH is: '$PATH'"
-    mkdir -p $GOPATH/src/github.com/provideapp
-    # ln -f -s `pwd` $GOPATH/src/github.com/provideapp/nchain
+    mkdir -p $GOPATH/src/github.com/provideplatform
+    # ln -f -s `pwd` $GOPATH/src/github.com/provideplatform/nchain
     # echo "GOPATH is: $GOPATH"
     mkdir -p $GOBIN
 

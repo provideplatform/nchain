@@ -49,13 +49,16 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/provideplatform/ident v0.9.9
-	github.com/provideservices/provide-go v0.0.0-20210528064845-41b80b9b02b9
+	github.com/provideplatform/ident v0.0.0-00010101000000-000000000000
+	github.com/provideplatform/provide-go v0.0.0-20210701150626-bff9948fbd9a
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.4
 	go.mongodb.org/mongo-driver v1.3.3
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
 
 replace github.com/provideplatform/ident => ../ident
+
+//replace github.com/provideplatform/provide-go => ../provide-go

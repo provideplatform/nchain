@@ -18,10 +18,10 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network/p2p"
-	provide "github.com/provideservices/provide-go/api"
-	c2 "github.com/provideservices/provide-go/api/c2"
-	provideapi "github.com/provideservices/provide-go/api/nchain"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	provide "github.com/provideplatform/provide-go/api"
+	c2 "github.com/provideplatform/provide-go/api/c2"
+	provideapi "github.com/provideplatform/provide-go/api/nchain"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const defaultWebappPort = 3000

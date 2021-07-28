@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kthomas/go-redisutil"
-	"github.com/vmihailenco/msgpack/v5"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/consumer"
 )
 
 func setupRedis() {

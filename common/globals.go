@@ -11,9 +11,9 @@ import (
 	awsconf "github.com/kthomas/go-aws-config"
 	"github.com/kthomas/go-logger"
 
-	ident "github.com/provideservices/provide-go/api/ident"
-	vault "github.com/provideservices/provide-go/api/vault"
-	util "github.com/provideservices/provide-go/common/util"
+	ident "github.com/provideplatform/provide-go/api/ident"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 const defaultDockerhubOrganization = "provide"

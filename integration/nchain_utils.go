@@ -1,4 +1,4 @@
-// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly bulk
+// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly bulk transfer
 
 package integration
 
@@ -8,7 +8,7 @@ import (
 
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/ident/common"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	provide "github.com/provideplatform/provide-go/api/nchain"
 )
 
 func NetworkFactory(token string, testId uuid.UUID) (*provide.Network, error) {

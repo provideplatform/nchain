@@ -97,6 +97,9 @@ integration_readonly:
 integration_bookie:
 	LOCAL_TAGS=bookie NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
 
+integration_bulk:
+	LOCAL_TAGS=bulk NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=4224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests.sh
+
 debug:
 	NATS_SERVER_PORT=4223 NATS_STREAMING_SERVER_PORT=3224 REDIS_SERVER_PORT=6380 ./ops/run_integration_tests_debug.sh
 
@@ -133,4 +136,11 @@ statsdaemon_bounce:
 	docker-compose -f ./ops/docker-compose-integration.yml up -d
 	docker kill statsdaemon
 	docker kill nchain
-	docker kill nchain-consumer
+	docker kill nchain-consumer	
+
+bulk_bounce:
+	docker-compose -f ./ops/docker-compose.yml down
+	docker volume rm ops_provide-db
+	docker-compose -f ./ops/docker-compose.yml up -d
+	docker kill nchain-consumer	
+

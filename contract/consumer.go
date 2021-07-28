@@ -72,6 +72,7 @@ func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contrac
 		cachedContracts = cachedCntrcts
 	} else {
 		cachedContracts = map[string]*Contract{}
+		// CHECKME - this throws a subscribelocked panic occasionally
 		cachedNetworkContracts[networkID.String()] = cachedContracts
 	}
 
@@ -281,6 +282,7 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 
 	common.Log.Tracef("Unmarshaled %d-byte log transceiver event from emitted log event JSON", len(msg.Data))
 
+	// CHECKME - root of the panic thrown occasionally
 	network := cachedNetwork(networkUUID)
 	if network == nil || network.ID == uuid.Nil {
 		common.Log.Warningf("Failed to process log transceiver event emission message; network lookup failed for network id: %s", networkID)

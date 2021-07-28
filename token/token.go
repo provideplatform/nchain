@@ -9,7 +9,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
-	provide "github.com/provideservices/provide-go/api"
+	provide "github.com/provideplatform/provide-go/api"
 )
 
 // Token instances must be associated with an application identifier.

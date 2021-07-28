@@ -2,7 +2,7 @@ package prices
 
 import (
 	"github.com/gin-gonic/gin"
-	provide "github.com/provideservices/provide-go/common"
+	provide "github.com/provideplatform/provide-go/common"
 )
 
 // InstallPricesAPI installs the handlers using the given gin Engine

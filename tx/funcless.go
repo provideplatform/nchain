@@ -8,14 +8,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	dbconf "github.com/kthomas/go-db-config"
+	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	"github.com/provideplatform/nchain/network"
-	provide "github.com/provideservices/provide-go/api/nchain"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	provideAPI "github.com/provideplatform/provide-go/api"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 func executeTransaction(c *contract.Contract, execution *contract.Execution) (*contract.ExecutionResponse, error) {
@@ -127,7 +127,6 @@ func executeTransaction(c *contract.Contract, execution *contract.Execution) (*c
 	if tx.Response == nil {
 
 		common.Log.Debugf("response is: %+v", response)
-		//tx.Response = &contract.ExecutionResponse{
 		resp = contract.ExecutionResponse{
 			Response:    response["response"],
 			Receipt:     response,
@@ -136,7 +135,7 @@ func executeTransaction(c *contract.Contract, execution *contract.Execution) (*c
 			Ref:         ref,
 			View:        readonlyMethod,
 		}
-		common.Log.Debugf("resp is: %+v", resp)
+
 	} else if tx.Response.Transaction == nil {
 		//?? when does this get tripped?
 		//tx.Response.Transaction = tx
@@ -174,122 +173,86 @@ func getTransactionResponse(tx *Transaction, c *contract.Contract, network *netw
 			if abiMethod.IsConstant() {
 				common.Log.Debugf("Attempting to read constant method %s on contract: %s", method, c.ID)
 				client, err := providecrypto.EVMDialJsonRpc(network.ID.String(), network.RPCURL())
-				msg := tx.asEthereumCallMsg(signer.Address(), 0, 0)
+				if err != nil {
+					return nil, err
+				}
+				address, err := signer.Address()
+				if err != nil {
+					return nil, err
+				}
+				msg := tx.asEthereumCallMsg(*address, 0, 0)
 				result, err = client.CallContract(context.TODO(), msg, nil)
 				if err != nil {
 					err = fmt.Errorf("Failed to read constant method %s on contract: %s; %s", method, c.ID, err.Error())
 					return nil, err
 				}
 			} else {
-				var txResponse *contract.ExecutionResponse
-				if tx.Create(db) {
-					common.Log.Debugf("Executed %s on contract: %s", methodDescriptor, c.ID)
-					if tx.Response != nil {
-						txResponse = tx.Response
+				params := c.ParseParams()
+
+				value := uint64(0)
+				if val, valOk := params["value"].(float64); valOk {
+					value = uint64(val)
+				}
+
+				var accountID *string
+				if acctID, acctIDOk := params["account_id"].(string); acctIDOk {
+					accountID = &acctID
+				}
+
+				var walletID *string
+				var hdDerivationPath *string
+				if wlltID, wlltIDOk := params["wallet_id"].(string); wlltIDOk {
+					walletID = &wlltID
+
+					if path, pathOk := params["hd_derivation_path"].(string); pathOk {
+						hdDerivationPath = &path
 					}
+				}
+				// send as a message to NATS
+				txExecutionMsg, _ := json.Marshal(map[string]interface{}{
+					"contract_id":        c.ID,
+					"data":               data,
+					"account_id":         accountID,
+					"wallet_id":          walletID,
+					"hd_derivation_path": hdDerivationPath,
+					"value":              value,
+					"params":             params,
+					"published_at":       time.Now(),
+					"reference":          tx.Ref,
+				})
+
+				err = natsutil.NatsStreamingPublish(natsTxSubject, txExecutionMsg)
+				if err != nil {
+					common.Log.Warningf("Failed to publish contract deployment tx ref %s. Error: %s", *tx.Ref, err.Error())
+					c.Errors = append(c.Errors, &provideAPI.Error{
+						Message: common.StringOrNil(err.Error()),
+					})
+					return nil, err
+				}
+
+				//otherwise we're good, so return the reference so it can be tracked
+				out["reference"] = *tx.Ref
+				return out, nil
+			}
+			// we executed a read-only method
+			if result != nil {
+				outptr, err := abiMethod.Outputs.UnpackValues(result)
+				if err != nil {
+					return nil, fmt.Errorf("failed to unpack contract execution response for contract: %s; method: %s; signature with encoded parameters: %s; %s", c.ID, methodDescriptor, *tx.Data, err.Error())
+				}
+				if len(outptr) == 1 {
+					out["response"] = outptr[0]
 				} else {
-					common.Log.Debugf("Failed tx errors: %s", *tx.Errors[0].Message)
-					txParams := tx.ParseParams()
-
-					publicKey, publicKeyOk := txParams["public_key"].(interface{})
-					privateKey, privateKeyOk := txParams["private_key"].(interface{})
-					gas, gasOk := txParams["gas"].(float64)
-					if !gasOk {
-						gas = float64(0)
-					}
-					var gasPrice *uint64
-					gp, gpOk := txParams["gas_price"].(float64)
-					if gpOk {
-						_gasPrice := uint64(gp)
-						gasPrice = &_gasPrice
-					}
-					var nonce *uint64
-					if nonceFloat, nonceOk := txParams["nonce"].(float64); nonceOk {
-						nonceUint := uint64(nonceFloat)
-						nonce = &nonceUint
-					}
-					delete(txParams, "private_key")
-					tx.setParams(txParams)
-
-					if publicKeyOk && privateKeyOk {
-						common.Log.Debugf("Attempting to execute %s on contract: %s; arbitrarily-provided signer for tx: %s; gas supplied: %v", methodDescriptor, c.ID, publicKey, gas)
-						tx.SignedTx, tx.Hash, err = providecrypto.EVMSignTx(network.ID.String(), network.RPCURL(), publicKey.(string), privateKey.(string), tx.To, tx.Data, tx.Value.BigInt(), nonce, uint64(gas), gasPrice)
-						if err != nil {
-							err = fmt.Errorf("Unable to broadcast signed tx; typecast failed for signed tx: %s", tx.SignedTx)
-							common.Log.Warning(err.Error())
-							return nil, err
-						}
-
-						if signedTx, ok := tx.SignedTx.(*types.Transaction); ok {
-							err = providecrypto.EVMBroadcastSignedTx(network.ID.String(), network.RPCURL(), signedTx)
-							return nil, err
-						}
-
-						if err != nil {
-							err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed using arbitrarily-provided signer: %s; %s", methodDescriptor, c.ID, *tx.Data, publicKey, err.Error())
-							common.Log.Warning(err.Error())
-							return nil, err
-						}
-					} else {
-						err = fmt.Errorf("Failed to execute %s on contract: %s (signature with encoded parameters: %s); tx broadcast failed", methodDescriptor, c.ID, *tx.Data)
-						if len(tx.Errors) > 0 {
-							err = fmt.Errorf("%s; %s", err.Error(), *tx.Errors[0].Message)
-						}
-						common.Log.Warning(err.Error())
-						return nil, err
-					}
+					out["response"] = outptr
 				}
 
-				if txResponse != nil {
-					common.Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
-
-					if txResponse.Traces != nil {
-						if traces, tracesOk := txResponse.Traces.(*provide.EthereumTxTraceResponse); tracesOk {
-							common.Log.Debugf("EVM tracing included in tx response")
-							if len(traces.Result) > 0 {
-								traceResult := traces.Result[0].Result
-								if traceResult.Output != nil {
-									result = []byte(*traceResult.Output)
-								}
-							}
-						}
-					} else {
-						common.Log.Debugf("Received response to tx broadcast attempt calling method %s on contract: %s", methodDescriptor, c.ID)
-						switch (txResponse.Receipt).(type) {
-						case []byte:
-							result = (txResponse.Receipt).([]byte)
-							json.Unmarshal(result, &receipt)
-						case types.Receipt:
-							txReceipt := txResponse.Receipt.(*types.Receipt)
-							txReceiptJSON, _ := json.Marshal(txReceipt)
-							json.Unmarshal(txReceiptJSON, &receipt)
-							out["receipt"] = receipt
-							return out, nil
-						default:
-							// no-op
-							common.Log.Warningf("Unhandled transaction receipt type; %s", tx.Response.Receipt)
-						}
-					}
-
-					return out, nil
+				if receipt != nil {
+					out["receipt"] = receipt
 				}
+
+				return out, nil
 			}
 
-			outptr, err := abiMethod.Outputs.UnpackValues(result)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to unpack contract execution response for contract: %s; method: %s; signature with encoded parameters: %s; %s", c.ID, methodDescriptor, *tx.Data, err.Error())
-			}
-			if len(outptr) == 1 {
-				out["response"] = outptr[0]
-			} else {
-				out["response"] = outptr
-			}
-
-			if receipt != nil {
-				out["receipt"] = receipt
-			}
-
-			return out, nil
 		}
 
 		err = fmt.Errorf("Failed to execute method %s on contract: %s; method not found in ABI", methodDescriptor, c.ID)

@@ -12,10 +12,10 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
 	"github.com/provideplatform/nchain/token"
-	provide "github.com/provideservices/provide-go/api"
-	vault "github.com/provideservices/provide-go/api/vault"
-	util "github.com/provideservices/provide-go/common/util"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	provide "github.com/provideplatform/provide-go/api"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	util "github.com/provideplatform/provide-go/common/util"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 // Account represents a single address associated with a specific network and application or user

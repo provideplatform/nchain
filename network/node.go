@@ -13,13 +13,13 @@ import (
 
 	// natsutil "github.com/kthomas/go-natsutil"
 
-	// "github.com/provideapp/nchain/gpgputil"
+	// "github.com/provideplatform/nchain/gpgputil"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network/p2p"
-	provide "github.com/provideservices/provide-go/api"
-	c2 "github.com/provideservices/provide-go/api/c2"
+	provide "github.com/provideplatform/provide-go/api"
+	c2 "github.com/provideplatform/provide-go/api/c2"
 )
 
 const defualtNodeLogRPP = int64(500)
@@ -358,7 +358,8 @@ func (n *Node) ParseConfig() map[string]interface{} {
 
 // Delete a network node
 func (n *Node) Delete(token string) bool {
-	err := c2.DeleteNode(token, n.ID.String())
+	// CHECKME updates in provide-go for c2 work
+	_, err := c2.DeleteNode(token, n.ID.String())
 	if err != nil {
 		n.Errors = append(n.Errors, &provide.Error{
 			Message: common.StringOrNil(fmt.Sprintf("Failed to delete network node; %s", err.Error())),

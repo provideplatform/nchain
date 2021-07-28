@@ -26,8 +26,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
-	provide "github.com/provideservices/provide-go/api/nchain"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	provide "github.com/provideplatform/provide-go/api/nchain"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const blockchainInfoWebsocketURL = "wss://ws.blockchain.info/inv"

@@ -14,7 +14,7 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	"github.com/provideplatform/nchain/token"
-	provide "github.com/provideservices/provide-go/api"
+	provide "github.com/provideplatform/provide-go/api"
 )
 
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"

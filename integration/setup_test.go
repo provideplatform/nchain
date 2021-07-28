@@ -1,4 +1,4 @@
-// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly bulk
+// +build integration nchain failing rinkeby ropsten kovan goerli nobookie basic bookie readonly bulk transfer
 
 package integration
 
@@ -8,7 +8,7 @@ import (
 
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/ident/common"
-	provide "github.com/provideservices/provide-go/api/nchain"
+	provide "github.com/provideplatform/provide-go/api/nchain"
 )
 
 // ropsten
@@ -25,15 +25,18 @@ var goerliNetworkName string = "goerli"
 var kovanNetworkID string = "8d31bf48-df6b-4a71-9d7c-3cb291111e27"
 var kovanNetworkName string = "kovan"
 
-const contractTimeout = 480
-const transactionTimeout = 480
+const contractTimeout = 960
+const transactionTimeout = 4800
 
-const bulkContractTimeout = 480
-const bulkTransactionTimeout = 480
+const bulkContractTimeout = 4800
+const bulkTransactionTimeout = 4800
 
 const contractSleepTime = 10
 
 const transactionSleepTime = 10
+
+const infuraAuthCode = "62dc7b9674d7445b84419139dcbedb26" // eoin provide one
+//const infuraAuthCode = "c674f4905e07452db8b8d467d85681ab" // eoin gmail one
 
 type chainSpecConfig struct {
 	HomesteadBlock      int `json:"homesteadBlock"`
@@ -214,8 +217,8 @@ func generateRopstenConfig() (json.RawMessage, error) {
 		Client:            common.StringOrNil("geth"),
 		NetworkID:         3,
 		BlockExplorerUrl:  common.StringOrNil("https://ropsten.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("https://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("wss://ropsten.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
+		JsonRpcUrl:        common.StringOrNil(fmt.Sprintf("https://ropsten.infura.io/v3/%s", infuraAuthCode)),
+		WebsocketUrl:      common.StringOrNil(fmt.Sprintf("wss://ropsten.infura.io/v3/%s", infuraAuthCode)),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),
 		ChainSpec:         &networkChainSpec,
@@ -269,8 +272,8 @@ func generateRinkebyConfig() (json.RawMessage, error) {
 		Client:            common.StringOrNil("geth"),
 		NetworkID:         4,
 		BlockExplorerUrl:  common.StringOrNil("https://rinkeby.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("https://rinkeby.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("wss://rinkeby.infura.io/ws/v3/561dda3e54c54188934d2ab95b1910e8"),
+		JsonRpcUrl:        common.StringOrNil(fmt.Sprintf("https://rinkeby.infura.io/v3/%s", infuraAuthCode)),
+		WebsocketUrl:      common.StringOrNil(fmt.Sprintf("wss://rinkeby.infura.io/ws/v3/%s", infuraAuthCode)),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("pow"),
 		ChainSpec:         &networkChainSpec,
@@ -315,6 +318,23 @@ func generateKovanConfig() (json.RawMessage, error) {
 		Timestamp:  common.StringOrNil("0x00"),
 	}
 
+	// networkChainConfig := chainConfig{
+	// 	NativeCurrency:    common.StringOrNil("KETH"),
+	// 	Platform:          common.StringOrNil("evm"),
+	// 	EngineID:          common.StringOrNil("aura"),
+	// 	IsEthereumNetwork: true,
+	// 	Client:            common.StringOrNil("parity"),
+	// 	NetworkID:         42,
+	// 	BlockExplorerUrl:  common.StringOrNil("https://kovan.etherscan.io"),
+	// 	JsonRpcUrl:        common.StringOrNil(fmt.Sprintf("https://kovan.infura.io/v3/%s", infuraAuthCode)),
+	// 	WebsocketUrl:      common.StringOrNil(fmt.Sprintf("wss://kovan.infura.io/ws/v3/%s", infuraAuthCode)),
+	// 	Chain:             common.StringOrNil("test"),
+	// 	ProtocolID:        common.StringOrNil("poa"),
+	// 	ChainSpec:         &networkChainSpec,
+	// }
+
+	//https://kovan.poa.network/
+
 	networkChainConfig := chainConfig{
 		NativeCurrency:    common.StringOrNil("KETH"),
 		Platform:          common.StringOrNil("evm"),
@@ -323,12 +343,13 @@ func generateKovanConfig() (json.RawMessage, error) {
 		Client:            common.StringOrNil("parity"),
 		NetworkID:         42,
 		BlockExplorerUrl:  common.StringOrNil("https://kovan.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("https://kovan.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("wss://kovan.infura.io/ws/v3/561dda3e54c54188934d2ab95b1910e8"),
+		JsonRpcUrl:        common.StringOrNil(fmt.Sprintf("https://kovan.poa.network/")),
+		WebsocketUrl:      common.StringOrNil(fmt.Sprintf("wss://kovan.poa.network/")),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("poa"),
 		ChainSpec:         &networkChainSpec,
 	}
+
 	// convert networkChainConfig to a json.RawMessage
 	config, err := json.Marshal(networkChainConfig)
 	if err != nil {
@@ -377,8 +398,8 @@ func generateGoerliConfig() (json.RawMessage, error) {
 		Client:            common.StringOrNil("parity"),
 		NetworkID:         5,
 		BlockExplorerUrl:  common.StringOrNil("https://goerli.etherscan.io"),
-		JsonRpcUrl:        common.StringOrNil("https://goerli.infura.io/v3/561dda3e54c54188934d2ab95b1910e8"),
-		WebsocketUrl:      common.StringOrNil("wss://goerli.infura.io/ws/v3/561dda3e54c54188934d2ab95b1910e8"),
+		JsonRpcUrl:        common.StringOrNil(fmt.Sprintf("https://goerli.infura.io/v3/%s", infuraAuthCode)),
+		WebsocketUrl:      common.StringOrNil(fmt.Sprintf("wss://goerli.infura.io/ws/v3/%s", infuraAuthCode)),
 		Chain:             common.StringOrNil("test"),
 		ProtocolID:        common.StringOrNil("poa"),
 		ChainSpec:         &networkChainSpec,

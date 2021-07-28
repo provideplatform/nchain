@@ -4,12 +4,13 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	pgputil "github.com/kthomas/go-pgputil"
-	bookie "github.com/provideservices/provide-go/api/bookie"
+	bookie "github.com/provideplatform/provide-go/api/bookie"
 )
 
 var natsStreamingConnectionMutex sync.Mutex
@@ -92,4 +93,25 @@ func MarshalConfig(opts map[string]interface{}) *json.RawMessage {
 	cfgJSON, _ := json.Marshal(opts)
 	_cfgJSON := json.RawMessage(cfgJSON)
 	return &_cfgJSON
+}
+
+// Retry attempts functions multiple times until they succceed
+func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
+	var errors []error
+
+	for i := 0; ; i++ {
+		err = f()
+		if err == nil {
+			return
+		}
+		errors = append(errors, err)
+		if i >= (attempts - 1) {
+			break
+		}
+
+		// TODO increase sleep duration by a factor of i, so there's a backoff
+		time.Sleep(sleep)
+
+	}
+	return fmt.Errorf("after %d attempts, errors %+v, last error: %s", attempts, errors, err)
 }

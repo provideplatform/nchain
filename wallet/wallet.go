@@ -9,9 +9,9 @@ import (
 	bip32 "github.com/FactomProject/go-bip32"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	provide "github.com/provideservices/provide-go/api"
-	vault "github.com/provideservices/provide-go/api/vault"
-	util "github.com/provideservices/provide-go/common/util"
+	provide "github.com/provideplatform/provide-go/api"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	util "github.com/provideplatform/provide-go/common/util"
 
 	"github.com/jinzhu/gorm"
 	"github.com/provideplatform/nchain/common"

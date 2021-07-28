@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // InstallTokensAPI installs the handlers using the given gin Engine
