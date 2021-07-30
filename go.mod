@@ -16,7 +16,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.22
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
-	github.com/gin-gonic/gin v1.6.3
+	github.com/gin-gonic/gin v1.7.0
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/golang-migrate/migrate v3.5.4+incompatible
 	github.com/gorilla/websocket v1.4.1
@@ -49,7 +49,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/provideplatform/ident v0.0.0-00010101000000-000000000000
+	github.com/provideplatform/ident v0.9.10-0.20210727215953-cdd9940805ce
 	github.com/provideplatform/provide-go v0.0.0-20210701150626-bff9948fbd9a
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
@@ -57,7 +57,3 @@ require (
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
-
-replace github.com/provideplatform/ident => ../ident
-
-//replace github.com/provideplatform/provide-go => ../provide-go
