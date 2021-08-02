@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/stan.go"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 var dataStream = setupStub()
@@ -82,8 +83,38 @@ func setupStub() *testStream {
 	return sub
 }
 
+func checkReassemblyMsg(t *testing.T, msg *stan.Msg) {
+	t.Log("Recieved packet complete message")
+
+	reassembly := &packetReassembly{}
+	err := msgpack.Unmarshal(msg.Data, &reassembly)
+	if err != nil {
+		t.Errorf("Failed to umarshal packet reassembly message; %s", err.Error())
+	} else {
+		percentComplete, i, err := reassembly.fragmentIngestProgress()
+		if err != nil {
+			t.Errorf("Failed to reassemble %d-byte packet consisting of %d fragment(s); failed atomically reading or parsing fragment ingest progress; %s", reassembly.Size, reassembly.Cardinality, err.Error())
+			return
+		}
+
+		if *percentComplete != 1 {
+			t.Errorf("Failed to reassemble %d-byte packet consisting of %d fragment(s); only %d fragments ingested", reassembly.Size, reassembly.Cardinality, *i)
+			return
+		}
+
+		assembled, err := reassembly.Reassemble()
+		if !assembled || err != nil {
+			t.Errorf("Failed to reassemble data - err: '%s'", err)
+		}
+	}
+
+	testDone.Done()
+}
+
 func TestStubbedBroadcast(t *testing.T) {
-	payload := generateRandomBytes(1024 * 128)
+	payload1 := generateRandomBytes(1024 * 128)
+	payload2 := generateRandomBytes(1024 * 64)
+	payload3 := generateRandomBytes(1024 * 256)
 	setupRedis()
 
 	var wg sync.WaitGroup
@@ -91,18 +122,17 @@ func TestStubbedBroadcast(t *testing.T) {
 		time.Second*200,
 		natsPacketCompleteSubject,
 		natsPacketCompleteSubject,
-		func(msg *stan.Msg) { consumePacketCompleteMsg(t, msg, &payload) },
+		func(msg *stan.Msg) { checkReassemblyMsg(t, msg) },
 		time.Second*200,
 		1024,
 		nil,
 	)
 
-	testDone.Add(1)
+	testDone.Add(3)
 
-	err := BroadcastFragments(payload, true)
-	if err != nil {
-		t.Errorf("BroadcastFragments() error; %s", err.Error())
-	}
+	go BroadcastFragments(payload1, true)
+	go BroadcastFragments(payload2, true)
+	go BroadcastFragments(payload3, true)
 
 	testDone.Wait()
 }
