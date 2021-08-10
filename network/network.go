@@ -897,6 +897,8 @@ func (n *Network) P2PAPIClient() (p2p.API, error) {
 		apiClient = p2p.InitParityP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	case p2p.ProviderQuorum:
 		apiClient = p2p.InitQuorumP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
+	case p2p.ProviderBaseledger:
+		apiClient = p2p.InitBaseledgerP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	default:
 		return nil, fmt.Errorf("Failed to resolve p2p provider for network %s; unsupported client", n.ID)
 	}

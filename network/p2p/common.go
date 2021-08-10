@@ -58,6 +58,9 @@ const ProviderParity = "parity"
 // ProviderQuorum quorum p2p provider
 const ProviderQuorum = "quorum"
 
+// ProviderBaseledger baseledger p2p provider
+const ProviderBaseledger = "baseledger"
+
 const tokenTypeERC20 = "ERC-20"
 const tokenTypeERC721 = "ERC-721"
 
