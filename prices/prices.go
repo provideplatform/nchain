@@ -10,7 +10,7 @@ import (
 var CurrentPrices = &Prices{}
 
 func init() {
-	CurrentPrices.PrvdUsdPrice = 0.0 // PRVD tokens are worthless until the mainnet launches; TODO-- determine appropriate strategy to oracalize this data
+	CurrentPrices.PrvdUsdPrice = 0.0
 }
 
 type Prices struct {
