@@ -32,10 +32,10 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.PRODUCTION_AWS_DEFAULT_REGION }}
           AWS_DEFAULT_OUTPUT: json
-          ECR_REPOSITORY_NAME: provide/nchain
-          ECS_TASK_DEFINITION_FAMILY: nchain-fargate
+          ECR_REPOSITORY_NAME: provide/goldmine
+          ECS_TASK_DEFINITION_FAMILY: goldmine
           ECS_CLUSTER: production
-          ECS_SERVICE_NAME: nchain
+          ECS_SERVICE_NAME: goldmine
           RUN_INTEGRATION_SUITE: false
         run: |
           chmod +x "${GITHUB_WORKSPACE}/ops/ci-process.sh"
