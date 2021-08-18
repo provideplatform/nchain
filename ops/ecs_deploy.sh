@@ -9,7 +9,7 @@ get_build_info()
     buildDate=$(date '+%m.%d.%y')
     buildTime=$(date '+%H.%M.%S')
     echo "$(echo `git status` | grep "nothing to commit" > /dev/null 2>&1; if [ "$?" -ne "0" ]; then echo 'Local git status is dirty'; fi )";
-    buildRef=${gitBranch}-${gitHash}-${buildDate}-${buildTime}
+    buildRef=test-${gitHash}-${buildDate}-${buildTime}
     echo 'Build Ref =' $buildRef
 }
 
