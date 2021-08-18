@@ -55,6 +55,7 @@ const networkConfigIsHandshakeNetwork = "is_handshake_network"
 const networkConfigIsHyperledgerBesuNetwork = "is_hyperledger_besu_network"
 const networkConfigIsHyperledgerFabricNetwork = "is_hyperledger_fabric_network"
 const networkConfigIsQuorumNetwork = "is_quorum_network"
+const networkConfigIsBaseledgerNetwork = "is_baseledger_network"
 
 const networkConfigEnvBootnodes = "BOOTNODES"
 const networkConfigEnvClient = "CLIENT"
@@ -863,6 +864,16 @@ func (n *Network) IsHandshakeNetwork() bool {
 	if cfg != nil {
 		if isHandshakeNetwork, ok := cfg[networkConfigIsHandshakeNetwork].(bool); ok {
 			return isHandshakeNetwork
+		}
+	}
+	return false
+}
+
+func (n *Network) IsBaseledgerNetwork() bool {
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isBaseledgerNetwork, ok := cfg[networkConfigIsBaseledgerNetwork].(bool); ok {
+			return isBaseledgerNetwork
 		}
 	}
 	return false

@@ -333,6 +333,172 @@ func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkSta
 	}
 }
 
+// TMP struct, just for testing
+// format is still unknown
+type BaseledgerSubscriptionResponse struct {
+	ID      interface{}            `json:"id"`
+	Jsonrpc string                 `json:"jsonrpc"`
+	Result  map[string]interface{} `json:"result"`
+}
+
+// TMP struct, just for testing
+// format is still unknown
+type BaseledgerBlockHeader struct {
+	AppHash       string `json:"app_hash"`
+	ChainID       string `json:"chain_id"`
+	ConsensusHash string `json:"consensus_hash"`
+	DataHash      string `json:"data_hash"`
+	EvidenceHash  string `json:"evidence_hash"`
+	Height        string `json:"height"`
+	LastBlockID   struct {
+		Hash  string `json:"hash"`
+		Parts struct {
+			Hash  string `json:"hash"`
+			Total int    `json:"total"`
+		} `json:"parts"`
+	} `json:"last_block_id"`
+	LastCommitHash     string    `json:"last_commit_hash"`
+	LastResultsHash    string    `json:"last_results_hash"`
+	NextValidatorsHash string    `json:"next_validators_hash"`
+	ProposerAddress    string    `json:"proposer_address"`
+	Time               time.Time `json:"time"`
+	ValidatorsHash     string    `json:"validators_hash"`
+	Version            struct {
+		App   string `json:"app"`
+		Block string `json:"block"`
+	} `json:"version"`
+}
+
+// TMP struct, just for testing
+// format is still unknown
+type BaseledgerBlockHeaderResponse struct {
+	ID      int    `json:"id"`
+	Jsonrpc string `json:"jsonrpc"`
+	Result  struct {
+		Data struct {
+			Type  string `json:"type"`
+			Value struct {
+				Header struct {
+					AppHash       string `json:"app_hash"`
+					ChainID       string `json:"chain_id"`
+					ConsensusHash string `json:"consensus_hash"`
+					DataHash      string `json:"data_hash"`
+					EvidenceHash  string `json:"evidence_hash"`
+					Height        string `json:"height"`
+					LastBlockID   struct {
+						Hash  string `json:"hash"`
+						Parts struct {
+							Hash  string `json:"hash"`
+							Total int    `json:"total"`
+						} `json:"parts"`
+					} `json:"last_block_id"`
+					LastCommitHash     string    `json:"last_commit_hash"`
+					LastResultsHash    string    `json:"last_results_hash"`
+					NextValidatorsHash string    `json:"next_validators_hash"`
+					ProposerAddress    string    `json:"proposer_address"`
+					Time               time.Time `json:"time"`
+					ValidatorsHash     string    `json:"validators_hash"`
+					Version            struct {
+						App   string `json:"app"`
+						Block string `json:"block"`
+					} `json:"version"`
+				} `json:"header"`
+				NumTxs           string `json:"num_txs"`
+				ResultBeginBlock struct {
+					Events []struct {
+						Attributes []struct {
+							Index bool   `json:"index"`
+							Key   string `json:"key"`
+							Value string `json:"value"`
+						} `json:"attributes"`
+						Type string `json:"type"`
+					} `json:"events"`
+				} `json:"result_begin_block"`
+				ResultEndBlock struct {
+					ValidatorUpdates interface{} `json:"validator_updates"`
+				} `json:"result_end_block"`
+			} `json:"value"`
+		} `json:"data"`
+		Events struct {
+			BlockHeader []time.Time `json:"block.header"`
+			TmEvent     []string    `json:"tm.event"`
+		} `json:"events"`
+		Query string `json:"query"`
+	} `json:"result"`
+}
+
+// BaseledgerNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
+// data source which is used by stats daemon instances to consume EVM-based network statistics
+func BaseledgerNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsDataSource {
+	return &NetworkStatsDataSource{
+		Network: network,
+
+		Poll: func(ch chan *provide.NetworkStatus) error {
+			return new(jsonRpcNotSupported)
+		},
+
+		Stream: func(ch chan *provide.NetworkStatus) error {
+			websocketURL := network.WebsocketURL()
+			if websocketURL == "" {
+				err := new(websocketNotSupported)
+				return *err
+			}
+			var wsDialer websocket.Dialer
+			wsConn, _, err := wsDialer.Dial(websocketURL, nil)
+			if err != nil {
+				common.Log.Errorf("Failed to establish network stats websocket connection to %s; %s", websocketURL, err.Error())
+			} else {
+				defer wsConn.Close()
+				// { "jsonrpc": "2.0", "method": "subscribe", "params": ["tm.event='NewBlock'"], "id": 1 }
+				payload := map[string]interface{}{
+					"method":  "subscribe",
+					"params":  []string{"tm.event='NewBlockHeader'"},
+					"id":      1,
+					"jsonrpc": "2.0",
+				}
+				if err := wsConn.WriteJSON(payload); err != nil {
+					common.Log.Errorf("Failed to write subscribe message to network stats websocket connection")
+				} else {
+					common.Log.Debugf("Subscribed to network stats websocket: %s", websocketURL)
+					for {
+						_, message, err := wsConn.ReadMessage()
+						if err != nil {
+							common.Log.Errorf("Failed to receive message on network stats websocket; %s", err)
+							break
+						} else {
+							common.Log.Debugf("Received %d-byte message on network stats websocket for network: %s", len(message), *network.Name)
+							// TODO: try unmarshaling whole struct, for some reason parsing time is failing in header
+							// even though tendermint timestamps layout is RFC3339
+							response := &BaseledgerSubscriptionResponse{}
+							err := json.Unmarshal(message, response)
+							if err != nil {
+								common.Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
+							} else {
+								if result, ok := response.Result["data"].(map[string]interface{}); ok {
+									if resultJSON, err := json.Marshal(result); err == nil {
+										header := &BaseledgerBlockHeader{}
+										err := json.Unmarshal(resultJSON, header)
+										if err != nil {
+											common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
+										} else if header != nil {
+											ch <- &provide.NetworkStatus{
+												Meta: map[string]interface{}{
+													"last_block_header": result,
+												},
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			return err
+		},
+	}
+}
+
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
 func (sd *StatsDaemon) consume() []error {
 	errs := make([]error, 0)
@@ -700,6 +866,8 @@ func NewNetworkStatsDaemon(lg *logger.Logger, network *network.Network) *StatsDa
 		sd.dataSource = BcoinNetworkStatsDataSourceFactory(network)
 	} else if network.IsEthereumNetwork() {
 		sd.dataSource = EthereumNetworkStatsDataSourceFactory(network)
+	} else if network.IsBaseledgerNetwork() {
+		sd.dataSource = BaseledgerNetworkStatsDataSourceFactory(network)
 	}
 	//sd.handleSignals()
 
