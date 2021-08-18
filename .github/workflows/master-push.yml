@@ -19,7 +19,7 @@ jobs:
            password: ${{ secrets.DOCKER_HUB_PAT }}
            repository: provide/nchain
            tags: "latest"
-           
+
   deploy-api:
     name: Deploy to Production (API)
     runs-on: ubuntu-latest
