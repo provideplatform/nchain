@@ -9,7 +9,7 @@ get_build_info()
     buildDate=$(date '+%m.%d.%y')
     buildTime=$(date '+%H.%M.%S')
     echo "$(echo `git status` | grep "nothing to commit" > /dev/null 2>&1; if [ "$?" -ne "0" ]; then echo 'Local git status is dirty'; fi )";
-    buildRef=test-${gitHash}-${buildDate}-${buildTime}
+    buildRef=${gitBranch}-${gitHash}-${buildDate}-${buildTime}
     echo 'Build Ref =' $buildRef
 }
 
@@ -70,7 +70,7 @@ docker_build()
     sudo docker tag provide/goldmine:latest "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
 
     echo 'Docker push...'
-    aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+    $(aws ecr get-login --no-include-email --region us-east-1)
     sudo docker push "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
 }
 
