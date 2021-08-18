@@ -23,8 +23,9 @@ jobs:
     name: Update Production
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Run ci-process.sh
-      - shell: bash
+        shell: bash
         env:
           AWS_ACCOUNT_ID: ${{ secrets.PRODUCTION_AWS_ACCOUNT_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.PRODUCTION_AWS_ACCESS_KEY_ID }}
@@ -36,5 +37,6 @@ jobs:
           ECS_CLUSTER: production
           ECS_SERVICE_NAME: hardcode
           RUN_INTEGRATION_SUITE: false
-      - run: |
-          "${GITHUB_WORKSPACE}/ops/ci-process.sh"
+        run: |
+          chmod +x "${GITHUB_WORKSPACE}/ops/ci-process.sh"
+          ".${GITHUB_WORKSPACE}/ops/ci-process.sh"
