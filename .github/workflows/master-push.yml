@@ -36,5 +36,5 @@ jobs:
           ECS_CLUSTER: production
           ECS_SERVICE_NAME: hardcode
           RUN_INTEGRATION_SUITE: false
-        run: |
+      - run: |
           "${GITHUB_WORKSPACE}/ops/ci-process.sh"
