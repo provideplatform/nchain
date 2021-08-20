@@ -67,11 +67,11 @@ docker_build()
     sudo docker build -t provide/goldmine .
 
     echo 'Docker tag...'
-    sudo docker tag provide/goldmine:latest "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+    sudo docker tag provide/goldmine:latest "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/provide/goldmine:${buildRef}"
 
     echo 'Docker push...'
-    $(aws ecr get-login --no-include-email --region us-east-1)
-    sudo docker push "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/provide/goldmine:${buildRef}"
+    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+    docker push "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/provide/goldmine:${buildRef}"
 }
 
 ecs_deploy()
