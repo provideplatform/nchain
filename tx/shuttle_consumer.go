@@ -198,6 +198,12 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 			func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 				common.Log.Debugf("resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
+				var address *string
+				if network.IsEthereumNetwork() {
+					ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
+					address = common.StringOrNil(ethCommonAddress.Hex())
+				}
+
 				tok := &token.Token{
 					ApplicationID: c.ApplicationID,
 					NetworkID:     c.NetworkID,
@@ -206,7 +212,7 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 					Name:          common.StringOrNil(name),
 					Symbol:        common.StringOrNil(symbol),
 					Decimals:      decimals.Uint64(),
-					Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
+					Address:       address,
 				}
 
 				createdToken = tok.Create()

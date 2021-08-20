@@ -369,64 +369,6 @@ type BaseledgerBlockHeader struct {
 	} `json:"version"`
 }
 
-// TMP struct, just for testing
-// format is still unknown
-type BaseledgerBlockHeaderResponse struct {
-	ID      int    `json:"id"`
-	Jsonrpc string `json:"jsonrpc"`
-	Result  struct {
-		Data struct {
-			Type  string `json:"type"`
-			Value struct {
-				Header struct {
-					AppHash       string `json:"app_hash"`
-					ChainID       string `json:"chain_id"`
-					ConsensusHash string `json:"consensus_hash"`
-					DataHash      string `json:"data_hash"`
-					EvidenceHash  string `json:"evidence_hash"`
-					Height        string `json:"height"`
-					LastBlockID   struct {
-						Hash  string `json:"hash"`
-						Parts struct {
-							Hash  string `json:"hash"`
-							Total int    `json:"total"`
-						} `json:"parts"`
-					} `json:"last_block_id"`
-					LastCommitHash     string    `json:"last_commit_hash"`
-					LastResultsHash    string    `json:"last_results_hash"`
-					NextValidatorsHash string    `json:"next_validators_hash"`
-					ProposerAddress    string    `json:"proposer_address"`
-					Time               time.Time `json:"time"`
-					ValidatorsHash     string    `json:"validators_hash"`
-					Version            struct {
-						App   string `json:"app"`
-						Block string `json:"block"`
-					} `json:"version"`
-				} `json:"header"`
-				NumTxs           string `json:"num_txs"`
-				ResultBeginBlock struct {
-					Events []struct {
-						Attributes []struct {
-							Index bool   `json:"index"`
-							Key   string `json:"key"`
-							Value string `json:"value"`
-						} `json:"attributes"`
-						Type string `json:"type"`
-					} `json:"events"`
-				} `json:"result_begin_block"`
-				ResultEndBlock struct {
-					ValidatorUpdates interface{} `json:"validator_updates"`
-				} `json:"result_end_block"`
-			} `json:"value"`
-		} `json:"data"`
-		Events struct {
-			BlockHeader []time.Time `json:"block.header"`
-			TmEvent     []string    `json:"tm.event"`
-		} `json:"events"`
-		Query string `json:"query"`
-	} `json:"result"`
-}
-
 // BaseledgerNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
 // data source which is used by stats daemon instances to consume EVM-based network statistics
 func BaseledgerNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsDataSource {

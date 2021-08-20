@@ -43,7 +43,7 @@ func (p *NethermindP2PProvider) EnrichStartCommand(bootnodes []string) []string 
 }
 
 // FetchTxReceipt fetch a transaction receipt given its hash
-func (p *NethermindP2PProvider) FetchTxReceipt(signerAddress, hash string) (*provide.TxReceipt, error) {
+func (p *NethermindP2PProvider) FetchTxReceipt(signerAddress, hash string) (*TxReceipt, error) {
 	receipt, err := evmFetchTxReceipt(p.networkID, *p.rpcURL, signerAddress, hash)
 	if err != nil {
 		return nil, err
@@ -54,11 +54,11 @@ func (p *NethermindP2PProvider) FetchTxReceipt(signerAddress, hash string) (*pro
 		logs = append(logs, *log)
 	}
 
-	return &provide.TxReceipt{
-		TxHash:            receipt.TxHash,
-		ContractAddress:   receipt.ContractAddress,
+	return &TxReceipt{
+		TxHash:            receipt.TxHash.Bytes(),
+		ContractAddress:   receipt.ContractAddress.Bytes(),
 		GasUsed:           receipt.GasUsed,
-		BlockHash:         receipt.BlockHash,
+		BlockHash:         receipt.BlockHash.Bytes(),
 		BlockNumber:       receipt.BlockNumber,
 		TransactionIndex:  receipt.TransactionIndex,
 		PostState:         receipt.PostState,

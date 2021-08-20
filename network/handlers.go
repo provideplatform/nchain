@@ -38,32 +38,6 @@ func InstallNetworksAPI(r *gin.Engine) {
 	r.DELETE("/api/v1/networks/:id/nodes/:nodeId", deleteNodeHandler)
 
 	r.GET("/api/v1/networks/:id/oracles", networkOraclesListHandler)
-	r.GET("/api/v1/tendermintrpc/:id/:txHash", testTendermintTxReceiptHandler)
-}
-
-// TODO: just used as entry point for testing p2p client
-func testTendermintTxReceiptHandler(c *gin.Context) {
-	network := &Network{}
-	dbconf.DatabaseConnection().Where("id = ?", c.Param("id")).Find(&network)
-	if network.ID == uuid.Nil {
-		provide.RenderError("network not found", 404, c)
-		return
-	}
-
-	p2pClient, err := network.P2PAPIClient()
-	if err != nil {
-		provide.RenderError(err.Error(), 500, c)
-		return
-	}
-
-	txReceipt, err := p2pClient.FetchTxReceipt("", c.Param("txHash"))
-
-	if err != nil {
-		provide.RenderError(err.Error(), 500, c)
-		return
-	}
-
-	provide.Render(txReceipt, 200, c)
 }
 
 func createNetworkHandler(c *gin.Context) {

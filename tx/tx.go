@@ -26,6 +26,7 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	"github.com/provideplatform/nchain/network"
+	"github.com/provideplatform/nchain/network/p2p"
 	"github.com/provideplatform/nchain/token"
 	"github.com/provideplatform/nchain/wallet"
 	provide "github.com/provideplatform/provide-go/api"
@@ -1343,12 +1344,17 @@ func (t *Transaction) handleTxReceipt(
 	db *gorm.DB,
 	network *network.Network,
 	signerAddress string,
-	receipt *provideapi.TxReceipt,
+	receipt *p2p.TxReceipt,
 ) error {
 	if t.To == nil {
-		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, receipt.ContractAddress.Hex())
+		var contractAddress string
+		if network.IsEthereumNetwork() {
+			ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
+			contractAddress = *common.StringOrNil(ethCommonAddress.Hex())
+		}
+		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, contractAddress)
 		params := t.ParseParams()
-		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(receipt.ContractAddress.Hex()))
+		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(contractAddress))
 		if name, ok := params["name"].(string); ok {
 			contractName = name
 		}
@@ -1367,7 +1373,7 @@ func (t *Transaction) handleTxReceipt(
 				Name:           common.StringOrNil(name),
 				Symbol:         common.StringOrNil(symbol),
 				Decimals:       decimals.Uint64(),
-				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+				Address:        common.StringOrNil(contractAddress),
 			}
 
 			createdToken = tok.Create()
@@ -1387,7 +1393,7 @@ func (t *Transaction) handleTxReceipt(
 				NetworkID:      t.NetworkID,
 				TransactionID:  &t.ID,
 				Name:           common.StringOrNil(contractName),
-				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+				Address:        common.StringOrNil(contractAddress),
 				Params:         t.Params,
 				Ref:            t.Ref,
 			}
@@ -1399,7 +1405,7 @@ func (t *Transaction) handleTxReceipt(
 			}
 		} else {
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s, txID: %s", kontract.ID, *network.Name, *t.Hash, t.ID)
-			kontract.Address = common.StringOrNil(receipt.ContractAddress.Hex())
+			kontract.Address = common.StringOrNil(contractAddress)
 			db.Save(&kontract)
 			common.Log.Debugf("Updated contract with address for txID: %s", t.ID)
 			kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
@@ -1414,7 +1420,7 @@ func (t *Transaction) handleTxTraces(
 	network *network.Network,
 	signerAddress string,
 	traces *provideapi.TxTrace,
-	receipt *provideapi.TxReceipt,
+	receipt *p2p.TxReceipt,
 ) error {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {
@@ -1470,7 +1476,11 @@ func (t *Transaction) handleTxTraces(
 							internalContract.ResolveTokenContract(db, network, signerAddress, receipt,
 								func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 									common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
-
+									var contractAddress *string
+									if network.IsEthereumNetwork() {
+										ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
+										contractAddress = common.StringOrNil(ethCommonAddress.Hex())
+									}
 									tok := &token.Token{
 										ApplicationID:  c.ApplicationID,
 										OrganizationID: c.OrganizationID,
@@ -1480,7 +1490,7 @@ func (t *Transaction) handleTxTraces(
 										Name:           common.StringOrNil(name),
 										Symbol:         common.StringOrNil(symbol),
 										Decimals:       decimals.Uint64(),
-										Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+										Address:        contractAddress,
 									}
 
 									createdToken = tok.Create()

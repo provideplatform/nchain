@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/jinzhu/gorm"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
@@ -62,7 +61,7 @@ func (p *BaseledgerP2PProvider) AddPeer(peerURL string) error {
 }
 
 // FetchTxReceipt fetch a transaction receipt given its hash
-func (p *BaseledgerP2PProvider) FetchTxReceipt(signerAddress, hash string) (*nchain.TxReceipt, error) {
+func (p *BaseledgerP2PProvider) FetchTxReceipt(signerAddress, hash string) (*TxReceipt, error) {
 	httpClient := &provide.Client{
 		Host:   *p.rpcURL,
 		Scheme: "http",
@@ -103,12 +102,11 @@ func (p *BaseledgerP2PProvider) FetchTxReceipt(signerAddress, hash string) (*nch
 	blockNumber, _ := n.SetString(txEntity.Result.Height, 10)
 	var logs []interface{}
 	json.Unmarshal([]byte(txEntity.Result.TxResult.Log), &logs)
-	return &nchain.TxReceipt{
-		// TODO: tx receipt is heavy coupled with ethereum, fix this?
-		TxHash:            ethCommon.HexToHash(txEntity.Result.Hash),
-		ContractAddress:   ethCommon.Address{},
+	return &TxReceipt{
+		TxHash:            []byte(txEntity.Result.Hash),
+		ContractAddress:   nil,
 		GasUsed:           uint64(gasUsed),
-		BlockHash:         ethCommon.HexToHash(blockEntity.Result.BlockID.Hash),
+		BlockHash:         []byte(blockEntity.Result.BlockID.Hash),
 		BlockNumber:       blockNumber,
 		TransactionIndex:  0,
 		PostState:         nil,

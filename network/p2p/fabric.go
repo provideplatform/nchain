@@ -49,7 +49,7 @@ func (p *HyperledgerFabricP2PProvider) EnrichStartCommand(bootnodes []string) []
 }
 
 // FetchTxReceipt fetch a transaction receipt given its hash
-func (p *HyperledgerFabricP2PProvider) FetchTxReceipt(signerAddress, hash string) (*provide.TxReceipt, error) {
+func (p *HyperledgerFabricP2PProvider) FetchTxReceipt(signerAddress, hash string) (*TxReceipt, error) {
 	return nil, errors.New("fabric does not impl FetchTxReceipt()")
 }
 
