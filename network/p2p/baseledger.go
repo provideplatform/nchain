@@ -3,6 +3,7 @@ package p2p
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -102,10 +103,10 @@ func (p *BaseledgerP2PProvider) FetchTxReceipt(signerAddress, hash string) (*nch
 	var logs []interface{}
 	json.Unmarshal([]byte(txEntity.Result.TxResult.Log), &logs)
 	return &nchain.TxReceipt{
-		TxHash:            []byte(txEntity.Result.Hash),
+		TxHash:            []byte(fmt.Sprintf("0x%s", string(txEntity.Result.Hash))),
 		ContractAddress:   nil,
 		GasUsed:           uint64(gasUsed),
-		BlockHash:         []byte(blockEntity.Result.BlockID.Hash),
+		BlockHash:         []byte(fmt.Sprintf("0x%s", string(blockEntity.Result.BlockID.Hash))),
 		BlockNumber:       blockNumber,
 		TransactionIndex:  0,
 		PostState:         nil,
