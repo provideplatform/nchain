@@ -26,7 +26,6 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	"github.com/provideplatform/nchain/network"
-	"github.com/provideplatform/nchain/network/p2p"
 	"github.com/provideplatform/nchain/token"
 	"github.com/provideplatform/nchain/wallet"
 	provide "github.com/provideplatform/provide-go/api"
@@ -1344,7 +1343,7 @@ func (t *Transaction) handleTxReceipt(
 	db *gorm.DB,
 	network *network.Network,
 	signerAddress string,
-	receipt *p2p.TxReceipt,
+	receipt *provideapi.TxReceipt,
 ) error {
 	if t.To == nil {
 		var contractAddress string
@@ -1420,7 +1419,7 @@ func (t *Transaction) handleTxTraces(
 	network *network.Network,
 	signerAddress string,
 	traces *provideapi.TxTrace,
-	receipt *p2p.TxReceipt,
+	receipt *provideapi.TxReceipt,
 ) error {
 	kontract := t.GetContract(db)
 	if kontract == nil || kontract.ID == uuid.Nil {

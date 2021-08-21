@@ -71,7 +71,7 @@ type API interface {
 	AddPeer(string) error
 	RemovePeer(string) error
 	ParsePeerURL(string) (*string, error)
-	FetchTxReceipt(signerAddress, hash string) (*TxReceipt, error)
+	FetchTxReceipt(signerAddress, hash string) (*provide.TxReceipt, error)
 	FetchTxTraces(hash string) (*provide.TxTrace, error)
 	FormatBootnodes([]string) string
 	RequireBootnodes(db *gorm.DB, userID *uuid.UUID, networkID *uuid.UUID, n common.Configurable) error
@@ -81,21 +81,6 @@ type API interface {
 
 	DefaultEntrypoint() []string
 	EnrichStartCommand(bootnodes []string) []string
-}
-
-// move to provide-go
-type TxReceipt struct {
-	TxHash            []byte        `json:"hash"`
-	ContractAddress   []byte        `json:"contract_address"`
-	GasUsed           uint64        `json:"gas_used"`
-	BlockHash         []byte        `json:"block_hash,omitempty"`
-	BlockNumber       *big.Int      `json:"block,omitempty"`
-	TransactionIndex  uint          `json:"transaction_index"`
-	PostState         []byte        `json:"root"`
-	Status            uint64        `json:"status"`
-	CumulativeGasUsed uint64        `json:"cumulative_gas_used"`
-	Bloom             interface{}   `json:"logs_bloom"`
-	Logs              []interface{} `json:"logs"`
 }
 
 func evmFetchTxReceipt(rpcClientKey, rpcURL, signerAddress, hash string) (*types.Receipt, error) {

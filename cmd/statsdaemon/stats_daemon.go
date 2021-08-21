@@ -333,42 +333,6 @@ func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkSta
 	}
 }
 
-// TMP struct, just for testing
-// format is still unknown
-type BaseledgerSubscriptionResponse struct {
-	ID      interface{}            `json:"id"`
-	Jsonrpc string                 `json:"jsonrpc"`
-	Result  map[string]interface{} `json:"result"`
-}
-
-// TMP struct, just for testing
-// format is still unknown
-type BaseledgerBlockHeader struct {
-	AppHash       string `json:"app_hash"`
-	ChainID       string `json:"chain_id"`
-	ConsensusHash string `json:"consensus_hash"`
-	DataHash      string `json:"data_hash"`
-	EvidenceHash  string `json:"evidence_hash"`
-	Height        string `json:"height"`
-	LastBlockID   struct {
-		Hash  string `json:"hash"`
-		Parts struct {
-			Hash  string `json:"hash"`
-			Total int    `json:"total"`
-		} `json:"parts"`
-	} `json:"last_block_id"`
-	LastCommitHash     string    `json:"last_commit_hash"`
-	LastResultsHash    string    `json:"last_results_hash"`
-	NextValidatorsHash string    `json:"next_validators_hash"`
-	ProposerAddress    string    `json:"proposer_address"`
-	Time               time.Time `json:"time"`
-	ValidatorsHash     string    `json:"validators_hash"`
-	Version            struct {
-		App   string `json:"app"`
-		Block string `json:"block"`
-	} `json:"version"`
-}
-
 // BaseledgerNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
 // data source which is used by stats daemon instances to consume EVM-based network statistics
 func BaseledgerNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsDataSource {
@@ -411,14 +375,14 @@ func BaseledgerNetworkStatsDataSourceFactory(network *network.Network) *NetworkS
 							common.Log.Debugf("Received %d-byte message on network stats websocket for network: %s", len(message), *network.Name)
 							// TODO: try unmarshaling whole struct, for some reason parsing time is failing in header
 							// even though tendermint timestamps layout is RFC3339
-							response := &BaseledgerSubscriptionResponse{}
+							response := &provide.BaseledgerSubscriptionResponse{}
 							err := json.Unmarshal(message, response)
 							if err != nil {
 								common.Log.Warningf("Failed to unmarshal message received on network stats websocket: %s; %s", message, err.Error())
 							} else {
 								if result, ok := response.Result["data"].(map[string]interface{}); ok {
 									if resultJSON, err := json.Marshal(result); err == nil {
-										header := &BaseledgerBlockHeader{}
+										header := &provide.BaseledgerBlockHeader{}
 										err := json.Unmarshal(resultJSON, header)
 										if err != nil {
 											common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
