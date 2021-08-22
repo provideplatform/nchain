@@ -26,6 +26,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
+	"github.com/provideplatform/provide-go/api/nchain"
 	provide "github.com/provideplatform/provide-go/api/nchain"
 	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
@@ -333,51 +334,6 @@ func EthereumNetworkStatsDataSourceFactory(network *network.Network) *NetworkSta
 	}
 }
 
-type HeaderResponse struct {
-	Type  string `json:"type"`
-	Value struct {
-		Header struct {
-			AppHash       string `json:"app_hash"`
-			ChainID       string `json:"chain_id"`
-			ConsensusHash string `json:"consensus_hash"`
-			DataHash      string `json:"data_hash"`
-			EvidenceHash  string `json:"evidence_hash"`
-			Height        string `json:"height"`
-			LastBlockID   struct {
-				Hash  string `json:"hash"`
-				Parts struct {
-					Hash  string `json:"hash"`
-					Total int    `json:"total"`
-				} `json:"parts"`
-			} `json:"last_block_id"`
-			LastCommitHash     string    `json:"last_commit_hash"`
-			LastResultsHash    string    `json:"last_results_hash"`
-			NextValidatorsHash string    `json:"next_validators_hash"`
-			ProposerAddress    string    `json:"proposer_address"`
-			Time               time.Time `json:"time"`
-			ValidatorsHash     string    `json:"validators_hash"`
-			Version            struct {
-				App   string `json:"app"`
-				Block string `json:"block"`
-			} `json:"version"`
-		} `json:"header"`
-		NumTxs           string `json:"num_txs"`
-		ResultBeginBlock struct {
-			Events []struct {
-				Attributes []struct {
-					Index bool   `json:"index"`
-					Key   string `json:"key"`
-					Value string `json:"value"`
-				} `json:"attributes"`
-				Type string `json:"type"`
-			} `json:"events"`
-		} `json:"result_begin_block"`
-		ResultEndBlock struct {
-			ValidatorUpdates interface{} `json:"validator_updates"`
-		} `json:"result_end_block"`
-	} `json:"value"`
-}
-
 // BaseledgerNetworkStatsDataSourceFactory builds and returns a JSON-RPC and streaming websocket
 // data source which is used by stats daemon instances to consume EVM-based network statistics
 func BaseledgerNetworkStatsDataSourceFactory(network *network.Network) *NetworkStatsDataSource {
@@ -425,15 +381,15 @@ func BaseledgerNetworkStatsDataSourceFactory(network *network.Network) *NetworkS
 							} else {
 								if result, ok := response.Result["data"].(map[string]interface{}); ok {
 									if resultJSON, err := json.Marshal(result); err == nil {
-										header := &HeaderResponse{}
-										err := json.Unmarshal(resultJSON, header)
+										headerResponse := &nchain.BaseledgerBlockHeaderResponse{}
+										err := json.Unmarshal(resultJSON, headerResponse)
 										if err != nil {
 											common.Log.Warningf("Failed to stringify result JSON in otherwise valid message received on network stats websocket: %s; %s", response, err.Error())
-										} else if header != nil {
-											common.Log.Debugf("Block header received %v\n", result)
+										} else if headerResponse != nil {
+											common.Log.Debugf("Block header received %v\n", headerResponse.Value.Header)
 											ch <- &provide.NetworkStatus{
 												Meta: map[string]interface{}{
-													"last_block_header": result,
+													"last_block_header": headerResponse.Value.Header,
 												},
 											}
 										}

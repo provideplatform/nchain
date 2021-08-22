@@ -50,7 +50,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/provideplatform/ident v0.9.10-0.20210727215953-cdd9940805ce
-	github.com/provideplatform/provide-go v0.0.0-20210820142615-4728f8d567a1
+	github.com/provideplatform/provide-go v0.0.0-20210822183020-1c080cdc4a77
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	go.mongodb.org/mongo-driver v1.5.1
