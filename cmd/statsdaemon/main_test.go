@@ -115,13 +115,9 @@ func TestNChainBaseledgerStatsdaemon(t *testing.T) {
 		t.Errorf("Failed to set up baseledger test network %v", err.Error())
 	}
 
-	statsDaemon := NewNetworkStatsDaemon(common.Log, testNetwork)
-
-	testCh := make(chan *nchain.NetworkStatus)
-	// go routine since this is blocking
-	go statsDaemon.dataSource.Stream(testCh)
+	statsDaemon := RequireNetworkStatsDaemon(testNetwork)
 	// get one result and shutdown statsdaemon and check result
-	sampleResult := <-testCh
+	sampleResult := <-statsDaemon.queue
 	statsDaemon.shutdown()
 
 	jsonSampleResult, _ := json.Marshal(sampleResult.Meta["last_block_header"])
