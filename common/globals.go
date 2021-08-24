@@ -50,6 +50,9 @@ var (
 	// DefaultKey for this instance of nchain
 	DefaultKey *vault.Key
 
+	// JWTKeypairs holds a reference to the configured keypairs
+	JWTKeypairs map[string]*util.JWTKeypair
+
 	// TxFilters contains in-memory Filter instances used for real-time stream processing
 	TxFilters = map[string][]interface{}{}
 
