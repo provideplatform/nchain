@@ -53,7 +53,7 @@ func init() {
 	}
 	godotenv.Load()
 
-	util.RequireJWT() // FIXME-- currently, this is still required by contract handlers call to token.VendNatsBearerAuthorization()
+	common.JWTKeypairs = util.RequireJWT() // FIXME-- currently, this is still required by contract handlers call to token.VendNatsBearerAuthorization()
 	util.RequireGin()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
