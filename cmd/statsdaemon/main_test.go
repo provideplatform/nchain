@@ -121,7 +121,7 @@ var _ = Describe("Main", func() {
 		statsDaemon := RequireNetworkStatsDaemon(testNetwork)
 		// get one result and shutdown statsdaemon and check result
 		sampleResult := <-statsDaemon.queue
-		statsDaemon.shutdown()
+		EvictNetworkStatsDaemon(testNetwork)
 
 		jsonSampleResult, _ := json.Marshal(sampleResult.Meta["last_block_header"])
 		formattedSampleHeaderResult := nchain.BaseledgerBlockHeaderResponse{}.Value.Header
