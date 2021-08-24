@@ -109,27 +109,27 @@ func SetupBaseledgerTestNetwork() (*network.Network, error) {
 func TestNChainBaseledgerStatsdaemon(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "NChain statsdaemon Suite")
-
-	testNetwork, err := SetupBaseledgerTestNetwork()
-	if err != nil {
-		t.Errorf("Failed to set up baseledger test network %v", err.Error())
-	}
-
-	statsDaemon := RequireNetworkStatsDaemon(testNetwork)
-	// get one result and shutdown statsdaemon and check result
-	sampleResult := <-statsDaemon.queue
-	statsDaemon.shutdown()
-
-	jsonSampleResult, _ := json.Marshal(sampleResult.Meta["last_block_header"])
-	formattedSampleHeaderResult := nchain.BaseledgerBlockHeaderResponse{}.Value.Header
-	err = json.Unmarshal(jsonSampleResult, &formattedSampleHeaderResult)
-	if err != nil {
-		t.Errorf("Failed to unmarshall header response %v", err.Error())
-	}
-
-	t.Logf("Header response success %v\n", formattedSampleHeaderResult)
 }
 
 var _ = Describe("Main", func() {
+	It("Should parse one successful baseledger block header event", func() {
+		testNetwork, err := SetupBaseledgerTestNetwork()
+		if err != nil {
+			Fail("Failed to set up baseledger test network")
+		}
 
+		statsDaemon := RequireNetworkStatsDaemon(testNetwork)
+		// get one result and shutdown statsdaemon and check result
+		sampleResult := <-statsDaemon.queue
+		statsDaemon.shutdown()
+
+		jsonSampleResult, _ := json.Marshal(sampleResult.Meta["last_block_header"])
+		formattedSampleHeaderResult := nchain.BaseledgerBlockHeaderResponse{}.Value.Header
+		err = json.Unmarshal(jsonSampleResult, &formattedSampleHeaderResult)
+		if err != nil {
+			Fail("Failed to unmarshall header response")
+		}
+
+		Expect(formattedSampleHeaderResult).NotTo(BeNil())
+	})
 })
