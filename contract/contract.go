@@ -396,9 +396,9 @@ func (c *Contract) networkQualifiedSubject(suffix *string) *string {
 		return nil
 	}
 	if suffix == nil {
-		return common.StringOrNil(fmt.Sprintf("networks.%s.contracts.%s", c.NetworkID, *c.Address))
+		return common.StringOrNil(fmt.Sprintf("network.%s.contracts.%s", c.NetworkID, *c.Address))
 	}
-	return common.StringOrNil(fmt.Sprintf("networks.%s.contracts.%s.%s", c.NetworkID, *c.Address, *suffix))
+	return common.StringOrNil(fmt.Sprintf("network.%s.contracts.%s.%s", c.NetworkID, *c.Address, *suffix))
 }
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
