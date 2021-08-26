@@ -68,13 +68,13 @@ func createNatsShuttleContractDeployedSubject(wg *sync.WaitGroup) {
 }
 
 func consumeShuttleCircuitDeployedMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS shuttle circuit deployed message: %s", msg)
+	common.Log.Debugf("consuming NATS shuttle circuit deployed message: %s", msg)
 
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal shuttle circuit deployed message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal shuttle circuit deployed message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -84,13 +84,13 @@ func consumeShuttleCircuitDeployedMsg(msg *stan.Msg) {
 }
 
 func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
-	common.Log.Debugf("Consuming NATS shuttle contract deployed message: %s", msg)
+	common.Log.Debugf("consuming NATS shuttle contract deployed message: %s", msg)
 
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal shuttle contract deployed message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal shuttle contract deployed message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -103,31 +103,31 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 	contractType, _ := params["type"].(string)
 
 	if !addressOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; contract address required")
+		common.Log.Warning("failed to handle shuttle.contract.deployed message; contract address required")
 		natsutil.Nack(msg)
 		return
 	}
 
 	if !byOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; by address required")
+		common.Log.Warning("failed to handle shuttle.contract.deployed message; by address required")
 		natsutil.Nack(msg)
 		return
 	}
 
 	if !networkIDOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; contract network_id required")
+		common.Log.Warning("failed to handle shuttle.contract.deployed message; contract network_id required")
 		natsutil.Nack(msg)
 		return
 	}
 
 	if !nameOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; contract name required")
+		common.Log.Warning("failed to handle shuttle.contract.deployed message; contract name required")
 		natsutil.Nack(msg)
 		return
 	}
 
 	if !txHashOk {
-		common.Log.Warning("Failed to handle shuttle.contract.deployed message; tx hash required")
+		common.Log.Warning("failed to handle shuttle.contract.deployed message; tx hash required")
 		natsutil.Nack(msg)
 		return
 	}
@@ -137,14 +137,14 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 	db.Where("network_id = ? AND address = ?", networkID, byAddr).Find(&cntrct)
 
 	if cntrct == nil || cntrct.ID == uuid.Nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; contract not resolved for address: %s", byAddr)
+		common.Log.Warningf("failed to handle shuttle.contract.deployed message; contract not resolved for address: %s", byAddr)
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
 
 	network, err := cntrct.GetNetwork()
 	if err != nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network not resolved for contract with address: %s; %s", byAddr, err.Error())
+		common.Log.Warningf("failed to handle shuttle.contract.deployed message; network not resolved for contract with address: %s; %s", byAddr, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
@@ -156,21 +156,21 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 
 	p2pAPI, err := network.P2PAPIClient()
 	if err != nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; network P2P API client not resolved for contract with address: %s; %s", byAddr, err.Error())
+		common.Log.Warningf("failed to handle shuttle.contract.deployed message; network P2P API client not resolved for contract with address: %s; %s", byAddr, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
 
 	receipt, err := p2pAPI.FetchTxReceipt(*cntrct.Address, txHash)
 	if err != nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; failed to fetch tx receipt for contract with address: %s; %s", byAddr, err.Error())
+		common.Log.Warningf("failed to handle shuttle.contract.deployed message; failed to fetch tx receipt for contract with address: %s; %s", byAddr, err.Error())
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}
 
 	dependency := cntrct.ResolveCompiledDependencyArtifact(name)
 	if dependency == nil {
-		common.Log.Warningf("Failed to handle shuttle.contract.deployed message; contract at address %s unable to resolved dependency: %s", byAddr, name)
+		common.Log.Warningf("failed to handle shuttle.contract.deployed message; contract at address %s unable to resolved dependency: %s", byAddr, name)
 		natsutil.AttemptNack(msg, natsShuttleContractDeployedTimeout)
 		return
 	}

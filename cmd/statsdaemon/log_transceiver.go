@@ -65,7 +65,7 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 			var wsDialer websocket.Dialer
 			wsConn, _, err := wsDialer.Dial(websocketURL, nil)
 			if err != nil {
-				common.Log.Errorf("Failed to establish network logs websocket connection to %s; %s", websocketURL, err.Error())
+				common.Log.Errorf("failed to establish network logs websocket connection to %s; %s", websocketURL, err.Error())
 			} else {
 				defer wsConn.Close()
 				id, _ := uuid.NewV4()
@@ -77,9 +77,9 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 					"jsonrpc": "2.0",
 				}
 				if err := wsConn.WriteJSON(payload); err != nil {
-					common.Log.Errorf("Failed to write subscribe message to network logs websocket connection")
+					common.Log.Errorf("failed to write subscribe message to network logs websocket connection")
 				} else {
-					common.Log.Debugf("Subscribed to network logs websocket: %s", websocketURL)
+					common.Log.Debugf("subscribed to network logs websocket: %s", websocketURL)
 
 					for {
 						_, message, err := wsConn.ReadMessage()
@@ -116,13 +116,13 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
 func (lt *LogTransceiver) consume() error {
-	lt.log.Debugf("Attempting to consume configured network log transceiver; attempt #%v", lt.attempt)
+	lt.log.Debugf("attempting to consume configured network log transceiver; attempt #%v", lt.attempt)
 
 	var err error
 	if lt.Stream != nil {
 		err = lt.Stream(lt.queue)
 	} else {
-		err = errors.New("Configured log transceiver does not have a configured Stream impl")
+		err = errors.New("configured log transceiver does not have a configured Stream impl")
 	}
 
 	return err
@@ -131,7 +131,7 @@ func (lt *LogTransceiver) consume() error {
 func (lt *LogTransceiver) ingest(logmsg []byte) {
 	defer func() {
 		if r := recover(); r != nil {
-			common.Log.Warningf("Recovered from failed log transceiver event ingestion attempt; %s", r)
+			common.Log.Warningf("recovered from failed log transceiver event ingestion attempt; %s", r)
 		}
 	}()
 
@@ -143,7 +143,7 @@ func (lt *LogTransceiver) ingest(logmsg []byte) {
 func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
 	err := natsutil.NatsStreamingPublish(natsLogTransceiverEmitSubject, logmsg)
 	if err != nil {
-		common.Log.Warningf("Log transceiver failed to publish %d-byte log emission message; %s", len(logmsg), err.Error())
+		common.Log.Warningf("log transceiver failed to publish %d-byte log emission message; %s", len(logmsg), err.Error())
 	}
 }
 
@@ -155,7 +155,7 @@ func (lt *LogTransceiver) loop() error {
 			lt.ingest(*evt)
 
 		case <-lt.shutdownCtx.Done():
-			lt.log.Debugf("Closing log transceiver on shutdown")
+			lt.log.Debugf("closing log transceiver on shutdown")
 			return nil
 		}
 	}
@@ -164,14 +164,14 @@ func (lt *LogTransceiver) loop() error {
 // EvictNetworkLogTransceiver evicts a single, previously-initialized log transceiver instance {
 func EvictNetworkLogTransceiver(network *network.Network) error {
 	if daemon, ok := currentLogTransceivers[network.ID.String()]; ok {
-		common.Log.Debugf("Evicting log transceiver instance for network: %s; id: %s", *network.Name, network.ID)
+		common.Log.Debugf("evicting log transceiver instance for network: %s; id: %s", *network.Name, network.ID)
 		daemon.shutdown()
 		currentLogTransceiversMutex.Lock()
 		delete(currentLogTransceivers, network.ID.String())
 		currentLogTransceiversMutex.Unlock()
 		return nil
 	}
-	return fmt.Errorf("Unable to evict log transceiver instance for network: %s; id; %s", *network.Name, network.ID)
+	return fmt.Errorf("unable to evict log transceiver instance for network: %s; id; %s", *network.Name, network.ID)
 }
 
 // RequireNetworkLogTransceiver ensures a single log transceiver instance is running for
@@ -180,12 +180,12 @@ func EvictNetworkLogTransceiver(network *network.Network) error {
 func RequireNetworkLogTransceiver(network *network.Network) *LogTransceiver {
 	var daemon *LogTransceiver
 	if daemon, ok := currentLogTransceivers[network.ID.String()]; ok {
-		common.Log.Debugf("Cached log transceiver instance found for network: %s; id: %s", *network.Name, network.ID)
+		common.Log.Debugf("cached log transceiver instance found for network: %s; id: %s", *network.Name, network.ID)
 		return daemon
 	}
 
 	currentLogTransceiversMutex.Lock()
-	common.Log.Infof("Initializing new log transceiver instance for network: %s; id: %s", *network.Name, network.ID)
+	common.Log.Infof("initializing new log transceiver instance for network: %s; id: %s", *network.Name, network.ID)
 	daemon = NewNetworkLogTransceiver(common.Log, network)
 	if daemon != nil {
 		currentLogTransceivers[network.ID.String()] = daemon
@@ -219,10 +219,10 @@ func (lt *LogTransceiver) run() error {
 	go func() {
 		for !lt.shuttingDown() {
 			lt.attempt++
-			common.Log.Debugf("Stepping into main runloop of log transceiver instance; attempt #%v", lt.attempt)
+			common.Log.Debugf("stepping into main runloop of log transceiver instance; attempt #%v", lt.attempt)
 			err := lt.consume()
 			if err != nil {
-				common.Log.Warningf("Configured network log transceiver failed to consume network log events; %s", err.Error())
+				common.Log.Warningf("configured network log transceiver failed to consume network log events; %s", err.Error())
 				if lt.backoff == 0 {
 					lt.backoff = 100
 				} else {
@@ -240,10 +240,10 @@ func (lt *LogTransceiver) run() error {
 	err := lt.loop()
 
 	if err == nil {
-		lt.log.Info("Network log transceiver exited cleanly")
+		lt.log.Info("network log transceiver exited cleanly")
 	} else {
 		if !lt.shuttingDown() {
-			common.Log.Errorf("Forcing shutdown of log transceiver due to error; %s", err)
+			common.Log.Errorf("forcing shutdown of log transceiver due to error; %s", err)
 			lt.shutdown()
 		}
 	}
@@ -252,14 +252,14 @@ func (lt *LogTransceiver) run() error {
 }
 
 func (lt *LogTransceiver) handleSignals() {
-	common.Log.Debug("Installing SIGINT and SIGTERM signal handlers")
+	common.Log.Debug("installing SIGINT and SIGTERM signal handlers")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		select {
 		case sig := <-sigs:
-			common.Log.Infof("Received signal: %s", sig)
+			common.Log.Infof("received signal: %s", sig)
 			lt.shutdown()
 		case <-lt.shutdownCtx.Done():
 			close(sigs)
@@ -269,7 +269,7 @@ func (lt *LogTransceiver) handleSignals() {
 
 func (lt *LogTransceiver) shutdown() {
 	if atomic.AddUint32(&lt.closing, 1) == 1 {
-		common.Log.Debugf("Shutting down log transceiver instance for network: %s", *lt.Network.Name)
+		common.Log.Debugf("shutting down log transceiver instance for network: %s", *lt.Network.Name)
 		lt.cancelF()
 	}
 }
