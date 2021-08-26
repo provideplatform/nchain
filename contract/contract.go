@@ -377,7 +377,7 @@ func (c *Contract) pubsubSubjectPrefix() *string {
 	return nil
 }
 
-// pubsubSubject returns a namespaced subject suitable for pub/sub subscriptions
+// qualifiedSubject returns a namespaced subject suitable for pub/sub subscriptions
 func (c *Contract) qualifiedSubject(suffix string) *string {
 	prefix := c.pubsubSubjectPrefix()
 	if prefix == nil {
@@ -387,6 +387,18 @@ func (c *Contract) qualifiedSubject(suffix string) *string {
 		return prefix
 	}
 	return common.StringOrNil(fmt.Sprintf("%s.%s", *prefix, suffix))
+}
+
+// networkQualifiedSubject returns the contract subject suitable for pub/sub subscriptions
+// using the unhashed `networks.<id>.contracts.<address>` approach
+func (c *Contract) networkQualifiedSubject(suffix *string) *string {
+	if c.Address == nil {
+		return nil
+	}
+	if suffix == nil {
+		return common.StringOrNil(fmt.Sprintf("networks.%s.contracts.%s", c.NetworkID, *c.Address))
+	}
+	return common.StringOrNil(fmt.Sprintf("networks.%s.contracts.%s.%s", c.NetworkID, *c.Address, *suffix))
 }
 
 // ExecuteFromTx executes a transaction on the contract instance using a tx callback, specific signer, value, method and params
@@ -470,7 +482,7 @@ func (c *Contract) ResolveTokenContract(
 		for {
 			select {
 			case <-ticker.C:
-				if time.Now().Sub(startedAt) >= resolveTokenTickerTimeout {
+				if time.Since(startedAt) >= resolveTokenTickerTimeout {
 					common.Log.Warningf("failed to resolve ERC20 token for contract: %s; timing out after %v", c.ID, resolveTokenTickerTimeout)
 					ticker.Stop()
 					return
