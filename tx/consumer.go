@@ -539,10 +539,6 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 	} else {
 		common.Log.Debugf("fetched tx receipt for hash: %s", *tx.Hash)
 
-		// w00t but potentially HACKYHACK...
-		// TODO go through the flow of the recept and see why some get a block
-		// and some don't
-
 		blockNumber := tx.Response.Receipt.(*provide.TxReceipt).BlockNumber
 		// if we have a block number in the receipt, and the tx has no block
 		// populate the block and finalized timestamp
@@ -551,7 +547,7 @@ func consumeTxReceiptMsg(msg *stan.Msg) {
 			tx.Block = &receiptBlock
 			receiptFinalized := time.Now()
 			tx.FinalizedAt = &receiptFinalized
-			common.Log.Debugf("*** tx hash %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
+			common.Log.Debugf("tx %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
 		}
 		tx.updateStatus(db, "success", nil)
 		msg.Ack()
