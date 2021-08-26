@@ -302,9 +302,7 @@ func (hbd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 			}
 		}
 
-		common.Log.Debugf("network: %s", *hbd.dataSource.Network.Name)
-		common.Log.Debugf("block hash processed: %s", blockHash)
-		common.Log.Debugf("block number processed: %v", header.Number.Uint64())
+		common.Log.Debugf("processed historical block %d with hash %s on network: %s", header.Number.Uint64(), blockHash, *hbd.dataSource.Network.Name)
 		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
 			NetworkID: common.StringOrNil(hbd.dataSource.Network.ID.String()),
 			Block:     header.Number.Uint64(),
