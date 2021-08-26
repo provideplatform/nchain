@@ -654,14 +654,16 @@ func (sd *StatsDaemon) publish() error {
 
 // EvictNetworkStatsDaemon evicts a single, previously-initialized stats daemon instance {
 func EvictNetworkStatsDaemon(network *network.Network) error {
+	currentNetworkStatsMutex.Lock()
+	defer currentNetworkStatsMutex.Unlock()
+
 	if daemon, ok := currentNetworkStats[network.ID.String()]; ok {
 		common.Log.Debugf("Evicting stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
 		daemon.shutdown()
-		currentNetworkStatsMutex.Lock()
 		delete(currentNetworkStats, network.ID.String())
-		currentNetworkStatsMutex.Unlock()
 		return nil
 	}
+
 	return fmt.Errorf("Unable to evict stats daemon instance for network: %s; id; %s", *network.Name, network.ID)
 }
 
@@ -676,13 +678,14 @@ func RequireNetworkStatsDaemon(network *network.Network) *StatsDaemon {
 	}
 
 	currentNetworkStatsMutex.Lock()
+	defer currentNetworkStatsMutex.Unlock()
+
 	common.Log.Infof("Initializing new stats daemon instance for network: %s; id: %s", *network.Name, network.ID)
 	daemon = NewNetworkStatsDaemon(common.Log, network)
 	if daemon != nil {
 		currentNetworkStats[network.ID.String()] = daemon
 		go daemon.run()
 	}
-	currentNetworkStatsMutex.Unlock()
 
 	return daemon
 }
