@@ -572,12 +572,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		sd.stats.LastBlockAt = &lastBlockAt
 
 		sd.stats.Meta["last_block_header"] = header
-
 		blockHash := header.Hash().String()
-
-		// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-		// chainptHash := []byte(blockHash)
-		// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
 
 		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
 			sd.recentBlocks = append(sd.recentBlocks, header)
@@ -609,9 +604,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			}
 		}
 
-		common.Log.Debugf("network: %s", *sd.dataSource.Network.Name)
-		common.Log.Debugf("block hash processed: %s", blockHash)
-		common.Log.Debugf("block number processed: %v", header.Number.Uint64())
+		common.Log.Debugf("processed block %d with hash %s on network: %s", header.Number.Uint64(), blockHash, *sd.dataSource.Network.Name)
 		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
 			NetworkID: common.StringOrNil(sd.dataSource.Network.ID.String()),
 			Block:     header.Number.Uint64(),

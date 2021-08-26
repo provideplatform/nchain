@@ -127,6 +127,7 @@ func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 func consumeBlockFinalizedMsg(msg *stan.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
+			common.Log.Warningf("recovered from panic during NATS block finalized message handling; %s", r)
 			natsutil.AttemptNack(msg, natsBlockFinalizedTimeout)
 		}
 	}()
