@@ -69,7 +69,6 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 			} else {
 				defer wsConn.Close()
 				id, _ := uuid.NewV4()
-				// xxx let's try out the blockNumber param
 				payload := map[string]interface{}{
 					"method":  "eth_subscribe",
 					"params":  []interface{}{"logs", map[string]interface{}{}},
