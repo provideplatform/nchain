@@ -735,6 +735,8 @@ func (n *Node) P2PAPIClient() (p2p.API, error) {
 	var apiClient p2p.API
 
 	switch client {
+	case p2p.ProviderBaseledger:
+		apiClient = p2p.InitBaseledgerP2PProvider(rpcURL, n.NetworkID.String(), n.Network)
 	case p2p.ProviderBcoin:
 		return nil, fmt.Errorf("Bcoin p2p provider not yet implemented")
 	case p2p.ProviderGeth:

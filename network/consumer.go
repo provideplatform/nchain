@@ -16,8 +16,8 @@ import (
 )
 
 const natsBlockFinalizedSubject = "nchain.block.finalized"
-const natsBlockFinalizedSubjectMaxInFlight = 2048
-const natsBlockFinalizedInvocationTimeout = time.Second * 30
+const natsBlockFinalizedSubjectMaxInFlight = 4096
+const natsBlockFinalizedInvocationTimeout = time.Second * 15
 const natsBlockFinalizedTimeout = int64(time.Minute * 1)
 
 const natsResolveNodePeerURLSubject = "nchain.node.peer.resolve"
@@ -131,18 +131,18 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS block finalized message: %s", msg)
+	common.Log.Debugf("consuming NATS block finalized message: %s", msg)
 	var err error
 
 	blockFinalizedMsg := &natsBlockFinalizedMsg{}
 	err = json.Unmarshal(msg.Data, &blockFinalizedMsg)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal block finalized message; %s", err.Error())
+		common.Log.Warningf("failed to unmarshal block finalized message; %s", err.Error())
 		return
 	}
 
 	if blockFinalizedMsg.NetworkID == nil {
-		err = fmt.Errorf("Parsed NATS block finalized message did not contain network id: %s", msg)
+		err = fmt.Errorf("parsed NATS block finalized message did not contain network id: %s", msg)
 	}
 
 	if err == nil {
@@ -152,7 +152,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 		db.Where("id = ?", blockFinalizedMsg.NetworkID).Find(&network)
 
 		if network == nil || network.ID == uuid.Nil {
-			err = fmt.Errorf("Failed to retrieve network by id: %s", *blockFinalizedMsg.NetworkID)
+			err = fmt.Errorf("failed to retrieve network by id: %s", *blockFinalizedMsg.NetworkID)
 		}
 
 		if err == nil {
@@ -193,16 +193,16 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 						}
 					}
 				} else {
-					err = fmt.Errorf("Failed to decode EVM block header; %s", err.Error())
+					err = fmt.Errorf("failed to decode EVM block header; %s", err.Error())
 				}
 			} else {
-				common.Log.Warningf("Received unhandled finalized block header; network id: %s", *blockFinalizedMsg.NetworkID)
+				common.Log.Warningf("received unhandled finalized block header; network id: %s", *blockFinalizedMsg.NetworkID)
 			}
 		}
 	}
 
 	if err != nil {
-		common.Log.Warningf("Failed to handle block finalized message; %s", err.Error())
+		common.Log.Warningf("failed to handle block finalized message; %s", err.Error())
 		natsutil.AttemptNack(msg, natsBlockFinalizedTimeout)
 	} else {
 		msg.Ack()
@@ -216,12 +216,12 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS resolve node peer url message: %s", msg)
+	common.Log.Debugf("consuming NATS resolve node peer url message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal resolve node peer url message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal resolve node peer url message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -229,7 +229,7 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	nodeID, nodeIDOk := params["node_id"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to resolve peer url for node; no node id provided")
+		common.Log.Warningf("failed to resolve peer url for node; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -239,14 +239,14 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
+		common.Log.Warningf("failed to resolve node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.resolvePeerURL(db)
 	if err != nil {
-		common.Log.Debugf("Attempt to resolve node peer url did not succeed; %s", err.Error())
+		common.Log.Debugf("attempt to resolve node peer url did not succeed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsResolveNodePeerURLTimeout)
 		return
 	}
@@ -267,12 +267,12 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS add peer message: %s", msg)
+	common.Log.Debugf("consuming NATS add peer message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal add peer message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal add peer message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -281,13 +281,13 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	peerURL, peerURLOk := params["peer_url"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to add network peer; no node id provided")
+		common.Log.Warningf("failed to add network peer; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
 
 	if !peerURLOk {
-		common.Log.Warningf("Failed to add network peer; no peer url provided")
+		common.Log.Warningf("failed to add network peer; no peer url provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -297,7 +297,7 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
+		common.Log.Warningf("failed to resolve node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
@@ -319,12 +319,12 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS remove peer message: %s", msg)
+	common.Log.Debugf("consuming NATS remove peer message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal remove peer message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal remove peer message; %s", err.Error())
 		natsutil.Nack(msg)
 		return
 	}
@@ -333,13 +333,13 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	peerURL, peerURLOk := params["peer_url"].(string)
 
 	if !nodeIDOk {
-		common.Log.Warningf("Failed to remove network peer; no node id provided")
+		common.Log.Warningf("failed to remove network peer; no node id provided")
 		natsutil.Nack(msg)
 		return
 	}
 
 	if !peerURLOk {
-		common.Log.Warningf("Failed to remove network peer; no peer url provided")
+		common.Log.Warningf("failed to remove network peer; no peer url provided")
 		natsutil.Nack(msg)
 		return
 	}
@@ -349,14 +349,14 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	node := &Node{}
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
+		common.Log.Warningf("failed to resolve node; no node resolved for id: %s", nodeID)
 		natsutil.Nack(msg)
 		return
 	}
 
 	err = node.removePeer(peerURL)
 	if err != nil {
-		common.Log.Debugf("Attempt to remove network peer failed; %s", err.Error())
+		common.Log.Debugf("attempt to remove network peer failed; %s", err.Error())
 		natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
 		return
 	}

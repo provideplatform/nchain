@@ -55,6 +55,7 @@ const networkConfigIsHandshakeNetwork = "is_handshake_network"
 const networkConfigIsHyperledgerBesuNetwork = "is_hyperledger_besu_network"
 const networkConfigIsHyperledgerFabricNetwork = "is_hyperledger_fabric_network"
 const networkConfigIsQuorumNetwork = "is_quorum_network"
+const networkConfigIsBaseledgerNetwork = "is_baseledger_network"
 
 const networkConfigEnvBootnodes = "BOOTNODES"
 const networkConfigEnvClient = "CLIENT"
@@ -868,6 +869,16 @@ func (n *Network) IsHandshakeNetwork() bool {
 	return false
 }
 
+func (n *Network) IsBaseledgerNetwork() bool {
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isBaseledgerNetwork, ok := cfg[networkConfigIsBaseledgerNetwork].(bool); ok {
+			return isBaseledgerNetwork
+		}
+	}
+	return false
+}
+
 // P2PAPIClient returns an instance of the network's underlying p2p.API, if that is possible given the network config
 func (n *Network) P2PAPIClient() (p2p.API, error) {
 	cfg := n.ParseConfig()
@@ -897,6 +908,8 @@ func (n *Network) P2PAPIClient() (p2p.API, error) {
 		apiClient = p2p.InitParityP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	case p2p.ProviderQuorum:
 		apiClient = p2p.InitQuorumP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
+	case p2p.ProviderBaseledger:
+		apiClient = p2p.InitBaseledgerP2PProvider(common.StringOrNil(rpcURL), n.ID.String(), n)
 	default:
 		return nil, fmt.Errorf("Failed to resolve p2p provider for network %s; unsupported client", n.ID)
 	}
