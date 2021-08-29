@@ -49,6 +49,7 @@ const networkConfigRPCAPIUser = "rpc_api_user"
 const networkConfigRPCAPIKey = "rpc_api_key"
 const networkConfigWebsocketURL = "websocket_url"
 const networkConfigWebsocketPort = "websocket_port"
+const networkConfigIsBaseledgerNetwork = "is_baseledger_network"
 const networkConfigIsBcoinNetwork = "is_bcoin_network"
 const networkConfigIsEthereumNetwork = "is_ethereum_network"
 const networkConfigIsHandshakeNetwork = "is_handshake_network"
@@ -833,6 +834,17 @@ func (n *Network) ReachableNodes() (nodes []*Node, err error) {
 	query := dbconf.DatabaseConnection().Where("nodes.network_id = ? AND nodes.status IN (?)", n.ID, nodeStatusRunning)
 	query.Order("created_at ASC").Find(&nodes)
 	return nodes, err
+}
+
+// IsBaseledgerNetwork returns true if the network is a baseledger testnet or mainnet
+func (n *Network) IsBaseledgerNetwork() bool {
+	cfg := n.ParseConfig()
+	if cfg != nil {
+		if isBaseledgerNetwork, ok := cfg[networkConfigIsBaseledgerNetwork].(bool); ok {
+			return isBaseledgerNetwork
+		}
+	}
+	return false
 }
 
 // IsBcoinNetwork returns true if the network is bcoin-based
