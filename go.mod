@@ -48,7 +48,8 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/provideplatform/ident v0.9.10-0.20210826043829-5d18558da1d0
+	github.com/provideplatform/ident v0.9.10-0.20210801033801-297a9eac7ffc
+	github.com/provideplatform/provide-go v0.0.0-20210624064849-d7328258f0d8
 	github.com/provideservices/provide-go v0.0.0-20210528064845-41b80b9b02b9
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect

@@ -25,8 +25,8 @@ import (
 
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 
 	identcommon "github.com/provideplatform/ident/common"
 	identtoken "github.com/provideplatform/ident/token"
