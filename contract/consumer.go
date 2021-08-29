@@ -191,8 +191,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 		mappedValues := map[string]interface{}{}
 		err = abievt.Inputs.UnpackIntoMap(mappedValues, hexutil.MustDecode(*evtmsg.Data))
 		if err != nil {
-			common.Log.Warningf("failed to ingest log event with id: %s; unpacking values failed; %s", eventIDHex, err.Error())
-			return
+			common.Log.Tracef("data was empty for log emission event with id: %s", eventIDHex)
 		}
 
 		var subject string
