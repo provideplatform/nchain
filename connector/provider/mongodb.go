@@ -16,7 +16,7 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
-	c2 "github.com/provideservices/provide-go/api/c2"
+	c2 "github.com/provideplatform/provide-go/api/c2"
 )
 
 // MongoDBProvider is a connector.ProviderAPI implementing orchestration for MongoDB

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	uuid "github.com/kthomas/go.uuid"
-	ident "github.com/provideservices/provide-go/api/ident"
-	nchain "github.com/provideservices/provide-go/api/nchain"
+	ident "github.com/provideplatform/provide-go/api/ident"
+	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
 func TestListAccounts(t *testing.T) {

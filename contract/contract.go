@@ -16,9 +16,9 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
-	provide "github.com/provideservices/provide-go/api"
-	api "github.com/provideservices/provide-go/api/nchain"
-	prvdcrypto "github.com/provideservices/provide-go/crypto"
+	provide "github.com/provideplatform/provide-go/api"
+	api "github.com/provideplatform/provide-go/api/nchain"
+	prvdcrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const resolveTokenTickerInterval = time.Millisecond * 5000

@@ -23,11 +23,11 @@ import (
 	"github.com/provideplatform/nchain/network"
 	"github.com/provideplatform/nchain/token"
 	"github.com/provideplatform/nchain/wallet"
-	provide "github.com/provideservices/provide-go/api"
-	provideapi "github.com/provideservices/provide-go/api/nchain"
-	vault "github.com/provideservices/provide-go/api/vault"
-	util "github.com/provideservices/provide-go/common/util"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	provide "github.com/provideplatform/provide-go/api"
+	provideapi "github.com/provideplatform/provide-go/api/nchain"
+	vault "github.com/provideplatform/provide-go/api/vault"
+	util "github.com/provideplatform/provide-go/common/util"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 const defaultDerivedCoinType = uint32(60)

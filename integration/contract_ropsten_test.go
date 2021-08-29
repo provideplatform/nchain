@@ -10,7 +10,7 @@ import (
 
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/ident/common"
-	nchain "github.com/provideservices/provide-go/api/nchain"
+	nchain "github.com/provideplatform/provide-go/api/nchain"
 )
 
 func TestExecuteContract_Ropsten(t *testing.T) {

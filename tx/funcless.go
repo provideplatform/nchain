@@ -14,8 +14,8 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	"github.com/provideplatform/nchain/network"
-	provide "github.com/provideservices/provide-go/api/nchain"
-	providecrypto "github.com/provideservices/provide-go/crypto"
+	provide "github.com/provideplatform/provide-go/api/nchain"
+	providecrypto "github.com/provideplatform/provide-go/crypto"
 )
 
 func executeTransaction(c *contract.Contract, execution *contract.Execution) (*contract.ExecutionResponse, error) {

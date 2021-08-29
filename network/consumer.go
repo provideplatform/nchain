@@ -11,8 +11,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideplatform/nchain/common"
-	providego "github.com/provideservices/provide-go/api"
-	provide "github.com/provideservices/provide-go/crypto"
+	providego "github.com/provideplatform/provide-go/api"
+	provide "github.com/provideplatform/provide-go/crypto"
 )
 
 const natsBlockFinalizedSubject = "nchain.block.finalized"

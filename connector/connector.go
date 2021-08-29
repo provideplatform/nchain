@@ -15,8 +15,8 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/connector/provider"
 	"github.com/provideplatform/nchain/network"
-	provide "github.com/provideservices/provide-go/api"
-	c2 "github.com/provideservices/provide-go/api/c2"
+	provide "github.com/provideplatform/provide-go/api"
+	c2 "github.com/provideplatform/provide-go/api/c2"
 )
 
 // Connector instances represent a logical connection to IPFS or other decentralized filesystem;

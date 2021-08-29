@@ -7,9 +7,9 @@
     },
     {
       "name": "golang",
-      "repository_url": "https://github.com/provideservices/provide-go",
-      "setup_instructions": "go get github.com/provideservices/provide-go",
-      "template": "import \"github.com/provideservices/provide-go\"\n\nparams := map[string]interface{}{\\n\\t\"account_id\": \"{{ walletId }}\",\\n\\t\"method\": \"{{ method }}\",\\n\\t\"params\": {{ params }},\\n\\t\"value\": {{ value }}\\n,}\\nstatus, resp, err := provide.ExecuteContract(\"{{ apiToken }}\", \"{{ contractId }}\", params)"
+      "repository_url": "https://github.com/provideplatform/provide-go",
+      "setup_instructions": "go get github.com/provideplatform/provide-go",
+      "template": "import \"github.com/provideplatform/provide-go\"\n\nparams := map[string]interface{}{\\n\\t\"account_id\": \"{{ walletId }}\",\\n\\t\"method\": \"{{ method }}\",\\n\\t\"params\": {{ params }},\\n\\t\"value\": {{ value }}\\n,}\\nstatus, resp, err := provide.ExecuteContract(\"{{ apiToken }}\", \"{{ contractId }}\", params)"
     },
     {
       "name": "groovy",

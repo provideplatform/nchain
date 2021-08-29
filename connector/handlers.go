@@ -9,9 +9,9 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
-	c2 "github.com/provideservices/provide-go/api/c2"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	c2 "github.com/provideplatform/provide-go/api/c2"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // InstallConnectorsAPI installs the handlers using the given gin Engine

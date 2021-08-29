@@ -16,10 +16,10 @@ import (
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/contract"
 	"github.com/provideplatform/nchain/wallet"
-	api "github.com/provideservices/provide-go/api"
-	bookie "github.com/provideservices/provide-go/api/bookie"
-	provide "github.com/provideservices/provide-go/api/nchain"
-	util "github.com/provideservices/provide-go/common/util"
+	api "github.com/provideplatform/provide-go/api"
+	bookie "github.com/provideplatform/provide-go/api/bookie"
+	provide "github.com/provideplatform/provide-go/api/nchain"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // TODO: should this be calculated dynamically against average blocktime for the network and subscriptions reestablished?

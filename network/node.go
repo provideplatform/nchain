@@ -18,8 +18,8 @@ import (
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network/p2p"
-	provide "github.com/provideservices/provide-go/api"
-	c2 "github.com/provideservices/provide-go/api/c2"
+	provide "github.com/provideplatform/provide-go/api"
+	c2 "github.com/provideplatform/provide-go/api/c2"
 )
 
 const defualtNodeLogRPP = int64(500)

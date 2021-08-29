@@ -10,10 +10,10 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
 	"github.com/provideplatform/nchain/common"
-	c2 "github.com/provideservices/provide-go/api/c2"
-	api "github.com/provideservices/provide-go/api/nchain"
-	provide "github.com/provideservices/provide-go/common"
-	util "github.com/provideservices/provide-go/common/util"
+	c2 "github.com/provideplatform/provide-go/api/c2"
+	api "github.com/provideplatform/provide-go/api/nchain"
+	provide "github.com/provideplatform/provide-go/common"
+	util "github.com/provideplatform/provide-go/common/util"
 )
 
 // InstallNetworksAPI installs the handlers using the given gin Engine
