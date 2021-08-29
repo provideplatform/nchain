@@ -53,7 +53,7 @@ func init() {
 	}
 	godotenv.Load()
 
-	common.JWTKeypairs = util.RequireJWTVerifiers() // FIXME-- currently, this is still required by contract handlers call to token.VendNatsBearerAuthorization()
+	util.RequireJWTVerifiers()
 	util.RequireGin()
 	pgputil.RequirePGP()
 	redisutil.RequireRedis()
