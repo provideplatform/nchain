@@ -868,9 +868,9 @@ func (t *Transaction) handleTxReceipt(
 	receipt *provideapi.TxReceipt,
 ) error {
 	if t.To == nil {
-		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, receipt.ContractAddress.Hex())
+		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, string(receipt.ContractAddress))
 		params := t.ParseParams()
-		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(receipt.ContractAddress.Hex()))
+		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(string(receipt.ContractAddress)))
 		if name, ok := params["name"].(string); ok {
 			contractName = name
 		}
@@ -889,7 +889,7 @@ func (t *Transaction) handleTxReceipt(
 				Name:           common.StringOrNil(name),
 				Symbol:         common.StringOrNil(symbol),
 				Decimals:       decimals.Uint64(),
-				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+				Address:        common.StringOrNil(string(receipt.ContractAddress)),
 			}
 
 			createdToken = tok.Create()
@@ -906,7 +906,7 @@ func (t *Transaction) handleTxReceipt(
 				NetworkID:      t.NetworkID,
 				TransactionID:  &t.ID,
 				Name:           common.StringOrNil(contractName),
-				Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+				Address:        common.StringOrNil(string(receipt.ContractAddress)),
 				Params:         t.Params,
 			}
 			if kontract.Create() {
@@ -917,7 +917,7 @@ func (t *Transaction) handleTxReceipt(
 			}
 		} else {
 			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
-			kontract.Address = common.StringOrNil(receipt.ContractAddress.Hex())
+			kontract.Address = common.StringOrNil(string(receipt.ContractAddress))
 			db.Save(&kontract)
 			kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 		}
@@ -997,7 +997,7 @@ func (t *Transaction) handleTxTraces(
 										Name:           common.StringOrNil(name),
 										Symbol:         common.StringOrNil(symbol),
 										Decimals:       decimals.Uint64(),
-										Address:        common.StringOrNil(receipt.ContractAddress.Hex()),
+										Address:        common.StringOrNil(string(receipt.ContractAddress)),
 									}
 
 									createdToken = tok.Create()

@@ -107,10 +107,10 @@ func (p *GethP2PProvider) FetchTxReceipt(signerAddress, hash string) (*provide.T
 	}
 
 	return &provide.TxReceipt{
-		TxHash:            receipt.TxHash,
-		ContractAddress:   receipt.ContractAddress,
+		TxHash:            receipt.TxHash.Bytes(),
+		ContractAddress:   receipt.ContractAddress.Bytes(),
 		GasUsed:           receipt.GasUsed,
-		BlockHash:         receipt.BlockHash,
+		BlockHash:         receipt.BlockHash.Bytes(),
 		BlockNumber:       receipt.BlockNumber,
 		TransactionIndex:  receipt.TransactionIndex,
 		PostState:         receipt.PostState,

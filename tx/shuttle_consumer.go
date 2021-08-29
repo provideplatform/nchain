@@ -206,7 +206,7 @@ func consumeShuttleContractDeployedMsg(msg *stan.Msg) {
 					Name:          common.StringOrNil(name),
 					Symbol:        common.StringOrNil(symbol),
 					Decimals:      decimals.Uint64(),
-					Address:       common.StringOrNil(receipt.ContractAddress.Hex()),
+					Address:       common.StringOrNil(string(receipt.ContractAddress)),
 				}
 
 				createdToken = tok.Create()
