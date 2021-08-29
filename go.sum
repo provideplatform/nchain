@@ -570,8 +570,9 @@ github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38i
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
 github.com/provideplatform/ident v0.9.10-0.20210801033801-297a9eac7ffc h1:GAhoRMHNCn61FfGhLnsFivGHQULqIJ6HUbZ5/qzM4GM=
 github.com/provideplatform/ident v0.9.10-0.20210801033801-297a9eac7ffc/go.mod h1:A0IzIOtqzS+MgpSTTKSQITY4kPH48IsGXw5pDCcegTU=
-github.com/provideplatform/provide-go v0.0.0-20210624064849-d7328258f0d8 h1:5a2YY70zmLjSNB9SyUea7ZoDc18C9KhJSBmQotSApms=
 github.com/provideplatform/provide-go v0.0.0-20210624064849-d7328258f0d8/go.mod h1:q0/Q8KaZxYg84rdwBIIE7ZwHluzM5zw7zJJoJOqAbzg=
+github.com/provideplatform/provide-go v0.0.0-20210829183306-7180bd3edc50 h1:KHZhiJUxIFF2xWszo9IN+HKYeN5EcT6hY5z92hxaAhY=
+github.com/provideplatform/provide-go v0.0.0-20210829183306-7180bd3edc50/go.mod h1:q0/Q8KaZxYg84rdwBIIE7ZwHluzM5zw7zJJoJOqAbzg=
 github.com/provideservices/provide-go v0.0.0-20210409104111-70ad008e4ae8/go.mod h1:zMvfECorm5+hb9aewWEVpxkaFGko3r5Qk3/N/aIuLeY=
 github.com/provideservices/provide-go v0.0.0-20210528064845-41b80b9b02b9 h1:eg0Q8Tubh6PgsOEFiPp/JnbW0sgSr3FxU5/zDG5McT8=
 github.com/provideservices/provide-go v0.0.0-20210528064845-41b80b9b02b9/go.mod h1:7DcVnSaId1x8W42xofin3gbBsfRJjo4DlILIhJJxDZU=
