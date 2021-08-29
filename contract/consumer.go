@@ -18,13 +18,13 @@ import (
 )
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"
-const natsLogTransceiverEmitMaxInFlight = 1024
-const natsLogTransceiverEmitInvocationTimeout = time.Second * 10
+const natsLogTransceiverEmitMaxInFlight = 1024 * 32
+const natsLogTransceiverEmitInvocationTimeout = time.Second * 5
 const natsLogTransceiverEmitTimeout = int64(time.Second * 30)
 
 const natsNetworkContractCreateInvocationSubject = "nchain.contract.create"
-const natsNetworkContractCreateInvocationMaxInFlight = 32
-const natsNetworkContractCreateInvocationTimeout = time.Minute * 1
+const natsNetworkContractCreateInvocationMaxInFlight = 128
+const natsNetworkContractCreateInvocationTimeout = time.Minute * 5
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
