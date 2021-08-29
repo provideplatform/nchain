@@ -93,10 +93,17 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 							if err != nil {
 								common.Log.Warningf("failed to unmarshal event received on network logs websocket: %s; %s", message, err.Error())
 							} else {
-								if result, ok := response.Params["result"].(map[string]interface{}); ok {
-									result["block_hash"] = result["blockHash"]
-									result["type"] = result["contractType"]
+								result := map[string]interface{}{}
+								if params, ok := response.Params["result"].(map[string]interface{}); ok {
+									result["address"] = params["address"]
+									result["block_hash"] = params["blockHash"]
+									result["block_hash"] = params["blockNumber"]
+									result["data"] = params["data"]
+									result["log_index"] = params["logIndex"]
+									result["type"] = params["contractType"]
+									result["topics"] = params["topics"]
 									result["transaction_hash"] = result["transactionHash"]
+									result["transaction_index"] = result["transactionIndex"]
 									result["network_id"] = network.ID.String()
 
 									if resultJSON, err := json.Marshal(result); err == nil {
