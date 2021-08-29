@@ -409,14 +409,10 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 				}
 
 				sd.stats.Meta["last_block_header"] = header
-
+				hash, _ := header["hash"].(string)
 				merkleRoot, _ := header["mrklRoot"].(string)
 
-				// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-				// chainptHash := []byte(merkleRoot)
-				// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
-
-				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["mrklRoot"].(string) != merkleRoot {
+				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["hash"].(string) != hash {
 					sd.recentBlocks = append(sd.recentBlocks, header)
 					sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
 				}
@@ -444,7 +440,8 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 					if len(blocktimes) > 0 {
 						sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
 						sd.stats.Meta["blocktimes"] = blocktimes
-						sd.stats.Meta["last_block_hash"] = merkleRoot
+						sd.stats.Meta["last_block_hash"] = hash
+						sd.stats.Meta["last_merkle_root"] = merkleRoot
 					}
 				} else if medianTime, medianTimeOk := chainInfo["mediantime"].(float64); medianTimeOk {
 					// This is pretty naive but gives us an avg. time before we have >= 3 recent blocks; can take some time after statsdaemon starts monitoring a PoW network...
@@ -470,14 +467,10 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 				}
 
 				sd.stats.Meta["last_block_header"] = header
-
+				hash, _ := header["hash"].(string)
 				merkleRoot, _ := header["merkleroot"].(string)
 
-				// chainptID := fmt.Sprintf("provide.%s.block", sd.dataSource.Network.ID)
-				// chainptHash := []byte(merkleRoot)
-				// providechainpoint.ImmortalizeHashes(chainptID, []*[]byte{&chainptHash})
-
-				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["merkleroot"].(string) != merkleRoot {
+				if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(map[string]interface{})["merkleroot"].(string) != hash {
 					sd.recentBlocks = append(sd.recentBlocks, header)
 					sd.recentBlockTimestamps = append(sd.recentBlockTimestamps, lastBlockAt)
 				}
@@ -505,7 +498,8 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 					if len(blocktimes) > 0 {
 						sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
 						sd.stats.Meta["blocktimes"] = blocktimes
-						sd.stats.Meta["last_block_hash"] = merkleRoot
+						sd.stats.Meta["last_block_hash"] = hash
+						sd.stats.Meta["last_merkle_root"] = merkleRoot
 					}
 				} else if medianTime, medianTimeOk := chainInfo["mediantime"].(float64); medianTimeOk {
 					// This is pretty naive but gives us an avg. time before we have >= 3 recent blocks; can take some time after statsdaemon starts monitoring a PoW network...
@@ -520,13 +514,6 @@ func (sd *StatsDaemon) ingestBcoin(response interface{}) {
 	}
 
 	sd.publish()
-}
-
-func (sd *StatsDaemon) ingestLcoin(response interface{}) {
-	switch response.(type) {
-	default:
-		common.Log.Warningf("Lcoin ingest functionality not yet implemented in stats daemon")
-	}
 }
 
 func (sd *StatsDaemon) ingestEthereum(response interface{}) {
@@ -572,6 +559,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 		sd.stats.LastBlockAt = &lastBlockAt
 
 		sd.stats.Meta["last_block_header"] = header
+		merkleRoot := header.Root.String()
 		blockHash := header.Hash().String()
 
 		if len(sd.recentBlocks) == 0 || sd.recentBlocks[len(sd.recentBlocks)-1].(*types.Header).Hash().String() != blockHash {
@@ -601,6 +589,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 				sd.stats.Meta["average_blocktime"] = timedelta / float64(len(blocktimes))
 				sd.stats.Meta["blocktimes"] = blocktimes
 				sd.stats.Meta["last_block_hash"] = blockHash
+				sd.stats.Meta["last_merkle_root"] = merkleRoot
 			}
 		}
 
