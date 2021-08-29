@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 	c2 "github.com/provideservices/provide-go/api/c2"
 	api "github.com/provideservices/provide-go/api/nchain"
 	provide "github.com/provideservices/provide-go/common"

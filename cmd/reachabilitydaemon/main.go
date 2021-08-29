@@ -14,8 +14,8 @@ import (
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/connector"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/connector"
 )
 
 const runloopTickerInterval = 5 * time.Second

@@ -12,24 +12,24 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/connector"
-	"github.com/provideapp/nchain/contract"
-	"github.com/provideapp/nchain/filter"
-	"github.com/provideapp/nchain/network"
-	"github.com/provideapp/nchain/oracle"
-	"github.com/provideapp/nchain/prices"
-	"github.com/provideapp/nchain/token"
-	"github.com/provideapp/nchain/tx"
-	"github.com/provideapp/nchain/wallet"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/connector"
+	"github.com/provideplatform/nchain/contract"
+	"github.com/provideplatform/nchain/filter"
+	"github.com/provideplatform/nchain/network"
+	"github.com/provideplatform/nchain/oracle"
+	"github.com/provideplatform/nchain/prices"
+	"github.com/provideplatform/nchain/token"
+	"github.com/provideplatform/nchain/tx"
+	"github.com/provideplatform/nchain/wallet"
 
 	pgputil "github.com/kthomas/go-pgputil"
 	redisutil "github.com/kthomas/go-redisutil"
 	provide "github.com/provideservices/provide-go/common"
 	util "github.com/provideservices/provide-go/common/util"
 
-	identcommon "github.com/provideapp/ident/common"
-	identtoken "github.com/provideapp/ident/token"
+	identcommon "github.com/provideplatform/ident/common"
+	identtoken "github.com/provideplatform/ident/token"
 )
 
 const runloopSleepInterval = 250 * time.Millisecond

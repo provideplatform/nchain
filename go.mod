@@ -1,4 +1,4 @@
-module github.com/provideapp/nchain
+module github.com/provideplatform/nchain
 
 go 1.13
 
@@ -10,7 +10,6 @@ require (
 	github.com/aws/aws-sdk-go v1.31.8
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/btcsuite/btcutil v1.0.2
-	github.com/cespare/cp v1.1.1 // indirect
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/deckarep/golang-set v1.7.2-0.20180927150649-699df6a3acf6 // indirect
 	github.com/ethereum/go-ethereum v1.9.22
@@ -49,7 +48,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/provideapp/ident v0.9.9
+	github.com/provideplatform/ident v0.9.10-0.20210826043829-5d18558da1d0
 	github.com/provideservices/provide-go v0.0.0-20210528064845-41b80b9b02b9
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect

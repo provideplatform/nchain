@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 )
 
 var CurrentPrices = &Prices{}

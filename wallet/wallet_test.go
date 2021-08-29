@@ -11,8 +11,8 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	pgputil "github.com/kthomas/go-pgputil"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
-	"github.com/provideapp/nchain/wallet"
+	"github.com/provideplatform/nchain/common"
+	"github.com/provideplatform/nchain/wallet"
 	provide "github.com/provideservices/provide-go/crypto"
 )
 

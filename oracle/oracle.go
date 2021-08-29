@@ -6,7 +6,7 @@ import (
 
 	dbconf "github.com/kthomas/go-db-config"
 	uuid "github.com/kthomas/go.uuid"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 	provide "github.com/provideservices/provide-go/api"
 )
 

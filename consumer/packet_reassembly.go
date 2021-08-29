@@ -13,7 +13,7 @@ import (
 
 	"github.com/kthomas/go-natsutil"
 	"github.com/kthomas/go-redisutil"
-	"github.com/provideapp/nchain/common"
+	"github.com/provideplatform/nchain/common"
 )
 
 const packetReassemblyHeaderKeySuffix = "header"
