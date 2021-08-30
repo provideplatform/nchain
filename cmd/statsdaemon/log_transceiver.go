@@ -96,8 +96,8 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 								result := map[string]interface{}{}
 								if params, ok := response.Params["result"].(map[string]interface{}); ok {
 									result["address"] = params["address"]
+									result["block"] = params["blockNumber"]
 									result["block_hash"] = params["blockHash"]
-									result["block_hash"] = params["blockNumber"]
 									result["data"] = params["data"]
 									result["log_index"] = params["logIndex"]
 									result["type"] = params["contractType"]

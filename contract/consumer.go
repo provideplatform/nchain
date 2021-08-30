@@ -15,6 +15,7 @@ import (
 	stan "github.com/nats-io/stan.go"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
+	"github.com/provideplatform/provide-go/api/nchain"
 )
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"
@@ -28,21 +29,6 @@ const natsNetworkContractCreateInvocationTimeout = time.Minute * 5
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
-
-type natsLogEventMessage struct {
-	Address         *string                `json:"address,omitempty"`
-	Block           uint64                 `json:"block,omitempty"`
-	BlockHash       *string                `json:"blockhash,omitempty"`
-	Timestamp       uint64                 `json:"timestamp,omitempty"`
-	TransactionHash *string                `json:"transaction_hash,omitempty"`
-	Data            *string                `json:"data,omitempty"`
-	Topics          []*string              `json:"topics,omitempty"`
-	Type            *string                `json:"type,omitempty"`
-	Params          map[string]interface{} `json:"params,omitempty"`
-	// Index           *big.Int        // FIXME? add logIndex?
-
-	NetworkID *string `json:"network_id,omitempty"`
-}
 
 var (
 	cachedNetworks            = map[string]*network.Network{}     // map of network id -> network
@@ -161,7 +147,7 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 	return cachedNetwork
 }
 
-func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtmsg *natsLogEventMessage) {
+func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtmsg *nchain.NetworkLog) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
 		evtmsg.Address = common.StringOrNil(ethcommon.HexToAddress(*evtmsg.Address).Hex())
 
@@ -276,7 +262,7 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 	common.Log.Tracef("consuming NATS log transceiver event emission message: %s", msg)
 
-	evtmsg := &natsLogEventMessage{}
+	evtmsg := &nchain.NetworkLog{}
 	err := json.Unmarshal(msg.Data, &evtmsg)
 	if err != nil {
 		common.Log.Warningf("failed to umarshal log transceiver event emission message; %s", err.Error())
