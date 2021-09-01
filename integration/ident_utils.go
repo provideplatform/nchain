@@ -135,7 +135,7 @@ func UserAndTokenFactory(testID uuid.UUID) (*string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error generating token. Error: %s", err.Error())
 	}
-	return token.Token, nil
+	return token.AccessToken, nil
 }
 
 func appFactory(token, name, desc string) (*provide.Application, error) {
