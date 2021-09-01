@@ -73,7 +73,7 @@ func getUserTokenByTestId(testID uuid.UUID) (*provide.Token, error) {
 		return nil, fmt.Errorf("error authenticating user. Error: %s", err.Error())
 	}
 
-	return authResponse.AccessToken, nil
+	return authResponse.Token, nil
 }
 
 func getOrgToken(testID uuid.UUID) (*string, error) {

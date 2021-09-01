@@ -64,7 +64,7 @@ func TestListAccounts(t *testing.T) {
 		t.Errorf("error creating application")
 		return
 	}
-	appToken, err := appTokenFactory(*setupUserToken.Token, app.ID)
+	appToken, err := appTokenFactory(*setupUserToken.AccessToken, app.ID)
 	if err != nil {
 		t.Errorf("error getting app token. Error: %s", err.Error())
 		return
