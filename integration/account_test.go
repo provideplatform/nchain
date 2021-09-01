@@ -54,7 +54,7 @@ func TestListAccounts(t *testing.T) {
 		"appdesc " + testId.String(),
 	}
 
-	app, err := appFactory(*setupUserToken.Token, testcaseApp.name, testcaseApp.description)
+	app, err := appFactory(*setupUserToken.AccessToken, testcaseApp.name, testcaseApp.description)
 	if err != nil {
 		t.Errorf("error setting up application. Error: %s", err.Error())
 		return

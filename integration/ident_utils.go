@@ -73,7 +73,7 @@ func getUserTokenByTestId(testID uuid.UUID) (*provide.Token, error) {
 		return nil, fmt.Errorf("error authenticating user. Error: %s", err.Error())
 	}
 
-	return authResponse.Token, nil
+	return authResponse.AccessToken, nil
 }
 
 func getOrgToken(testID uuid.UUID) (*string, error) {
@@ -114,7 +114,7 @@ func AppAndTokenFactory(testID uuid.UUID, userID uuid.UUID) (*string, error) {
 		"appdesc " + testID.String(),
 	}
 
-	app, err := appFactory(*token.Token, nchainApp.name, nchainApp.description)
+	app, err := appFactory(*token.AccessToken, nchainApp.name, nchainApp.description)
 	if err != nil {
 		return nil, fmt.Errorf("error generating application. Error: %s", err.Error())
 	}
