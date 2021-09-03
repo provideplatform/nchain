@@ -8,7 +8,7 @@ import (
 	"github.com/nats-io/stan.go"
 )
 
-type NetworkInterface interface {
+type INetwork interface {
 	Send(subject string, msg []byte) (*string, error)
 	Subscribe(wg *sync.WaitGroup, drainTimeout time.Duration, subject string, qgroup string, cb stan.MsgHandler, ackWait time.Duration, maxInFlight int, jwt *string)
 	Setup()

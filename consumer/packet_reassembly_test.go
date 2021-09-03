@@ -6,15 +6,11 @@ import (
 	"encoding/json"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 
-	"github.com/kthomas/go-redisutil"
 	"github.com/vmihailenco/msgpack/v5"
 )
-
-func setupRedis() {
-	redisutil.RequireRedis()
-}
 
 func generateRandomBytes(length int) []byte {
 	data := make([]byte, length)
@@ -32,25 +28,25 @@ func getTestFile(t *testing.T, path string) []byte {
 	return data
 }
 
-func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
+func checkFragmentIsValid(t *testing.T, db IDatabase, msg []byte) {
 	// Decode data into a fragment
 	fragment := &packetFragment{}
 	err := msgpack.Unmarshal(msg, &fragment)
 
 	if err != nil {
-		t.Errorf("Unable to decode message (call #%d)", call)
+		t.Errorf("Unable to decode message")
 		return
 	}
 
 	// Check that fragment has a payload
 	if fragment.Payload == nil {
-		t.Errorf("Fragment contained no Payload, (call #%d)", call)
+		t.Errorf("Fragment contained no Payload,")
 		return
 	}
 
 	// Check that the checksum is present & correct
 	if fragment.Checksum == nil {
-		t.Errorf("Fragment contained no checksum, (call #%d)", call)
+		t.Errorf("Fragment contained no checksum,")
 		return
 	}
 
@@ -59,26 +55,26 @@ func checkFragmentIsValid(t *testing.T, msg []byte, call uint64) {
 	hashBytes := md5.Sum(*fragment.Payload)
 
 	if !bytes.Equal(*fragment.Checksum, hashBytes[:]) {
-		t.Errorf("Fragment hash was not as expected. (call #%d)", call)
+		t.Errorf("Fragment hash was not as expected.")
 	}
 
 	// Ensure Index is within Cardinality range
 	if fragment.Index >= fragment.Cardinality {
-		t.Errorf("Fragment index was out of bounds, (call #%d). Index: %d, Cardinality: %d",
-			call, fragment.Index, fragment.Cardinality)
+		t.Errorf("Fragment index was out of bounds. Index: %d, Cardinality: %d",
+			fragment.Index, fragment.Cardinality)
 	}
 
 	// Ingest the fragment
-	valid, _, verr := fragment.Ingest()
+	valid, _, verr := fragment.Ingest(db)
 	if !valid {
-		t.Errorf("Fragment Ingest returned false. (call #%d)", call)
+		t.Errorf("Fragment Ingest returned false.")
 	}
 	if verr != nil {
-		t.Errorf("Fragment Ingest encountered error: '%s' (call #%d)", verr, call)
+		t.Errorf("Fragment Ingest encountered error: '%s'", verr)
 	}
 }
 
-func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
+func checkReassemblyIsValid(t *testing.T, db IDatabase, msg []byte) *packetReassembly {
 	// Decode data into a reassembly packet
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg, &reassembly)
@@ -89,7 +85,7 @@ func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
 	}
 
 	// Ingest the fragment
-	valid, _, verr := reassembly.Ingest()
+	valid, _, verr := reassembly.Ingest(db)
 	if !valid {
 		t.Error("Reassembly Ingest returned false")
 	}
@@ -101,18 +97,14 @@ func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
 }
 
 func TestBroadcastFragments(t *testing.T) {
-	var testNetwork = setupTestNetwork()
+	testNetwork, db := setupTestNetwork()
 
 	payload := generateRandomBytes(1024 * 128)
-	setupRedis()
 
 	// Stub out the publish function so that BroadcastFragments will use our stub above to "send" data.
-	var callsToPublish uint64 = 0
 	var reassembly *packetReassembly = nil
 	var totalMsgSize uint = 0
 	testNetwork.onSend = func(subject string, msg []byte) {
-		callsToPublish++
-
 		length := uint(len(msg))
 		totalMsgSize += length
 
@@ -122,40 +114,38 @@ func TestBroadcastFragments(t *testing.T) {
 
 		// Subject is always packetFragmentIngestSubject?
 		if subject == packetFragmentIngestSubject {
-			checkFragmentIsValid(t, msg, callsToPublish)
+			checkFragmentIsValid(t, db, msg)
 		} else if subject == packetReassembleSubject {
 			if reassembly != nil {
 				t.Error("Recieved more than one reassembly packet")
 			}
-			reassembly = checkReassemblyIsValid(t, msg)
+			reassembly = checkReassemblyIsValid(t, db, msg)
+		} else if subject == packetCompleteSubject {
+			// Reassemble the packets
+			if reassembly == nil {
+				t.Error("BroadcastFragments() error; did not get reassembly packet")
+				return
+			}
+			ret, err := reassembly.Reassemble(db)
+			if !ret {
+				t.Error("reassembly.Reassemble() returned false")
+			}
+			if err != nil {
+				t.Errorf("reassembly.Reassemble() error; %s", err.Error())
+			}
 		} else {
 			t.Errorf("Unknown fragment subject. Subject: '%s'", subject)
 		}
 	}
 
 	// Run the actual fragment broadcast
-	err := BroadcastFragments(testNetwork, payload, true)
+	var broadcastWG sync.WaitGroup
+	err := BroadcastFragments(testNetwork, payload, true, &broadcastWG)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}
 
-	// Reassemble the packets
-	if reassembly == nil {
-		t.Error("BroadcastFragments() error; did not get reassembly packet")
-		return
-	}
-	ret, err := reassembly.Reassemble()
-	if !ret {
-		t.Error("reassembly.Reassemble() returned false")
-	}
-	if err != nil {
-		t.Errorf("reassembly.Reassemble() error; %s", err.Error())
-	}
-
-	// Note: this may change as packet size or test data size is tweaked.
-	if callsToPublish != 31 {
-		t.Errorf("BroadcastFragments() not called correct amount of times. Expected: 31, Actual: %d.", callsToPublish)
-	}
+	broadcastWG.Wait()
 }
 
 func loadPacket(t *testing.T, path string) *packetFragment {
@@ -191,13 +181,12 @@ func expectFragmentIsNotValid(t *testing.T, fragment *packetFragment, expectedEr
 }
 
 func TestIngest(t *testing.T) {
-
-	setupRedis()
+	_, db := setupTestNetwork()
 
 	// Valid packet = success
 	{
 		fragment := loadPacket(t, "test/valid-packet.json")
-		ingested, count, err := fragment.Ingest()
+		ingested, count, err := fragment.Ingest(db)
 		if !ingested {
 			t.Errorf("Ingest() error; Ingest returned false, expected true, err: '%s'.", err)
 		}
@@ -212,7 +201,7 @@ func TestIngest(t *testing.T) {
 	// Ingest invalid packet = fail
 	{
 		fragment := loadPacket(t, "test/invalid-packet-wrong-checksum.json")
-		ingested, count, err := fragment.Ingest()
+		ingested, count, err := fragment.Ingest(db)
 		if ingested {
 			t.Error("Ingest() error; Ingest returned true, expected false")
 		}

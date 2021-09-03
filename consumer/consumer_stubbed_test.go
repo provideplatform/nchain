@@ -87,22 +87,26 @@ func (sub *testStream) Subscribe(wg *sync.WaitGroup, _ time.Duration, subject st
 // Test Helpers
 //
 
-func setupTestNetwork() *testStream {
+func setupTestNetwork() (*testStream, IDatabase) {
 	rand.Seed(time.Now().UnixNano())
+
 	network := new(testStream)
 	network.queues = make(map[string]*testQueue)
 
+	db := &Redis{}
+	db.Setup()
+
 	consumer := PacketConsumer{
 		network,
+		db,
 		wg,
 	}
 	consumer.Setup()
-	setupRedis()
 
-	return network
+	return network, db
 }
 
-func checkReassemblyMsg(t *testing.T, msg *stan.Msg) {
+func checkReassemblyMsg(t *testing.T, db IDatabase, msg *stan.Msg) {
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
@@ -119,7 +123,7 @@ func checkReassemblyMsg(t *testing.T, msg *stan.Msg) {
 			return
 		}
 
-		assembled, err := reassembly.Reassemble()
+		assembled, err := reassembly.Reassemble(db)
 		if !assembled || err != nil {
 			t.Errorf("Failed to reassemble data - err: '%s'", err)
 		}
@@ -135,7 +139,7 @@ func checkReassemblyMsg(t *testing.T, msg *stan.Msg) {
 //
 
 func TestStubbedBroadcast(t *testing.T) {
-	var testNetwork = setupTestNetwork()
+	var testNetwork, db = setupTestNetwork()
 
 	numPayloads := 25
 	t.Logf("Generating %d payloads...", numPayloads)
@@ -151,7 +155,7 @@ func TestStubbedBroadcast(t *testing.T) {
 		time.Second*200,
 		packetCompleteSubject,
 		packetCompleteSubject,
-		func(msg *stan.Msg) { checkReassemblyMsg(t, msg) },
+		func(msg *stan.Msg) { checkReassemblyMsg(t, db, msg) },
 		time.Second*200,
 		1024,
 		nil,
@@ -164,7 +168,7 @@ func TestStubbedBroadcast(t *testing.T) {
 	for _, payload := range payloads {
 		// Add a random delay
 		time.Sleep(time.Duration(rand.Intn(20)) * time.Millisecond)
-		go BroadcastFragments(testNetwork, payload, true)
+		go BroadcastFragments(testNetwork, payload, true, nil)
 	}
 
 	testDone.Wait()

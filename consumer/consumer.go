@@ -26,7 +26,8 @@ const packetReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see abov
 const packetCompleteSubject = "prvd.packet.reassemble.finalize"
 
 type PacketConsumer struct {
-	network   NetworkInterface
+	network   INetwork
+	db        IDatabase
 	waitGroup sync.WaitGroup
 }
 
@@ -90,7 +91,7 @@ func (consumer *PacketConsumer) consumePacketFragmentIngestMsg(msg *stan.Msg) {
 		return
 	}
 
-	ingestVerified, ingestCounter, err := fragment.Ingest()
+	ingestVerified, ingestCounter, err := fragment.Ingest(consumer.db)
 	if err != nil || !ingestVerified {
 		common.Log.Warningf("Failed to ingest %d-byte packet fragment containing %d-byte fragment payload (%d of %d); %s", len(msg.Data), len(*fragment.Payload), fragment.Index+1, fragment.Cardinality, err.Error())
 		// No acknowledgement here - so we can try again
@@ -98,10 +99,10 @@ func (consumer *PacketConsumer) consumePacketFragmentIngestMsg(msg *stan.Msg) {
 	}
 
 	// Add one to cardinality as we need to account for the reassembly message too
-	common.Log.Debugf("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index, hex.EncodeToString(*fragment.Checksum), *ingestCounter, fragment.Cardinality+1)
+	common.Log.Tracef("Successfully ingested fragment #%d with checksum %s; %d of %d total fragments needed for reassembly have been ingested", fragment.Index, hex.EncodeToString(*fragment.Checksum), *ingestCounter, fragment.Cardinality+1)
 	remaining := (fragment.Cardinality + 1) - *ingestCounter
 	if remaining == 0 {
-		reassembly, err := fragment.FetchReassemblyHeader()
+		reassembly, err := fragment.FetchReassemblyHeader(consumer.db)
 		if err != nil {
 			common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", packetReassembleSubject, err.Error())
 		} else {
@@ -113,8 +114,6 @@ func (consumer *PacketConsumer) consumePacketFragmentIngestMsg(msg *stan.Msg) {
 }
 
 func (consumer *PacketConsumer) consumePacketReassembleMsg(msg *stan.Msg) {
-	common.Log.Debugf("Recieved assembly message: Seq:%d, RedeliveryCount: %d", msg.Sequence, msg.RedeliveryCount)
-
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
@@ -123,14 +122,14 @@ func (consumer *PacketConsumer) consumePacketReassembleMsg(msg *stan.Msg) {
 		return
 	}
 
-	ingestVerified, ingestCounter, err := reassembly.Ingest()
+	ingestVerified, ingestCounter, err := reassembly.Ingest(consumer.db)
 	if err != nil || !ingestVerified {
 		common.Log.Warningf("Failed to ingest %d-byte packet header; %s", len(msg.Data), err.Error())
 		// No acknowledgement here - so we can try again
 		return
 	}
 
-	common.Log.Debugf("Successfully ingested reassembly header. %d of %d total fragments needed for reassembly have been ingested", *ingestCounter, reassembly.Cardinality+1)
+	common.Log.Tracef("Successfully ingested reassembly header. %d of %d total fragments needed for reassembly have been ingested", *ingestCounter, reassembly.Cardinality+1)
 	remaining := (reassembly.Cardinality + 1) - *ingestCounter
 	if remaining == 0 {
 		consumer.handleReassembly(msg, reassembly)

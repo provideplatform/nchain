@@ -15,18 +15,23 @@ var (
 	wg       sync.WaitGroup
 )
 
-func setupRealNatsNetwork() NetworkInterface {
+func setupRealNatsNetwork() (INetwork, IDatabase) {
+	var db = &Redis{}
+	db.Setup()
+
 	var nats = &NatsStreaming{}
 	consumer := PacketConsumer{
 		nats,
+		db,
 		wg,
 	}
+
 	consumer.Setup()
-	setupRedis()
-	return nats
+
+	return nats, db
 }
 
-func consumePacketCompleteMsg(network NetworkInterface, t *testing.T, msg *stan.Msg, expectedPayload *[]byte) {
+func consumePacketCompleteMsg(t *testing.T, network INetwork, db IDatabase, msg *stan.Msg, expectedPayload *[]byte) {
 	network.Acknowledge(msg)
 
 	reassembly := &packetReassembly{}
@@ -42,17 +47,17 @@ func consumePacketCompleteMsg(network NetworkInterface, t *testing.T, msg *stan.
 		return
 	}
 
-	if *percentComplete != 1 {
+	if *percentComplete < 1 {
 		t.Errorf("Failed to reassemble %d-byte packet consisting of %d fragment(s); only %d fragments ingested", reassembly.Size, reassembly.Cardinality, *i)
 		return
 	}
 
-	assembled, err := reassembly.Reassemble()
+	assembled, err := reassembly.Reassemble(db)
 	if !assembled || err != nil {
 		t.Errorf("Failed to reassemble data - err: '%s'", err)
 	}
 
-	// In theory Reassemble does a checksum comparison but just as an extra test we compare payload to expected
+	// Reassemble does a checksum comparison but just as an extra test we compare payload to expected
 	if bytes.Compare(*expectedPayload, *reassembly.Payload) != 0 {
 		t.Error("Reassembled payload did not match expected")
 	}
@@ -62,21 +67,15 @@ func consumePacketCompleteMsg(network NetworkInterface, t *testing.T, msg *stan.
 
 // TestConsumerBroadcastAndReassemble uses a real NATS-Streaming connection to test broadcast and reassembly of data
 func TestConsumerBroadcastAndReassemble(t *testing.T) {
-	nats := setupRealNatsNetwork()
-
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
-	payload := generateRandomBytes(1024 * 16)
-	setupRedis()
+	nats, db := setupRealNatsNetwork()
+	payload := generateRandomBytes(1024 * 16 * 64)
 
 	nats.Subscribe(&wg,
 		time.Second*5,
 		packetCompleteSubject,
 		packetCompleteSubject,
 		func(msg *stan.Msg) {
-			consumePacketCompleteMsg(nats, t, msg, &payload)
+			consumePacketCompleteMsg(t, nats, db, msg, &payload)
 		},
 		time.Second*5,
 		1024,
@@ -88,7 +87,7 @@ func TestConsumerBroadcastAndReassemble(t *testing.T) {
 
 	testDone.Add(1)
 
-	err := BroadcastFragments(nats, payload, true)
+	err := BroadcastFragments(nats, payload, true, nil)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}
