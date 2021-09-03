@@ -25,12 +25,14 @@ const packetReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see abov
 
 const packetCompleteSubject = "prvd.packet.reassemble.finalize"
 
+// PacketConsumer ingests packets that have been broadcasted out, and sends completion messages when a whole message has been ingested
 type PacketConsumer struct {
 	network   INetwork
 	db        IDatabase
 	waitGroup sync.WaitGroup
 }
 
+// Setup initialises a PacketConsumer and sets up the network as well as subscribing to the fragment and reassembly messages
 func (consumer *PacketConsumer) Setup() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Consumer package configured to skip NATS streaming subscription setup")
