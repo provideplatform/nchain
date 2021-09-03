@@ -101,6 +101,8 @@ func checkReassemblyIsValid(t *testing.T, msg []byte) *packetReassembly {
 }
 
 func TestBroadcastFragments(t *testing.T) {
+	var testNetwork = setupTestNetwork()
+
 	payload := generateRandomBytes(1024 * 128)
 	setupRedis()
 
@@ -108,7 +110,7 @@ func TestBroadcastFragments(t *testing.T) {
 	var callsToPublish uint64 = 0
 	var reassembly *packetReassembly = nil
 	var totalMsgSize uint = 0
-	setBroadcastPublishFunction(func(subject string, msg []byte) (*string, error) {
+	testNetwork.onSend = func(subject string, msg []byte) {
 		callsToPublish++
 
 		length := uint(len(msg))
@@ -118,10 +120,10 @@ func TestBroadcastFragments(t *testing.T) {
 			t.Errorf("Large fragment found. Expected size: <= 7000, Actual: %d. subject: '%s'", len(msg), subject)
 		}
 
-		// Subject is always natsPacketFragmentIngestSubject?
-		if subject == natsPacketFragmentIngestSubject {
+		// Subject is always packetFragmentIngestSubject?
+		if subject == packetFragmentIngestSubject {
 			checkFragmentIsValid(t, msg, callsToPublish)
-		} else if subject == natsPacketReassembleSubject {
+		} else if subject == packetReassembleSubject {
 			if reassembly != nil {
 				t.Error("Recieved more than one reassembly packet")
 			}
@@ -129,12 +131,10 @@ func TestBroadcastFragments(t *testing.T) {
 		} else {
 			t.Errorf("Unknown fragment subject. Subject: '%s'", subject)
 		}
-
-		return nil, nil
-	})
+	}
 
 	// Run the actual fragment broadcast
-	err := BroadcastFragments(payload, true)
+	err := BroadcastFragments(testNetwork, payload, true)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}

@@ -12,103 +12,81 @@ import (
 )
 
 // TODO: audit arbitrary max in flight & timeouts
-const natsPacketFragmentIngestSubject = "prvd.packet.fragment.ingest"
-const natsPacketFragmentIngestMaxInFlight = 1024
-const natsPacketFragmentIngestInvocationTimeout = time.Second * 5 // FIXME!!! (see above)
-const natsPacketFragmentIngestTimeout = int64(time.Second * 8)    // FIXME!!! (see above)
+const packetFragmentIngestSubject = "prvd.packet.fragment.ingest"
+const packetFragmentIngestMaxInFlight = 1024
+const packetFragmentIngestInvocationTimeout = time.Second * 5 // FIXME!!! (see above)
+const packetFragmentIngestTimeout = int64(time.Second * 8)    // FIXME!!! (see above)
 
 // TODO: audit arbitrary max in flight & timeouts; investigate dynamic timeout based on reassembled packet size
-const natsPacketReassembleSubject = "prvd.packet.reassemble.ingest"
-const natsPacketReassembleMaxInFlight = 256
-const natsPacketReassembleInvocationTimeout = time.Second * 30 // FIXME!!! (see above)
-const natsPacketReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see above)
+const packetReassembleSubject = "prvd.packet.reassemble.ingest"
+const packetReassembleMaxInFlight = 256
+const packetReassembleInvocationTimeout = time.Second * 30 // FIXME!!! (see above)
+const packetReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see above)
 
-const natsPacketCompleteSubject = "prvd.packet.reassemble.finalize"
+const packetCompleteSubject = "prvd.packet.reassemble.finalize"
 
-var (
-	waitGroup     sync.WaitGroup
-	currencyPairs = []string{}
-)
-
-type subscribeFn = func(*sync.WaitGroup, time.Duration, string, string, stan.MsgHandler, time.Duration, int, *string)
-
-var subscribe subscribeFn = natsutil.RequireNatsStreamingSubscription
-
-// setSubscribeFn sets the implementation that will be used to listen for packets (default is natsutil.RequireNatsStreamingSubscription)
-func setSubscribeFunction(function subscribeFn) {
-	subscribe = function
+type PacketConsumer struct {
+	network   NetworkInterface
+	waitGroup sync.WaitGroup
 }
 
-func natsAck(msg *stan.Msg) {
-	msg.Ack()
-}
-
-type ackFn = func(*stan.Msg)
-
-var ack ackFn = natsAck
-
-func setAckFunction(function ackFn) {
-	ack = function
-}
-
-func init() {
+func (consumer *PacketConsumer) Setup() {
 	if !common.ConsumeNATSStreamingSubscriptions {
 		common.Log.Debug("Consumer package configured to skip NATS streaming subscription setup")
 		return
 	}
 
-	natsutil.EstablishSharedNatsStreamingConnection(nil)
-
-	createNatsPacketReassemblySubscriptions(&waitGroup)
-	createNatsPacketFragmentIngestSubscriptions(&waitGroup)
+	consumer.network.Setup()
+	consumer.setupFragmentIngestSubscription()
+	consumer.setupReassemblyIngestSubscription()
 }
 
-func createNatsPacketFragmentIngestSubscriptions(wg *sync.WaitGroup) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		subscribe(wg,
-			natsPacketFragmentIngestInvocationTimeout,
-			natsPacketFragmentIngestSubject,
-			natsPacketFragmentIngestSubject,
-			consumePacketFragmentIngestMsg,
-			natsPacketFragmentIngestInvocationTimeout,
-			natsPacketFragmentIngestMaxInFlight,
+func (consumer *PacketConsumer) setupFragmentIngestSubscription() {
+	for i := uint64(0); i < consumer.network.GetConsumerConcurrency(); i++ {
+		consumer.network.Subscribe(&consumer.waitGroup,
+			packetFragmentIngestInvocationTimeout,
+			packetFragmentIngestSubject,
+			packetFragmentIngestSubject,
+			consumer.consumePacketFragmentIngestMsg,
+			packetFragmentIngestInvocationTimeout,
+			packetFragmentIngestMaxInFlight,
 			nil,
 		)
 	}
 }
 
-func createNatsPacketReassemblySubscriptions(wg *sync.WaitGroup) {
-	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		subscribe(wg,
-			natsPacketReassembleInvocationTimeout,
-			natsPacketReassembleSubject,
-			natsPacketReassembleSubject,
-			consumePacketReassembleMsg,
-			natsPacketReassembleInvocationTimeout,
-			natsPacketReassembleMaxInFlight,
+func (consumer *PacketConsumer) setupReassemblyIngestSubscription() {
+	for i := uint64(0); i < consumer.network.GetConsumerConcurrency(); i++ {
+		consumer.network.Subscribe(&consumer.waitGroup,
+			packetReassembleInvocationTimeout,
+			packetReassembleSubject,
+			packetReassembleSubject,
+			consumer.consumePacketReassembleMsg,
+			packetReassembleInvocationTimeout,
+			packetReassembleMaxInFlight,
 			nil,
 		)
 	}
 }
 
 // Common reassembly code - this is called once all fragments & the header have been consumed
-func handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
+func (consumer *PacketConsumer) handleReassembly(msg *stan.Msg, reassembly *packetReassembly) {
 	common.Log.Debugf("All fragments ingested for packet with checksum %s", hex.EncodeToString(*reassembly.Checksum))
 
 	payload, _ := msgpack.Marshal(reassembly)
-	_, err := streamingPublish(natsPacketCompleteSubject, payload)
+	_, err := consumer.network.Send(packetCompleteSubject, payload)
 	if err != nil {
-		common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), natsPacketReassembleSubject, err.Error())
-		natsutil.AttemptNack(msg, natsPacketFragmentIngestTimeout)
+		common.Log.Warningf("Failed to publish %d-byte packet reassembly message on subject: %s; %s", len(payload), packetReassembleSubject, err.Error())
+		natsutil.AttemptNack(msg, packetFragmentIngestTimeout)
 	}
 }
 
-func consumePacketFragmentIngestMsg(msg *stan.Msg) {
+func (consumer *PacketConsumer) consumePacketFragmentIngestMsg(msg *stan.Msg) {
 	fragment := &packetFragment{}
 	err := msgpack.Unmarshal(msg.Data, &fragment)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet fragment ingest message; %s", err.Error())
-		ack(msg) // Acknowledge the bad packet so it's not resent
+		consumer.network.Acknowledge(msg) // Acknowledge the bad packet so it's not resent
 		return
 	}
 
@@ -125,23 +103,23 @@ func consumePacketFragmentIngestMsg(msg *stan.Msg) {
 	if remaining == 0 {
 		reassembly, err := fragment.FetchReassemblyHeader()
 		if err != nil {
-			common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", natsPacketReassembleSubject, err.Error())
+			common.Log.Warningf("Unable to publish packet reassembly message on subject: %s; %s", packetReassembleSubject, err.Error())
 		} else {
-			handleReassembly(msg, reassembly)
+			consumer.handleReassembly(msg, reassembly)
 		}
 	}
 
-	ack(msg)
+	consumer.network.Acknowledge(msg)
 }
 
-func consumePacketReassembleMsg(msg *stan.Msg) {
+func (consumer *PacketConsumer) consumePacketReassembleMsg(msg *stan.Msg) {
 	common.Log.Debugf("Recieved assembly message: Seq:%d, RedeliveryCount: %d", msg.Sequence, msg.RedeliveryCount)
 
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal packet reassembly message; %s", err.Error())
-		ack(msg) // Acknowledge the bad packet so it's not resent
+		consumer.network.Acknowledge(msg) // Acknowledge the bad packet so it's not resent
 		return
 	}
 
@@ -155,8 +133,8 @@ func consumePacketReassembleMsg(msg *stan.Msg) {
 	common.Log.Debugf("Successfully ingested reassembly header. %d of %d total fragments needed for reassembly have been ingested", *ingestCounter, reassembly.Cardinality+1)
 	remaining := (reassembly.Cardinality + 1) - *ingestCounter
 	if remaining == 0 {
-		handleReassembly(msg, reassembly)
+		consumer.handleReassembly(msg, reassembly)
 	}
 
-	ack(msg)
+	consumer.network.Acknowledge(msg)
 }

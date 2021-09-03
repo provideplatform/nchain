@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kthomas/go-natsutil"
 	"github.com/kthomas/go-redisutil"
 	"github.com/provideplatform/nchain/common"
 	"github.com/vmihailenco/msgpack/v5"
@@ -25,7 +24,7 @@ const packetReassemblyFragmentationChunkSize = uint(4500)
 // Fragmentable interface
 type Fragmentable interface {
 	// Broadcast marshals and transmits the fragment metadata and payload
-	Broadcast() error
+	Broadcast(network NetworkInterface) error
 
 	// Ingest verifies the checksum of the fragment, writes the the underlying bytes to persistent
 	// or ephemeral storage, atomically increments the internal ingest counter associated with the
@@ -41,7 +40,7 @@ type Fragmentable interface {
 // BroadcastFragments splits the given packet into chunks. Each chunk is broadcast as a fragment for remote packet
 // reassembly. If `usePadding` is true then the last packet sent will be padded if required to make sure that all
 // packets sent have an equal size.
-func BroadcastFragments(packet []byte, usePadding bool) error {
+func BroadcastFragments(network NetworkInterface, packet []byte, usePadding bool) error {
 	packetSize := uint(len(packet))
 	chunkSize := packetReassemblyFragmentationChunkSize
 	common.Log.Debugf("fragmented broadcast of %d-byte packet into %d-byte chunks requested...", packetSize, chunkSize)
@@ -96,9 +95,9 @@ func BroadcastFragments(packet []byte, usePadding bool) error {
 	}
 
 	common.Log.Debugf("Prepared %d packet fragments for broadcast", len(fragments))
-	PacketReassembly.Broadcast()
+	PacketReassembly.Broadcast(network)
 	for _, fragment := range fragments {
-		err := fragment.Broadcast()
+		err := fragment.Broadcast(network)
 		if err != nil {
 			common.Log.Warningf("failed to broadcast fragment %d of %d ; %s", fragment.Index, numChunks, err.Error())
 			return err
@@ -148,7 +147,7 @@ func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) 
 	}
 
 	digest := sha256.New()
-	digest.Write([]byte(fmt.Sprintf("%s.%d.%s", natsPacketReassembleSubject, *nonce, *checksum)))
+	digest.Write([]byte(fmt.Sprintf("%s.%d.%s", packetReassembleSubject, *nonce, *checksum)))
 	key := hex.EncodeToString(digest.Sum(nil))
 
 	if suffix != nil {
@@ -160,7 +159,7 @@ func packetReassemblyIndexKeyFactory(fragmentable Fragmentable, suffix *string) 
 
 func fragmentIndexKeyFactory(nonce *int64, index uint, reassembledChecksum *[]byte, suffix *string) *string {
 	digest := sha256.New()
-	key := fmt.Sprintf("%s.%d.%s.%d", natsPacketFragmentIngestSubject, *nonce, hex.EncodeToString(*reassembledChecksum), index)
+	key := fmt.Sprintf("%s.%d.%s.%d", packetFragmentIngestSubject, *nonce, hex.EncodeToString(*reassembledChecksum), index)
 	digest.Write([]byte(key))
 	key = hex.EncodeToString(digest.Sum(nil))
 
@@ -183,25 +182,15 @@ type packetFragment struct {
 	// TODO: forward secrecy considerations
 }
 
-// broadcastFn is the signature for the method that broadcasts the packets out
-type broadcastFn = func(string, []byte) (*string, error)
-
-var streamingPublish broadcastFn = natsutil.NatsStreamingPublishAsync
-
-// setBroadcastPublishFunction sets the implementation that will be used to broadcast packets (default is natsutil.NatsStreamingPublish)
-func setBroadcastPublishFunction(function broadcastFn) {
-	streamingPublish = function
-}
-
 // Broadcast marshals and transmits the fragment metadata and payload
-func (p *packetFragment) Broadcast() error {
+func (p *packetFragment) Broadcast(network NetworkInterface) error {
 	payload, err := msgpack.Marshal(p)
 	if err != nil {
 		return err
 	}
 
 	common.Log.Debugf("attempting to broadcast %d-byte fragment for Nonce %d - index #%d", len(payload), p.Nonce, p.Index)
-	_, err = streamingPublish(natsPacketFragmentIngestSubject, payload)
+	_, err = network.Send(packetFragmentIngestSubject, payload)
 	return err
 }
 
@@ -357,12 +346,12 @@ func (p *packetReassembly) fragmentIngestProgress() (*float64, *uint, error) {
 }
 
 // Broadcast marshals and transmits the packet reassembly header payload
-func (p *packetReassembly) Broadcast() error {
+func (p *packetReassembly) Broadcast(network NetworkInterface) error {
 	payload, err := msgpack.Marshal(p)
 	if err != nil {
 		return err
 	}
-	_, err = streamingPublish(natsPacketReassembleSubject, payload)
+	_, err = network.Send(packetReassembleSubject, payload)
 	return err
 }
 

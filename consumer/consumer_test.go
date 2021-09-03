@@ -6,17 +6,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kthomas/go-natsutil"
 	"github.com/nats-io/stan.go"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 var (
 	testDone sync.WaitGroup
+	wg       sync.WaitGroup
 )
 
-func consumePacketCompleteMsg(t *testing.T, msg *stan.Msg, expectedPayload *[]byte) {
-	ack(msg)
+func setupRealNatsNetwork() NetworkInterface {
+	var nats = &NatsStreaming{}
+	consumer := PacketConsumer{
+		nats,
+		wg,
+	}
+	consumer.Setup()
+	setupRedis()
+	return nats
+}
+
+func consumePacketCompleteMsg(network NetworkInterface, t *testing.T, msg *stan.Msg, expectedPayload *[]byte) {
+	network.Acknowledge(msg)
 
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
@@ -51,6 +62,7 @@ func consumePacketCompleteMsg(t *testing.T, msg *stan.Msg, expectedPayload *[]by
 
 // TestConsumerBroadcastAndReassemble uses a real NATS-Streaming connection to test broadcast and reassembly of data
 func TestConsumerBroadcastAndReassemble(t *testing.T) {
+	nats := setupRealNatsNetwork()
 
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
@@ -59,13 +71,14 @@ func TestConsumerBroadcastAndReassemble(t *testing.T) {
 	payload := generateRandomBytes(1024 * 16)
 	setupRedis()
 
-	var wg sync.WaitGroup
-	natsutil.RequireNatsStreamingSubscription(&wg,
-		time.Second*200,
-		natsPacketCompleteSubject,
-		natsPacketCompleteSubject,
-		func(msg *stan.Msg) { consumePacketCompleteMsg(t, msg, &payload) },
-		time.Second*200,
+	nats.Subscribe(&wg,
+		time.Second*5,
+		packetCompleteSubject,
+		packetCompleteSubject,
+		func(msg *stan.Msg) {
+			consumePacketCompleteMsg(nats, t, msg, &payload)
+		},
+		time.Second*5,
 		1024,
 		nil,
 	)
@@ -75,7 +88,7 @@ func TestConsumerBroadcastAndReassemble(t *testing.T) {
 
 	testDone.Add(1)
 
-	err := BroadcastFragments(payload, true)
+	err := BroadcastFragments(nats, payload, true)
 	if err != nil {
 		t.Errorf("BroadcastFragments() error; %s", err.Error())
 	}

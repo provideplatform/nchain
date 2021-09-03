@@ -11,7 +11,9 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-var dataStream = setupStub()
+//
+// Stubbed NetworkInterface
+//
 
 type testQueue struct {
 	queue     chan []byte
@@ -23,13 +25,7 @@ type testQueue struct {
 type testStream struct {
 	queues       map[string]*testQueue
 	acksRecieved uint64
-}
-
-func (queue *testQueue) enqueue(data []byte) {
-	// Add a random delay
-	time.Sleep(time.Duration(rand.Intn(20)) * time.Millisecond)
-
-	queue.queue <- data
+	onSend       func(subject string, message []byte)
 }
 
 func (queue *testQueue) waitLoop(handler stan.MsgHandler) {
@@ -47,19 +43,33 @@ func (queue *testQueue) waitLoop(handler stan.MsgHandler) {
 	}
 }
 
-func (sub *testStream) send(subject string, message []byte) (*string, error) {
+func (sub *testStream) Send(subject string, message []byte) (*string, error) {
+	if sub.onSend != nil {
+		sub.onSend(subject, message)
+	}
+
 	if queue, ok := sub.queues[subject]; ok {
-		go queue.enqueue(message)
+		go func() {
+			// Add a random delay
+			time.Sleep(time.Duration(rand.Intn(20)) * time.Millisecond)
+			queue.queue <- message
+		}()
 	}
 
 	return nil, nil
 }
 
-func (sub *testStream) ack(handler *stan.Msg) {
-	atomic.AddUint64(&sub.acksRecieved, 1)
+func (sub *testStream) Acknowledge(handler *stan.Msg) {
 }
 
-func (sub *testStream) subscribe(wg *sync.WaitGroup, _ time.Duration, subject string, queuegroup string, handler stan.MsgHandler, _ time.Duration, _ int, _ *string) {
+func (sub *testStream) Setup() {
+}
+
+func (sub *testStream) GetConsumerConcurrency() uint64 {
+	return 4
+}
+
+func (sub *testStream) Subscribe(wg *sync.WaitGroup, _ time.Duration, subject string, queuegroup string, handler stan.MsgHandler, _ time.Duration, _ int, _ *string) {
 	var queue *testQueue
 	if q, ok := sub.queues[subject]; ok {
 		queue = q
@@ -73,19 +83,26 @@ func (sub *testStream) subscribe(wg *sync.WaitGroup, _ time.Duration, subject st
 	go queue.waitLoop(handler)
 }
 
-func setupStub() *testStream {
+//
+// Test Helpers
+//
+
+func setupTestNetwork() *testStream {
 	rand.Seed(time.Now().UnixNano())
-	sub := new(testStream)
-	sub.queues = make(map[string]*testQueue)
-	setSubscribeFunction(sub.subscribe)
-	setBroadcastPublishFunction(sub.send)
-	setAckFunction(sub.ack)
-	return sub
+	network := new(testStream)
+	network.queues = make(map[string]*testQueue)
+
+	consumer := PacketConsumer{
+		network,
+		wg,
+	}
+	consumer.Setup()
+	setupRedis()
+
+	return network
 }
 
 func checkReassemblyMsg(t *testing.T, msg *stan.Msg) {
-	t.Log("Recieved packet complete message")
-
 	reassembly := &packetReassembly{}
 	err := msgpack.Unmarshal(msg.Data, &reassembly)
 	if err != nil {
@@ -106,33 +123,50 @@ func checkReassemblyMsg(t *testing.T, msg *stan.Msg) {
 		if !assembled || err != nil {
 			t.Errorf("Failed to reassemble data - err: '%s'", err)
 		}
+
+		t.Logf("Recieved and reassembled %d length packet", reassembly.Size)
 	}
 
 	testDone.Done()
 }
 
-func TestStubbedBroadcast(t *testing.T) {
-	payload1 := generateRandomBytes(1024 * 128)
-	payload2 := generateRandomBytes(1024 * 64)
-	payload3 := generateRandomBytes(1024 * 256)
-	setupRedis()
+//
+// Tests
+//
 
+func TestStubbedBroadcast(t *testing.T) {
+	var testNetwork = setupTestNetwork()
+
+	numPayloads := 25
+	t.Logf("Generating %d payloads...", numPayloads)
+	var payloads [][]byte
+	for i := 1; i <= numPayloads; i++ {
+		payloads = append(payloads, generateRandomBytes(1024*64*i))
+	}
+	t.Log("Generated payloads")
+
+	t.Log("Subscribing..")
 	var wg sync.WaitGroup
-	dataStream.subscribe(&wg,
+	testNetwork.Subscribe(&wg,
 		time.Second*200,
-		natsPacketCompleteSubject,
-		natsPacketCompleteSubject,
+		packetCompleteSubject,
+		packetCompleteSubject,
 		func(msg *stan.Msg) { checkReassemblyMsg(t, msg) },
 		time.Second*200,
 		1024,
 		nil,
 	)
+	t.Log("Subscribed.")
 
-	testDone.Add(3)
+	testDone.Add(numPayloads)
 
-	go BroadcastFragments(payload1, true)
-	go BroadcastFragments(payload2, true)
-	go BroadcastFragments(payload3, true)
+	t.Log("Sending payloads..")
+	for _, payload := range payloads {
+		// Add a random delay
+		time.Sleep(time.Duration(rand.Intn(20)) * time.Millisecond)
+		go BroadcastFragments(testNetwork, payload, true)
+	}
 
 	testDone.Wait()
+	t.Log("Test complete.")
 }
