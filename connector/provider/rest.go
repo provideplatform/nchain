@@ -101,7 +101,7 @@ func (p *RESTProvider) Deprovision() error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"load_balancer_id": balancer.ID,
 		})
-		natsutil.NatsStreamingPublish(natsLoadBalancerDeprovisioningSubject, msg)
+		natsutil.NatsJetstreamPublish(natsLoadBalancerDeprovisioningSubject, msg)
 	}
 
 	return nil
@@ -126,7 +126,7 @@ func (p *RESTProvider) Provision() error {
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID,
 		})
-		natsutil.NatsStreamingPublish(natsConnectorDenormalizeConfigSubject, msg)
+		natsutil.NatsJetstreamPublish(natsConnectorDenormalizeConfigSubject, msg)
 
 		err := p.ProvisionNode()
 		if err != nil {
@@ -167,13 +167,13 @@ func (p *RESTProvider) ProvisionNode() error {
 				"load_balancer_id": balancer.ID.String(),
 				"node_id":          node.ID.String(),
 			})
-			natsutil.NatsStreamingPublish(natsLoadBalancerBalanceNodeSubject, msg)
+			natsutil.NatsJetstreamPublish(natsLoadBalancerBalanceNodeSubject, msg)
 		}
 
 		msg, _ := json.Marshal(map[string]interface{}{
 			"connector_id": p.connectorID.String(),
 		})
-		natsutil.NatsStreamingPublish(natsConnectorResolveReachabilitySubject, msg)
+		natsutil.NatsJetstreamPublish(natsConnectorResolveReachabilitySubject, msg)
 	} else {
 		return fmt.Errorf("Failed to provision node on connector: %s", p.connectorID)
 	}

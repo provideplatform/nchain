@@ -31,7 +31,7 @@ require (
 	github.com/kthomas/go-azure-wrapper v0.0.0-20210409115636-8b71edfc2fcc
 	github.com/kthomas/go-db-config v0.0.0-20200612131637-ec0436a9685e
 	github.com/kthomas/go-logger v0.0.0-20210526080020-a63672d0724c
-	github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05
+	github.com/kthomas/go-natsutil v0.0.0-20210903192029-65b750c188cc
 	github.com/kthomas/go-pgputil v0.0.0-20200602073402-784e96083943
 	github.com/kthomas/go-redisutil v0.0.0-20200602073431-aa49de17e9ff
 	github.com/kthomas/go.uuid v1.2.1-0.20190324131420-28d1fa77e9a4
@@ -43,7 +43,7 @@ require (
 	github.com/minio/sha256-simd v0.1.2-0.20190917233721-f675151bb5e1 // indirect
 	github.com/multiformats/go-multiaddr-net v0.1.1 // indirect
 	github.com/multiformats/go-varint v0.0.2 // indirect
-	github.com/nats-io/stan.go v0.7.0
+	github.com/nats-io/nats.go v1.12.0
 	github.com/olekukonko/tablewriter v0.0.3 // indirect
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1

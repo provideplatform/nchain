@@ -2,15 +2,18 @@ package connector
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	stan "github.com/nats-io/stan.go"
+	"github.com/nats-io/nats.go"
 	"github.com/provideplatform/nchain/common"
 )
+
+const defaultNatsStream = "nchain"
 
 const natsConnectorDeprovisioningSubject = "nchain.connector.deprovision"
 const natsConnectorDeprovisioningMaxInFlight = 64
@@ -40,7 +43,10 @@ func init() {
 		return
 	}
 
-	natsutil.EstablishSharedNatsStreamingConnection(nil)
+	natsutil.EstablishSharedNatsConnection(nil)
+	natsutil.NatsCreateStream(defaultNatsStream, []string{
+		fmt.Sprintf("%s.>", defaultNatsStream),
+	})
 
 	createNatsConnectorProvisioningSubscriptions(&waitGroup)
 	createNatsConnectorResolveReachabilitySubscriptions(&waitGroup)
@@ -50,7 +56,7 @@ func init() {
 
 func createNatsConnectorProvisioningSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsConnectorProvisioningInvocationTimeout,
 			natsConnectorProvisioningSubject,
 			natsConnectorProvisioningSubject,
@@ -64,7 +70,7 @@ func createNatsConnectorProvisioningSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsConnectorResolveReachabilitySubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsConnectorResolveReachabilityInvocationTimeout,
 			natsConnectorResolveReachabilitySubject,
 			natsConnectorResolveReachabilitySubject,
@@ -78,7 +84,7 @@ func createNatsConnectorResolveReachabilitySubscriptions(wg *sync.WaitGroup) {
 
 func createNatsConnectorDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsConnectorDeprovisioningInvocationTimeout,
 			natsConnectorDeprovisioningSubject,
 			natsConnectorDeprovisioningSubject,
@@ -92,7 +98,7 @@ func createNatsConnectorDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsConnectorDenormalizeConfigInvocationTimeout,
 			natsConnectorDenormalizeConfigSubject,
 			natsConnectorDenormalizeConfigSubject,
@@ -104,10 +110,10 @@ func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
-func consumeConnectorProvisioningMsg(msg *stan.Msg) {
+func consumeConnectorProvisioningMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsConnectorProvisioningTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -117,14 +123,14 @@ func consumeConnectorProvisioningMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector provisioning message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to provision connector; no connector id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -134,24 +140,24 @@ func consumeConnectorProvisioningMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to provision connector; no connector resolved for id: %s", connectorID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	err = connector.provision()
 	if err != nil {
 		common.Log.Warningf("Failed to provision connector; %s", err.Error())
-		natsutil.AttemptNack(msg, natsConnectorProvisioningTimeout)
+		msg.Nak()
 	} else {
 		common.Log.Debugf("Connector provisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
 	}
 }
 
-func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
+func consumeConnectorDeprovisioningMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsConnectorDeprovisioningTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -161,14 +167,14 @@ func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector deprovisioning message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to deprovision connector; no connector id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -178,24 +184,24 @@ func consumeConnectorDeprovisioningMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to deprovision connector; no connector resolved for id: %s", connectorID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	err = connector.deprovision()
 	if err != nil {
 		common.Log.Warningf("Failed to deprovision connector; %s", err.Error())
-		natsutil.AttemptNack(msg, natsConnectorDeprovisioningTimeout)
+		msg.Nak()
 	} else {
 		common.Log.Debugf("Connector deprovisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
 	}
 }
 
-func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
+func consumeConnectorDenormalizeConfigMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsConnectorDenormalizeConfigTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -205,14 +211,14 @@ func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector denormalize config message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to denormalize connector config; no connector id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -222,24 +228,24 @@ func consumeConnectorDenormalizeConfigMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to denormalize connector config; no connector resolved for id: %s", connectorID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	err = connector.denormalizeConfig()
 	if err != nil {
 		common.Log.Warningf("Failed to denormalize connector config; %s", err.Error())
-		natsutil.AttemptNack(msg, natsConnectorDenormalizeConfigTimeout)
+		msg.Nak()
 	} else {
 		common.Log.Debugf("Connector config denormalized; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
 	}
 }
 
-func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
+func consumeConnectorResolveReachabilityMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsConnectorResolveReachabilityTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -249,14 +255,14 @@ func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal connector resolve reachability message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
 		common.Log.Warningf("Failed to resolve connector reachability; no connector id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -266,7 +272,7 @@ func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
 		common.Log.Warningf("Failed to resolve connector reachability; no connector resolved for id: %s", connectorID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -280,6 +286,6 @@ func consumeConnectorResolveReachabilityMsg(msg *stan.Msg) {
 		}
 
 		common.Log.Debugf("Connector is not reachable: %s", connector.ID)
-		natsutil.AttemptNack(msg, natsConnectorResolveReachabilityTimeout)
+		msg.Nak()
 	}
 }

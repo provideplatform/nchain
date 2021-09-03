@@ -230,7 +230,7 @@ echo nchain ready
 
 export NATS_TOKEN=testtoken
 export NATS_URL=nats://localhost:${NATS_SERVER_PORT}
-export NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT}
+export NATS_JETSTREAM_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT}
 export NATS_CLUSTER_ID=provide
 export DATABASE_HOST=localhost
 export LOG_LEVEL=DEBUG

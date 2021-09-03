@@ -367,7 +367,7 @@ func (n *Node) Delete(token string) bool {
 	// msg, _ := json.Marshal(map[string]interface{}{
 	// 	"node_id": n.ID.String(),
 	// })
-	// natsutil.NatsStreamingPublish(natsDeleteTerminatedNodeSubject, msg)
+	// natsutil.NatsJetstreamPublish(natsDeleteTerminatedNodeSubject, msg)
 	return len(n.Errors) == 0
 }
 
@@ -607,7 +607,7 @@ func (n *Node) _deploy(network *Network, bootnodes []*Node, db *gorm.DB, token s
 	// msg, _ := json.Marshal(map[string]interface{}{
 	// 	"node_id": n.ID.String(),
 	// })
-	// natsutil.NatsStreamingPublish(natsResolveNodeHostSubject, msg)
+	// natsutil.NatsJetstreamPublish(natsResolveNodeHostSubject, msg)
 
 	return nil
 }

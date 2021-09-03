@@ -231,7 +231,7 @@ for d in "${pkgs[@]}" ; do
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
     NATS_TOKEN=testtoken \
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
-    NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
+    NATS_JETSTREAM_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
     NATS_CLUSTER_ID=provide \
     NATS_STREAMING_CONCURRENCY=1 \
     GIN_MODE=release \
@@ -265,7 +265,7 @@ for d in "${pkgs[@]}" ; do
     PGP_PASSPHRASE=$PGP_PASSPHRASE \
     NATS_TOKEN=testtoken \
     NATS_URL=nats://localhost:${NATS_SERVER_PORT} \
-    NATS_STREAMING_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
+    NATS_JETSTREAM_URL=nats://localhost:${NATS_STREAMING_SERVER_PORT} \
     NATS_CLUSTER_ID=provide \
     NATS_STREAMING_CONCURRENCY=1 \
     GIN_MODE=release \

@@ -65,7 +65,7 @@ func (e *Execution) ExecuteFromTx(
 ) (interface{}, error) {
 	network, err := e.Contract.GetNetwork()
 	if err != nil {
-		common.Log.Warningf("Cannot attempt contract execution; %s", err.Error())
+		common.Log.Warningf("cannot attempt contract execution; %s", err.Error())
 		return nil, err
 	}
 
@@ -76,7 +76,7 @@ func (e *Execution) ExecuteFromTx(
 		} else if e.Contract != nil {
 			execABI, err := e.Contract.ReadEthereumContractAbi()
 			if err != nil {
-				common.Log.Warningf("Cannot attempt EVM-based contract execution without ABI")
+				common.Log.Warningf("cannot attempt EVM-based contract execution without ABI")
 				return nil, err
 			}
 			_abi = execABI
@@ -95,5 +95,11 @@ func (e *Execution) ExecuteFromTx(
 	e.PublishedAt = &publishedAt
 
 	txMsg, _ := json.Marshal(e)
-	return e, natsutil.NatsStreamingPublish(natsTxSubject, txMsg)
+	_, err = natsutil.NatsJetstreamPublish(natsTxSubject, txMsg)
+	if err != nil {
+		common.Log.Warningf("failed to broadcast EVM-based contract execution message to NATS stream; %s", err.Error())
+		return nil, err
+	}
+
+	return e, nil
 }

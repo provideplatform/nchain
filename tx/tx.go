@@ -518,7 +518,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
 						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+						natsutil.NatsJetstreamPublish(natsTxReceiptSubject, payload)
 
 						return true
 					}
@@ -532,7 +532,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
 						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+						natsutil.NatsJetstreamPublish(natsTxReceiptSubject, payload)
 
 						return true
 					}
@@ -541,7 +541,7 @@ func (t *Transaction) Create(db *gorm.DB) bool {
 						payload, _ := json.Marshal(map[string]interface{}{
 							"transaction_id": t.ID.String(),
 						})
-						natsutil.NatsStreamingPublish(natsTxReceiptSubject, payload)
+						natsutil.NatsJetstreamPublish(natsTxReceiptSubject, payload)
 
 						return true
 					}

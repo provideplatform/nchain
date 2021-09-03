@@ -369,7 +369,7 @@ func (n *Network) resolveContracts(db *gorm.DB) {
 						}
 
 						payload, _ := json.Marshal(params)
-						natsutil.NatsStreamingPublish(natsNetworkContractCreateInvocationSubject, payload)
+						natsutil.NatsJetstreamPublish(natsNetworkContractCreateInvocationSubject, payload)
 					}
 				}
 			}
@@ -690,7 +690,7 @@ func (n *Network) addPeer(peerURL string) error {
 				"peer_url": peerURL,
 			}
 			payload, _ := json.Marshal(params)
-			_, err := natsutil.NatsStreamingPublishAsync(natsAddNodePeerSubject, payload)
+			_, err := natsutil.NatsJetstreamPublishAsync(natsAddNodePeerSubject, payload)
 			if err != nil {
 				common.Log.Warningf("Failed to add peer %s to network: %s; %s", peerURL, n.ID, err.Error())
 				return err
@@ -718,7 +718,7 @@ func (n *Network) removePeer(peerURL string) error {
 			"peer_url": peerURL,
 		}
 		payload, _ := json.Marshal(params)
-		_, err := natsutil.NatsStreamingPublishAsync(natsRemoveNodePeerSubject, payload)
+		_, err := natsutil.NatsJetstreamPublishAsync(natsRemoveNodePeerSubject, payload)
 		if err != nil {
 			common.Log.Warningf("Failed to remove peer %s to network: %s; %s", peerURL, n.ID, err.Error())
 			return err

@@ -310,7 +310,7 @@ func (hbd *HistoricalBlockDaemon) ingestEthereum(response interface{}) {
 			Timestamp: lastBlockAt,
 		})
 
-		natsutil.NatsStreamingPublish(natsBlockFinalizedSubject, natsPayload)
+		natsutil.NatsJetstreamPublish(natsBlockFinalizedSubject, natsPayload)
 	}
 
 	hbd.publish()

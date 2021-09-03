@@ -9,11 +9,13 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	stan "github.com/nats-io/stan.go"
+	"github.com/nats-io/nats.go"
 	"github.com/provideplatform/nchain/common"
 	providego "github.com/provideplatform/provide-go/api"
 	provide "github.com/provideplatform/provide-go/crypto"
 )
+
+const defaultNatsStream = "nchain"
 
 const natsBlockFinalizedSubject = "nchain.block.finalized"
 const natsBlockFinalizedSubjectMaxInFlight = 2048
@@ -60,7 +62,10 @@ func init() {
 		return
 	}
 
-	natsutil.EstablishSharedNatsStreamingConnection(nil)
+	natsutil.EstablishSharedNatsConnection(nil)
+	natsutil.NatsCreateStream(defaultNatsStream, []string{
+		fmt.Sprintf("%s.>", defaultNatsStream),
+	})
 
 	createNatsBlockFinalizedSubscriptions(&waitGroup)
 	createNatsResolveNodePeerURLSubscriptions(&waitGroup)
@@ -70,7 +75,7 @@ func init() {
 
 func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsBlockFinalizedInvocationTimeout,
 			natsBlockFinalizedSubject,
 			natsBlockFinalizedSubject,
@@ -84,7 +89,7 @@ func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsResolveNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsResolveNodePeerURLInvocationTimeout,
 			natsResolveNodePeerURLSubject,
 			natsResolveNodePeerURLSubject,
@@ -98,7 +103,7 @@ func createNatsResolveNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsAddNodePeerSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsAddNodePeerInvocationTimeout,
 			natsAddNodePeerSubject,
 			natsAddNodePeerSubject,
@@ -112,7 +117,7 @@ func createNatsAddNodePeerSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsRemoveNodePeerInvocationTimeout,
 			natsRemoveNodePeerSubject,
 			natsRemoveNodePeerSubject,
@@ -124,11 +129,11 @@ func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 	}
 }
 
-func consumeBlockFinalizedMsg(msg *stan.Msg) {
+func consumeBlockFinalizedMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("recovered from panic during NATS block finalized message handling; %s", r)
-			natsutil.AttemptNack(msg, natsBlockFinalizedTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -189,7 +194,7 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 								}
 
 								msgPayload, _ := json.Marshal(params)
-								natsutil.NatsStreamingPublish(natsTxFinalizeSubject, msgPayload)
+								natsutil.NatsJetstreamPublish(natsTxFinalizeSubject, msgPayload)
 							}
 						}
 					}
@@ -204,16 +209,16 @@ func consumeBlockFinalizedMsg(msg *stan.Msg) {
 
 	if err != nil {
 		common.Log.Warningf("Failed to handle block finalized message; %s", err.Error())
-		natsutil.AttemptNack(msg, natsBlockFinalizedTimeout)
+		msg.Nak()
 	} else {
 		msg.Ack()
 	}
 }
 
-func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
+func consumeResolveNodePeerURLMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsResolveNodePeerURLTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -223,7 +228,7 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal resolve node peer url message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -231,7 +236,7 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to resolve peer url for node; no node id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -241,14 +246,14 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	err = node.resolvePeerURL(db)
 	if err != nil {
 		common.Log.Debugf("Attempt to resolve node peer url did not succeed; %s", err.Error())
-		natsutil.AttemptNack(msg, natsResolveNodePeerURLTimeout)
+		msg.Nak()
 		return
 	}
 
@@ -261,10 +266,10 @@ func consumeResolveNodePeerURLMsg(msg *stan.Msg) {
 	msg.Ack()
 }
 
-func consumeAddNodePeerMsg(msg *stan.Msg) {
+func consumeAddNodePeerMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsAddNodePeerTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -274,7 +279,7 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal add peer message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -283,13 +288,13 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to add network peer; no node id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	if !peerURLOk {
 		common.Log.Warningf("Failed to add network peer; no peer url provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -299,24 +304,24 @@ func consumeAddNodePeerMsg(msg *stan.Msg) {
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	err = node.addPeer(peerURL)
 	if err != nil {
 		common.Log.Debugf("Attempt to to add network peer failed; %s", err.Error())
-		natsutil.AttemptNack(msg, natsAddNodePeerTimeout)
+		msg.Nak()
 		return
 	}
 
 	msg.Ack()
 }
 
-func consumeRemoveNodePeerMsg(msg *stan.Msg) {
+func consumeRemoveNodePeerMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+			msg.Nak()
 		}
 	}()
 
@@ -326,7 +331,7 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("Failed to umarshal remove peer message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -335,13 +340,13 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 
 	if !nodeIDOk {
 		common.Log.Warningf("Failed to remove network peer; no node id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	if !peerURLOk {
 		common.Log.Warningf("Failed to remove network peer; no peer url provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -351,14 +356,14 @@ func consumeRemoveNodePeerMsg(msg *stan.Msg) {
 	db.Where("id = ?", nodeID).Find(&node)
 	if node == nil || node.ID == uuid.Nil {
 		common.Log.Warningf("Failed to resolve node; no node resolved for id: %s", nodeID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
 	err = node.removePeer(peerURL)
 	if err != nil {
 		common.Log.Debugf("Attempt to remove network peer failed; %s", err.Error())
-		natsutil.AttemptNack(msg, natsRemoveNodePeerTimeout)
+		msg.Nak()
 		return
 	}
 

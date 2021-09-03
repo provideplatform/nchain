@@ -673,7 +673,7 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			Timestamp: lastBlockAt,
 		})
 
-		natsutil.NatsStreamingPublish(natsBlockFinalizedSubject, natsPayload)
+		natsutil.NatsJetstreamPublish(natsBlockFinalizedSubject, natsPayload)
 	}
 
 	sd.publish()

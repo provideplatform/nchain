@@ -192,7 +192,8 @@ func (p *packetFragment) Broadcast() error {
 		return err
 	}
 	common.Log.Debugf("attempting to broadcast %d-byte fragment", len(payload))
-	return natsutil.NatsStreamingPublish(natsPacketFragmentIngestSubject, payload)
+	_, err = natsutil.NatsJetstreamPublish(natsPacketFragmentIngestSubject, payload)
+	return err
 }
 
 // FetchReassemblyHeader fetches the previously-cached packet reassembly header, warms the fragment-local
@@ -329,7 +330,8 @@ func (p *packetReassembly) Broadcast() error {
 	if err != nil {
 		return err
 	}
-	return natsutil.NatsStreamingPublish(natsPacketReassembleSubject, payload)
+	_, err = natsutil.NatsJetstreamPublish(natsPacketReassembleSubject, payload)
+	return err
 }
 
 // Cache the packet reassembly as a header (i.e., without its payload)

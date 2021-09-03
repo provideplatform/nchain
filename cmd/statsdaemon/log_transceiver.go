@@ -147,7 +147,7 @@ func (lt *LogTransceiver) ingest(logmsg []byte) {
 }
 
 func (lt *LogTransceiver) ingestEthereum(logmsg []byte) {
-	err := natsutil.NatsStreamingPublish(natsLogTransceiverEmitSubject, logmsg)
+	_, err := natsutil.NatsJetstreamPublish(natsLogTransceiverEmitSubject, logmsg)
 	if err != nil {
 		common.Log.Warningf("log transceiver failed to publish %d-byte log emission message; %s", len(logmsg), err.Error())
 	}

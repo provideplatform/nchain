@@ -12,11 +12,13 @@ import (
 	dbconf "github.com/kthomas/go-db-config"
 	natsutil "github.com/kthomas/go-natsutil"
 	uuid "github.com/kthomas/go.uuid"
-	stan "github.com/nats-io/stan.go"
+	"github.com/nats-io/nats.go"
 	"github.com/provideplatform/nchain/common"
 	"github.com/provideplatform/nchain/network"
 	"github.com/provideplatform/provide-go/api/nchain"
 )
+
+const defaultNatsStream = "nchain"
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"
 const natsLogTransceiverEmitMaxInFlight = 1024 * 32
@@ -46,7 +48,7 @@ func init() {
 		return
 	}
 
-	natsutil.EstablishSharedNatsStreamingConnection(nil)
+	natsutil.EstablishSharedNatsConnection(nil)
 	db = dbconf.DatabaseConnection()
 	mutex = &sync.Mutex{}
 
@@ -147,7 +149,7 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 	return cachedNetwork
 }
 
-func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtmsg *nchain.NetworkLog) {
+func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *nats.Msg, evtmsg *nchain.NetworkLog) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
 		evtmsg.Address = common.StringOrNil(ethcommon.HexToAddress(*evtmsg.Address).Hex())
 
@@ -158,19 +160,19 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 		contract, contractABI := cachedContractArtifacts(networkUUID, *evtmsg.Address, *evtmsg.TransactionHash)
 		if contract == nil {
 			common.Log.Tracef("no contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
-			natsutil.Nack(msg)
+			msg.Nak()
 			return
 		}
 		if contractABI == nil {
 			common.Log.Tracef("no contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
-			natsutil.Nack(msg)
+			msg.Nak()
 			return
 		}
 
 		abievt, err := contractABI.EventByID(eventID)
 		if err != nil {
 			common.Log.Warningf("failed to publish log emission event with id: %s; %s", eventIDHex, err.Error())
-			natsutil.Nack(msg)
+			msg.Nak()
 			return
 		}
 
@@ -203,7 +205,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 			err = natsutil.NatsPublish(*networkQualifiedSubject, payload)
 			if err != nil {
 				common.Log.Warningf("failed to publish %d-byte contract log event with id: %s; subject: %s; %s", len(payload), eventIDHex, *networkQualifiedSubject, err.Error())
-				natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
+				msg.Nak()
 				return
 			}
 		}
@@ -213,27 +215,27 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *stan.Msg, evtm
 			err = natsutil.NatsPublish(*qualifiedSubject, payload)
 			if err != nil {
 				common.Log.Warningf("failed to publish %d-byte log event with id: %s; %s", len(payload), eventIDHex, err.Error())
-				natsutil.AttemptNack(msg, natsLogTransceiverEmitTimeout)
+				msg.Nak()
 			} else {
 				common.Log.Debugf("published %d-byte log event with id: %s; subject: %s", len(payload), eventIDHex, *qualifiedSubject)
 				if subject == natsShuttleContractDeployedSubject || subject == natsShuttleCircuitDeployedSubject { // HACK!!!
-					natsutil.NatsStreamingPublish(subject, payload)
+					natsutil.NatsJetstreamPublish(subject, payload)
 				}
 				msg.Ack()
 			}
 		} else {
 			common.Log.Tracef("dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
-			natsutil.Nack(msg)
+			msg.Nak()
 		}
 	} else {
 		common.Log.Tracef("dropping anonymous %d-byte log emission event on the floor", len(msg.Data))
-		natsutil.Nack(msg)
+		msg.Nak()
 	}
 }
 
 func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsLogTransceiverEmitInvocationTimeout,
 			natsLogTransceiverEmitSubject,
 			natsLogTransceiverEmitSubject,
@@ -247,7 +249,7 @@ func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
 
 func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
-		natsutil.RequireNatsStreamingSubscription(wg,
+		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsNetworkContractCreateInvocationTimeout,
 			natsNetworkContractCreateInvocationSubject,
 			natsNetworkContractCreateInvocationSubject,
@@ -259,14 +261,14 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 	}
 }
 
-func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
+func consumeLogTransceiverEmitMsg(msg *nats.Msg) {
 	common.Log.Tracef("consuming NATS log transceiver event emission message: %s", msg)
 
 	evtmsg := &nchain.NetworkLog{}
 	err := json.Unmarshal(msg.Data, &evtmsg)
 	if err != nil {
 		common.Log.Warningf("failed to umarshal log transceiver event emission message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -278,12 +280,12 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 
 	if evtmsg.Address == nil {
 		common.Log.Warningf("failed to process log transceiver event emission message; no contract address provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 	if networkUUIDErr != nil {
 		common.Log.Warningf("failed to process log transceiver event emission message; invalid or no network id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -292,7 +294,7 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 	network := cachedNetwork(networkUUID)
 	if network == nil || network.ID == uuid.Nil {
 		common.Log.Warningf("failed to process log transceiver event emission message; network lookup failed for network id: %s", networkID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -300,19 +302,19 @@ func consumeLogTransceiverEmitMsg(msg *stan.Msg) {
 		consumeEVMLogTransceiverEventMsg(networkUUID, msg, evtmsg)
 	} else {
 		common.Log.Warningf("failed to process log transceiver event emission message; log events not supported for network: %s", networkID)
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 }
 
-func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
+func consumeNetworkContractCreateInvocationMsg(msg *nats.Msg) {
 	common.Log.Debugf("consuming NATS network contract creation invocation message: %s", msg)
 
 	var params map[string]interface{}
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
 		common.Log.Warningf("failed to umarshal network contract creation invocation message; %s", err.Error())
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 
@@ -324,22 +326,22 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 
 	if !addrOk {
 		common.Log.Warningf("failed to create network contract; no contract address provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 	if !networkIDOk || networkUUIDErr != nil {
 		common.Log.Warningf("failed to create network contract; invalid or no network id provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 	if !contractNameOk {
 		common.Log.Warningf("failed to create network contract; no contract name provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 	if !abiOk {
 		common.Log.Warningf("failed to create network contract; no ABI provided")
-		natsutil.Nack(msg)
+		msg.Nak()
 		return
 	}
 	contract := &Contract{
@@ -357,6 +359,6 @@ func consumeNetworkContractCreateInvocationMsg(msg *stan.Msg) {
 		msg.Ack()
 	} else {
 		common.Log.Warningf("failed to persist network contract with address: %s", addr)
-		natsutil.Nack(msg)
+		msg.Nak()
 	}
 }
