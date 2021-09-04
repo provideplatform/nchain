@@ -390,7 +390,6 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 	}
 }
 
-// TODO: consider batching this using a buffered channel for high-volume networks
 func consumeTxFinalizeMsg(msg *nats.Msg) {
 	common.Log.Tracef("consuming NATS tx finalize message: %s", msg)
 
@@ -417,42 +416,44 @@ func consumeTxFinalizeMsg(msg *nats.Msg) {
 	hash, hashOk := params["hash"].(string)
 
 	if !blockOk {
-		nack(msg, "Failed to finalize tx; no block provided", true)
+		nack(msg, "failed to finalize tx; no block provided", true)
 		return
 	}
 	if !blockTimestampStrOk {
-		nack(msg, "Failed to finalize tx; no block timestamp provided", true)
+		nack(msg, "failed to finalize tx; no block timestamp provided", true)
 
 		return
 	}
 	if !finalizedAtStrOk {
-		nack(msg, "Failed to finalize tx; no finalized at timestamp provided", true)
+		nack(msg, "failed to finalize tx; no finalized at timestamp provided", true)
 		return
 	}
 	if !hashOk {
-		nack(msg, "Failed to finalize tx; no hash provided", true)
+		nack(msg, "failed to finalize tx; no hash provided", true)
 		return
 	}
 
 	blockTimestamp, err := time.Parse(time.RFC3339, blockTimestampStr)
 	if err != nil {
-		nack(msg, fmt.Sprintf("Failed to unmarshal block_timestamp during NATS %v message handling; %s", msg.Subject, err.Error()), true)
+		nack(msg, fmt.Sprintf("failed to unmarshal block_timestamp during NATS %v message handling; %s", msg.Subject, err.Error()), true)
 		return
 	}
 
 	finalizedAt, err := time.Parse(time.RFC3339, finalizedAtStr)
 	if err != nil {
-		nack(msg, fmt.Sprintf("Failed to unmarshal finalized_at during NATS %v message handling; %s", msg.Subject, err.Error()), true)
+		nack(msg, fmt.Sprintf("failed to unmarshal finalized_at during NATS %v message handling; %s", msg.Subject, err.Error()), true)
 		return
 	}
 
 	tx := &Transaction{}
 	db := dbconf.DatabaseConnection()
+
 	common.Log.Tracef("checking local db for tx status; tx hash: %s", hash)
+
 	db.Where("hash = ? AND status IN (?, ?)", hash, "pending", "failed").Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
 		// TODO: this is integration point to upsert Wallet & Transaction... need to think thru performance implications & implementation details
-		nack(msg, fmt.Sprintf("Failed to mark block and finalized_at timestamp on tx: %s; tx not found for given hash", hash), true)
+		nack(msg, fmt.Sprintf("failed to mark block and finalized_at timestamp on tx: %s; tx not found for given hash", hash), true)
 		return
 	}
 

@@ -25,7 +25,6 @@ import (
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"
 
-const defaultLogTransceiverQueueSize = 512
 const defaultLogTransceiverMaximumBackoffMillis = 12800
 
 var currentLogTransceivers = map[string]*LogTransceiver{}

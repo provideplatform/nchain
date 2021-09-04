@@ -149,7 +149,7 @@ func cachedNetwork(networkID uuid.UUID) *network.Network {
 	return cachedNetwork
 }
 
-func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *nats.Msg, evtmsg *nchain.NetworkLog) {
+func consumeEVMLogTransceiverEventMsg(ntwrk *network.Network, msg *nats.Msg, evtmsg *nchain.NetworkLog) {
 	if evtmsg.Topics != nil && len(evtmsg.Topics) > 0 && evtmsg.Data != nil {
 		evtmsg.Address = common.StringOrNil(ethcommon.HexToAddress(*evtmsg.Address).Hex())
 
@@ -157,7 +157,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *nats.Msg, evtm
 		eventIDHex := eventID.Hex()
 		common.Log.Tracef("attempting to publish parsed log emission event with id: %s", eventIDHex)
 
-		contract, contractABI := cachedContractArtifacts(networkUUID, *evtmsg.Address, *evtmsg.TransactionHash)
+		contract, contractABI := cachedContractArtifacts(ntwrk.ID, *evtmsg.Address, *evtmsg.TransactionHash)
 		if contract == nil {
 			common.Log.Tracef("no contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
 			msg.Nak()
@@ -195,7 +195,7 @@ func consumeEVMLogTransceiverEventMsg(networkUUID uuid.UUID, msg *nats.Msg, evtm
 
 		evtmsg.Params["by"] = *evtmsg.Address
 		evtmsg.Params["tx_hash"] = *evtmsg.TransactionHash
-		evtmsg.Params["network_id"] = networkUUID.String()
+		evtmsg.Params["network_id"] = ntwrk.ID.String()
 
 		payload, _ := json.Marshal(evtmsg.Params)
 		common.Log.Tracef("unpacked emitted log event values with id: %s; emitting %d-byte payload", eventIDHex, len(payload))
@@ -299,7 +299,7 @@ func consumeLogTransceiverEmitMsg(msg *nats.Msg) {
 	}
 
 	if network.IsEthereumNetwork() {
-		consumeEVMLogTransceiverEventMsg(networkUUID, msg, evtmsg)
+		consumeEVMLogTransceiverEventMsg(network, msg, evtmsg)
 	} else {
 		common.Log.Warningf("failed to process log transceiver event emission message; log events not supported for network: %s", networkID)
 		msg.Nak()
