@@ -94,23 +94,19 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 							} else {
 								result := map[string]interface{}{}
 								if params, ok := response.Params["result"].(map[string]interface{}); ok {
-									if _, txHashOk := result["transactionHash"].(string); !txHashOk {
-										common.Log.Tracef("dropping %d-byte event packet received on network logs websocket; contract address: %s; tx pending", len(message), params["address"])
-									} else {
-										result["address"] = params["address"]
-										result["block"] = params["blockNumber"]
-										result["block_hash"] = params["blockHash"]
-										result["data"] = params["data"]
-										result["log_index"] = params["logIndex"]
-										result["network_id"] = network.ID.String()
-										result["type"] = params["contractType"]
-										result["topics"] = params["topics"]
-										result["transaction_hash"] = result["transactionHash"]
-										result["transaction_index"] = result["transactionIndex"]
+									result["address"] = params["address"]
+									result["block"] = params["blockNumber"]
+									result["block_hash"] = params["blockHash"]
+									result["data"] = params["data"]
+									result["log_index"] = params["logIndex"]
+									result["network_id"] = network.ID.String()
+									result["type"] = params["contractType"]
+									result["topics"] = params["topics"]
+									result["transaction_hash"] = result["transactionHash"]
+									result["transaction_index"] = result["transactionIndex"]
 
-										if resultJSON, err := json.Marshal(result); err == nil {
-											ch <- &resultJSON
-										}
+									if resultJSON, err := json.Marshal(result); err == nil {
+										ch <- &resultJSON
 									}
 								}
 							}

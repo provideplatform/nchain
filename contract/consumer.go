@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -49,6 +50,10 @@ func init() {
 	}
 
 	natsutil.EstablishSharedNatsConnection(nil)
+	natsutil.NatsCreateStream(defaultNatsStream, []string{
+		fmt.Sprintf("%s.>", defaultNatsStream),
+	})
+
 	db = dbconf.DatabaseConnection()
 	mutex = &sync.Mutex{}
 
@@ -56,7 +61,7 @@ func init() {
 	createNatsNetworkContractCreateInvocationSubscriptions(&waitGroup)
 }
 
-func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contract, *abi.ABI) {
+func cachedContractArtifacts(networkID uuid.UUID, addr string, txHash *string) (*Contract, *abi.ABI) {
 	var cachedContracts map[string]*Contract
 	if cachedCntrcts, cachedCntrctsOk := cachedNetworkContracts[networkID.String()]; cachedCntrctsOk {
 		cachedContracts = cachedCntrcts
@@ -83,27 +88,40 @@ func cachedContractArtifacts(networkID uuid.UUID, addr, txHash string) (*Contrac
 
 	if cachedContract, cachedContractOk := cachedContracts[addr]; cachedContractOk {
 		contract = cachedContract
+	} else if txHash != nil {
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		common.Log.Tracef("contract cache miss; attempting to load contract from persistent storage by tx hash (%s) for network: %s; address: %s", *txHash, networkID, addr)
+
+		out := []string{}
+		db.Table("transactions").Select("id").Where("transactions.hash = ?", *txHash).Pluck("id", &out)
+		if len(out) == 0 {
+			common.Log.Tracef("contract lookup failed for address: %s; no tx resolved for hash: %s", addr, *txHash)
+			return nil, nil
+		}
+		txID, err := uuid.FromString(out[0])
+		if err != nil {
+			common.Log.Tracef("contract lookup failed for address: %s; no tx resolved for hash: %s; %s", addr, *txHash, err.Error())
+			return nil, nil
+		}
+
+		contract = FindByTxID(db, txID)
+		if contract == nil || contract.ID == uuid.Nil {
+			common.Log.Tracef("contract lookup failed for address: %s; no contract resolved for tx hash: %s", addr, *txHash)
+			return nil, nil
+		}
+
+		cachedContracts[addr] = contract
 	} else {
 		mutex.Lock()
 		defer mutex.Unlock()
 
 		common.Log.Tracef("contract cache miss; attempting to load contract from persistent storage for network: %s; address: %s", networkID, addr)
 
-		out := []string{}
-		db.Table("transactions").Select("id").Where("transactions.hash = ?", txHash).Pluck("id", &out)
-		if len(out) == 0 {
-			common.Log.Tracef("contract lookup failed for address: %s; no tx resolved for hash: %s", addr, txHash)
-			return nil, nil
-		}
-		txID, err := uuid.FromString(out[0])
-		if err != nil {
-			common.Log.Tracef("contract lookup failed for address: %s; no tx resolved for hash: %s; %s", addr, txHash, err.Error())
-			return nil, nil
-		}
-
-		contract = FindByTxID(db, txID)
+		contract = FindByAddress(db, networkID, addr)
 		if contract == nil || contract.ID == uuid.Nil {
-			common.Log.Tracef("contract lookup failed for address: %s; no contract resolved for tx hash: %s", addr, txHash)
+			common.Log.Tracef("contract lookup failed for address: %s; no contract resolved for network: %s", addr, networkID)
 			return nil, nil
 		}
 
@@ -157,7 +175,7 @@ func consumeEVMLogTransceiverEventMsg(ntwrk *network.Network, msg *nats.Msg, evt
 		eventIDHex := eventID.Hex()
 		common.Log.Tracef("attempting to publish parsed log emission event with id: %s", eventIDHex)
 
-		contract, contractABI := cachedContractArtifacts(ntwrk.ID, *evtmsg.Address, *evtmsg.TransactionHash)
+		contract, contractABI := cachedContractArtifacts(ntwrk.ID, *evtmsg.Address, evtmsg.TransactionHash)
 		if contract == nil {
 			common.Log.Tracef("no contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
 			msg.Nak()
