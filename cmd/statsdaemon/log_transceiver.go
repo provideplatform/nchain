@@ -96,7 +96,7 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 								result := map[string]interface{}{}
 								if params, ok := response.Params["result"].(map[string]interface{}); ok {
 									if _, txHashOk := result["transactionHash"].(string); !txHashOk {
-										common.Log.Tracef("dropping unmarshaled %d-byte event packet received on network logs websocket: %s; tx pending", len(message), message, err.Error())
+										common.Log.Tracef("dropping %d-byte event packet received on network logs websocket; contract address: %s; tx pending", len(message), params["address"])
 									} else {
 										result["address"] = params["address"]
 										result["block"] = params["blockNumber"]
