@@ -18,10 +18,9 @@ jobs:
       - name: Checkout ident
         uses: actions/checkout@v2
         with:
-          repository: provideapp/ident
+          repository: provideplatform/ident
           path: 'ident'
-          ref: dev
-          token: ${{ secrets.DEPLOY_GITHUB_PAT }}               
+          ref: dev            
       - name: Checkout nchain
         uses: actions/checkout@v2
         with:
