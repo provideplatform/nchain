@@ -663,17 +663,15 @@ func (sd *StatsDaemon) ingestEthereum(response interface{}) {
 			}
 		}
 
-		common.Log.Debugf("network: %s", *sd.dataSource.Network.Name)
-		common.Log.Debugf("block hash processed: %s", blockHash)
-		common.Log.Debugf("block number processed: %v", header.Number.Uint64())
 		natsPayload, _ := json.Marshal(&natsBlockFinalizedMsg{
 			NetworkID: common.StringOrNil(sd.dataSource.Network.ID.String()),
 			Block:     header.Number.Uint64(),
 			BlockHash: common.StringOrNil(blockHash),
 			Timestamp: lastBlockAt,
 		})
-
 		natsutil.NatsJetstreamPublish(natsBlockFinalizedSubject, natsPayload)
+
+		common.Log.Debugf("processed block %d (%s) on network: %s", header.Number.Uint64(), blockHash, *sd.dataSource.Network.Name)
 	}
 
 	sd.publish()
