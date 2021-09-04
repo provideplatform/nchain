@@ -86,28 +86,32 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 							common.Log.Errorf("failed to receive event on network logs websocket; %s", err)
 							break
 						} else {
-							common.Log.Debugf("received %d-byte event on network logs websocket for network: %s", len(message), *network.Name)
+							common.Log.Tracef("received %d-byte event on network logs websocket for network: %s", len(message), *network.Name)
 
 							response := &provide.EthereumWebsocketSubscriptionResponse{}
 							err := json.Unmarshal(message, response)
 							if err != nil {
-								common.Log.Warningf("failed to unmarshal event received on network logs websocket: %s; %s", message, err.Error())
+								common.Log.Warningf("failed to unmarshal %d-byte event received on network logs websocket: %s; %s", len(message), message, err.Error())
 							} else {
 								result := map[string]interface{}{}
 								if params, ok := response.Params["result"].(map[string]interface{}); ok {
-									result["address"] = params["address"]
-									result["block"] = params["blockNumber"]
-									result["block_hash"] = params["blockHash"]
-									result["data"] = params["data"]
-									result["log_index"] = params["logIndex"]
-									result["type"] = params["contractType"]
-									result["topics"] = params["topics"]
-									result["transaction_hash"] = result["transactionHash"]
-									result["transaction_index"] = result["transactionIndex"]
-									result["network_id"] = network.ID.String()
+									if _, txHashOk := result["transactionHash"].(string); !txHashOk {
+										common.Log.Tracef("dropping unmarshaled %d-byte event packet received on network logs websocket: %s; tx pending", len(message), message, err.Error())
+									} else {
+										result["address"] = params["address"]
+										result["block"] = params["blockNumber"]
+										result["block_hash"] = params["blockHash"]
+										result["data"] = params["data"]
+										result["log_index"] = params["logIndex"]
+										result["network_id"] = network.ID.String()
+										result["type"] = params["contractType"]
+										result["topics"] = params["topics"]
+										result["transaction_hash"] = result["transactionHash"]
+										result["transaction_index"] = result["transactionIndex"]
 
-									if resultJSON, err := json.Marshal(result); err == nil {
-										ch <- &resultJSON
+										if resultJSON, err := json.Marshal(result); err == nil {
+											ch <- &resultJSON
+										}
 									}
 								}
 							}
@@ -122,13 +126,13 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 
 // Consume the websocket stream; attempts to fallback to JSON-RPC if websocket stream fails or is not available for the network
 func (lt *LogTransceiver) consume() error {
-	lt.log.Debugf("Attempting to consume configured network log transceiver; attempt #%v", lt.attempt)
+	lt.log.Debugf("attempting to consume configured network log transceiver; attempt #%v", lt.attempt)
 
 	var err error
 	if lt.Stream != nil {
 		err = lt.Stream(lt.queue)
 	} else {
-		err = errors.New("Configured log transceiver does not have a configured Stream impl")
+		err = errors.New("configured log transceiver does not have a configured Stream impl")
 	}
 
 	return err
@@ -188,14 +192,14 @@ func EvictNetworkLogTransceiver(network *network.Network) error {
 func RequireNetworkLogTransceiver(network *network.Network) *LogTransceiver {
 	var daemon *LogTransceiver
 	if daemon, ok := currentLogTransceivers[network.ID.String()]; ok {
-		common.Log.Debugf("Cached log transceiver instance found for network: %s; id: %s", *network.Name, network.ID)
+		common.Log.Debugf("cached log transceiver instance found for network: %s; id: %s", *network.Name, network.ID)
 		return daemon
 	}
 
 	currentLogTransceiversMutex.Lock()
 	defer currentLogTransceiversMutex.Unlock()
 
-	common.Log.Infof("Initializing new log transceiver instance for network: %s; id: %s", *network.Name, network.ID)
+	common.Log.Infof("initializing new log transceiver instance for network: %s; id: %s", *network.Name, network.ID)
 	daemon = NewNetworkLogTransceiver(common.Log, network)
 	if daemon != nil {
 		currentLogTransceivers[network.ID.String()] = daemon
@@ -228,10 +232,10 @@ func (lt *LogTransceiver) run() error {
 	go func() {
 		for !lt.shuttingDown() {
 			lt.attempt++
-			common.Log.Debugf("Stepping into main runloop of log transceiver instance; attempt #%v", lt.attempt)
+			common.Log.Debugf("stepping into main runloop of log transceiver instance; attempt #%v", lt.attempt)
 			err := lt.consume()
 			if err != nil {
-				common.Log.Warningf("Configured network log transceiver failed to consume network log events; %s", err.Error())
+				common.Log.Warningf("configured network log transceiver failed to consume network log events; %s", err.Error())
 				if lt.backoff == 0 {
 					lt.backoff = 100
 				} else {
@@ -249,10 +253,10 @@ func (lt *LogTransceiver) run() error {
 	err := lt.loop()
 
 	if err == nil {
-		lt.log.Info("Network log transceiver exited cleanly")
+		lt.log.Info("network log transceiver exited cleanly")
 	} else {
 		if !lt.shuttingDown() {
-			common.Log.Errorf("Forcing shutdown of log transceiver due to error; %s", err)
+			common.Log.Errorf("forcing shutdown of log transceiver due to error; %s", err)
 			lt.shutdown()
 		}
 	}
@@ -261,14 +265,14 @@ func (lt *LogTransceiver) run() error {
 }
 
 func (lt *LogTransceiver) handleSignals() {
-	common.Log.Debug("Installing SIGINT and SIGTERM signal handlers")
+	common.Log.Debug("installing SIGINT and SIGTERM signal handlers")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		select {
 		case sig := <-sigs:
-			common.Log.Infof("Received signal: %s", sig)
+			common.Log.Infof("received signal: %s", sig)
 			lt.shutdown()
 		case <-lt.shutdownCtx.Done():
 			close(sigs)
@@ -278,7 +282,7 @@ func (lt *LogTransceiver) handleSignals() {
 
 func (lt *LogTransceiver) shutdown() {
 	if atomic.AddUint32(&lt.closing, 1) == 1 {
-		common.Log.Debugf("Shutting down log transceiver instance for network: %s", *lt.Network.Name)
+		common.Log.Debugf("shutting down log transceiver instance for network: %s", *lt.Network.Name)
 		lt.cancelF()
 	}
 }
