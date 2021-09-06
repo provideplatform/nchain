@@ -868,9 +868,15 @@ func (t *Transaction) handleTxReceipt(
 	receipt *provideapi.TxReceipt,
 ) error {
 	if t.To == nil {
-		common.Log.Debugf("Retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, string(receipt.ContractAddress))
+		var contractAddress string
+		if network.IsEthereumNetwork() {
+			ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
+			contractAddress = *common.StringOrNil(ethCommonAddress.Hex())
+		}
+
+		common.Log.Debugf("retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, contractAddress)
 		params := t.ParseParams()
-		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(string(receipt.ContractAddress)))
+		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(contractAddress))
 		if name, ok := params["name"].(string); ok {
 			contractName = name
 		}
@@ -878,7 +884,7 @@ func (t *Transaction) handleTxReceipt(
 		var tok *token.Token
 
 		tokenCreateFn := func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
-			common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+			common.Log.Debugf("resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 			tok = &token.Token{
 				ApplicationID:  c.ApplicationID,
@@ -889,7 +895,7 @@ func (t *Transaction) handleTxReceipt(
 				Name:           common.StringOrNil(name),
 				Symbol:         common.StringOrNil(symbol),
 				Decimals:       decimals.Uint64(),
-				Address:        common.StringOrNil(string(receipt.ContractAddress)),
+				Address:        common.StringOrNil(contractAddress),
 			}
 
 			createdToken = tok.Create()
@@ -906,18 +912,18 @@ func (t *Transaction) handleTxReceipt(
 				NetworkID:      t.NetworkID,
 				TransactionID:  &t.ID,
 				Name:           common.StringOrNil(contractName),
-				Address:        common.StringOrNil(string(receipt.ContractAddress)),
+				Address:        common.StringOrNil(contractAddress),
 				Params:         t.Params,
 			}
 			if kontract.Create() {
-				common.Log.Debugf("Created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
+				common.Log.Debugf("created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
 				kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 			} else {
 				common.Log.Warningf("failed to create contract for %s contract creation tx %s", *network.Name, *t.Hash)
 			}
 		} else {
-			common.Log.Debugf("Using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
-			kontract.Address = common.StringOrNil(string(receipt.ContractAddress))
+			common.Log.Debugf("using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
+			kontract.Address = common.StringOrNil(contractAddress)
 			db.Save(&kontract)
 			kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 		}
@@ -952,19 +958,19 @@ func (t *Transaction) handleTxTraces(
 			contractCode := result.Result.Code
 
 			if contractAddr == nil || contractCode == nil {
-				common.Log.Warningf("No contract address or bytecode resolved for contract-internal CREATE opcode; tx hash: %s", *t.Hash)
+				common.Log.Warningf("no contract address or bytecode resolved for contract-internal CREATE opcode; tx hash: %s", *t.Hash)
 				continue
 			}
 
 			resultJSON, _ := json.Marshal(result)
-			common.Log.Debugf("Observed contract-internal CREATE opcode resulting in deployed contract at address: %s; tx hash: %s; code: %s; tracing result: %s", *contractAddr, *t.Hash, *contractCode, string(resultJSON))
+			common.Log.Debugf("observed contract-internal CREATE opcode resulting in deployed contract at address: %s; tx hash: %s; code: %s; tracing result: %s", *contractAddr, *t.Hash, *contractCode, string(resultJSON))
 
 			dep := kontract.ResolveCompiledDependencyArtifact(*contractCode)
 			if dep != nil {
 				if dep.Fingerprint != nil {
-					common.Log.Debugf("Checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", dep.Name, *dep.Fingerprint, *contractAddr, *t.Hash)
+					common.Log.Debugf("checking if compiled artifact dependency: %s (fingerprint: %s) is target of contract-internal CREATE opcode at address: %s; tx hash: %s", dep.Name, *dep.Fingerprint, *contractAddr, *t.Hash)
 					if strings.HasSuffix(*contractCode, *dep.Fingerprint) {
-						common.Log.Debugf("Observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", dep.Name, *contractAddr, *dep.Fingerprint, *t.Hash)
+						common.Log.Debugf("observed fingerprinted dependency %s as target of contract-internal CREATE opcode at contract address %s; fingerprint: %s; tx hash: %s", dep.Name, *contractAddr, *dep.Fingerprint, *t.Hash)
 						params, _ := json.Marshal(map[string]interface{}{
 							"compiled_artifact": dep,
 						})
@@ -983,10 +989,16 @@ func (t *Transaction) handleTxTraces(
 						}
 
 						if internalContract.Create() {
-							common.Log.Debugf("Created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
+							common.Log.Debugf("created contract %s for %s contract-internal tx: %s", internalContract.ID, *network.Name, *t.Hash)
 							internalContract.ResolveTokenContract(db, network, signerAddress, receipt,
 								func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
-									common.Log.Debugf("Resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+									common.Log.Debugf("resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
+
+									var contractAddress *string
+									if network.IsEthereumNetwork() {
+										ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
+										contractAddress = common.StringOrNil(ethCommonAddress.Hex())
+									}
 
 									tok := &token.Token{
 										ApplicationID:  c.ApplicationID,
@@ -997,7 +1009,7 @@ func (t *Transaction) handleTxTraces(
 										Name:           common.StringOrNil(name),
 										Symbol:         common.StringOrNil(symbol),
 										Decimals:       decimals.Uint64(),
-										Address:        common.StringOrNil(string(receipt.ContractAddress)),
+										Address:        common.StringOrNil(contractAddress),
 									}
 
 									createdToken = tok.Create()
