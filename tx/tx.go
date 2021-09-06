@@ -923,7 +923,7 @@ func (t *Transaction) handleTxReceipt(
 			}
 		} else {
 			common.Log.Debugf("using previously created contract %s for %s contract creation tx: %s", kontract.ID, *network.Name, *t.Hash)
-			kontract.Address = common.StringOrNil(contractAddress)
+			kontract.Address = contractAddress
 			db.Save(&kontract)
 			kontract.ResolveTokenContract(db, network, signerAddress, receipt, tokenCreateFn)
 		}
