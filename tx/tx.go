@@ -868,15 +868,15 @@ func (t *Transaction) handleTxReceipt(
 	receipt *provideapi.TxReceipt,
 ) error {
 	if t.To == nil {
-		var contractAddress string
+		var contractAddress *string
 		if network.IsEthereumNetwork() {
 			ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
-			contractAddress = *common.StringOrNil(ethCommonAddress.Hex())
+			contractAddress = common.StringOrNil(ethCommonAddress.Hex())
 		}
 
-		common.Log.Debugf("retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, contractAddress)
+		common.Log.Debugf("retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, *contractAddress)
 		params := t.ParseParams()
-		contractName := fmt.Sprintf("Contract %s", *common.StringOrNil(contractAddress))
+		contractName := fmt.Sprintf("Contract %s", contractAddress)
 		if name, ok := params["name"].(string); ok {
 			contractName = name
 		}
@@ -895,7 +895,7 @@ func (t *Transaction) handleTxReceipt(
 				Name:           common.StringOrNil(name),
 				Symbol:         common.StringOrNil(symbol),
 				Decimals:       decimals.Uint64(),
-				Address:        common.StringOrNil(contractAddress),
+				Address:        contractAddress,
 			}
 
 			createdToken = tok.Create()
@@ -912,7 +912,7 @@ func (t *Transaction) handleTxReceipt(
 				NetworkID:      t.NetworkID,
 				TransactionID:  &t.ID,
 				Name:           common.StringOrNil(contractName),
-				Address:        common.StringOrNil(contractAddress),
+				Address:        contractAddress,
 				Params:         t.Params,
 			}
 			if kontract.Create() {
@@ -1009,7 +1009,7 @@ func (t *Transaction) handleTxTraces(
 										Name:           common.StringOrNil(name),
 										Symbol:         common.StringOrNil(symbol),
 										Decimals:       decimals.Uint64(),
-										Address:        common.StringOrNil(contractAddress),
+										Address:        contractAddress,
 									}
 
 									createdToken = tok.Create()
