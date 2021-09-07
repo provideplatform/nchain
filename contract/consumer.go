@@ -212,8 +212,8 @@ func consumeEVMLogTransceiverEventMsg(ntwrk *network.Network, msg *nats.Msg, evt
 			delete(evtmsg.Params, "contractType")
 		}
 
-		evtmsg.Params["by"] = *evtmsg.Address
-		evtmsg.Params["tx_hash"] = *evtmsg.TransactionHash
+		evtmsg.Params["by"] = evtmsg.Address
+		evtmsg.Params["tx_hash"] = evtmsg.TransactionHash
 		evtmsg.Params["network_id"] = ntwrk.ID.String()
 
 		payload, _ := json.Marshal(evtmsg.Params)
