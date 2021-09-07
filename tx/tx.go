@@ -876,7 +876,7 @@ func (t *Transaction) handleTxReceipt(
 
 		common.Log.Debugf("retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, *contractAddress)
 		params := t.ParseParams()
-		contractName := fmt.Sprintf("Contract %s", contractAddress)
+		contractName := fmt.Sprintf("Contract %s", *contractAddress)
 		if name, ok := params["name"].(string); ok {
 			contractName = name
 		}
