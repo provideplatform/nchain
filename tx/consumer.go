@@ -28,23 +28,23 @@ const defaultNatsStream = "nchain"
 
 const natsTxSubject = "nchain.tx"
 const natsTxMaxInFlight = 2048
+const natsTxMsgMaxDeliveries = 5
 const txAckWait = time.Second * 60
-const txMsgTimeout = int64(txAckWait * 5)
 
 const natsTxCreateSubject = "nchain.tx.create"
 const natsTxCreateMaxInFlight = 2048
+const natsTxCreateMaxDeliveries = 5
 const txCreateAckWait = time.Second * 60
-const txCreateMsgTimeout = int64(txCreateAckWait * 5)
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
+const natsTxFinalizedMsgMaxDeliveries = 6
 const txFinalizeAckWait = time.Second * 15
-const txFinalizedMsgTimeout = int64(txFinalizeAckWait * 6)
 
 const natsTxReceiptSubject = "nchain.tx.receipt"
 const natsTxReceiptMaxInFlight = 2048
+const natsTxReceiptMsgMaxDeliveries = 15
 const txReceiptAckWait = time.Second * 15
-const txReceiptMsgTimeout = int64(txReceiptAckWait * 15)
 
 var waitGroup sync.WaitGroup
 
@@ -74,6 +74,7 @@ func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 			consumeTxExecutionMsg,
 			txAckWait,
 			natsTxMaxInFlight,
+			natsTxMsgMaxDeliveries,
 			nil,
 		)
 	}
@@ -88,6 +89,7 @@ func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 			consumeTxCreateMsg,
 			txCreateAckWait,
 			natsTxCreateMaxInFlight,
+			natsTxCreateMaxDeliveries,
 			nil,
 		)
 	}
@@ -102,6 +104,7 @@ func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 			consumeTxFinalizeMsg,
 			txFinalizeAckWait,
 			natsTxFinalizeMaxInFlight,
+			natsTxFinalizedMsgMaxDeliveries,
 			nil,
 		)
 	}
@@ -116,19 +119,20 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 			consumeTxReceiptMsg,
 			txReceiptAckWait,
 			natsTxReceiptMaxInFlight,
+			natsTxReceiptMsgMaxDeliveries,
 			nil,
 		)
 	}
 }
 
 func consumeTxCreateMsg(msg *nats.Msg) {
-	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", len(msg.Data), msg.Subject)
+	common.Log.Debugf("consuming %d-byte NATS tx message on subject: %s", len(msg.Data), msg.Subject)
 
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal tx creation message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal tx creation message; %s", err.Error())
 		msg.Nak()
 		return
 	}
@@ -143,32 +147,32 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 	publishedAt, publishedAtOk := params["published_at"].(string)
 
 	if !contractIDOk {
-		common.Log.Warningf("Failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
 	if !dataOk {
-		common.Log.Warningf("Failed to unmarshal data during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal data during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
 	if !accountIDStrOk && !walletIDStrOk {
-		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
 	if !valueOk {
-		common.Log.Warningf("Failed to unmarshal value during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal value during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
 	if !paramsOk {
-		common.Log.Warningf("Failed to unmarshal params during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal params during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
 	if !publishedAtOk {
-		common.Log.Warningf("Failed to unmarshal published_at during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal published_at during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
@@ -191,14 +195,14 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 	}
 
 	if accountID == nil && walletID == nil {
-		common.Log.Warningf("Failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
+		common.Log.Warningf("failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
 		msg.Nak()
 		return
 	}
 
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
-		common.Log.Warningf("Failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
+		common.Log.Warningf("failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
 		msg.Nak()
 		return
 	}
@@ -220,17 +224,17 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 	if tx.Create(db) {
 		contract.TransactionID = &tx.ID
 		db.Save(&contract)
-		common.Log.Debugf("Transaction execution successful: %s", *tx.Hash)
+		common.Log.Debugf("transaction execution successful: %s", *tx.Hash)
 		msg.Ack()
 	} else {
-		errmsg := fmt.Sprintf("Failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
+		errmsg := fmt.Sprintf("failed to execute transaction; tx failed with %d error(s)", len(tx.Errors))
 		for _, err := range tx.Errors {
 			errmsg = fmt.Sprintf("%s\n\t%s", errmsg, *err.Message)
 		}
 
 		faucetSubsidyEligible := strings.Contains(strings.ToLower(errmsg), "insufficient funds") && tx.shouldSubsidize()
 		if faucetSubsidyEligible {
-			common.Log.Debugf("Transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
+			common.Log.Debugf("transaction execution failed due to insufficient funds but faucet subsidy exists for network: %s; requesting subsidized tx funding", tx.NetworkID)
 			faucetBeneficiary, _ := tx.signerFactory(db)
 			faucetBeneficiaryAddress := faucetBeneficiary.Address()
 
@@ -250,7 +254,7 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 			)
 			if err == nil {
 				db.Delete(&tx) // Drop tx that had insufficient funds so its hash can be rebroadcast...
-				common.Log.Debugf("Faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
+				common.Log.Debugf("faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
 				contract.TransactionID = &tx.ID
 				db.Save(&contract)
 			}
@@ -277,18 +281,18 @@ func subsidize(db *gorm.DB, networkID uuid.UUID, beneficiary string, val, gas in
 }
 
 func consumeTxExecutionMsg(msg *nats.Msg) {
-	common.Log.Debugf("Consuming %d-byte NATS tx message on subject: %s", len(msg.Data), msg.Subject)
+	common.Log.Debugf("consuming %d-byte NATS tx message on subject: %s", len(msg.Data), msg.Subject)
 
 	execution := &contract.Execution{}
 	err := json.Unmarshal(msg.Data, execution)
 	if err != nil {
-		common.Log.Warningf("Failed to unmarshal contract execution during NATS tx message handling")
+		common.Log.Warningf("failed to unmarshal contract execution during NATS tx message handling")
 		msg.Nak()
 		return
 	}
 
 	if execution.ContractID == nil {
-		common.Log.Errorf("Invalid tx message; missing contract_id")
+		common.Log.Errorf("invalid tx message; missing contract_id")
 		msg.Nak()
 		return
 	}
@@ -304,7 +308,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 			}
 		}
 		if execution.Account != nil && execution.AccountID != nil && *executionAccountID != *execution.AccountID {
-			common.Log.Errorf("Invalid tx message specifying a account_id and account")
+			common.Log.Errorf("invalid tx message specifying a account_id and account")
 			msg.Nak()
 			return
 		}
@@ -324,7 +328,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 			}
 		}
 		if execution.Wallet != nil && execution.WalletID != nil && *executionWalletID != *execution.WalletID {
-			common.Log.Errorf("Invalid tx message specifying a wallet_id and wallet")
+			common.Log.Errorf("invalid tx message specifying a wallet_id and wallet")
 			msg.Nak()
 			return
 		}
@@ -341,7 +345,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 		db.Where("address = ?", *execution.ContractID).Find(&cntract)
 	}
 	if cntract == nil || cntract.ID == uuid.Nil {
-		common.Log.Errorf("Unable to execute contract; contract not found: %s", cntract.ID)
+		common.Log.Errorf("unable to execute contract; contract not found: %s", cntract.ID)
 		msg.Nak()
 		return
 	}

@@ -17,13 +17,13 @@ const defaultNatsStream = "nchain"
 const natsPacketFragmentIngestSubject = "prvd.packet.fragment.ingest"
 const natsPacketFragmentIngestMaxInFlight = 1024
 const natsPacketFragmentIngestInvocationTimeout = time.Second * 5 // FIXME!!! (see above)
-const natsPacketFragmentIngestTimeout = int64(time.Second * 8)    // FIXME!!! (see above)
+const natsPacketFragmentIngestMaxDeliveries = 2                   // FIXME!!! (see above)
 
 // TODO: audit arbitrary max in flight & timeouts; investigate dynamic timeout based on reassembled packet size
 const natsPacketReassembleSubject = "prvd.packet.reassemble"
 const natsPacketReassembleMaxInFlight = 256
 const natsPacketReassembleInvocationTimeout = time.Second * 30 // FIXME!!! (see above)
-const natsPacketReassembleTimeout = int64(time.Second * 52)    // FIXME!!! (see above)
+const natsPacketReassembleMaxDeliveries = 2                    // FIXME!!! (see above)
 
 var (
 	waitGroup     sync.WaitGroup
@@ -54,6 +54,7 @@ func createNatsPacketFragmentIngestSubscriptions(wg *sync.WaitGroup) {
 			consumePacketFragmentIngestMsg,
 			natsPacketFragmentIngestInvocationTimeout,
 			natsPacketFragmentIngestMaxInFlight,
+			natsPacketFragmentIngestMaxDeliveries,
 			nil,
 		)
 	}
@@ -68,6 +69,7 @@ func createNatsPacketReassemblySubscriptions(wg *sync.WaitGroup) {
 			consumePacketReassembleMsg,
 			natsPacketReassembleInvocationTimeout,
 			natsPacketReassembleMaxInFlight,
+			natsPacketReassembleMaxDeliveries,
 			nil,
 		)
 	}

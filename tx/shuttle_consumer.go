@@ -21,12 +21,12 @@ import (
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
 const natsShuttleCircuitDeployedMaxInFlight = 1024
 const natsShuttleCircuitDeployedInvocationTimeout = time.Second * 30
-const natsShuttleCircuitDeployedTimeout = int64(natsShuttleCircuitDeployedInvocationTimeout * 3)
+const natsShuttleCircuitDeployedMaxDeliveries = 3
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleContractDeployedMaxInFlight = 1024
 const natsShuttleContractDeployedInvocationTimeout = time.Second * 30
-const natsShuttleContractDeployedTimeout = int64(natsShuttleContractDeployedInvocationTimeout * 3)
+const natsShuttleContractDeployedMaxDeliveries = 3
 
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
@@ -52,6 +52,7 @@ func createNatsShuttleCircuitDeployedSubject(wg *sync.WaitGroup) {
 			consumeShuttleCircuitDeployedMsg,
 			natsShuttleCircuitDeployedInvocationTimeout,
 			natsShuttleCircuitDeployedMaxInFlight,
+			natsShuttleCircuitDeployedMaxDeliveries,
 			nil,
 		)
 	}
@@ -66,6 +67,7 @@ func createNatsShuttleContractDeployedSubject(wg *sync.WaitGroup) {
 			consumeShuttleContractDeployedMsg,
 			natsShuttleContractDeployedInvocationTimeout,
 			natsShuttleContractDeployedMaxInFlight,
+			natsShuttleContractDeployedMaxDeliveries,
 			nil,
 		)
 	}

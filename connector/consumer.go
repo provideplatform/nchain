@@ -17,23 +17,23 @@ const defaultNatsStream = "nchain"
 
 const natsConnectorDeprovisioningSubject = "nchain.connector.deprovision"
 const natsConnectorDeprovisioningMaxInFlight = 64
-const natsConnectorDeprovisioningTimeout = int64(time.Minute * 10)
 const natsConnectorDeprovisioningInvocationTimeout = time.Second * 15
+const natsConnectorDeprovisioningMaxDeliveries = 50
 
 const natsConnectorProvisioningSubject = "nchain.connector.provision"
 const natsConnectorProvisioningMaxInFlight = 64
-const natsConnectorProvisioningTimeout = int64(time.Minute * 10)
 const natsConnectorProvisioningInvocationTimeout = time.Second * 15
+const natsConnectorProvisioningMaxDeliveries = 50
 
 const natsConnectorResolveReachabilitySubject = "nchain.connector.reachability.resolve"
 const natsConnectorResolveReachabilityMaxInFlight = 64
-const natsConnectorResolveReachabilityTimeout = int64(time.Minute * 20)
 const natsConnectorResolveReachabilityInvocationTimeout = time.Second * 10
+const natsConnectorResolveReachabilityMaxDeliveries = 200
 
 const natsConnectorDenormalizeConfigSubject = "nchain.connector.config.denormalize"
 const natsConnectorDenormalizeConfigMaxInFlight = 64
-const natsConnectorDenormalizeConfigTimeout = int64(time.Minute * 1)
 const natsConnectorDenormalizeConfigInvocationTimeout = time.Second * 5
+const natsConnectorDenormalizeConfigMaxDeliveries = 12
 
 var waitGroup sync.WaitGroup
 
@@ -63,6 +63,7 @@ func createNatsConnectorProvisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorProvisioningMsg,
 			natsConnectorProvisioningInvocationTimeout,
 			natsConnectorProvisioningMaxInFlight,
+			natsConnectorProvisioningMaxDeliveries,
 			nil,
 		)
 	}
@@ -77,6 +78,7 @@ func createNatsConnectorResolveReachabilitySubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorResolveReachabilityMsg,
 			natsConnectorResolveReachabilityInvocationTimeout,
 			natsConnectorResolveReachabilityMaxInFlight,
+			natsConnectorResolveReachabilityMaxDeliveries,
 			nil,
 		)
 	}
@@ -91,6 +93,7 @@ func createNatsConnectorDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorDeprovisioningMsg,
 			natsConnectorDeprovisioningInvocationTimeout,
 			natsConnectorDeprovisioningMaxInFlight,
+			natsConnectorDeprovisioningMaxDeliveries,
 			nil,
 		)
 	}
@@ -105,6 +108,7 @@ func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 			consumeConnectorDenormalizeConfigMsg,
 			natsConnectorDenormalizeConfigInvocationTimeout,
 			natsConnectorDenormalizeConfigMaxInFlight,
+			natsConnectorDenormalizeConfigMaxDeliveries,
 			nil,
 		)
 	}
