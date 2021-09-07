@@ -27,9 +27,9 @@ const natsLogTransceiverEmitInvocationTimeout = time.Second * 5
 const natsLogTransceiverEmitMaxDeliveries = 6
 
 const natsNetworkContractCreateInvocationSubject = "nchain.contract.create"
-const natsNetworkContractCreateInvocationMaxInFlight = 128
-const natsNetworkContractCreateInvocationTimeout = time.Minute * 5
-const natsNetworkContractCreateInvocationMaxDeliveries = 3
+const natsNetworkContractCreateInvocationMaxInFlight = 512
+const natsNetworkContractCreateInvocationTimeout = time.Second * 10
+const natsNetworkContractCreateInvocationMaxDeliveries = 5
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
