@@ -150,7 +150,7 @@ func transactionDetailsHandler(c *gin.Context) {
 
 	validApp := appID != nil && (tx.ApplicationID != nil && *tx.ApplicationID == *appID)
 	validOrg := orgID != nil && (tx.OrganizationID != nil && *tx.OrganizationID == *orgID)
-	validUser := userID != nil && (tx.UserID != nil && *tx.UserID != *userID)
+	validUser := userID != nil && (tx.UserID != nil && *tx.UserID == *userID)
 
 	if !validApp && !validOrg && !validUser {
 		provide.RenderError("forbidden", 403, c)
