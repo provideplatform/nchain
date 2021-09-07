@@ -872,6 +872,7 @@ func (t *Transaction) handleTxReceipt(
 		if network.IsEthereumNetwork() {
 			ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
 			contractAddress = common.StringOrNil(ethCommonAddress.Hex())
+			common.Log.Debugf("CONTRACT ADDRESS: %s", *contractAddress)
 		}
 
 		common.Log.Debugf("retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, *contractAddress)

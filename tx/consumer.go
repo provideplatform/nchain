@@ -38,13 +38,13 @@ const txCreateAckWait = time.Second * 60
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
 const natsTxFinalizeMaxInFlight = 4096
-const natsTxFinalizedMsgMaxDeliveries = 6
-const txFinalizeAckWait = time.Second * 15
+const natsTxFinalizedMsgMaxDeliveries = 5
+const txFinalizeAckWait = time.Second * 5
 
 const natsTxReceiptSubject = "nchain.tx.receipt"
-const natsTxReceiptMaxInFlight = 2048
-const natsTxReceiptMsgMaxDeliveries = 15
-const txReceiptAckWait = time.Second * 15
+const natsTxReceiptMaxInFlight = 4096
+const natsTxReceiptMsgMaxDeliveries = 30000
+const txReceiptAckWait = time.Second * 30
 
 var waitGroup sync.WaitGroup
 
