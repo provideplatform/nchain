@@ -18,6 +18,8 @@ import (
 	provide "github.com/provideplatform/provide-go/api"
 )
 
+const defaultShuttleNatsStream = "shuttle"
+
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
 const natsShuttleCircuitDeployedMaxInFlight = 1024
 const natsShuttleCircuitDeployedInvocationTimeout = time.Second * 30
@@ -35,8 +37,8 @@ func init() {
 	}
 
 	natsutil.EstablishSharedNatsConnection(nil)
-	natsutil.NatsCreateStream(defaultNatsStream, []string{
-		fmt.Sprintf("%s.>", defaultNatsStream),
+	natsutil.NatsCreateStream(defaultShuttleNatsStream, []string{
+		fmt.Sprintf("%s.>", defaultShuttleNatsStream),
 	})
 
 	createNatsShuttleCircuitDeployedSubject(&waitGroup)
