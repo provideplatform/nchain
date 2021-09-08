@@ -21,12 +21,12 @@ import (
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
 const natsShuttleCircuitDeployedMaxInFlight = 1024
 const natsShuttleCircuitDeployedInvocationTimeout = time.Second * 30
-const natsShuttleCircuitDeployedMaxDeliveries = 3
+const natsShuttleCircuitDeployedMaxDeliveries = 30000
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleContractDeployedMaxInFlight = 1024
 const natsShuttleContractDeployedInvocationTimeout = time.Second * 30
-const natsShuttleContractDeployedMaxDeliveries = 3
+const natsShuttleContractDeployedMaxDeliveries = 30000
 
 func init() {
 	if !common.ConsumeNATSStreamingSubscriptions {
