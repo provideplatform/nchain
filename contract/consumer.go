@@ -263,6 +263,7 @@ func createNatsLogTransceiverEmitInvocationSubscriptions(wg *sync.WaitGroup) {
 			natsLogTransceiverEmitInvocationTimeout,
 			natsLogTransceiverEmitSubject,
 			natsLogTransceiverEmitSubject,
+			natsLogTransceiverEmitSubject,
 			consumeLogTransceiverEmitMsg,
 			natsLogTransceiverEmitInvocationTimeout,
 			natsLogTransceiverEmitMaxInFlight,
@@ -276,6 +277,7 @@ func createNatsNetworkContractCreateInvocationSubscriptions(wg *sync.WaitGroup) 
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsNetworkContractCreateInvocationTimeout,
+			natsNetworkContractCreateInvocationSubject,
 			natsNetworkContractCreateInvocationSubject,
 			natsNetworkContractCreateInvocationSubject,
 			consumeNetworkContractCreateInvocationMsg,

@@ -79,6 +79,7 @@ func createNatsBlockFinalizedSubscriptions(wg *sync.WaitGroup) {
 			natsBlockFinalizedInvocationTimeout,
 			natsBlockFinalizedSubject,
 			natsBlockFinalizedSubject,
+			natsBlockFinalizedSubject,
 			consumeBlockFinalizedMsg,
 			natsBlockFinalizedInvocationTimeout,
 			natsBlockFinalizedSubjectMaxInFlight,
@@ -92,6 +93,7 @@ func createNatsResolveNodePeerURLSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsResolveNodePeerURLInvocationTimeout,
+			natsResolveNodePeerURLSubject,
 			natsResolveNodePeerURLSubject,
 			natsResolveNodePeerURLSubject,
 			consumeResolveNodePeerURLMsg,
@@ -109,6 +111,7 @@ func createNatsAddNodePeerSubscriptions(wg *sync.WaitGroup) {
 			natsAddNodePeerInvocationTimeout,
 			natsAddNodePeerSubject,
 			natsAddNodePeerSubject,
+			natsAddNodePeerSubject,
 			consumeAddNodePeerMsg,
 			natsAddNodePeerInvocationTimeout,
 			natsAddNodePeerMaxInFlight,
@@ -122,6 +125,7 @@ func createNatsRemoveNodePeerSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsRemoveNodePeerInvocationTimeout,
+			natsRemoveNodePeerSubject,
 			natsRemoveNodePeerSubject,
 			natsRemoveNodePeerSubject,
 			consumeRemoveNodePeerMsg,

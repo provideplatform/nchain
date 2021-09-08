@@ -60,6 +60,7 @@ func createNatsConnectorProvisioningSubscriptions(wg *sync.WaitGroup) {
 			natsConnectorProvisioningInvocationTimeout,
 			natsConnectorProvisioningSubject,
 			natsConnectorProvisioningSubject,
+			natsConnectorProvisioningSubject,
 			consumeConnectorProvisioningMsg,
 			natsConnectorProvisioningInvocationTimeout,
 			natsConnectorProvisioningMaxInFlight,
@@ -73,6 +74,7 @@ func createNatsConnectorResolveReachabilitySubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsConnectorResolveReachabilityInvocationTimeout,
+			natsConnectorResolveReachabilitySubject,
 			natsConnectorResolveReachabilitySubject,
 			natsConnectorResolveReachabilitySubject,
 			consumeConnectorResolveReachabilityMsg,
@@ -90,6 +92,7 @@ func createNatsConnectorDeprovisioningSubscriptions(wg *sync.WaitGroup) {
 			natsConnectorDeprovisioningInvocationTimeout,
 			natsConnectorDeprovisioningSubject,
 			natsConnectorDeprovisioningSubject,
+			natsConnectorDeprovisioningSubject,
 			consumeConnectorDeprovisioningMsg,
 			natsConnectorDeprovisioningInvocationTimeout,
 			natsConnectorDeprovisioningMaxInFlight,
@@ -103,6 +106,7 @@ func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsConnectorDenormalizeConfigInvocationTimeout,
+			natsConnectorDenormalizeConfigSubject,
 			natsConnectorDenormalizeConfigSubject,
 			natsConnectorDenormalizeConfigSubject,
 			consumeConnectorDenormalizeConfigMsg,

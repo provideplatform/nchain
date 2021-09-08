@@ -71,6 +71,7 @@ func createNatsTxSubscriptions(wg *sync.WaitGroup) {
 			txAckWait,
 			natsTxSubject,
 			natsTxSubject,
+			natsTxSubject,
 			consumeTxExecutionMsg,
 			txAckWait,
 			natsTxMaxInFlight,
@@ -84,6 +85,7 @@ func createNatsTxCreateSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			txCreateAckWait,
+			natsTxCreateSubject,
 			natsTxCreateSubject,
 			natsTxCreateSubject,
 			consumeTxCreateMsg,
@@ -101,6 +103,7 @@ func createNatsTxFinalizeSubscriptions(wg *sync.WaitGroup) {
 			txFinalizeAckWait,
 			natsTxFinalizeSubject,
 			natsTxFinalizeSubject,
+			natsTxFinalizeSubject,
 			consumeTxFinalizeMsg,
 			txFinalizeAckWait,
 			natsTxFinalizeMaxInFlight,
@@ -114,6 +117,7 @@ func createNatsTxReceiptSubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			txReceiptAckWait,
+			natsTxReceiptSubject,
 			natsTxReceiptSubject,
 			natsTxReceiptSubject,
 			consumeTxReceiptMsg,

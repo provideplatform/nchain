@@ -51,6 +51,7 @@ func createNatsPacketFragmentIngestSubscriptions(wg *sync.WaitGroup) {
 			natsPacketFragmentIngestInvocationTimeout,
 			natsPacketFragmentIngestSubject,
 			natsPacketFragmentIngestSubject,
+			natsPacketFragmentIngestSubject,
 			consumePacketFragmentIngestMsg,
 			natsPacketFragmentIngestInvocationTimeout,
 			natsPacketFragmentIngestMaxInFlight,
@@ -64,6 +65,7 @@ func createNatsPacketReassemblySubscriptions(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsPacketReassembleInvocationTimeout,
+			natsPacketReassembleSubject,
 			natsPacketReassembleSubject,
 			natsPacketReassembleSubject,
 			consumePacketReassembleMsg,

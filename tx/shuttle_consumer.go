@@ -51,6 +51,7 @@ func createNatsShuttleCircuitDeployedSubject(wg *sync.WaitGroup) {
 			natsShuttleCircuitDeployedInvocationTimeout,
 			natsShuttleCircuitDeployedSubject,
 			natsShuttleCircuitDeployedSubject,
+			natsShuttleCircuitDeployedSubject,
 			consumeShuttleCircuitDeployedMsg,
 			natsShuttleCircuitDeployedInvocationTimeout,
 			natsShuttleCircuitDeployedMaxInFlight,
@@ -64,6 +65,7 @@ func createNatsShuttleContractDeployedSubject(wg *sync.WaitGroup) {
 	for i := uint64(0); i < natsutil.GetNatsConsumerConcurrency(); i++ {
 		natsutil.RequireNatsJetstreamSubscription(wg,
 			natsShuttleContractDeployedInvocationTimeout,
+			natsShuttleContractDeployedSubject,
 			natsShuttleContractDeployedSubject,
 			natsShuttleContractDeployedSubject,
 			consumeShuttleContractDeployedMsg,
