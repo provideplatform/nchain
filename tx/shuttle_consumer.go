@@ -112,31 +112,31 @@ func consumeShuttleContractDeployedMsg(msg *nats.Msg) {
 
 	if !addressOk {
 		common.Log.Warning("failed to handle shuttle.contract.deployed message; contract address required")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
 	if !byOk {
 		common.Log.Warning("failed to handle shuttle.contract.deployed message; by address required")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
 	if !networkIDOk {
 		common.Log.Warning("failed to handle shuttle.contract.deployed message; contract network_id required")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
 	if !nameOk {
 		common.Log.Warning("failed to handle shuttle.contract.deployed message; contract name required")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
 	if !txHashOk {
 		common.Log.Warning("failed to handle shuttle.contract.deployed message; tx hash required")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -146,14 +146,14 @@ func consumeShuttleContractDeployedMsg(msg *nats.Msg) {
 
 	if cntrct == nil || cntrct.ID == uuid.Nil {
 		common.Log.Warningf("failed to handle shuttle.contract.deployed message; contract not resolved for address: %s", byAddr)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
 	network, err := cntrct.GetNetwork()
 	if err != nil {
 		common.Log.Warningf("failed to handle shuttle.contract.deployed message; network not resolved for contract with address: %s; %s", byAddr, err.Error())
-		msg.Nak()
+		// msg.Nak()
 		return
 	}
 
