@@ -151,26 +151,31 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 		msg.Term()
 		return
 	}
+
 	if !dataOk {
 		common.Log.Warningf("failed to unmarshal data during NATS %v message handling", msg.Subject)
 		msg.Term()
 		return
 	}
+
 	if !accountIDStrOk && !walletIDStrOk {
 		common.Log.Warningf("failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
 		msg.Term()
 		return
 	}
+
 	if !valueOk {
 		common.Log.Warningf("failed to unmarshal value during NATS %v message handling", msg.Subject)
 		msg.Term()
 		return
 	}
+
 	if !paramsOk {
 		common.Log.Warningf("failed to unmarshal params during NATS %v message handling", msg.Subject)
 		msg.Term()
 		return
 	}
+
 	if !publishedAtOk {
 		common.Log.Warningf("failed to unmarshal published_at during NATS %v message handling", msg.Subject)
 		msg.Term()

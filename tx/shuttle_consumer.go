@@ -146,7 +146,7 @@ func consumeShuttleContractDeployedMsg(msg *nats.Msg) {
 
 	if cntrct == nil || cntrct.ID == uuid.Nil {
 		common.Log.Warningf("failed to handle shuttle.contract.deployed message; contract not resolved for address: %s", byAddr)
-		msg.Term()
+		// msg.Term()
 		return
 	}
 
