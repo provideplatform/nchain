@@ -102,8 +102,8 @@ func EthereumLogTransceiverFactory(network *network.Network) *LogTransceiver {
 									result["network_id"] = network.ID.String()
 									result["type"] = params["contractType"]
 									result["topics"] = params["topics"]
-									result["transaction_hash"] = result["transactionHash"]
-									result["transaction_index"] = result["transactionIndex"]
+									result["transaction_hash"] = params["transactionHash"]
+									result["transaction_index"] = params["transactionIndex"]
 
 									if resultJSON, err := json.Marshal(result); err == nil {
 										ch <- &resultJSON
