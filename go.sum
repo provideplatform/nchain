@@ -377,8 +377,8 @@ github.com/kthomas/go-logger v0.0.0-20200602072946-d7d72dfc2531/go.mod h1:sXRQB7
 github.com/kthomas/go-logger v0.0.0-20210526080020-a63672d0724c h1:RY4Ei3MRDKfjWqaSG9OA2R/xz4GGmRQx/wcgGosYilI=
 github.com/kthomas/go-logger v0.0.0-20210526080020-a63672d0724c/go.mod h1:TtVSBQILggONVgiZObhmzisbSxWrgnF+GYhwKbNDV8Y=
 github.com/kthomas/go-natsutil v0.0.0-20200602073459-388e1f070b05/go.mod h1:N0lpxSQ7hGx0pR4CK79koHPC2duLwvUORDHQ1hEERqU=
-github.com/kthomas/go-natsutil v0.0.0-20210908103922-900a62df34f6 h1:tQm7nGflt3Bylp+NXsBwflrJYN6dXkjFLXo7Hmh/+vo=
-github.com/kthomas/go-natsutil v0.0.0-20210908103922-900a62df34f6/go.mod h1:KusOWECXhtBAKMWmuj7yV75orxXeQC9ZVDFhrrHDUwE=
+github.com/kthomas/go-natsutil v0.0.0-20210908110601-453a4cf568b7 h1:+QKBwVsOq1VcEs7r7yatym/3x29BfiR5+rWGMfXFiOc=
+github.com/kthomas/go-natsutil v0.0.0-20210908110601-453a4cf568b7/go.mod h1:KusOWECXhtBAKMWmuj7yV75orxXeQC9ZVDFhrrHDUwE=
 github.com/kthomas/go-pgputil v0.0.0-20200602073402-784e96083943 h1:cDp8m82Etk3UybAMLVTgUyvscBc54Yuy1MsoqXbo71c=
 github.com/kthomas/go-pgputil v0.0.0-20200602073402-784e96083943/go.mod h1:1wYaoVWP9k76g2FfW5U9NaJ6dELUDFt2J2XMzSbJAVg=
 github.com/kthomas/go-redisutil v0.0.0-20200602073431-aa49de17e9ff h1:8tlYBAzX9jkEwGpIXLOwOMO57S5XmLLAcRDbuEtNJv8=
