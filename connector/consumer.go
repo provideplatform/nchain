@@ -117,24 +117,24 @@ func createNatsConnectorDenormalizeConfigSubscriptions(wg *sync.WaitGroup) {
 func consumeConnectorProvisioningMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			msg.Nak()
+			msg.Term()
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS connector provisioning message: %s", msg)
+	common.Log.Debugf("consuming NATS connector provisioning message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal connector provisioning message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal connector provisioning message; %s", err.Error())
 		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
-		common.Log.Warningf("Failed to provision connector; no connector id provided")
-		msg.Nak()
+		common.Log.Warningf("failed to provision connector; no connector id provided")
+		msg.Term()
 		return
 	}
 
@@ -143,14 +143,14 @@ func consumeConnectorProvisioningMsg(msg *nats.Msg) {
 	connector := &Connector{}
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
-		common.Log.Warningf("Failed to provision connector; no connector resolved for id: %s", connectorID)
-		msg.Nak()
+		common.Log.Warningf("failed to provision connector; no connector resolved for id: %s", connectorID)
+		msg.Term()
 		return
 	}
 
 	err = connector.provision()
 	if err != nil {
-		common.Log.Warningf("Failed to provision connector; %s", err.Error())
+		common.Log.Warningf("failed to provision connector; %s", err.Error())
 		msg.Nak()
 	} else {
 		common.Log.Debugf("Connector provisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
@@ -161,24 +161,24 @@ func consumeConnectorProvisioningMsg(msg *nats.Msg) {
 func consumeConnectorDeprovisioningMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			msg.Nak()
+			msg.Term()
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS connector deprovisioning message: %s", msg)
+	common.Log.Debugf("consuming NATS connector deprovisioning message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal connector deprovisioning message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal connector deprovisioning message; %s", err.Error())
 		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
-		common.Log.Warningf("Failed to deprovision connector; no connector id provided")
-		msg.Nak()
+		common.Log.Warningf("failed to deprovision connector; no connector id provided")
+		msg.Term()
 		return
 	}
 
@@ -187,17 +187,17 @@ func consumeConnectorDeprovisioningMsg(msg *nats.Msg) {
 	connector := &Connector{}
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
-		common.Log.Warningf("Failed to deprovision connector; no connector resolved for id: %s", connectorID)
-		msg.Nak()
+		common.Log.Warningf("failed to deprovision connector; no connector resolved for id: %s", connectorID)
+		msg.Term()
 		return
 	}
 
 	err = connector.deprovision()
 	if err != nil {
-		common.Log.Warningf("Failed to deprovision connector; %s", err.Error())
+		common.Log.Warningf("failed to deprovision connector; %s", err.Error())
 		msg.Nak()
 	} else {
-		common.Log.Debugf("Connector deprovisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
+		common.Log.Debugf("connector deprovisioning succeeded; ACKing NATS message for connector: %s", connector.ID)
 		msg.Ack()
 	}
 }
@@ -205,24 +205,24 @@ func consumeConnectorDeprovisioningMsg(msg *nats.Msg) {
 func consumeConnectorDenormalizeConfigMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			msg.Nak()
+			msg.Term()
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS connector denormalize config message: %s", msg)
+	common.Log.Debugf("consuming NATS connector denormalize config message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal connector denormalize config message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal connector denormalize config message; %s", err.Error())
 		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
-		common.Log.Warningf("Failed to denormalize connector config; no connector id provided")
-		msg.Nak()
+		common.Log.Warningf("failed to denormalize connector config; no connector id provided")
+		msg.Term()
 		return
 	}
 
@@ -231,14 +231,14 @@ func consumeConnectorDenormalizeConfigMsg(msg *nats.Msg) {
 	connector := &Connector{}
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
-		common.Log.Warningf("Failed to denormalize connector config; no connector resolved for id: %s", connectorID)
+		common.Log.Warningf("failed to denormalize connector config; no connector resolved for id: %s", connectorID)
 		msg.Nak()
 		return
 	}
 
 	err = connector.denormalizeConfig()
 	if err != nil {
-		common.Log.Warningf("Failed to denormalize connector config; %s", err.Error())
+		common.Log.Warningf("failed to denormalize connector config; %s", err.Error())
 		msg.Nak()
 	} else {
 		common.Log.Debugf("Connector config denormalized; ACKing NATS message for connector: %s", connector.ID)
@@ -249,24 +249,24 @@ func consumeConnectorDenormalizeConfigMsg(msg *nats.Msg) {
 func consumeConnectorResolveReachabilityMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
-			msg.Nak()
+			msg.Term()
 		}
 	}()
 
-	common.Log.Debugf("Consuming NATS connector resolve reachability message: %s", msg)
+	common.Log.Debugf("consuming NATS connector resolve reachability message: %s", msg)
 	var params map[string]interface{}
 
 	err := json.Unmarshal(msg.Data, &params)
 	if err != nil {
-		common.Log.Warningf("Failed to umarshal connector resolve reachability message; %s", err.Error())
+		common.Log.Warningf("failed to umarshal connector resolve reachability message; %s", err.Error())
 		msg.Nak()
 		return
 	}
 
 	connectorID, connectorIDOk := params["connector_id"].(string)
 	if !connectorIDOk {
-		common.Log.Warningf("Failed to resolve connector reachability; no connector id provided")
-		msg.Nak()
+		common.Log.Warningf("failed to resolve connector reachability; no connector id provided")
+		msg.Term()
 		return
 	}
 
@@ -275,8 +275,8 @@ func consumeConnectorResolveReachabilityMsg(msg *nats.Msg) {
 	connector := &Connector{}
 	db.Where("id = ?", connectorID).Find(&connector)
 	if connector == nil || connector.ID == uuid.Nil {
-		common.Log.Warningf("Failed to resolve connector reachability; no connector resolved for id: %s", connectorID)
-		msg.Nak()
+		common.Log.Warningf("failed to resolve connector reachability; no connector resolved for id: %s", connectorID)
+		msg.Term()
 		return
 	}
 
@@ -289,7 +289,7 @@ func consumeConnectorResolveReachabilityMsg(msg *nats.Msg) {
 			connector.UpdateStatus(db, "unavailable", nil)
 		}
 
-		common.Log.Debugf("Connector is not reachable: %s", connector.ID)
+		common.Log.Debugf("connector is not reachable: %s", connector.ID)
 		msg.Nak()
 	}
 }

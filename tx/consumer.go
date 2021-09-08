@@ -27,24 +27,24 @@ const defaultNatsStream = "nchain"
 // TODO: should this be calculated dynamically against average blocktime for the network and subscriptions reestablished?
 
 const natsTxSubject = "nchain.tx"
-const natsTxMaxInFlight = 2048
+const natsTxMaxInFlight = 1024 * 30
 const natsTxMsgMaxDeliveries = 5
 const txAckWait = time.Second * 60
 
 const natsTxCreateSubject = "nchain.tx.create"
-const natsTxCreateMaxInFlight = 2048
+const natsTxCreateMaxInFlight = 1024 * 30
 const natsTxCreateMaxDeliveries = 5
 const txCreateAckWait = time.Second * 60
 
 const natsTxFinalizeSubject = "nchain.tx.finalize"
-const natsTxFinalizeMaxInFlight = 4096
-const natsTxFinalizedMsgMaxDeliveries = 5
+const natsTxFinalizeMaxInFlight = 1024 * 30
+const natsTxFinalizedMsgMaxDeliveries = 100
 const txFinalizeAckWait = time.Second * 5
 
 const natsTxReceiptSubject = "nchain.tx.receipt"
-const natsTxReceiptMaxInFlight = 4096
-const natsTxReceiptMsgMaxDeliveries = 30000
-const txReceiptAckWait = time.Second * 30
+const natsTxReceiptMaxInFlight = 1024 * 30
+const natsTxReceiptMsgMaxDeliveries = 100
+const txReceiptAckWait = time.Second * 5
 
 var waitGroup sync.WaitGroup
 
@@ -148,32 +148,32 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 
 	if !contractIDOk {
 		common.Log.Warningf("failed to unmarshal contract_id during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !dataOk {
 		common.Log.Warningf("failed to unmarshal data during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !accountIDStrOk && !walletIDStrOk {
 		common.Log.Warningf("failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !valueOk {
 		common.Log.Warningf("failed to unmarshal value during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !paramsOk {
 		common.Log.Warningf("failed to unmarshal params during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !publishedAtOk {
 		common.Log.Warningf("failed to unmarshal published_at during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -196,14 +196,14 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 
 	if accountID == nil && walletID == nil {
 		common.Log.Warningf("failed to unmarshal account_id or wallet_id during NATS %v message handling", msg.Subject)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
 	publishedAtTime, err := time.Parse(time.RFC3339, publishedAt)
 	if err != nil {
 		common.Log.Warningf("failed to parse published_at as RFC3339 timestamp during NATS %v message handling; %s", msg.Subject, err.Error())
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -293,7 +293,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 
 	if execution.ContractID == nil {
 		common.Log.Errorf("invalid tx message; missing contract_id")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -309,7 +309,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 		}
 		if execution.Account != nil && execution.AccountID != nil && *executionAccountID != *execution.AccountID {
 			common.Log.Errorf("invalid tx message specifying a account_id and account")
-			msg.Nak()
+			msg.Term()
 			return
 		}
 		account := &wallet.Account{}
@@ -329,7 +329,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 		}
 		if execution.Wallet != nil && execution.WalletID != nil && *executionWalletID != *execution.WalletID {
 			common.Log.Errorf("invalid tx message specifying a wallet_id and wallet")
-			msg.Nak()
+			msg.Term()
 			return
 		}
 		wallet := &wallet.Wallet{}
@@ -346,7 +346,7 @@ func consumeTxExecutionMsg(msg *nats.Msg) {
 	}
 	if cntract == nil || cntract.ID == uuid.Nil {
 		common.Log.Errorf("unable to execute contract; contract not found: %s", cntract.ID)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -402,7 +402,7 @@ func consumeTxFinalizeMsg(msg *nats.Msg) {
 	nack := func(msg *nats.Msg, errmsg string, dropPacket bool) {
 		if dropPacket {
 			common.Log.Tracef("dropping tx packet on the floor; %s", errmsg)
-			msg.Ack()
+			msg.Term()
 			return
 		}
 		msg.Nak()
@@ -423,15 +423,17 @@ func consumeTxFinalizeMsg(msg *nats.Msg) {
 		nack(msg, "failed to finalize tx; no block provided", true)
 		return
 	}
+
 	if !blockTimestampStrOk {
 		nack(msg, "failed to finalize tx; no block timestamp provided", true)
-
 		return
 	}
+
 	if !finalizedAtStrOk {
 		nack(msg, "failed to finalize tx; no finalized at timestamp provided", true)
 		return
 	}
+
 	if !hashOk {
 		nack(msg, "failed to finalize tx; no hash provided", true)
 		return
@@ -501,7 +503,7 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 	defer func() {
 		if r := recover(); r != nil {
 			common.Log.Warningf("recovered from failed tx receipt message; %s", r)
-			msg.Nak()
+			msg.Term()
 		}
 	}()
 
@@ -519,7 +521,7 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 	transactionID, transactionIDOk := params["transaction_id"].(string)
 	if !transactionIDOk {
 		common.Log.Warningf("failed to consume NATS tx receipt message; no transaction id provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -529,7 +531,7 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 	db.Where("id = ?", transactionID).Find(&tx)
 	if tx == nil || tx.ID == uuid.Nil {
 		common.Log.Tracef("failed to fetch tx receipt; no tx resolved for id: %s", transactionID)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -544,8 +546,9 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 
 	err = tx.fetchReceipt(db, signer.Network, signer.Address())
 	if err != nil {
-		common.Log.Debugf(fmt.Sprintf("Failed to fetch tx receipt; %s", err.Error()))
-		msg.Nak()
+		common.Log.Debugf(fmt.Sprintf("failed to fetch tx receipt; %s", err.Error()))
+		// msg.Nak()
+		return
 	} else {
 		common.Log.Debugf("fetched tx receipt for hash: %s", *tx.Hash)
 
@@ -559,6 +562,7 @@ func consumeTxReceiptMsg(msg *nats.Msg) {
 			tx.FinalizedAt = &receiptFinalized
 			common.Log.Debugf("tx %s finalized in block %v at %s", *tx.Hash, blockNumber, receiptFinalized.Format("Mon, 02 Jan 2006 15:04:05 MST"))
 		}
+
 		tx.updateStatus(db, "success", nil)
 		msg.Ack()
 	}

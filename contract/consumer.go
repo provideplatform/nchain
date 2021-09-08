@@ -22,14 +22,14 @@ import (
 const defaultNatsStream = "nchain"
 
 const natsLogTransceiverEmitSubject = "nchain.logs.emit"
-const natsLogTransceiverEmitMaxInFlight = 1024 * 32
+const natsLogTransceiverEmitMaxInFlight = 1024 * 100
 const natsLogTransceiverEmitInvocationTimeout = time.Second * 5
-const natsLogTransceiverEmitMaxDeliveries = 6
+const natsLogTransceiverEmitMaxDeliveries = 5
 
 const natsNetworkContractCreateInvocationSubject = "nchain.contract.create"
 const natsNetworkContractCreateInvocationMaxInFlight = 512
-const natsNetworkContractCreateInvocationTimeout = time.Second * 10
-const natsNetworkContractCreateInvocationMaxDeliveries = 5
+const natsNetworkContractCreateInvocationTimeout = time.Second * 60
+const natsNetworkContractCreateInvocationMaxDeliveries = 10
 
 const natsShuttleContractDeployedSubject = "shuttle.contract.deployed"
 const natsShuttleCircuitDeployedSubject = "shuttle.circuit.deployed"
@@ -179,19 +179,19 @@ func consumeEVMLogTransceiverEventMsg(ntwrk *network.Network, msg *nats.Msg, evt
 		contract, contractABI := cachedContractArtifacts(ntwrk.ID, *evtmsg.Address, evtmsg.TransactionHash)
 		if contract == nil {
 			common.Log.Tracef("no contract resolved for log emission event with id: %s; nacking log event", eventIDHex)
-			msg.Nak()
+			// msg.Nak()
 			return
 		}
 		if contractABI == nil {
 			common.Log.Tracef("no contract abi resolved for log emission event with id: %s; nacking log event", eventIDHex)
-			msg.Nak()
+			// msg.Nak()
 			return
 		}
 
 		abievt, err := contractABI.EventByID(eventID)
 		if err != nil {
 			common.Log.Warningf("failed to publish log emission event with id: %s; %s", eventIDHex, err.Error())
-			msg.Nak()
+			msg.Term()
 			return
 		}
 
@@ -238,17 +238,22 @@ func consumeEVMLogTransceiverEventMsg(ntwrk *network.Network, msg *nats.Msg, evt
 			} else {
 				common.Log.Debugf("published %d-byte log event with id: %s; subject: %s", len(payload), eventIDHex, *qualifiedSubject)
 				if subject == natsShuttleContractDeployedSubject || subject == natsShuttleCircuitDeployedSubject { // HACK!!!
-					natsutil.NatsJetstreamPublish(subject, payload)
+					_, err = natsutil.NatsJetstreamPublish(subject, payload)
+					if err != nil {
+						common.Log.Warningf("failed to publish %d-byte contract log event with id: %s; subject: %s; %s", len(payload), eventIDHex, subject, err.Error())
+						msg.Nak()
+						return
+					}
 				}
 				msg.Ack()
 			}
 		} else {
 			common.Log.Tracef("dropping %d-byte log emission event on the floor; contract not configured for pub/sub fanout", len(msg.Data))
-			msg.Nak()
+			msg.Term()
 		}
 	} else {
 		common.Log.Tracef("dropping anonymous %d-byte log emission event on the floor", len(msg.Data))
-		msg.Nak()
+		msg.Term()
 	}
 }
 
@@ -301,12 +306,12 @@ func consumeLogTransceiverEmitMsg(msg *nats.Msg) {
 
 	if evtmsg.Address == nil {
 		common.Log.Warningf("failed to process log transceiver event emission message; no contract address provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if networkUUIDErr != nil {
 		common.Log.Warningf("failed to process log transceiver event emission message; invalid or no network id provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -315,7 +320,7 @@ func consumeLogTransceiverEmitMsg(msg *nats.Msg) {
 	network := cachedNetwork(networkUUID)
 	if network == nil || network.ID == uuid.Nil {
 		common.Log.Warningf("failed to process log transceiver event emission message; network lookup failed for network id: %s", networkID)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 
@@ -323,7 +328,7 @@ func consumeLogTransceiverEmitMsg(msg *nats.Msg) {
 		consumeEVMLogTransceiverEventMsg(network, msg, evtmsg)
 	} else {
 		common.Log.Warningf("failed to process log transceiver event emission message; log events not supported for network: %s", networkID)
-		msg.Nak()
+		msg.Term()
 		return
 	}
 }
@@ -347,22 +352,22 @@ func consumeNetworkContractCreateInvocationMsg(msg *nats.Msg) {
 
 	if !addrOk {
 		common.Log.Warningf("failed to create network contract; no contract address provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !networkIDOk || networkUUIDErr != nil {
 		common.Log.Warningf("failed to create network contract; invalid or no network id provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !contractNameOk {
 		common.Log.Warningf("failed to create network contract; no contract name provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	if !abiOk {
 		common.Log.Warningf("failed to create network contract; no ABI provided")
-		msg.Nak()
+		msg.Term()
 		return
 	}
 	contract := &Contract{
