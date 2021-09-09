@@ -795,6 +795,44 @@ func (t *Transaction) broadcast(db *gorm.DB, ntwrk *network.Network, signer Sign
 	return err
 }
 
+// cancel a pending transaction
+func (t *Transaction) cancel(db *gorm.DB, signer Signer) error {
+	ref, err := uuid.NewV4()
+	if err != nil {
+		common.Log.Warningf("failed to generate ref id; %s", err.Error())
+	}
+
+	origParams := t.ParseParams()
+
+	// FIXME-- use t.Nonce
+
+	var nonce *uint64
+	if nonceFloat, nonceOk := origParams["nonce"].(float64); nonceOk {
+		nonceUint := uint64(nonceFloat)
+		nonce = &nonceUint
+	}
+
+	txParams, _ := json.Marshal(map[string]interface{}{
+		"nonce": nonce,
+	})
+	rawmsg := json.RawMessage(txParams)
+
+	cancelTx := &Transaction{
+		To:     t.To,
+		Ref:    common.StringOrNil(ref.String()),
+		Data:   common.StringOrNil("0x"),
+		Params: &rawmsg,
+		Value:  NewTxValue(0),
+	}
+
+	if cancelTx.Create(db) {
+		common.Log.Debugf("created cancel tx for original tx: %s (tx hash: %s)", t.ID, *t.Hash)
+		return nil
+	}
+
+	return fmt.Errorf("failed to create cancel tx for original tx: %s (tx hash: %s)", t.ID, *t.Hash)
+}
+
 func (t *Transaction) sign(db *gorm.DB, signer Signer) error {
 	var err error
 	var hash []byte
