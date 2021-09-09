@@ -266,12 +266,13 @@ func consumeTxCreateMsg(msg *nats.Msg) {
 				common.Log.Debugf("faucet subsidy transaction broadcast; beneficiary: %s", faucetBeneficiaryAddress)
 				contract.TransactionID = &tx.ID
 				db.Save(&contract)
+				msg.Ack()
+				return
 			}
 		} else {
 			common.Log.Warning(errmsg)
+			msg.Nak()
 		}
-
-		msg.Nak()
 	}
 }
 
