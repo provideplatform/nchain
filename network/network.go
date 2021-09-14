@@ -217,6 +217,8 @@ func (n *Network) IsPublic() bool {
 			return true
 		case "1b16996e-3595-4985-816c-043345d22f8c":
 			return true
+		case "d186de3a-48e9-4d99-8e60-adb98ae87a0c":
+			return true
 		default:
 			return false
 		}
@@ -238,6 +240,8 @@ func (n *Network) PaymentsNetworkName() *string {
 			return common.StringOrNil("kovan")
 		case "1b16996e-3595-4985-816c-043345d22f8c":
 			return common.StringOrNil("goerli")
+		case "d186de3a-48e9-4d99-8e60-adb98ae87a0c":
+			return common.StringOrNil("bsn-testnet")
 		default:
 			return nil
 		}
