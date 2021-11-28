@@ -61,8 +61,23 @@ func main() {
 		panic(err)
 	}
 
+	initialMigration := false
+	_, _, versionErr := m.Version()
+	if versionErr != nil {
+		initialMigration = versionErr == migrate.ErrNilVersion
+	}
+
 	err = m.Up()
 	if err != nil && err != migrate.ErrNoChange {
+		common.Log.Warningf("migration failed; %s", err.Error())
+	}
+
+	if initialMigration {
+		db, _ := dbconf.DatabaseConnectionFactory(cfg)
+		defaultNetworksErr := initDefaultNetworks(db)
+		if defaultNetworksErr != nil {
+			common.Log.Warningf("default networks not upserted in database %s; %s", cfg.DatabaseName, defaultNetworksErr.Error())
+		}
 		common.Log.Warningf("migration failed; %s", err.Error())
 	}
 }
