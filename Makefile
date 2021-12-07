@@ -8,11 +8,11 @@ clean:
 
 build: clean mod
 	go fmt ./...
-	go build -v -o ./.bin/nchain_api ./cmd/api
-	go build -v -o ./.bin/nchain_consumer ./cmd/consumer
-	go build -v -o ./.bin/nchain_migrate ./cmd/migrate
-	go build -v -o ./.bin/nchain_reachabilitydaemon ./cmd/reachabilitydaemon
-	go build -v -o ./.bin/nchain_statsdaemon ./cmd/statsdaemon
+	CGO_ENABLED=0 go build -v -o ./.bin/nchain_api ./cmd/api
+	CGO_ENABLED=0 go build -v -o ./.bin/nchain_consumer ./cmd/consumer
+	CGO_ENABLED=0 go build -v -o ./.bin/nchain_migrate ./cmd/migrate
+	CGO_ENABLED=0 go build -v -o ./.bin/nchain_reachabilitydaemon ./cmd/reachabilitydaemon
+	CGO_ENABLED=0 go build -v -o ./.bin/nchain_statsdaemon ./cmd/statsdaemon
 
 ecs_deploy:
 	./ops/ecs_deploy.sh
