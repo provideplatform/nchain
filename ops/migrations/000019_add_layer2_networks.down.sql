@@ -1,2 +1,2 @@
-CREATE INDEX idx_blocks_hash;
-ALTER TABLE blocks RENAME COLUMN hash TO transactions_hash;
+DROP INDEX idx_networks_layer2;
+ALTER TABLE networks DROP COLUMN layer2;
