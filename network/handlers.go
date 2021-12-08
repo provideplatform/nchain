@@ -123,6 +123,12 @@ func networksListHandler(c *gin.Context) {
 		query = query.Where("networks.cloneable = false")
 	}
 
+	if strings.ToLower(c.Query("layer2")) == "true" {
+		query = query.Where("networks.layer2 IS TRUE")
+	} else if strings.ToLower(c.Query("layer2")) == "false" {
+		query = query.Where("networks.layer2 IS FALSE")
+	}
+
 	if strings.ToLower(c.Query("public")) == "true" {
 		query = query.Where("networks.application_id IS NULL AND networks.user_id IS NULL")
 	} else {
