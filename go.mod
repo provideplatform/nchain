@@ -7,7 +7,7 @@ require (
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/FactomProject/go-bip32 v0.3.5
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
-	github.com/aws/aws-sdk-go v1.31.8
+	github.com/aws/aws-sdk-go v1.34.28
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
@@ -52,6 +52,6 @@ require (
 	github.com/provideplatform/provide-go v0.0.0-20210911063258-1dbb008837b3
 	github.com/spaolacci/murmur3 v1.1.1-0.20190317074736-539464a789e9 // indirect
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
-	go.mongodb.org/mongo-driver v1.3.3
+	go.mongodb.org/mongo-driver v1.5.1
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
 )
