@@ -172,3 +172,19 @@ func initDefaultNetworks(db *gorm.DB) error {
 
 	return nil
 }
+
+func initDefaultPolygonNetworks(db *gorm.DB) error {
+	networkUpsertQueries := []string{
+		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config, layer2) VALUES ('2fd61fde-5031-41f1-86b8-8a72e2945ead', now(), 'Polygon Mainnet', 'Polygon Mainnet', '137', true, false, false, '{\"block_explorer_url\":\"https://polygonscan.com\",\"engine_id\":\"ethash\",\"is_ethereum_network\":true,\"native_currency\":\"MATIC\",\"network_id\":137,\"platform\":\"evm\",\"protocol_id\":\"pos\",\"websocket_url\":\"wss://polygon.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33\",\"json_rpc_url\":\"https://polygon.infura.io/v3/fde5e81d5d3141a093def423db3eeb33\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8545,8546,8547,30303],\"udp\":[30303]}}}}', true);",
+		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config, layer2) VALUES ('4251b6fd-c98d-4017-87a3-d691a77a52a7', now(), 'Polygon Mumbai Testnet', 'Polygon Mumbia Testnet', '80001', true, false, false, '{\"block_explorer_url\":\"https://mumbai.polygonscan.com\",\"engine_id\":\"ethash\",\"is_ethereum_network\":true,\"native_currency\":\"TMATIC\",\"network_id\":80001,\"platform\":\"evm\",\"protocol_id\":\"pos\",\"websocket_url\":\"wss://polygon-mumbai.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33\",\"json_rpc_url\":\"https://polygon-mumbai.infura.io/v3/fde5e81d5d3141a093def423db3eeb33\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8545,8546,8547,30303],\"udp\":[30303]}}}}', true);",
+	}
+	for _, raw := range networkUpsertQueries {
+		result := db.Exec(raw)
+		err := result.Error
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
