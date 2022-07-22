@@ -1,3 +1,6 @@
+//go:build integration || nchain || ropsten || rinkeby || kovan || goerli || basic || bookie || readonly
+// +build integration nchain ropsten rinkeby kovan goerli basic bookie readonly
+
 /*
  * Copyright 2017-2022 Provide Technologies Inc.
  *
@@ -13,8 +16,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-// +build integration nchain ropsten rinkeby kovan goerli basic bookie readonly
 
 package integration
 

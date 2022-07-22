@@ -1,3 +1,6 @@
+//go:build failing
+// +build failing
+
 /*
  * Copyright 2017-2022 Provide Technologies Inc.
  *
@@ -13,8 +16,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-// +build failing
 
 package integration
 
