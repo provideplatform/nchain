@@ -1001,8 +1001,8 @@ func (t *Transaction) handleTxTraces(
 						rawParams := json.RawMessage(params)
 
 						internalContract := &contract.Contract{
-							ApplicationID:  t.ApplicationID,
-							OrganizationID: t.OrganizationID,
+							ApplicationID:  kontract.ApplicationID,
+							OrganizationID: kontract.OrganizationID,
 							NetworkID:      t.NetworkID,
 							ContractID:     &kontract.ID,
 							TransactionID:  &t.ID,
