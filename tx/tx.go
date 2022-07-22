@@ -888,7 +888,7 @@ func (t *Transaction) handleTxReceipt(
 		if network.IsEthereumNetwork() {
 			ethCommonAddress := ethcommon.BytesToAddress(receipt.ContractAddress)
 			contractAddress = common.StringOrNil(ethCommonAddress.Hex())
-			common.Log.Debugf("CONTRACT ADDRESS: %s", *contractAddress)
+			common.Log.Debugf("deployed '%s' contract; address: %s", *contractAddress)
 		}
 
 		common.Log.Debugf("retrieved tx receipt for %s contract creation tx: %s; deployed contract address: %s", *network.Name, *t.Hash, *contractAddress)
@@ -900,12 +900,18 @@ func (t *Transaction) handleTxReceipt(
 		kontract := &contract.Contract{}
 		var tok *token.Token
 
+		var applicationID *uuid.UUID
+		var organizationID *uuid.UUID
+
 		tokenCreateFn := func(c *contract.Contract, tokenType, name string, decimals *big.Int, symbol string) (createdToken bool, tokenID uuid.UUID, errs []*provide.Error) {
 			common.Log.Debugf("resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
+			applicationID = c.ApplicationID
+			organizationID = c.OrganizationID
+
 			tok = &token.Token{
-				ApplicationID:  c.ApplicationID,
-				OrganizationID: c.OrganizationID,
+				ApplicationID:  applicationID,
+				OrganizationID: organizationID,
 				NetworkID:      c.NetworkID,
 				ContractID:     &c.ID,
 				Type:           common.StringOrNil(tokenType),
@@ -924,8 +930,8 @@ func (t *Transaction) handleTxReceipt(
 		db.Where("transaction_id = ?", t.ID).Find(&kontract)
 		if kontract == nil || kontract.ID == uuid.Nil {
 			kontract = &contract.Contract{
-				ApplicationID:  t.ApplicationID,
-				OrganizationID: t.OrganizationID,
+				ApplicationID:  applicationID,
+				OrganizationID: organizationID,
 				NetworkID:      t.NetworkID,
 				TransactionID:  &t.ID,
 				Name:           common.StringOrNil(contractName),

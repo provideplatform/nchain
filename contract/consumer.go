@@ -365,6 +365,8 @@ func consumeNetworkContractCreateInvocationMsg(msg *nats.Msg) {
 	addr, addrOk := params["address"].(string)
 	networkID, networkIDOk := params["network_id"].(string)
 	networkUUID, networkUUIDErr := uuid.FromString(networkID)
+	organizationID, organizationIDOk := params["organization_id"].(string)
+	organizationUUID, organizationUUIDErr := uuid.FromString(organizationID)
 	contractName, contractNameOk := params["name"].(string)
 	_, abiOk := params["abi"].([]interface{})
 
@@ -388,13 +390,20 @@ func consumeNetworkContractCreateInvocationMsg(msg *nats.Msg) {
 		msg.Term()
 		return
 	}
+
+	var orgID *uuid.UUID
+	if organizationUUIDErr == nil {
+		orgID = &organizationUUID
+	}
+
 	contract := &Contract{
-		ApplicationID: nil,
-		NetworkID:     networkUUID,
-		TransactionID: nil,
-		Name:          common.StringOrNil(contractName),
-		Address:       common.StringOrNil(addr),
-		Params:        nil,
+		ApplicationID:  nil,
+		OrganizationID: orgID,
+		NetworkID:      networkUUID,
+		TransactionID:  nil,
+		Name:           common.StringOrNil(contractName),
+		Address:        common.StringOrNil(addr),
+		Params:         nil,
 	}
 	contract.setParams(params)
 
