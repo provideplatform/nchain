@@ -366,7 +366,6 @@ func consumeNetworkContractCreateInvocationMsg(msg *nats.Msg) {
 	networkID, networkIDOk := params["network_id"].(string)
 	networkUUID, networkUUIDErr := uuid.FromString(networkID)
 	organizationID, organizationIDOk := params["organization_id"].(string)
-	organizationUUID, organizationUUIDErr := uuid.FromString(organizationID)
 	contractName, contractNameOk := params["name"].(string)
 	_, abiOk := params["abi"].([]interface{})
 
@@ -392,7 +391,13 @@ func consumeNetworkContractCreateInvocationMsg(msg *nats.Msg) {
 	}
 
 	var orgID *uuid.UUID
-	if organizationUUIDErr == nil {
+	if organizationIDOk {
+		organizationUUID, organizationUUIDErr := uuid.FromString(organizationID)
+		if organizationUUIDErr != nil {
+			common.Log.Warningf("failed to create network contract; invalid organization id provided")
+			msg.Term()
+			return
+		}
 		orgID = &organizationUUID
 	}
 
