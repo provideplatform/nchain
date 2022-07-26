@@ -208,13 +208,14 @@ func consumeShuttleContractDeployedMsg(msg *nats.Msg) {
 	rawParams := json.RawMessage(contractParams)
 
 	internalContract := &contract.Contract{
-		ApplicationID: cntrct.ApplicationID,
-		NetworkID:     cntrct.NetworkID,
-		ContractID:    &cntrct.ID,
-		Name:          common.StringOrNil(name),
-		Address:       common.StringOrNil(address),
-		Params:        &rawParams,
-		Type:          common.StringOrNil(contractType),
+		ApplicationID:  cntrct.ApplicationID,
+		OrganizationID: cntrct.OrganizationID,
+		NetworkID:      cntrct.NetworkID,
+		ContractID:     &cntrct.ID,
+		Name:           common.StringOrNil(name),
+		Address:        common.StringOrNil(address),
+		Params:         &rawParams,
+		Type:           common.StringOrNil(contractType),
 	}
 
 	if internalContract.Create() {
@@ -225,14 +226,15 @@ func consumeShuttleContractDeployedMsg(msg *nats.Msg) {
 				common.Log.Debugf("resolved %s token: %s (%v decimals); symbol: %s", *network.Name, name, decimals, symbol)
 
 				tok := &token.Token{
-					ApplicationID: c.ApplicationID,
-					NetworkID:     c.NetworkID,
-					ContractID:    &c.ID,
-					Type:          common.StringOrNil(tokenType),
-					Name:          common.StringOrNil(name),
-					Symbol:        common.StringOrNil(symbol),
-					Decimals:      decimals.Uint64(),
-					Address:       common.StringOrNil(string(receipt.ContractAddress)),
+					ApplicationID:  c.ApplicationID,
+					OrganizationID: c.OrganizationID,
+					NetworkID:      c.NetworkID,
+					ContractID:     &c.ID,
+					Type:           common.StringOrNil(tokenType),
+					Name:           common.StringOrNil(name),
+					Symbol:         common.StringOrNil(symbol),
+					Decimals:       decimals.Uint64(),
+					Address:        common.StringOrNil(string(receipt.ContractAddress)),
 				}
 
 				createdToken = tok.Create()
