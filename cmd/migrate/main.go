@@ -88,13 +88,27 @@ func main() {
 		common.Log.Warningf("migration failed; %s", err.Error())
 	}
 
+	gormDB, _ := dbconf.DatabaseConnectionFactory(cfg)
 	if initialMigration {
-		db, _ := dbconf.DatabaseConnectionFactory(cfg)
-		defaultNetworksErr := initDefaultNetworks(db)
-		if defaultNetworksErr != nil {
-			common.Log.Warningf("default networks not upserted in database %s; %s", cfg.DatabaseName, defaultNetworksErr.Error())
+		defaultL1NetworksErr := initDefaultL1Networks(gormDB)
+		if defaultL1NetworksErr != nil {
+			common.Log.Warningf("default l1 networks not upserted in database %s; %s", cfg.DatabaseName, defaultL1NetworksErr.Error())
 		}
-		common.Log.Warningf("migration failed; %s", err.Error())
+
+		defaultL2NetworksErr := initDefaultL2Networks(gormDB)
+		if defaultL2NetworksErr != nil {
+			common.Log.Warningf("default l2 networks not upserted in database %s; %s", cfg.DatabaseName, defaultL2NetworksErr.Error())
+		}
+	}
+
+	enabledL1NetworksErr := setEnabledL1Networks(gormDB)
+	if enabledL1NetworksErr != nil {
+		common.Log.Warningf("failed to set enabled L1 networks in database %s; %s", cfg.DatabaseName, enabledL1NetworksErr.Error())
+	}
+
+	enabledL2NetworksErr := setEnabledL2Networks(gormDB)
+	if enabledL2NetworksErr != nil {
+		common.Log.Warningf("failed to set enabled L2 networks in database %s; %s", cfg.DatabaseName, enabledL2NetworksErr.Error())
 	}
 }
 
@@ -170,7 +184,7 @@ func initIfNotExists(cfg *dbconf.DBConfig, superuser, password string) error {
 	return nil
 }
 
-func initDefaultNetworks(db *gorm.DB) error {
+func initDefaultL1Networks(db *gorm.DB) error {
 	networkUpsertQueries := []string{
 		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config) VALUES ('deca2436-21ba-4ff5-b225-ad1b0b2f5c59', now(), 'Ethereum mainnet', 'Ethereum mainnet', '1', true, false, false, '{\"block_explorer_url\":\"https://etherscan.io\",\"chainspec_url\":\"https://gist.githubusercontent.com/kthomas/3ac2e29ee1b2fb22d501ae7b52884c24/raw/161c6a9de91db7044fb93852aed7b0fa0e78e55f/mainnet.chainspec.json\",\"is_ethereum_network\":true,\"json_rpc_url\":\"https://mainnet.infura.io/v3/fde5e81d5d3141a093def423db3eeb33\",\"native_currency\":\"ETH\",\"network_id\":1,\"websocket_url\":\"wss://mainnet.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33\",\"platform\":\"evm\",\"protocol_id\":\"pow\",\"engine_id\":\"ethash\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8050,8051,30300],\"udp\":[30300]}}}}');",
 		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config) VALUES ('07102258-5e49-480e-86af-6d0c3260827d', now(), 'Ethereum Rinkeby testnet', 'Ethereum Rinkeby testnet', '4', true, false, false, '{\"block_explorer_url\":\"https://rinkeby.etherscan.io\",\"is_ethereum_network\":true,\"json_rpc_url\":\"https://rinkeby.infura.io/v3/fde5e81d5d3141a093def423db3eeb33\",\"native_currency\":\"ETH\",\"network_id\":4,\"websocket_url\":\"wss://rinkeby.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33\",\"platform\":\"evm\",\"protocol_id\":\"pow\",\"engine_id\":\"ethash\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8050,8051,30300],\"udp\":[30300]}}}}');",
@@ -189,7 +203,7 @@ func initDefaultNetworks(db *gorm.DB) error {
 	return nil
 }
 
-func initDefaultPolygonNetworks(db *gorm.DB) error {
+func initDefaultL2Networks(db *gorm.DB) error {
 	networkUpsertQueries := []string{
 		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config, layer2) VALUES ('2fd61fde-5031-41f1-86b8-8a72e2945ead', now(), 'Polygon Mainnet', 'Polygon Mainnet', '137', true, false, false, '{\"block_explorer_url\":\"https://polygonscan.com\",\"engine_id\":\"ethash\",\"is_ethereum_network\":true,\"native_currency\":\"MATIC\",\"network_id\":137,\"platform\":\"evm\",\"protocol_id\":\"pos\",\"websocket_url\":\"wss://polygon.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33\",\"json_rpc_url\":\"https://polygon.infura.io/v3/fde5e81d5d3141a093def423db3eeb33\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8545,8546,8547,30303],\"udp\":[30303]}}}}', true);",
 		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config, layer2) VALUES ('4251b6fd-c98d-4017-87a3-d691a77a52a7', now(), 'Polygon Mumbai Testnet', 'Polygon Mumbia Testnet', '80001', true, false, false, '{\"block_explorer_url\":\"https://mumbai.polygonscan.com\",\"engine_id\":\"ethash\",\"is_ethereum_network\":true,\"native_currency\":\"TMATIC\",\"network_id\":80001,\"platform\":\"evm\",\"protocol_id\":\"pos\",\"websocket_url\":\"wss://polygon-mumbai.infura.io/ws/v3/fde5e81d5d3141a093def423db3eeb33\",\"json_rpc_url\":\"https://polygon-mumbai.infura.io/v3/fde5e81d5d3141a093def423db3eeb33\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8545,8546,8547,30303],\"udp\":[30303]}}}}', true);",
@@ -199,6 +213,38 @@ func initDefaultPolygonNetworks(db *gorm.DB) error {
 		err := result.Error
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func setEnabledL1Networks(db *gorm.DB) error {
+	if os.Getenv("ENABLED_L1_NETWORK_IDS") != "" {
+		network_ids := strings.Split(os.Getenv("ENABLED_L1_NETWORK_IDS"), ",")
+
+		for _, id := range network_ids {
+			result := db.Exec("UPDATE networks SET enabled = true where id = ? AND layer2 = false", id)
+			err := result.Error
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func setEnabledL2Networks(db *gorm.DB) error {
+	if os.Getenv("ENABLED_L2_NETWORK_IDS") != "" {
+		l2_network_ids := strings.Split(os.Getenv("ENABLED_L2_NETWORK_IDS"), ",")
+
+		for _, id := range l2_network_ids {
+			result := db.Exec("UPDATE networks SET enabled = true where id = ? AND layer2 = true", id)
+			err := result.Error
+			if err != nil {
+				return err
+			}
 		}
 	}
 
