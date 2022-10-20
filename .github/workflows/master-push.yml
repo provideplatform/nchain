@@ -36,7 +36,7 @@ jobs:
           ECR_REPOSITORY_NAME: provide/goldmine
           ECS_TASK_DEFINITION_FAMILY: goldmine
           ECS_CLUSTER: production
-          ECS_SERVICE_NAME: goldmine
+          ECS_SERVICE_NAME: nchain
           RUN_INTEGRATION_SUITE: false
         run: |
           chmod +x "${GITHUB_WORKSPACE}/ops/ci-process.sh"
@@ -58,7 +58,7 @@ jobs:
           ECR_REPOSITORY_NAME: provide/goldmine
           ECS_TASK_DEFINITION_FAMILY: goldmine-consumer
           ECS_CLUSTER: production
-          ECS_SERVICE_NAME: goldmine-consumer
+          ECS_SERVICE_NAME: nchain-consumer
           RUN_INTEGRATION_SUITE: false
         run: |
           chmod +x "${GITHUB_WORKSPACE}/ops/ci-process.sh"
