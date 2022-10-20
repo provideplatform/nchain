@@ -226,14 +226,21 @@ func (n *Network) IsPublic() bool {
 		switch n.ID.String() {
 		case "deca2436-21ba-4ff5-b225-ad1b0b2f5c59":
 			return true
-		case "07102258-5e49-480e-86af-6d0c3260827d":
-			return true
-		case "66d44f30-9092-4182-a3c4-bc02736d6ae5":
-			return true
-		case "8d31bf48-df6b-4a71-9d7c-3cb291111e27":
-			return true
 		case "1b16996e-3595-4985-816c-043345d22f8c":
 			return true
+		case "ffc9a168-1327-4ddc-8af9-2301da82cccb":
+			return true
+
+		case "2fd61fde-5031-41f1-86b8-8a72e2945ead":
+			return true
+		case "4251b6fd-c98d-4017-87a3-d691a77a52a7":
+			return true
+
+		case "f6d2383b-8e0b-48d8-b539-cfdc13c7b970":
+			return true
+		case "27795197-2a45-4a84-aed2-218a737d77f2":
+			return true
+
 		case "d186de3a-48e9-4d99-8e60-adb98ae87a0c":
 			return true
 		default:
@@ -249,14 +256,21 @@ func (n *Network) PaymentsNetworkName() *string {
 		switch n.ID.String() {
 		case "deca2436-21ba-4ff5-b225-ad1b0b2f5c59":
 			return common.StringOrNil("mainnet")
-		case "07102258-5e49-480e-86af-6d0c3260827d":
-			return common.StringOrNil("rinkeby")
-		case "66d44f30-9092-4182-a3c4-bc02736d6ae5":
-			return common.StringOrNil("ropsten")
-		case "8d31bf48-df6b-4a71-9d7c-3cb291111e27":
-			return common.StringOrNil("kovan")
 		case "1b16996e-3595-4985-816c-043345d22f8c":
 			return common.StringOrNil("goerli")
+		case "ffc9a168-1327-4ddc-8af9-2301da82cccb":
+			return common.StringOrNil("sepolia")
+
+		case "2fd61fde-5031-41f1-86b8-8a72e2945ead":
+			return common.StringOrNil("polygon")
+		case "4251b6fd-c98d-4017-87a3-d691a77a52a7":
+			return common.StringOrNil("polygon-mumbai")
+
+		case "f6d2383b-8e0b-48d8-b539-cfdc13c7b970":
+			return common.StringOrNil("prvd")
+		case "27795197-2a45-4a84-aed2-218a737d77f2":
+			return common.StringOrNil("prvd-peachtree")
+
 		case "d186de3a-48e9-4d99-8e60-adb98ae87a0c":
 			return common.StringOrNil("bsn-ope")
 		default:
