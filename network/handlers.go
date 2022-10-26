@@ -145,6 +145,12 @@ func networksListHandler(c *gin.Context) {
 		query = query.Where("networks.layer2 IS FALSE")
 	}
 
+	if strings.ToLower(c.Query("layer3")) == "true" {
+		query = query.Where("networks.layer3 IS TRUE")
+	} else if strings.ToLower(c.Query("layer3")) == "false" {
+		query = query.Where("networks.layer3 IS FALSE")
+	}
+
 	if strings.ToLower(c.Query("public")) == "true" {
 		query = query.Where("networks.application_id IS NULL AND networks.user_id IS NULL")
 	} else {

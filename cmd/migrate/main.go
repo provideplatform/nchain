@@ -99,6 +99,11 @@ func main() {
 		if defaultL2NetworksErr != nil {
 			common.Log.Warningf("default l2 networks not upserted in database %s; %s", cfg.DatabaseName, defaultL2NetworksErr.Error())
 		}
+
+		defaultL3NetworksErr := initDefaultL3Networks(gormDB)
+		if defaultL3NetworksErr != nil {
+			common.Log.Warningf("default l3 networks not upserted in database %s; %s", cfg.DatabaseName, defaultL3NetworksErr.Error())
+		}
 	}
 
 	enabledL1NetworksErr := setEnabledL1Networks(gormDB)
@@ -109,6 +114,11 @@ func main() {
 	enabledL2NetworksErr := setEnabledL2Networks(gormDB)
 	if enabledL2NetworksErr != nil {
 		common.Log.Warningf("failed to set enabled L2 networks in database %s; %s", cfg.DatabaseName, enabledL2NetworksErr.Error())
+	}
+
+	enabledL3NetworksErr := setEnabledL3Networks(gormDB)
+	if enabledL2NetworksErr != nil {
+		common.Log.Warningf("failed to set enabled L3 networks in database %s; %s", cfg.DatabaseName, enabledL3NetworksErr.Error())
 	}
 }
 
@@ -215,10 +225,22 @@ func initDefaultL2Networks(db *gorm.DB) error {
 		// d4e050b6-3402-4707-8b07-e94dbd9851f8 Arbitrum Görli
 		// 4ac304ad-a5ea-4063-be3c-6723cadf5f5c Optimism
 		// ebf8af38-2270-4b54-b98c-206f2a63334e Optimism Görli
+	}
+	for _, raw := range networkUpsertQueries {
+		result := db.Exec(raw)
+		err := result.Error
+		if err != nil {
+			return err
+		}
+	}
 
-		// TODO... add the following L3 networks
-		// 27795197-2a45-4a84-aed2-218a737d77f2 for PRVD mainnet
-		// f6d2383b-8e0b-48d8-b539-cfdc13c7b970 for PRVD testnet
+	return nil
+}
+
+func initDefaultL3Networks(db *gorm.DB) error {
+	networkUpsertQueries := []string{
+		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config, layer2) VALUES ('27795197-2a45-4a84-aed2-218a737d77f2', now(), 'PRVD Mainnet', 'PRVD Mainnet', '1337', true, false, false, '{\"client\":\"geth\",\"block_explorer_url\":\"https://explorer.provide.network\",\"engine_id\":\"ethash\",\"is_ethereum_network\":true,\"native_currency\":\"PRVG\",\"network_id\":137,\"platform\":\"evm\",\"protocol_id\":\"pos\",\"websocket_url\":null,\"json_rpc_url\":\"https://rpc.provide.network\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8545,8546,8547,30303],\"udp\":[30303]}}}}', true);",
+		"INSERT INTO networks (id, created_at, name, description, chain_id, is_production, cloneable, enabled, config, layer2) VALUES ('f6d2383b-8e0b-48d8-b539-cfdc13c7b970', now(), 'PRVD Peachtree Testnet', 'PRVD Peachtree Testnet', '1338', true, false, false, '{\"client\":\"geth\",\"block_explorer_url\":\"https://explorer.provide.network\",\"engine_id\":\"ethash\",\"is_ethereum_network\":true,\"native_currency\":\"PRVG\",\"network_id\":80001,\"platform\":\"evm\",\"protocol_id\":\"pos\",\"websocket_url\":null,\"json_rpc_url\":\"https://rpc.peachtree.provide.network\",\"security\":{\"egress\":\"*\",\"ingress\":{\"0.0.0.0/0\":{\"tcp\":[8545,8546,8547,30303],\"udp\":[30303]}}}}', true);",
 	}
 	for _, raw := range networkUpsertQueries {
 		result := db.Exec(raw)
@@ -253,6 +275,22 @@ func setEnabledL2Networks(db *gorm.DB) error {
 
 		for _, id := range l2_network_ids {
 			result := db.Exec("UPDATE networks SET enabled = true where id = ? AND layer2 = true", id)
+			err := result.Error
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func setEnabledL3Networks(db *gorm.DB) error {
+	if os.Getenv("ENABLED_L3_NETWORK_IDS") != "" {
+		l3_network_ids := strings.Split(os.Getenv("ENABLED_L3_NETWORK_IDS"), ",")
+
+		for _, id := range l3_network_ids {
+			result := db.Exec("UPDATE networks SET enabled = true where id = ? AND layer3 = true", id)
 			err := result.Error
 			if err != nil {
 				return err

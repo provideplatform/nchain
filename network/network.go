@@ -93,6 +93,7 @@ type Network struct {
 	Description     *string          `json:"description"`
 	IsProduction    *bool            `sql:"not null" json:"-"` // deprecated
 	Layer2          *bool            `sql:"not null" json:"layer2,omitempty"`
+	Layer3          *bool            `sql:"not null" json:"layer3,omitempty"`
 	Cloneable       *bool            `sql:"not null" json:"-"` // deprecated
 	Enabled         *bool            `sql:"not null" json:"enabled"`
 	ChainID         *string          `json:"chain_id"`                               // protocol-specific chain id
