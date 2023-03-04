@@ -165,13 +165,13 @@ func contractDetailsHandler(c *gin.Context) {
 
 	query := db.Where("id = ?", c.Param("id"))
 	if appID != nil {
-		query = query.Where("contracts.application_id = ?", appID)
+		query = query.Where("contracts.application_id IS NULL OR contracts.application_id = ?", appID)
 	}
 	if orgID != nil {
-		query = query.Where("contracts.organization_id = ?", orgID)
+		query = query.Where("contracts.organization_id IS NULL OR contracts.organization_id = ?", orgID)
 	}
 	if userID != nil {
-		query = query.Where("contracts.application_id IS NULL", userID)
+		query = query.Where("contracts.application_id IS NULL AND contracts.organization_id IS NULL")
 	}
 
 	query.Find(&contract)
