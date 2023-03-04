@@ -122,9 +122,9 @@ func contractsListHandler(c *gin.Context) {
 	}
 
 	if appID != nil {
-		query = query.Where("contracts.application_id = ?", appID)
+		query = query.Where("contracts.application_id IS NULL OR contracts.application_id = ?", appID)
 	} else if orgID != nil {
-		query = query.Where("contracts.organization_id = ?", orgID)
+		query = query.Where("contracts.organization_id IS NULL OR contracts.organization_id = ?", orgID)
 	}
 
 	filterTokens := strings.ToLower(c.Query("filter_tokens")) == "true"
