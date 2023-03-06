@@ -419,6 +419,10 @@ func (txs *TransactionSigner) String() string {
 		return fmt.Sprintf("HD wallet: %s", txs.Wallet.ID)
 	}
 
+	if txs.Sender != nil {
+		return fmt.Sprintf("address: %s", *txs.Sender)
+	}
+
 	return "(misconfigured tx signer)"
 }
 
