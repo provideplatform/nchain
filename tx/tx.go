@@ -90,6 +90,9 @@ type Transaction struct {
 	SignedTx interface{}                 `sql:"-" json:"-"`
 	Traces   interface{}                 `sql:"-" json:"traces,omitempty"`
 
+	From      *string `sql:"-" json:"from,omitempty"`
+	Signature *string `sql:"-" json:"signature,omitempty"`
+
 	// Transaction metadata/instrumentation
 	Block          *uint64    `json:"block"`
 	BlockTimestamp *time.Time `json:"block_timestamp,omitempty"`                       // timestamp when the tx was finalized on-chain, according to its tx receipt
@@ -109,6 +112,9 @@ type TransactionSigner struct {
 
 	Account *wallet.Account
 	Wallet  *wallet.Wallet
+
+	Sender    *string
+	Signature *string
 }
 
 // Address returns the public network address of the underlying Signer
@@ -126,6 +132,8 @@ func (txs *TransactionSigner) Address() string {
 			common.Log.Warningf("error obtaining address from transactionsigner. Error: %s", err.Error())
 		}
 		address = *txAddress
+	} else if txs.Sender != nil {
+		address = *txs.Sender
 	}
 
 	return address
@@ -176,6 +184,11 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 		address = key.Address
 		derivationPath = key.HDDerivationPath
 	}
+
+	if txs.Sender != nil {
+		address = txs.Sender
+	}
+
 	return address, derivationPath, nil
 }
 
@@ -349,6 +362,46 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 				return nil, nil, err
 			}
 		}
+
+		if tx.Signature != nil {
+
+			txAddress, _, err := txs.GetSignerDetails()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			signer, _tx, hash, err = providecrypto.EVMTxFactory(
+				txs.Network.ID.String(),
+				txs.Network.RPCURL(),
+				*txAddress,
+				tx.To,
+				tx.Data,
+				tx.Value.BigInt(),
+				nonce,
+				uint64(gas),
+				gasPrice,
+			)
+
+			if err != nil {
+				err = fmt.Errorf("failed to initialize signed transaction payload; %s", err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			_sig, err := hex.DecodeString(*tx.Signature)
+			if err != nil {
+				err = fmt.Errorf("failed to decode %d-byte transaction signature; %s", len(_sig), err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+
+			signedTx, err = _tx.WithSignature(signer, _sig)
+			if err != nil {
+				err = fmt.Errorf("failed to initialize transaction using given %d-byte signature; %s", len(_sig), err.Error())
+				common.Log.Warning(err.Error())
+				return nil, nil, err
+			}
+		}
 	} else {
 		return nil, nil, fmt.Errorf("unable to generate signed tx for unsupported network: %s", *txs.Network.Name)
 	}
@@ -461,10 +514,12 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 	}
 
 	return &TransactionSigner{
-		DB:      db,
-		Network: ntwrk,
-		Account: acct,
-		Wallet:  wllt,
+		DB:        db,
+		Network:   ntwrk,
+		Account:   acct,
+		Wallet:    wllt,
+		Sender:    t.From,
+		Signature: t.Signature,
 	}, nil
 }
 

@@ -39,6 +39,7 @@ import (
 func InstallTransactionsAPI(r *gin.Engine) {
 	r.GET("/api/v1/transactions", transactionsListHandler)
 	r.POST("/api/v1/transactions", createTransactionHandler)
+	r.POST("/api/v1/transactions/broadcast", broadcastTransactionHandler)
 	r.GET("/api/v1/transactions/:id", transactionDetailsHandler)
 	r.GET("/api/v1/networks/:id/transactions", networkTransactionsListHandler)
 	r.GET("/api/v1/networks/:id/transactions/:transactionId", networkTransactionDetailsHandler)
@@ -107,6 +108,43 @@ func transactionsListHandler(c *gin.Context) {
 }
 
 func createTransactionHandler(c *gin.Context) {
+	appID := util.AuthorizedSubjectID(c, "application")
+	orgID := util.AuthorizedSubjectID(c, "organization")
+	userID := util.AuthorizedSubjectID(c, "user")
+	if appID == nil && orgID == nil && userID == nil {
+		provide.RenderError("unauthorized", 401, c)
+		return
+	}
+
+	buf, err := c.GetRawData()
+	if err != nil {
+		provide.RenderError(err.Error(), 400, c)
+		return
+	}
+
+	tx := &Transaction{}
+	err = json.Unmarshal(buf, tx)
+	if err != nil {
+		provide.RenderError(err.Error(), 422, c)
+		return
+	}
+
+	tx.ApplicationID = appID
+	tx.OrganizationID = orgID
+	tx.UserID = userID
+
+	db := dbconf.DatabaseConnection()
+
+	if tx.Create(db) {
+		provide.Render(tx, 201, c)
+	} else {
+		obj := map[string]interface{}{}
+		obj["errors"] = tx.Errors
+		provide.Render(obj, 422, c)
+	}
+}
+
+func broadcastTransactionHandler(c *gin.Context) {
 	appID := util.AuthorizedSubjectID(c, "application")
 	orgID := util.AuthorizedSubjectID(c, "organization")
 	userID := util.AuthorizedSubjectID(c, "user")
