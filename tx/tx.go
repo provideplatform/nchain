@@ -513,8 +513,8 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 		return nil, errors.New("invalid network for tx broadcast")
 	}
 
-	if (acct == nil || acct.ID == uuid.Nil) && (wllt == nil || wllt.ID == uuid.Nil) {
-		return nil, errors.New("no account or HD wallet signing identity to sign tx for broadcast")
+	if (acct == nil || acct.ID == uuid.Nil) && (wllt == nil || wllt.ID == uuid.Nil) && (t.From == nil || t.Signature == nil) {
+		return nil, errors.New("no account, HD wallet or self-custody signing identity to sign tx for broadcast")
 	}
 
 	return &TransactionSigner{
