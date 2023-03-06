@@ -86,12 +86,10 @@ type Transaction struct {
 	Description *string          `json:"description"`
 
 	// Ephemeral fields for managing the tx/rx and tracing lifecycles
-	Response *contract.ExecutionResponse `sql:"-" json:"-"`
-	SignedTx interface{}                 `sql:"-" json:"-"`
-	Traces   interface{}                 `sql:"-" json:"traces,omitempty"`
-
-	From      *string `sql:"-" json:"from,omitempty"`
-	Signature *string `sql:"-" json:"signature,omitempty"`
+	Response  *contract.ExecutionResponse `sql:"-" json:"-"`
+	SignedTx  interface{}                 `sql:"-" json:"-"`
+	Traces    interface{}                 `sql:"-" json:"traces,omitempty"`
+	Signature *string                     `sql:"-" json:"signature,omitempty"`
 
 	// Transaction metadata/instrumentation
 	Block          *uint64    `json:"block"`
@@ -513,7 +511,7 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 		return nil, errors.New("invalid network for tx broadcast")
 	}
 
-	if (acct == nil || acct.ID == uuid.Nil) && (wllt == nil || wllt.ID == uuid.Nil) && (t.From == nil || t.Signature == nil) {
+	if (acct == nil || acct.ID == uuid.Nil) && (wllt == nil || wllt.ID == uuid.Nil) && (t.Signer == nil || t.Signature == nil) {
 		return nil, errors.New("no account, HD wallet or self-custody signing identity to sign tx for broadcast")
 	}
 
@@ -522,7 +520,7 @@ func (t *Transaction) signerFactory(db *gorm.DB) (*TransactionSigner, error) {
 		Network:   ntwrk,
 		Account:   acct,
 		Wallet:    wllt,
-		Sender:    t.From,
+		Sender:    t.Signer,
 		Signature: t.Signature,
 	}, nil
 }
