@@ -142,7 +142,7 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 
 	// first check if we have a provided path
 	// we'll ignore the other branch (no hd wallet path for the moment TODO)
-	if txs.Wallet.Path != nil {
+	if txs.Wallet != nil && txs.Wallet.Path != nil {
 		// ensure the path is valid
 		_, err := hdwallet.ParseDerivationPath(*txs.Wallet.Path)
 		if err != nil {
@@ -165,9 +165,7 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 		}
 		common.Log.Debugf("address generated using derivation path %s: %s", *derivationPath, *key.Address)
 		address = key.Address
-	}
-
-	if txs.Wallet.Path == nil {
+	} else if txs.Wallet != nil && txs.Wallet.Path == nil {
 		key, err := vault.DeriveKey(util.DefaultVaultAccessJWT, txs.Wallet.VaultID.String(), txs.Wallet.KeyID.String(), map[string]interface{}{})
 		if err != nil {
 			err := fmt.Errorf("unable to generate key material for HD wallet; %s", err.Error())
@@ -181,9 +179,7 @@ func (txs *TransactionSigner) GetSignerDetails() (address, derivationPath *strin
 		// lol, Kyle was right :)
 		address = key.Address
 		derivationPath = key.HDDerivationPath
-	}
-
-	if txs.Sender != nil {
+	} else if txs.Sender != nil && txs.Signature != nil {
 		address = txs.Sender
 	}
 
@@ -227,8 +223,9 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 		var signer types.Signer
 		var _tx *types.Transaction
 
-		// we are using an account to sign the transaction
 		if txs.Account != nil && txs.Account.VaultID != nil && txs.Account.KeyID != nil {
+			// we are using an account to sign the transaction
+
 			signer, _tx, hash, err = providecrypto.EVMTxFactory(
 				txs.Network.ID.String(),
 				txs.Network.RPCURL(),
@@ -285,16 +282,13 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 			}
 		}
 
-		// var txAddress *string
-		// var txDerivationPath *string
-
-		// we are using a wallet to sign the transaction
-		// it can include a derivation path to generate a specific address
-		// or with no derivation path, signs using the default address from the hd wallet
-		// maybe there's something we can do here with the signer to get the next increment from the signer
-		// which returns a derivation path, which we can use for the transaction creation,
-		// but that seems a little hacky
 		if txs.Wallet != nil && txs.Wallet.VaultID != nil && txs.Wallet.KeyID != nil {
+			// we are using a wallet to sign the transaction
+			// it can include a derivation path to generate a specific address
+			// or with no derivation path, signs using the default address from the hd wallet
+			// maybe there's something we can do here with the signer to get the next increment from the signer
+			// which returns a derivation path, which we can use for the transaction creation,
+			// but that seems a little hacky
 
 			txAddress, txDerivationPath, err := txs.GetSignerDetails()
 			if err != nil {
@@ -362,6 +356,7 @@ func (txs *TransactionSigner) Sign(tx *Transaction) (signedTx interface{}, hash 
 		}
 
 		if tx.Signature != nil {
+			// the tx is already signed by an external, self-custodied private key
 
 			txAddress, _, err := txs.GetSignerDetails()
 			if err != nil {
