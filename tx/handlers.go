@@ -475,12 +475,12 @@ func contractExecutionHandler(c *gin.Context) {
 		// return
 	}
 
-	if appID != nil && *contractObj.ApplicationID != *appID {
+	if appID != nil && contractObj.ApplicationID != nil && *contractObj.ApplicationID != *appID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
 
-	if orgID != nil && *contractObj.OrganizationID != *orgID {
+	if orgID != nil && contractObj.OrganizationID != nil && *contractObj.OrganizationID != *orgID {
 		provide.RenderError("forbidden", 403, c)
 		return
 	}
