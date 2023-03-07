@@ -687,7 +687,7 @@ func (t *Transaction) Validate() bool {
 			t.Errors = append(t.Errors, &provide.Error{
 				Message: common.StringOrNil("provided signer and account_id to tx creation, which is ambiguous"),
 			})
-		} else {
+		} else if t.Signature == nil {
 			account := &wallet.Account{}
 			db.Where("address = ?", t.Signer).Find(&account)
 			if account == nil || account.ID == uuid.Nil {
@@ -696,6 +696,8 @@ func (t *Transaction) Validate() bool {
 				})
 			}
 			t.AccountID = &account.ID
+		} else {
+			common.Log.Debugf("using self-custody signer for tx: %s", t)
 		}
 	}
 
