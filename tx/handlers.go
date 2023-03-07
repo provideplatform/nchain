@@ -175,6 +175,11 @@ func broadcastTransactionHandler(c *gin.Context) {
 	if tx.Create(db) {
 		provide.Render(tx, 201, c)
 	} else {
+		for _, err := range tx.Errors {
+			if err.Message != nil && tx.Data != nil {
+				common.Log.Debugf("failed to broadcast %d-byte transaction; %s", len(*tx.Data), *err.Message)
+			}
+		}
 		obj := map[string]interface{}{}
 		obj["errors"] = tx.Errors
 		provide.Render(obj, 422, c)
