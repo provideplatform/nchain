@@ -110,7 +110,7 @@ func getOrgToken(testID uuid.UUID) (*string, error) {
 		return nil, fmt.Errorf("error creating org name(%s) in ident. Error %s", nchainOrg.name, err.Error())
 	}
 
-	orgToken, err := orgTokenFactory(*userToken, userOrg.ID)
+	orgToken, err := orgTokenFactory(*userToken, *userOrg.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting token for org (name: %s). Error: %s", nchainOrg.name, err.Error())
 	}
@@ -188,7 +188,7 @@ func appUserTokenFactory(token string, applicationID, userID uuid.UUID) (*provid
 	})
 }
 
-func orgTokenFactory(token string, organizationID uuid.UUID) (*provide.Token, error) {
+func orgTokenFactory(token string, organizationID string) (*provide.Token, error) {
 	return provide.CreateToken(token, map[string]interface{}{
 		"organization_id": organizationID,
 	})

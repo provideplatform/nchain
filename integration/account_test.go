@@ -98,10 +98,10 @@ func TestListAccounts(t *testing.T) {
 
 		// use the app token to add that user to the application
 		err = ident.CreateApplicationUser(*appToken.Token, app.ID.String(), map[string]interface{}{
-			"user_id": identUser.ID.String(),
+			"user_id": *identUser.ID,
 		})
 		if err != nil {
-			t.Errorf("error adding user %s to app %s. Error: %s", identUser.ID, app.ID, err.Error())
+			t.Errorf("error adding user %s to app %s. Error: %s", *identUser.ID, app.ID, err.Error())
 			return
 		}
 
