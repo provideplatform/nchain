@@ -287,12 +287,12 @@ func (p *ZokratesProvider) Find(id string) (*ConnectedEntity, error) {
 	status, resp, err := apiClient.GetWithTLSClientConfig(fmt.Sprintf("vk/%s", id), map[string]interface{}{}, p.tlsClientConfigFactory())
 
 	if err != nil {
-		common.Log.Warningf("failed to initiate baseline protocol; %s", err.Error())
+		common.Log.Warningf("failed to initiate axiom protocol; %s", err.Error())
 		return nil, err
 	}
 
 	if status == 201 {
-		common.Log.Debugf("created agreement via baseline connector; %s", resp)
+		common.Log.Debugf("created agreement via axiom connector; %s", resp)
 	}
 
 	entity := &ConnectedEntity{}

@@ -1006,14 +1006,14 @@ func payloadFactory() []byte {
 			  }
 			},
 			{
-			  "id":"provide/baseline-messenger",
+			  "id":"provide/axiom-messenger",
 			  "name":"messenger",
-			  "description":"baseline messenger api",
+			  "description":"axiom messenger api",
 			  "img_src_dark":null,
 			  "img_src_light":null,
-			  "github_url":"https://github.com/ethereum-oasis/baseline",
+			  "github_url":"https://github.com/ethereum-oasis/axiom",
 			  "dockerhub_url":null,
-			  "image": "provide/baseline-messenger",
+			  "image": "provide/axiom-messenger",
 			  "enabled":true,
 			  "tags":["messaging", "whisper"],
 			  "type":"rest",
@@ -1029,16 +1029,16 @@ func payloadFactory() []byte {
 			  }
 			},
 			{
-			  "id":"provide/baseline-api",
+			  "id":"provide/axiom-api",
 			  "name":"radish-api",
-			  "description":"baseline radish api",
+			  "description":"axiom radish api",
 			  "img_src_dark":null,
 			  "img_src_light":null,
-			  "github_url":"https://github.com/ethereum-oasis/baseline",
+			  "github_url":"https://github.com/ethereum-oasis/axiom",
 			  "dockerhub_url":null,
-			  "image": "provide/baseline-api",
+			  "image": "provide/axiom-api",
 			  "enabled":true,
-			  "tags":["baseline"],
+			  "tags":["axiom"],
 			  "type":"rest",
 			  "api_port":8101,
 			  "security": {
@@ -1161,14 +1161,14 @@ func payloadFactory() []byte {
 			}
 		  ]
 		},
-		"baseline":{
+		"axiom":{
 		  "contracts":[
 	  
 		  ],
 		  "default_organization_containers":[
 			"mongo",
-			"provide/baseline-api",
-			"provide/baseline-messenger",
+			"provide/axiom-api",
+			"provide/axiom-messenger",
 			"redis",
 			"zokrates/zokrates"
 		  ]

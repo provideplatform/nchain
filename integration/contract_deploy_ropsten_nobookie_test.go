@@ -128,9 +128,9 @@ func TestEkhoContractWithSeededHDWallet_Ropsten(t *testing.T) {
 	// }
 
 	// shuttleCompiledArtifact := nchain.CompiledArtifact{}
-	// baseline := manifestMap["baseline"].(map[string]interface{})
+	// axiom := manifestMap["axiom"].(map[string]interface{})
 
-	// contractArray := baseline["contracts"].([]interface{})
+	// contractArray := axiom["contracts"].([]interface{})
 
 	// contractRaw, _ := json.Marshal(contractArray[2])
 	// _ = json.Unmarshal(contractRaw, &shuttleCompiledArtifact)
