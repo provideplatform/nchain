@@ -242,6 +242,9 @@ func (n *Network) IsPublic() bool {
 		case "27795197-2a45-4a84-aed2-218a737d77f2":
 			return true
 
+		case "d818afb9-df2f-4e46-963a-f7b6cb7655d2":
+			return true
+
 		case "d186de3a-48e9-4d99-8e60-adb98ae87a0c":
 			return true
 		default:
@@ -271,6 +274,9 @@ func (n *Network) PaymentsNetworkName() *string {
 			return common.StringOrNil("prvd")
 		case "27795197-2a45-4a84-aed2-218a737d77f2":
 			return common.StringOrNil("prvd-peachtree")
+
+		case "d818afb9-df2f-4e46-963a-f7b6cb7655d2":
+			return common.StringOrNil("celo-alfajores")
 
 		case "d186de3a-48e9-4d99-8e60-adb98ae87a0c":
 			return common.StringOrNil("bsn-ope")
