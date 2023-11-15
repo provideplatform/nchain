@@ -89,7 +89,7 @@ func (p *AzureOrchestrationProvider) GetLoadBalancers(loadBalancerName *string) 
 	return nil, nil
 }
 
-//CreateLoadBalancerV2 creates load balancer on Azure
+// CreateLoadBalancerV2 creates load balancer on Azure
 func (p *AzureOrchestrationProvider) CreateLoadBalancerV2(vpcID, name, balancerType *string, securityGroupIds []string) (response *elbv2.CreateLoadBalancerOutput, err error) {
 	// returns empty array for azure showcase
 	return &elbv2.CreateLoadBalancerOutput{
